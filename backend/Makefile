@@ -1,7 +1,11 @@
 -include .env
 export
 
-.PHONY: db run test migrate migrate-diff
+.PHONY: up down db run test migrate migrate-diff
+up:
+	docker compose up --build -d api
+down:
+	docker compose --profile tools down
 db:
 	docker compose up -d --wait db
 run:

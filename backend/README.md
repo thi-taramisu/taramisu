@@ -1,26 +1,36 @@
 # Taramisu backend
 
-Go API with [Chi](https://github.com/go-chi/chi) and [Huma](https://huma.rocks) (OpenAPI + Swagger UI at `/docs`).
+Go HTTP API for Taramisu.
+
+- **[Chi](https://github.com/go-chi/chi)** — routing
+- **[Huma](https://huma.rocks)** — handlers, OpenAPI 3.1, Swagger UI at `/docs`
+- **PostgreSQL** + **pgx** — database
+- **sqlc** — queries in `db/queries/` → `internal/db/`
+- **Atlas** — migrations from `db/schema.sql` in `db/migrations/`
+- **Docker Compose** — Postgres, migrate, optional API container
 
 ## Commands
 
 ```bash
 cp .env.example .env
-make db migrate    # Postgres in Docker, apply migrations
-make run           # http://localhost:8080
+make db migrate
+make run
+make up
+make down
 make test
+make migrate-diff name=my_change
 ```
 
-`HTTP_ADDR` and `DATABASE_URL` are loaded from `.env` when you use the Makefile (see `.env.example`).
+Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`.
 
 ## Structure
 
 ```
-cmd/api/
-db/                  schema, migrations, sqlc queries
-internal/db/         sqlc-generated code
-internal/httpapi/
-internal/httpapi/handlers/
+cmd/api/                       entrypoint
+db/                            schema, Atlas migrations, sqlc queries
+internal/db/                   sqlc-generated query code
+internal/httpapi/              router, OpenAPI
+internal/httpapi/handlers/     HTTP handlers
 ```
 
-Health: `GET /health/live`, `GET /health/ready`. Readiness returns `status` and the `message` row from Postgres (after migrate).
+So far the API only has health checks: `GET /health/live` and `GET /health/ready` (readiness uses Postgres after migrate). No domain routes yet.

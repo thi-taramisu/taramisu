@@ -33,5 +33,15 @@ services:
       db:
         condition: service_healthy
 
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres_data:
