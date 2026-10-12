@@ -9,13 +9,25 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-func New() http.Handler {
+func New(queries handlers.StatusReader) http.Handler {
+	mux, _ := newAPI(queries)
+	return mux
+}
+
+func OpenAPI() *huma.OpenAPI {
+	_, api := newAPI(nil)
+	return api.OpenAPI()
+}
+
+func newAPI(queries handlers.StatusReader) (*chi.Mux, huma.API) {
+	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
 	cfg := huma.DefaultConfig("Taramisu API", "1.0.0")
 	cfg.DocsRenderer = huma.DocsRendererSwaggerUI
+	cfg.CreateHooks = nil
 	api := humachi.New(mux, cfg)
 
-	h := &handlers.Health{}
 	huma.Get(api, "/health/live", h.Live)
-	return mux
+	huma.Get(api, "/health/ready", h.Ready)
+	return mux, api
 }

@@ -6,6 +6,7 @@ Go API with [Chi](https://github.com/go-chi/chi) and [Huma](https://huma.rocks) 
 
 ```bash
 go run ./cmd/api
+go test ./...
 ```
 
 `HTTP_ADDR` overrides the listen address (default `:8080`).
@@ -18,4 +19,4 @@ internal/httpapi/        router
 internal/httpapi/handlers/
 ```
 
-Right now there is only `GET /health/live`.
+Health checks: `GET /health/live`, `GET /health/ready`.
