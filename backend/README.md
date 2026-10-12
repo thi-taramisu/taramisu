@@ -17,11 +17,14 @@ make db migrate
 make run
 make up
 make down
+make reset
 make test
 make migrate-diff name=my_change
 ```
 
-Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`.
+Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.
+
+> **Warning:** `make reset` runs `docker compose down -v` and **deletes the local Postgres volume** (all data in the Compose `postgres_data` volume). Use it when you want a clean database, not for a normal stop.
 
 ## Structure
 
