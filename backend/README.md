@@ -9,6 +9,11 @@ Go HTTP API for Taramisu.
 - **Atlas** — migrations from `db/schema.sql` in `db/migrations/`
 - **Docker Compose** — Postgres, migrate, optional API container
 
+## Prerequisites
+
+- Docker (Compose), Go 1.25+, make
+- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.29.0 — only to regenerate `internal/db/` after changing `db/queries/` or `db/schema.sql`
+
 ## Commands
 
 ```bash
@@ -20,6 +25,7 @@ make down
 make reset
 make test
 make migrate-diff name=my_change
+make sqlc
 ```
 
 Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.

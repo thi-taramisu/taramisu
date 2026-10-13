@@ -1,7 +1,7 @@
 -include .env
 export
 
-.PHONY: up down reset db run test migrate migrate-diff
+.PHONY: up down reset db run test migrate migrate-diff sqlc
 up:
 	docker compose up --build -d api
 down:
@@ -19,3 +19,5 @@ migrate:
 migrate-diff:
 	docker compose up -d --wait dev-db
 	docker compose run --rm migrate migrate diff "$(name)" --env local
+sqlc:
+	sqlc generate
