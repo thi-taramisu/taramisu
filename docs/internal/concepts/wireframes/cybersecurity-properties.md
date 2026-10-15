@@ -77,7 +77,7 @@ There is a second problem. The standard does not force the order asset, then dam
 
 Because the property sits on the link, it does not matter whether the user starts at the asset, the damage scenario or the threat scenario.
 
-The proposed screens are in the Claude Design canvas "TARAmisu Cybersecurity Properties Wireframes": asset definition, asset's damage scenario links, damage scenario definition, threat scenario definition, a threat scenario started before any asset exists, and the graph view.
+The proposed screens, each with an explanatory note, are in [cybersecurity-properties-wireframes.html](cybersecurity-properties-wireframes.html). Download the file and open it in a browser (GitHub only shows its source). It has six screens: asset definition, the asset's damage scenario links, damage scenario definition, threat scenario definition, a threat scenario started before any asset exists, and the graph view.
 
 ### Schema change for #40 (proposal, for Lorenz)
 
