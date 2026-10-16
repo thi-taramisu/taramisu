@@ -26,6 +26,8 @@ make reset
 make test
 make migrate-diff name=my_change
 make sqlc
+make lint
+make fmt
 ```
 
 Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.
