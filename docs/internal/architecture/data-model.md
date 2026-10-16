@@ -28,9 +28,9 @@ erDiagram
     %% ==========================================
     %% 3. ASSET & CYBERSECURITY PROPERTIES (15.3)
     %% ==========================================
-    ASSET ||--|{ ASSET_CYBERSECURITY_PROPERTY : "has property [RQ-15-02]"
-    ASSET_CYBERSECURITY_PROPERTY }|--|{ DAMAGE_SCENARIO_ASSET_PROPERTY : "compromise leads to [RQ-15-02]"
-    DAMAGE_SCENARIO ||--|{ DAMAGE_SCENARIO_ASSET_PROPERTY : "impacts relevant assets (15.3.2 NOTE 1)"
+    ASSET ||--o{ ASSET_CYBERSECURITY_PROPERTY : "has property (0..N at creation, >=1 when complete [RQ-15-02])"
+    ASSET_CYBERSECURITY_PROPERTY ||--o{ DAMAGE_SCENARIO_ASSET_PROPERTY : "compromise leads to [RQ-15-02]"
+    DAMAGE_SCENARIO ||--o{ DAMAGE_SCENARIO_ASSET_PROPERTY : "impacts relevant assets (15.3.2 NOTE 1)"
 
     %% ==========================================
     %% 4. IMPACT RATING (15.5)
@@ -40,8 +40,8 @@ erDiagram
     %% ==========================================
     %% 5. THREAT SCENARIO IDENTIFICATION (15.4)
     %% ==========================================
-    THREAT_SCENARIO }|--|{ THREAT_SCENARIO_ASSET_PROPERTY : "compromises [RQ-15-03]"
-    ASSET_CYBERSECURITY_PROPERTY }|--|{ THREAT_SCENARIO_ASSET_PROPERTY : "targeted by [RQ-15-03]"
+    THREAT_SCENARIO ||--o{ THREAT_SCENARIO_ASSET_PROPERTY : "compromises (0..N at creation, >=1 when complete [RQ-15-03])"
+    ASSET_CYBERSECURITY_PROPERTY ||--o{ THREAT_SCENARIO_ASSET_PROPERTY : "targeted by [RQ-15-03]"
     THREAT_SCENARIO }|--|{ THREAT_DAMAGE_LINK : "leads to (15.4.2 NOTE 3)"
     DAMAGE_SCENARIO }|--|{ THREAT_DAMAGE_LINK : "corresponds to (15.4.2 NOTE 3)"
 
