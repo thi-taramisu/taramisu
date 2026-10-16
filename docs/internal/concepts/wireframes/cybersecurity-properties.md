@@ -32,7 +32,7 @@ ISO/SAE 21434:2021 (checked 2026-10-15; the standard is licensed, so everything 
 |---|---|---|
 | 3.1.2, Note 1 | An asset has one or more properties, and compromising them can lead to one or more damage scenarios. | Asset, property and damage scenario are linked many-to-many. |
 | 3.1.20 | A cybersecurity property is an attribute worth protecting. The note names confidentiality, integrity and/or availability. | C / I / A are the named properties. The list is introductory, not closed. |
-| RQ-15-02 (15.3.2) | Identify assets together with the properties whose compromise leads to a damage scenario. | The property belongs to the pair *asset and damage scenario*. |
+| RQ-15-02 (15.3.2) | Identify assets together with the properties whose compromise leads to a damage scenario. | The property belongs to the pair *asset and damage scenario*. The wording is looser than that; Annex H, Table H.2 shows the pair structure. |
 | Note 2 to RQ-15-02 | Assets can be found from the item definition, an impact rating, by deriving them from threat scenarios, or from catalogues. | There are several valid ways to start. |
 | RQ-15-03 (15.4.2) | A threat scenario names the targeted asset, the compromised property of that asset and the cause. | The property also belongs to the pair *asset and threat scenario*. |
 | Note 3 to RQ-15-03 | A damage scenario can have several threat scenarios and the other way round. | Threat and damage scenarios are many-to-many. |
@@ -47,7 +47,7 @@ Not in the standard: authenticity, authorization and non-repudiation. They appea
 ## Where we are today
 
 - **Wireframes ([Concept #02 in Whimsical](https://whimsical.com/taramisu/taramisu-concept-MeRaRm6cqUmmG6KBFgjiim), documented in [PR #27](https://github.com/thi-taramisu/taramisu/pull/27)):** the damage scenario's Definition tab has the three C / I / A checkboxes. The threat scenario has a STRIDE block marked "STRIDE Optional?" and no property field. The asset's Definition tab is not drawn.
-- **Draft data model ([data-model.md](https://github.com/thi-taramisu/taramisu/blob/docs/initial-er-schema/docs/internal/architecture/data-model.md), branch `docs/initial-er-schema`):** the `ASSET` table has six yes/no flags (C, I, A plus authenticity, authorization, non-repudiation). The link tables `ASSET_DAMAGE_MAPPING` and `ASSET_THREAT_MAPPING` only have a free-text `notes` field. The data model is still being worked on in [#40](https://github.com/thi-taramisu/taramisu/issues/40).
+- **Draft data model ([PR #29](https://github.com/thi-taramisu/taramisu/pull/29), branch `docs/initial-er-schema`, state of 2026-10-15 evening):** the six yes/no flags on `ASSET` are gone. A new table `ASSET_CYBERSECURITY_PROPERTY` holds one row per (asset, property) with C / I / A only. The link tables `DAMAGE_SCENARIO_ASSET_PROPERTY` and `THREAT_SCENARIO_ASSET_PROPERTY` point at these rows, so the property already sits on the link (option C). One row per property matches the wireframes: several rows for a damage scenario (Annex H), one row per property for a threat. The data model is still being worked on in [#40](https://github.com/thi-taramisu/taramisu/issues/40).
 - **Database on `main` ([schema.sql](https://github.com/thi-taramisu/taramisu/blob/main/backend/db/schema.sql)):** only a placeholder table so far, so nothing is blocked by existing tables.
 - **Course slides:** slide 9 shows the table asset, property, damage scenario. Slide 11 maps a damage scenario to a threat scenario that causes "loss of I or A".
 
@@ -81,11 +81,10 @@ The proposed screens, each with an explanatory note, are in [cybersecurity-prope
 
 ### Schema change for #40 (proposal, for Lorenz)
 
-- `ASSET_DAMAGE_MAPPING`: add the compromised properties as a set per link (for example three yes/no fields, one per C / I / A), with at least one set. Annex H marks several properties in one row, so a set fits.
-- `ASSET_THREAT_MAPPING`: add one `compromised_property` value. If a threat compromises two properties of one asset, that is two links.
-- `THREAT_SCENARIO`: a nullable `compromised_property` for the case "threat scenario first, no asset yet". It is cleared when the asset link is created and the property moves to the link.
-- `ASSET` keeps its flags for the relevant properties. A link may only use a property that is enabled on the asset.
-- Property list: C / I / A for now, stored in a way that more values could be added later.
+[PR #29](https://github.com/thi-taramisu/taramisu/pull/29) already covers most of option C: the property sits on the link, a link can only use a property enabled on the asset (foreign key), and only C / I / A are used. What is left:
+
+- **Threat scenario first:** in the ER diagram, `THREAT_SCENARIO_ASSET_PROPERTY` requires at least one link per threat scenario, and every asset needs at least one property. That blocks creating a threat scenario before an asset exists. The standard only requires the item definition (15.4.1.1), and Note 2 to RQ-15-02 allows deriving assets from threat scenarios. Proposal: make the threat link optional, and add a nullable `compromised_property` on `THREAT_SCENARIO` that is cleared when the asset link is created. "At least one link" is then a completeness check, not a schema rule.
+- **Property list:** `property_type` is a fixed enum (C / I / A). That is fine for now. 3.1.20 Note 1 says attributes "include" C / I / A, so the list is open, but extending it needs a migration.
 
 ## Decisions (2026-10-15)
 
@@ -101,4 +100,4 @@ To be confirmed with Lorenz (data model) and the stakeholders.
 
 - Agree the schema change with Lorenz in [#40](https://github.com/thi-taramisu/taramisu/issues/40).
 - Confirm the decisions with the wireframe team on 16.10 (see [planning.md](https://github.com/thi-taramisu/taramisu/blob/wireframes-concept/docs/internal/concepts/wireframes/planning.md)), and carry them into the wireframes ([#35](https://github.com/thi-taramisu/taramisu/issues/35), [#34](https://github.com/thi-taramisu/taramisu/issues/34)).
-- Correct a citation in the data model: it names "15.3.2, Note 1" as the source of the asset to damage scenario many-to-many relation. That note does not say this. The source is 3.1.2, Note 1.
+- Make a citation in the data model precise: it names "15.3.2, Note 1" as the source of the asset to damage scenario many-to-many relation. That note only says a damage scenario can include "relevant assets" (several assets per damage scenario). That one asset property can lead to several damage scenarios is in 3.1.2, Note 1. Both should be cited.
