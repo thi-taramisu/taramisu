@@ -20,17 +20,18 @@ erDiagram
     %% ==========================================
     %% 2. PROJECT & PREREQUISITES (15.1, 15.3.1)
     %% ==========================================
-    TARA_PROJECT ||--o{ ASSET : "contains (15.3.1)"
-    TARA_PROJECT ||--o{ DAMAGE_SCENARIO : "defines context for (15.3.1)"
-    TARA_PROJECT ||--o{ THREAT_SCENARIO : "defines context for (15.4.1)"
-    TARA_PROJECT ||--o{ ATTACK_PATH : "defines architecture for (15.6.1.1)"
+    TARA_PROJECT ||--o{ ITEM_DEFINITION : "contains (0..N)"
+    ITEM_DEFINITION ||--o{ ASSET : "contains (15.3.1)"
+    ITEM_DEFINITION ||--o{ DAMAGE_SCENARIO : "defines context for (15.3.1)"
+    ITEM_DEFINITION ||--o{ THREAT_SCENARIO : "defines context for (15.4.1)"
+    ITEM_DEFINITION ||--o{ ATTACK_PATH : "defines architecture for (15.6.1.1)"
 
     %% ==========================================
     %% 3. ASSET & CYBERSECURITY PROPERTIES (15.3)
     %% ==========================================
     ASSET ||--o{ ASSET_CYBERSECURITY_PROPERTY : "has property (0..N at creation, >=1 when complete [RQ-15-02])"
     ASSET_CYBERSECURITY_PROPERTY ||--o{ DAMAGE_SCENARIO_ASSET_PROPERTY : "compromise leads to [RQ-15-02]"
-    DAMAGE_SCENARIO ||--o{ DAMAGE_SCENARIO_ASSET_PROPERTY : "impacts relevant assets (15.3.2 NOTE 1)"
+    DAMAGE_SCENARIO ||--o{ DAMAGE_SCENARIO_ASSET_PROPERTY : "impacts relevant assets (3.1.2 Note 1, 15.3.2 NOTE 1)"
 
     %% ==========================================
     %% 4. IMPACT RATING (15.5)
@@ -67,16 +68,11 @@ erDiagram
     IAM_USER {
         uuid id PK "Internal UUID"
         string external_iam_sub UK "Keycloak 'sub' or ORY Kratos 'identity.id'"
-        string email "Synced display email"
-        string display_name "Synced full name"
-        timestamp last_synced_at
     }
 
     IAM_GROUP {
-        uuid id PK
+        uuid id PK "Internal UUID"
         string external_iam_group_id UK "Keycloak Group ID / Role or ORY Group"
-        string name "e.g., Braking-Security-Team, Auditors"
-        string description
     }
 
     IAM_USER_GROUP_MEMBER {
@@ -99,7 +95,15 @@ erDiagram
 
     TARA_PROJECT {
         uuid id PK
-        string name "Project / Item / Component Name"
+        string name "Top-level project name, e.g., Vehicle Platform X"
+        text description "Project description"
+        timestamp created_at
+    }
+
+    ITEM_DEFINITION {
+        uuid id PK
+        uuid tara_project_id FK
+        string name "Item or Component Name"
         enum scope_type "ITEM | COMPONENT (15.1, 15.6.1.1)"
         string lifecycle_phase "e.g., Concept, Product Development (15.1)"
         text item_definition_wp_09_01 "Prerequisite [WP-09-01] (15.3.1.1, 15.4.1.1)"
@@ -110,7 +114,7 @@ erDiagram
 
     ASSET {
         uuid id PK
-        uuid tara_project_id FK
+        uuid item_definition_id FK
         string name "e.g., Braking CAN Communication, Personal Data"
         text description "Asset description"
         enum identification_source "ITEM_DEF | IMPACT_RATING | THREAT_DERIVED | CATALOGUE (15.3.2 NOTE 2)"
@@ -125,7 +129,7 @@ erDiagram
 
     DAMAGE_SCENARIO {
         uuid id PK
-        uuid tara_project_id FK
+        uuid item_definition_id FK
         string title "Short title of damage scenario [WP-15-01]"
         text functionality_adverse_relation "Relation between item functionality and adverse consequence (15.3.2 NOTE 1)"
         text road_user_harm_description "Description of harm to the road user (15.1, 15.3.2 NOTE 1)"
@@ -150,7 +154,7 @@ erDiagram
 
     THREAT_SCENARIO {
         uuid id PK
-        uuid tara_project_id FK
+        uuid item_definition_id FK
         string title "Title of threat scenario [WP-15-03]"
         text cause_of_compromise "Cause of compromise, e.g., Spoofing [RQ-15-03]"
         enum elicitation_method "GROUP_DISCUSSION | MALICIOUS_USE_CASE | EVITA | TVRA | PASTA | STRIDE | OTHER (15.4.2 NOTE 2)"
@@ -173,7 +177,7 @@ erDiagram
 
     ATTACK_PATH {
         uuid id PK
-        uuid tara_project_id FK
+        uuid item_definition_id FK
         string title "Attack path identifier/title [WP-15-05]"
         enum analysis_approach "TOP_DOWN | BOTTOM_UP (15.6.2 NOTE 1)"
         boolean is_partial_early_stage "True if incomplete in early development (15.6.2 NOTE 2 & 3)"
@@ -221,14 +225,14 @@ erDiagram
 
 ## 2. Key Architectural & Normative Design Decisions
 
-### 2.1 Project Container & External IAM / RBAC Integration
-* **Project Boundary (`TARA_PROJECT`):** According to **Clause 15.1**, TARA methods are generic modules invoked at any point in the lifecycle of an *Item* or *Component*. `TARA_PROJECT` represents this assessment workspace, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** / **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
-* **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication is handled externally (e.g., via Keycloak or ORY Kratos). The database stores only immutable external references (`external_iam_sub`, `external_iam_group_id`) and display metadata.
+### 2.1 Project Container, Item Definitions & External IAM / RBAC Integration
+* **Project Hierarchy (`TARA_PROJECT` & `ITEM_DEFINITION`):** `TARA_PROJECT` represents a top-level organizational project (e.g., a vehicle platform) and acts as the authorization boundary for Role-Based Access Control (RBAC). A `TARA_PROJECT` contains one or more `ITEM_DEFINITION` instances. According to **Clause 15.1**, TARA methods are generic modules invoked at any point in the lifecycle of an *Item* or *Component*. `ITEM_DEFINITION` represents this specific assessment scope, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** / **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
+* **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled externally (e.g., via Keycloak or ORY Kratos). Following strict separation of concerns, no redundant user-specific metadata (such as emails or display names) is stored in the application database; it stores only immutable external references (`external_iam_sub`, `external_iam_group_id`).
 * **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`) on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
 
 ### 2.2 Separation of Assets and Cybersecurity Properties (`[RQ-15-02]`, `[WP-15-02]`)
 * **Granular Property Modeling (`ASSET` & `ASSET_CYBERSECURITY_PROPERTY`):** **Clause 15.3.2 `[RQ-15-02]`** requires identifying assets along with the specific cybersecurity properties (*Confidentiality, Integrity, Availability*) whose compromise leads to a damage scenario (**15.3.2 EXAMPLE 1 & 2**). Modeling `ASSET_CYBERSECURITY_PROPERTY` as a dedicated entity ensures that both Damage Scenarios (`[RQ-15-02]`) and Threat Scenarios (`[RQ-15-03]`) reference an exact *(Asset + Property)* combination rather than an unspecific asset.
-* **Many-to-Many ($N:M$) Mapping to Damage Scenarios (`DAMAGE_SCENARIO_ASSET_PROPERTY`):** A single Damage Scenario can involve multiple relevant assets (**15.3.2 NOTE 1**), and the compromise of a single asset property can lead to multiple distinct Damage Scenarios.
+* **Many-to-Many ($N:M$) Mapping to Damage Scenarios (`DAMAGE_SCENARIO_ASSET_PROPERTY`):** Per **Clause 3.1.2, Note 1** and **15.3.2 NOTE 1**, a single Damage Scenario can involve multiple relevant assets, and the compromise of a single asset property can lead to multiple distinct Damage Scenarios.
 
 ### 2.3 Many-to-Many ($N:M$) Threat Scenario Relationships (`[RQ-15-03]`, `15.4.2`)
 * **Threat Scenario $\leftrightarrow$ Asset Cybersecurity Property (`THREAT_SCENARIO_ASSET_PROPERTY`):** **Clause 15.4.2 `[RQ-15-03]`** requires each Threat Scenario to specify the targeted asset, the compromised cybersecurity property, and the cause of compromise. Furthermore, **15.4.2 NOTE 1** and **15.4.2 EXAMPLE** (*"Spoofing of CAN messages for the braking ECU leads to loss of integrity of the CAN messages and thereby to loss of integrity of the braking function"*) demonstrate that a single threat scenario can affect multiple interdependent assets or multiple properties (e.g., simultaneous loss of *Integrity* and *Availability*) through a single cause of compromise. The associative table `THREAT_SCENARIO_ASSET_PROPERTY` models this $N:M$ relationship cleanly.
@@ -257,12 +261,13 @@ erDiagram
 
 | Entity (Table) | ISO/SAE 21434 Clause & Work Product | Purpose & Required Attributes Justification |
 | :--- | :--- | :--- |
-| **`IAM_USER`**, **`IAM_GROUP`**, **`IAM_USER_GROUP_MEMBER`**, **`PROJECT_ROLE_ASSIGNMENT`** | App Infrastructure (RBAC) | Maps external IAM identities (`external_iam_sub`) and groups to `TARA_PROJECT` instances with specific roles (`OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`). |
-| **`TARA_PROJECT`** | **15.1, 15.3.1, 15.4.1, 15.6.1, 15.9.1** (`[WP-09-01]`, `[WP-10-01]`) | Root project container. Stores `scope_type` (`ITEM \| COMPONENT` per **15.6.1.1 NOTE**), `lifecycle_phase` (**15.1**), and prerequisite references. |
-| **`ASSET`** | **15.3** (`[RQ-15-02]`, **15.3.2 NOTE 2**) | Represents system assets. Tracks `identification_source` (*Item Definition, Impact Rating, Threat Derived, Catalogue*). |
+| **`IAM_USER`**, **`IAM_GROUP`**, **`IAM_USER_GROUP_MEMBER`**, **`PROJECT_ROLE_ASSIGNMENT`** | App Infrastructure (RBAC) | Maps external IAM technical IDs (`external_iam_sub`, `external_iam_group_id`) without redundant user metadata to `TARA_PROJECT` instances with specific roles (`OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`). |
+| **`TARA_PROJECT`** | App Organizational Hierarchy | Top-level project container (e.g., vehicle platform) grouping multiple `ITEM_DEFINITION` scopes and serving as the RBAC authorization boundary. |
+| **`ITEM_DEFINITION`** | **15.1, 15.3.1, 15.4.1, 15.6.1, 15.9.1** (`[WP-09-01]`, `[WP-10-01]`) | Specific TARA scope under a `TARA_PROJECT`. Stores `scope_type` (`ITEM \| COMPONENT` per **15.6.1.1 NOTE**), `lifecycle_phase` (**15.1**), and prerequisite references. |
+| **`ASSET`** | **15.3** (`[RQ-15-02]`, **15.3.2 NOTE 2**) | Represents system assets within an `ITEM_DEFINITION`. Tracks `identification_source` (*Item Definition, Impact Rating, Threat Derived, Catalogue*). |
 | **`ASSET_CYBERSECURITY_PROPERTY`** | **15.3** (`[RQ-15-02]`, `[WP-15-02]`) | Stores the specific security properties (`CONFIDENTIALITY \| INTEGRITY \| AVAILABILITY`) assigned to an `ASSET`. |
 | **`DAMAGE_SCENARIO`** | **15.3** (`[RQ-15-01]`, `[WP-15-01]`) | Documents adverse consequences (`functionality_adverse_relation`) and harm to the road user (`road_user_harm_description` per **15.3.2 NOTE 1**). |
-| **`DAMAGE_SCENARIO_ASSET_PROPERTY`** | **15.3** (`[RQ-15-02]`, **15.3.2 NOTE 1**) | $N:M$ join table linking Damage Scenarios to the compromised `ASSET_CYBERSECURITY_PROPERTY` entries. |
+| **`DAMAGE_SCENARIO_ASSET_PROPERTY`** | **15.3** (`[RQ-15-02]`, **3.1.2 Note 1**, **15.3.2 NOTE 1**) | $N:M$ join table linking Damage Scenarios to the compromised `ASSET_CYBERSECURITY_PROPERTY` entries. |
 | **`IMPACT_RATING`** | **15.5** (`[RQ-15-04]` to `[PM-15-07]`, `[WP-15-04]`) | Evaluates a Damage Scenario for each category (`SAFETY \| FINANCIAL \| OPERATIONAL \| PRIVACY`) as `SEVERE \| MAJOR \| MODERATE \| NEGLIGIBLE` or `OMITTED` (**`[PM-15-07]`**), including ISO 26262-3 references (**`[RQ-15-06]`**). |
 | **`THREAT_SCENARIO`** | **15.4 & 15.8** (`[RQ-15-03]`, `[WP-15-03]`, **15.8.2 NOTE 2**) | Stores `cause_of_compromise`, `elicitation_method` (e.g., STRIDE, EVITA per **15.4.2 NOTE 2**), `aggregated_attack_feasibility` (max across attack paths), and `max_risk_score` (max across granular risk values). |
 | **`THREAT_SCENARIO_ASSET_PROPERTY`** | **15.4** (`[RQ-15-03]`, **15.4.2 NOTE 1 & EXAMPLE**) | $N:M$ join table allowing a Threat Scenario to target and compromise one or multiple `ASSET_CYBERSECURITY_PROPERTY` entries. |
