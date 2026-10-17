@@ -1,0 +1,16 @@
+server {
+  listen 5173;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # Hash-benannte Assets lange cachen
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+  }
+
+  # Unbekannte Pfade -> index.html
+  location / {
+    try_files $uri /index.html;
+  }
+}
