@@ -35,29 +35,29 @@ erDiagram
     %% ==========================================
     %% 4. IMPACT RATING (15.5)
     %% ==========================================
-    DAMAGE_SCENARIO ||--|{ IMPACT_RATING : "assessed across S, F, O, P [RQ-15-04]"
+    DAMAGE_SCENARIO ||--o{ IMPACT_RATING : "assessed across S, F, O, P [RQ-15-04]"
 
     %% ==========================================
     %% 5. THREAT SCENARIO IDENTIFICATION (15.4)
     %% ==========================================
     THREAT_SCENARIO ||--o{ THREAT_SCENARIO_ASSET_PROPERTY : "compromises (0..N at creation, >=1 when complete [RQ-15-03])"
     ASSET_CYBERSECURITY_PROPERTY ||--o{ THREAT_SCENARIO_ASSET_PROPERTY : "targeted by [RQ-15-03]"
-    THREAT_SCENARIO }|--|{ THREAT_DAMAGE_LINK : "leads to (15.4.2 NOTE 3)"
-    DAMAGE_SCENARIO }|--|{ THREAT_DAMAGE_LINK : "corresponds to (15.4.2 NOTE 3)"
+    THREAT_SCENARIO ||--o{ THREAT_DAMAGE_LINK : "leads to (15.4.2 NOTE 3)"
+    DAMAGE_SCENARIO ||--o{ THREAT_DAMAGE_LINK : "corresponds to (15.4.2 NOTE 3)"
 
     %% ==========================================
     %% 6. ATTACK PATH & ATTACK FEASIBILITY (15.6 & 15.7)
     %% ==========================================
-    THREAT_SCENARIO }|--|{ THREAT_ATTACK_PATH_LINK : "realized by [RQ-15-08], [RQ-15-09]"
-    ATTACK_PATH }|--|{ THREAT_ATTACK_PATH_LINK : "realizes [RQ-15-09]"
-    ATTACK_PATH ||--|| ATTACK_FEASIBILITY_RATING : "evaluated by [RQ-15-10]"
+    THREAT_SCENARIO ||--o{ THREAT_ATTACK_PATH_LINK : "realized by [RQ-15-08], [RQ-15-09]"
+    ATTACK_PATH ||--o{ THREAT_ATTACK_PATH_LINK : "realizes [RQ-15-09]"
+    ATTACK_PATH ||--o| ATTACK_FEASIBILITY_RATING : "evaluated by (0..1 at creation, 1 when complete [RQ-15-10])"
 
     %% ==========================================
     %% 7. RISK VALUE & RISK TREATMENT (15.8 & 15.9)
     %% ==========================================
-    THREAT_SCENARIO ||--|{ RISK_VALUE : "has granular risk score (1-5) [RQ-15-15]"
+    THREAT_SCENARIO ||--o{ RISK_VALUE : "has granular risk score (1-5) [RQ-15-15]"
     IMPACT_RATING ||--o{ RISK_VALUE : "provides impact input (15.8.2 NOTE 1)"
-    THREAT_SCENARIO ||--|{ RISK_TREATMENT_DECISION : "treated based on max risk [RQ-15-17]"
+    THREAT_SCENARIO ||--o{ RISK_TREATMENT_DECISION : "treated based on max risk [RQ-15-17]"
     RISK_VALUE ||--o{ RISK_TREATMENT_DECISION : "optionally references specific risk (15.9.1.1)"
 
     %% ==========================================
