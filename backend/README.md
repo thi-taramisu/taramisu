@@ -50,4 +50,4 @@ So far the API only has health checks: `GET /health/live` and `GET /health/ready
 
 With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at [http://localhost:8080/openapi.json](http://localhost:8080/openapi.json), UI at [/docs](http://localhost:8080/docs). Example: `curl -fsS "http://localhost:8080/openapi.json" -o openapi.json`.
 
-For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file). API-changing PRs must include an updated spec. Source of truth: `internal/httpapi/`.
+For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file). API-changing PRs must include an updated spec; CI regenerates and fails if it is stale. Source of truth: `internal/httpapi/`.

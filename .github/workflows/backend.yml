@@ -1,0 +1,31 @@
+name: backend
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run tests
+        run: go test -race ./...
+      - name: Regenerate OpenAPI spec
+        run: make openapi
+      - name: Verify committed OpenAPI spec is up to date
+        working-directory: ${{ github.workspace }}
+        run: git diff --exit-code -- backend/openapi.json
