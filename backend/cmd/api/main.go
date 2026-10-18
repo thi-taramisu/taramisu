@@ -37,7 +37,7 @@ func run() error {
 	server := &http.Server{Addr: addr, Handler: httpapi.New(db.New(pool)), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
