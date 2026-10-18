@@ -23,7 +23,7 @@ func TestPostgresReadiness(t *testing.T) {
 	}
 	defer pool.Close()
 	rr := httptest.NewRecorder()
-	httpapi.New(db.New(pool)).ServeHTTP(rr, httptest.NewRequest("GET", "/health/ready", http.NoBody))
+	httpapi.New(db.New(pool)).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/ready", http.NoBody))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("readiness failed: %d %s", rr.Code, rr.Body.String())
 	}
