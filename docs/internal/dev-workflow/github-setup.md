@@ -1,6 +1,7 @@
 # GitHub Repository Guidelines & Configuration
 
-This document outlines the configured governance rules, branch protections, and security guardrails enforced for this repository. All team members must adhere to these workflows.
+This document outlines the configured governance rules, branch protections, and security guardrails enforced for this
+repository. All team members must adhere to these workflows.
 
 ---
 
@@ -12,7 +13,8 @@ The `main` branch serves as the single source of truth and is strictly protected
 * **Pull Request Requirements:**
   * **Approvals:** At least **1 peer approval** is required before merging.
   * **Latest Push Approval:** Approvals must come from someone other than the author of the most recent reviewable push.
-  * **Dismiss Stale Approvals:** Pushing new commits to an open PR automatically dismisses existing approvals to ensure newly introduced code is reviewed.
+  * **Dismiss Stale Approvals:** Pushing new commits to an open PR automatically dismisses existing approvals to ensure
+    newly introduced code is reviewed.
   * **Conversation Resolution:** All review conversations/comments must be resolved before a PR can be merged.
 * **Merge Strategy:**
   * Only standard **Merge commits** (`Create a merge commit`) are allowed.

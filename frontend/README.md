@@ -16,7 +16,7 @@ npm run test:watch # tests in watch mode
 
 ## Structure
 
-```
+```text
 src/
   api/                         # typed API client (openapi-fetch), generated schema.d.ts
   pages/                       # route-level components
