@@ -50,7 +50,7 @@ linters:
         - octalLiteral
         - redundantSprint
         - sloppyReassign
-        - sloppyType
+        - sloppyTypeAssert
         - stringConcatSimplify
         - stringsCompare
         - typeUnparen
