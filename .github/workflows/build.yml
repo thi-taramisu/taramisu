@@ -53,7 +53,7 @@ jobs:
     # Outside of PRs (push to main, manual run) everything is built and tested as a safety net.
     if: needs.changes.outputs.frontend == 'true' || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -76,11 +76,28 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run unit & component tests
-        run: npm test
+      - name: Run unit & component tests with coverage
+        run: npm run test:coverage
 
       - name: Build production bundle
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload production build artifact
         uses: actions/upload-artifact@v7

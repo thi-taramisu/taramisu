@@ -1,22 +1,27 @@
 # Taramisu frontend
 
-React + TypeScript + Vite, with [React Flow](https://reactflow.dev) (`@xyflow/react`) for diagrams and Vitest for tests.
+React + TypeScript + Vite, with [React Flow](https://reactflow.dev) (`@xyflow/react`) for diagrams,
+Vitest for unit/component tests, and Playwright for end-to-end tests.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev        # dev server on http://localhost:5173
-npm run build      # type check + production build
-npm run lint       # oxlint
+npm run dev           # dev server on http://localhost:5173
+npm run typecheck     # strict TypeScript check (tsc -b)
+npm run build         # type check + production build
+npm run lint          # oxlint
 npm run generate:api  # regenerate src/api/schema.d.ts from openapi/openapi.yaml
-npm test           # run tests once
-npm run test:watch # tests in watch mode
+npm test              # run unit/component tests once
+npm run test:coverage # run unit/component tests with enforced V8 coverage thresholds
+npm run test:watch    # tests in watch mode
+npm run test:e2e      # run Playwright E2E tests against production preview
 ```
 
 ## Structure
 
 ```text
+e2e/                           # Playwright end-to-end tests
 src/
   api/                         # typed API client (openapi-fetch), generated schema.d.ts
   pages/                       # route-level components
