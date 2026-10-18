@@ -496,35 +496,35 @@ type Asset struct {
 	ID                   pgtype.UUID
 	ItemDefinitionID     pgtype.UUID
 	Name                 string
-	Description          pgtype.Text
-	IdentificationSource NullIdentificationSource
+	Description          *string
+	IdentificationSource *IdentificationSource
 }
 
 type AssetCybersecurityProperty struct {
 	ID           pgtype.UUID
 	AssetID      pgtype.UUID
 	PropertyType CybersecurityPropertyType
-	Description  pgtype.Text
+	Description  *string
 }
 
 type AttackFeasibilityRating struct {
 	ID                    pgtype.UUID
 	AttackPathID          pgtype.UUID
-	ApElapsedTime         pgtype.Int4
-	ApSpecialistExpertise pgtype.Int4
-	ApKnowledgeOfItem     pgtype.Int4
-	ApWindowOfOpportunity pgtype.Int4
-	ApEquipment           pgtype.Int4
-	ApTotalScore          pgtype.Int4
-	FeasibilityRating     NullAttackFeasibility
-	Rationale             pgtype.Text
+	ApElapsedTime         *int32
+	ApSpecialistExpertise *int32
+	ApKnowledgeOfItem     *int32
+	ApWindowOfOpportunity *int32
+	ApEquipment           *int32
+	ApTotalScore          *int32
+	FeasibilityRating     *AttackFeasibility
+	Rationale             *string
 }
 
 type AttackPath struct {
 	ID                       pgtype.UUID
 	ItemDefinitionID         pgtype.UUID
 	Title                    string
-	AnalysisApproach         NullAnalysisApproach
+	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
 }
@@ -533,15 +533,15 @@ type DamageScenario struct {
 	ID                           pgtype.UUID
 	ItemDefinitionID             pgtype.UUID
 	Title                        string
-	FunctionalityAdverseRelation pgtype.Text
-	RoadUserHarmDescription      pgtype.Text
+	FunctionalityAdverseRelation *string
+	RoadUserHarmDescription      *string
 }
 
 type DamageScenarioAssetProperty struct {
 	ID                           pgtype.UUID
 	DamageScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
-	CompromiseMechanismNote      pgtype.Text
+	CompromiseMechanismNote      *string
 }
 
 type IamGroup struct {
@@ -563,9 +563,9 @@ type ImpactRating struct {
 	ID                         pgtype.UUID
 	DamageScenarioID           pgtype.UUID
 	ImpactCategory             ImpactCategory
-	RatingValue                NullImpactRatingValue
+	RatingValue                *ImpactRatingValue
 	IsOmittedByPm1507          bool
-	OmissionOrRatingRationale  pgtype.Text
+	OmissionOrRatingRationale  *string
 	ReusedFromFunctionalSafety bool
 }
 
@@ -574,11 +574,11 @@ type ItemDefinition struct {
 	TaraProjectID            pgtype.UUID
 	Name                     string
 	ScopeType                ScopeType
-	LifecyclePhase           pgtype.Text
-	ItemDefinitionWp0901     pgtype.Text
-	CybersecuritySpecsWp1001 pgtype.Text
-	ArchitecturalDesign      pgtype.Text
-	CreatedAt                pgtype.Timestamp
+	LifecyclePhase           *string
+	ItemDefinitionWp0901     *string
+	CybersecuritySpecsWp1001 *string
+	ArchitecturalDesign      *string
+	CreatedAt                pgtype.Timestamptz
 }
 
 type ProjectRoleAssignment struct {
@@ -587,7 +587,7 @@ type ProjectRoleAssignment struct {
 	UserID        pgtype.UUID
 	GroupID       pgtype.UUID
 	ProjectRole   ProjectRole
-	AssignedAt    pgtype.Timestamp
+	AssignedAt    pgtype.Timestamptz
 }
 
 type RiskTreatmentDecision struct {
@@ -595,7 +595,7 @@ type RiskTreatmentDecision struct {
 	ThreatScenarioID     pgtype.UUID
 	RiskValueID          pgtype.UUID
 	TreatmentOption      RiskTreatmentOption
-	DecisionRationale    pgtype.Text
+	DecisionRationale    *string
 	IsCybersecurityClaim bool
 }
 
@@ -615,8 +615,8 @@ type ServiceStatus struct {
 type TaraProject struct {
 	ID          pgtype.UUID
 	Name        string
-	Description pgtype.Text
-	CreatedAt   pgtype.Timestamp
+	Description *string
+	CreatedAt   pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {
@@ -635,11 +635,11 @@ type ThreatScenario struct {
 	ID                          pgtype.UUID
 	ItemDefinitionID            pgtype.UUID
 	Title                       string
-	CauseOfCompromise           pgtype.Text
-	ElicitationMethod           NullElicitationMethod
-	TechnicalNotes              pgtype.Text
-	AggregatedAttackFeasibility NullAttackFeasibility
-	MaxRiskScore                pgtype.Int4
+	CauseOfCompromise           *string
+	ElicitationMethod           *ElicitationMethod
+	TechnicalNotes              *string
+	AggregatedAttackFeasibility *AttackFeasibility
+	MaxRiskScore                *int32
 }
 
 type ThreatScenarioAssetProperty struct {

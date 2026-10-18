@@ -34,8 +34,8 @@ CREATE TABLE iam_group (
 );
 
 CREATE TABLE iam_user_group_member (
-    user_id uuid NOT NULL REFERENCES iam_user (id),
-    group_id uuid NOT NULL REFERENCES iam_group (id),
+    user_id uuid NOT NULL REFERENCES iam_user (id) ON DELETE CASCADE,
+    group_id uuid NOT NULL REFERENCES iam_group (id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, group_id)
 );
 
@@ -45,16 +45,16 @@ CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     description text,
-    created_at timestamp NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE project_role_assignment (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tara_project_id uuid NOT NULL REFERENCES tara_project (id),
-    user_id uuid REFERENCES iam_user (id),
-    group_id uuid REFERENCES iam_group (id),
+    tara_project_id uuid NOT NULL REFERENCES tara_project (id) ON DELETE CASCADE,
+    user_id uuid REFERENCES iam_user (id) ON DELETE CASCADE,
+    group_id uuid REFERENCES iam_group (id) ON DELETE CASCADE,
     project_role project_role NOT NULL,
-    assigned_at timestamp NOT NULL DEFAULT now(),
+    assigned_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT project_role_assignment_one_principal CHECK (
         (user_id IS NOT NULL) <> (group_id IS NOT NULL)
     ),
@@ -74,7 +74,7 @@ CREATE TABLE item_definition (
     item_definition_wp_09_01 text,
     cybersecurity_specs_wp_10_01 text,
     architectural_design text,
-    created_at timestamp NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX item_definition_tara_project_id_idx ON item_definition (tara_project_id);
@@ -91,7 +91,7 @@ CREATE INDEX asset_item_definition_id_idx ON asset (item_definition_id);
 
 CREATE TABLE asset_cybersecurity_property (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    asset_id uuid NOT NULL REFERENCES asset (id),
+    asset_id uuid NOT NULL REFERENCES asset (id) ON DELETE CASCADE,
     property_type cybersecurity_property_type NOT NULL,
     description text,
     UNIQUE (asset_id, property_type)
@@ -109,8 +109,8 @@ CREATE INDEX damage_scenario_item_definition_id_idx ON damage_scenario (item_def
 
 CREATE TABLE damage_scenario_asset_property (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id),
-    asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id),
+    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id) ON DELETE CASCADE,
+    asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id) ON DELETE CASCADE,
     compromise_mechanism_note text,
     UNIQUE (damage_scenario_id, asset_cybersecurity_property_id)
 );
@@ -120,7 +120,7 @@ CREATE INDEX damage_scenario_asset_property_property_id_idx
 
 CREATE TABLE impact_rating (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id),
+    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id) ON DELETE CASCADE,
     impact_category impact_category NOT NULL,
     rating_value impact_rating_value,
     is_omitted_by_pm_15_07 boolean NOT NULL DEFAULT false,
@@ -150,8 +150,8 @@ CREATE INDEX threat_scenario_item_definition_id_idx ON threat_scenario (item_def
 
 CREATE TABLE threat_scenario_asset_property (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id),
-    asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id),
+    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
+    asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id) ON DELETE CASCADE,
     UNIQUE (threat_scenario_id, asset_cybersecurity_property_id)
 );
 
@@ -160,8 +160,8 @@ CREATE INDEX threat_scenario_asset_property_property_id_idx
 
 CREATE TABLE threat_damage_link (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id),
-    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id),
+    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
+    damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id) ON DELETE CASCADE,
     UNIQUE (threat_scenario_id, damage_scenario_id)
 );
 
@@ -180,8 +180,8 @@ CREATE INDEX attack_path_item_definition_id_idx ON attack_path (item_definition_
 
 CREATE TABLE threat_attack_path_link (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id),
-    attack_path_id uuid NOT NULL REFERENCES attack_path (id),
+    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
+    attack_path_id uuid NOT NULL REFERENCES attack_path (id) ON DELETE CASCADE,
     UNIQUE (threat_scenario_id, attack_path_id)
 );
 
@@ -189,7 +189,7 @@ CREATE INDEX threat_attack_path_link_attack_path_id_idx ON threat_attack_path_li
 
 CREATE TABLE attack_feasibility_rating (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    attack_path_id uuid NOT NULL UNIQUE REFERENCES attack_path (id),
+    attack_path_id uuid NOT NULL UNIQUE REFERENCES attack_path (id) ON DELETE CASCADE,
     ap_elapsed_time integer CHECK (ap_elapsed_time >= 0),
     ap_specialist_expertise integer CHECK (ap_specialist_expertise >= 0),
     ap_knowledge_of_item integer CHECK (ap_knowledge_of_item >= 0),
@@ -213,8 +213,8 @@ CREATE TABLE attack_feasibility_rating (
 
 CREATE TABLE risk_value (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id),
-    impact_rating_id uuid NOT NULL REFERENCES impact_rating (id),
+    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
+    impact_rating_id uuid NOT NULL REFERENCES impact_rating (id) ON DELETE CASCADE,
     risk_score integer NOT NULL CHECK (risk_score BETWEEN 1 AND 5),
     determination_method risk_determination_method NOT NULL,
     UNIQUE (threat_scenario_id, impact_rating_id),
@@ -225,14 +225,14 @@ CREATE INDEX risk_value_impact_rating_id_idx ON risk_value (impact_rating_id);
 
 CREATE TABLE risk_treatment_decision (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id),
+    threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
     risk_value_id uuid,
     treatment_option risk_treatment_option NOT NULL,
     decision_rationale text,
     is_cybersecurity_claim boolean NOT NULL DEFAULT false,
     CONSTRAINT risk_treatment_decision_risk_threat_fk
         FOREIGN KEY (risk_value_id, threat_scenario_id)
-        REFERENCES risk_value (id, threat_scenario_id),
+        REFERENCES risk_value (id, threat_scenario_id) ON DELETE NO ACTION,
     CONSTRAINT risk_treatment_decision_claim_required CHECK (
         treatment_option NOT IN ('RETAINING', 'SHARING') OR is_cybersecurity_claim
     )

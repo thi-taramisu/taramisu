@@ -25,7 +25,7 @@ CREATE TABLE "public"."tara_project" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "name" text NOT NULL,
   "description" text NULL,
-  "created_at" timestamp NOT NULL DEFAULT now(),
+  "created_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id")
 );
 -- Create "item_definition" table
@@ -38,7 +38,7 @@ CREATE TABLE "public"."item_definition" (
   "item_definition_wp_09_01" text NULL,
   "cybersecurity_specs_wp_10_01" text NULL,
   "architectural_design" text NULL,
-  "created_at" timestamp NOT NULL DEFAULT now(),
+  "created_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   CONSTRAINT "item_definition_tara_project_id_fkey" FOREIGN KEY ("tara_project_id") REFERENCES "public"."tara_project" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
 );
@@ -64,7 +64,7 @@ CREATE TABLE "public"."asset_cybersecurity_property" (
   "description" text NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "asset_cybersecurity_property_asset_id_property_type_key" UNIQUE ("asset_id", "property_type"),
-  CONSTRAINT "asset_cybersecurity_property_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "public"."asset" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "asset_cybersecurity_property_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "public"."asset" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create "attack_path" table
 CREATE TABLE "public"."attack_path" (
@@ -93,7 +93,7 @@ CREATE TABLE "public"."attack_feasibility_rating" (
   "rationale" text NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "attack_feasibility_rating_attack_path_id_key" UNIQUE ("attack_path_id"),
-  CONSTRAINT "attack_feasibility_rating_attack_path_id_fkey" FOREIGN KEY ("attack_path_id") REFERENCES "public"."attack_path" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "attack_feasibility_rating_attack_path_id_fkey" FOREIGN KEY ("attack_path_id") REFERENCES "public"."attack_path" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "attack_feasibility_rating_ap_elapsed_time_check" CHECK (ap_elapsed_time >= 0),
   CONSTRAINT "attack_feasibility_rating_ap_equipment_check" CHECK (ap_equipment >= 0),
   CONSTRAINT "attack_feasibility_rating_ap_knowledge_of_item_check" CHECK (ap_knowledge_of_item >= 0),
@@ -122,8 +122,8 @@ CREATE TABLE "public"."damage_scenario_asset_property" (
   "compromise_mechanism_note" text NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "damage_scenario_asset_propert_damage_scenario_id_asset_cybe_key" UNIQUE ("damage_scenario_id", "asset_cybersecurity_property_id"),
-  CONSTRAINT "damage_scenario_asset_propert_asset_cybersecurity_property_fkey" FOREIGN KEY ("asset_cybersecurity_property_id") REFERENCES "public"."asset_cybersecurity_property" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "damage_scenario_asset_property_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "damage_scenario_asset_propert_asset_cybersecurity_property_fkey" FOREIGN KEY ("asset_cybersecurity_property_id") REFERENCES "public"."asset_cybersecurity_property" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "damage_scenario_asset_property_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "damage_scenario_asset_property_property_id_idx" to table: "damage_scenario_asset_property"
 CREATE INDEX "damage_scenario_asset_property_property_id_idx" ON "public"."damage_scenario_asset_property" ("asset_cybersecurity_property_id");
@@ -146,8 +146,8 @@ CREATE TABLE "public"."iam_user_group_member" (
   "user_id" uuid NOT NULL,
   "group_id" uuid NOT NULL,
   PRIMARY KEY ("user_id", "group_id"),
-  CONSTRAINT "iam_user_group_member_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "public"."iam_group" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "iam_user_group_member_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."iam_user" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "iam_user_group_member_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "public"."iam_group" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "iam_user_group_member_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."iam_user" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "iam_user_group_member_group_id_idx" to table: "iam_user_group_member"
 CREATE INDEX "iam_user_group_member_group_id_idx" ON "public"."iam_user_group_member" ("group_id");
@@ -162,7 +162,7 @@ CREATE TABLE "public"."impact_rating" (
   "reused_from_functional_safety" boolean NOT NULL DEFAULT false,
   PRIMARY KEY ("id"),
   CONSTRAINT "impact_rating_damage_scenario_id_impact_category_key" UNIQUE ("damage_scenario_id", "impact_category"),
-  CONSTRAINT "impact_rating_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "impact_rating_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "impact_rating_functional_safety_category" CHECK ((NOT reused_from_functional_safety) OR (impact_category = 'SAFETY'::public.impact_category)),
   CONSTRAINT "impact_rating_omission_consistent" CHECK (is_omitted_by_pm_15_07 = ((rating_value IS NOT NULL) AND (rating_value = 'OMITTED'::public.impact_rating_value)))
 );
@@ -173,13 +173,13 @@ CREATE TABLE "public"."project_role_assignment" (
   "user_id" uuid NULL,
   "group_id" uuid NULL,
   "project_role" "public"."project_role" NOT NULL,
-  "assigned_at" timestamp NOT NULL DEFAULT now(),
+  "assigned_at" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("id"),
   CONSTRAINT "project_role_assignment_tara_project_id_group_id_project_ro_key" UNIQUE ("tara_project_id", "group_id", "project_role"),
   CONSTRAINT "project_role_assignment_tara_project_id_user_id_project_rol_key" UNIQUE ("tara_project_id", "user_id", "project_role"),
-  CONSTRAINT "project_role_assignment_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "public"."iam_group" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "project_role_assignment_tara_project_id_fkey" FOREIGN KEY ("tara_project_id") REFERENCES "public"."tara_project" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "project_role_assignment_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."iam_user" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "project_role_assignment_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "public"."iam_group" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "project_role_assignment_tara_project_id_fkey" FOREIGN KEY ("tara_project_id") REFERENCES "public"."tara_project" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "project_role_assignment_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."iam_user" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "project_role_assignment_one_principal" CHECK ((user_id IS NOT NULL) <> (group_id IS NOT NULL))
 );
 -- Create index "project_role_assignment_group_id_idx" to table: "project_role_assignment"
@@ -212,8 +212,8 @@ CREATE TABLE "public"."risk_value" (
   PRIMARY KEY ("id"),
   CONSTRAINT "risk_value_id_threat_scenario_id_key" UNIQUE ("id", "threat_scenario_id"),
   CONSTRAINT "risk_value_threat_scenario_id_impact_rating_id_key" UNIQUE ("threat_scenario_id", "impact_rating_id"),
-  CONSTRAINT "risk_value_impact_rating_id_fkey" FOREIGN KEY ("impact_rating_id") REFERENCES "public"."impact_rating" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "risk_value_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "risk_value_impact_rating_id_fkey" FOREIGN KEY ("impact_rating_id") REFERENCES "public"."impact_rating" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "risk_value_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "risk_value_risk_score_check" CHECK ((risk_score >= 1) AND (risk_score <= 5))
 );
 -- Create index "risk_value_impact_rating_id_idx" to table: "risk_value"
@@ -228,7 +228,7 @@ CREATE TABLE "public"."risk_treatment_decision" (
   "is_cybersecurity_claim" boolean NOT NULL DEFAULT false,
   PRIMARY KEY ("id"),
   CONSTRAINT "risk_treatment_decision_risk_threat_fk" FOREIGN KEY ("risk_value_id", "threat_scenario_id") REFERENCES "public"."risk_value" ("id", "threat_scenario_id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "risk_treatment_decision_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "risk_treatment_decision_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "risk_treatment_decision_claim_required" CHECK ((treatment_option <> ALL (ARRAY['RETAINING'::public.risk_treatment_option, 'SHARING'::public.risk_treatment_option])) OR is_cybersecurity_claim)
 );
 -- Create index "risk_treatment_decision_risk_value_id_idx" to table: "risk_treatment_decision"
@@ -242,8 +242,8 @@ CREATE TABLE "public"."threat_attack_path_link" (
   "attack_path_id" uuid NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "threat_attack_path_link_threat_scenario_id_attack_path_id_key" UNIQUE ("threat_scenario_id", "attack_path_id"),
-  CONSTRAINT "threat_attack_path_link_attack_path_id_fkey" FOREIGN KEY ("attack_path_id") REFERENCES "public"."attack_path" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "threat_attack_path_link_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "threat_attack_path_link_attack_path_id_fkey" FOREIGN KEY ("attack_path_id") REFERENCES "public"."attack_path" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "threat_attack_path_link_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "threat_attack_path_link_attack_path_id_idx" to table: "threat_attack_path_link"
 CREATE INDEX "threat_attack_path_link_attack_path_id_idx" ON "public"."threat_attack_path_link" ("attack_path_id");
@@ -254,8 +254,8 @@ CREATE TABLE "public"."threat_damage_link" (
   "damage_scenario_id" uuid NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "threat_damage_link_threat_scenario_id_damage_scenario_id_key" UNIQUE ("threat_scenario_id", "damage_scenario_id"),
-  CONSTRAINT "threat_damage_link_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "threat_damage_link_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "threat_damage_link_damage_scenario_id_fkey" FOREIGN KEY ("damage_scenario_id") REFERENCES "public"."damage_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "threat_damage_link_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "threat_damage_link_damage_scenario_id_idx" to table: "threat_damage_link"
 CREATE INDEX "threat_damage_link_damage_scenario_id_idx" ON "public"."threat_damage_link" ("damage_scenario_id");
@@ -266,8 +266,8 @@ CREATE TABLE "public"."threat_scenario_asset_property" (
   "asset_cybersecurity_property_id" uuid NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "threat_scenario_asset_propert_threat_scenario_id_asset_cybe_key" UNIQUE ("threat_scenario_id", "asset_cybersecurity_property_id"),
-  CONSTRAINT "threat_scenario_asset_propert_asset_cybersecurity_property_fkey" FOREIGN KEY ("asset_cybersecurity_property_id") REFERENCES "public"."asset_cybersecurity_property" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
-  CONSTRAINT "threat_scenario_asset_property_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION
+  CONSTRAINT "threat_scenario_asset_propert_asset_cybersecurity_property_fkey" FOREIGN KEY ("asset_cybersecurity_property_id") REFERENCES "public"."asset_cybersecurity_property" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "threat_scenario_asset_property_threat_scenario_id_fkey" FOREIGN KEY ("threat_scenario_id") REFERENCES "public"."threat_scenario" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "threat_scenario_asset_property_property_id_idx" to table: "threat_scenario_asset_property"
 CREATE INDEX "threat_scenario_asset_property_property_id_idx" ON "public"."threat_scenario_asset_property" ("asset_cybersecurity_property_id");
