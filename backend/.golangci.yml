@@ -5,6 +5,64 @@ run:
 
 linters:
   default: standard
+  enable:
+    # Correctness and resource-safety checks for HTTP and database code.
+    - bodyclose
+    - contextcheck
+    - durationcheck
+    - errorlint
+    - nilerr
+    - rowserrcheck
+    - sqlclosecheck
+
+    # Maintainability and performance checks.
+    - gocritic
+    - makezero
+    - perfsprint
+    - prealloc
+    - unconvert
+    - usestdlibvars
+    - wastedassign
+
+    # Security and portability checks.
+    - asciicheck
+    - bidichk
+    - gosec
+    - nosprintfhostport
+
+  settings:
+    gocritic:
+      enabled-checks:
+        - appendAssign
+        - badCond
+        - boolExprSimplify
+        - builtinShadow
+        - dupBranchBody
+        - dupCase
+        - emptyFallthrough
+        - equalFold
+        - evalOrder
+        - exitAfterDefer
+        - httpNoBody
+        - importShadow
+        - indexAlloc
+        - nestingReduce
+        - octalLiteral
+        - redundantSprint
+        - sloppyReassign
+        - sloppyType
+        - stringConcatSimplify
+        - stringsCompare
+        - typeUnparen
+        - unnecessaryBlock
+        - unslice
+        - weakCond
+    gosec:
+      excludes:
+        - G112 # Connection limits are managed outside the application.
+
+  exclusions:
+    generated: lax
 
 formatters:
   enable:
