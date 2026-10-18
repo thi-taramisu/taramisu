@@ -33,16 +33,11 @@ linters:
   settings:
     gocritic:
       enabled-checks:
-        - appendAssign
-        - badCond
         - boolExprSimplify
         - builtinShadow
-        - dupBranchBody
-        - dupCase
         - emptyFallthrough
         - equalFold
         - evalOrder
-        - exitAfterDefer
         - httpNoBody
         - importShadow
         - indexAlloc
@@ -50,12 +45,10 @@ linters:
         - octalLiteral
         - redundantSprint
         - sloppyReassign
-        - sloppyTypeAssert
         - stringConcatSimplify
         - stringsCompare
         - typeUnparen
         - unnecessaryBlock
-        - unslice
         - weakCond
     gosec:
       excludes:
