@@ -42,7 +42,7 @@ ISO/SAE 21434:2021 (checked 2026-10-15; the standard is licensed, so everything 
 
 Notation: **RQ-15-02** is requirement number 2 of clause 15, a "shall" statement. **Annex H** is an informative example that walks through a full TARA.
 
-Not in the standard: authenticity, authorization and non-repudiation. They appear in our draft data model because they come from the STRIDE threat categories.
+Not in the standard: authenticity, authorization and non-repudiation. They appear in our draft data model because they come from the STRIDE threat categories. STRIDE is only one of several threat modelling methods (next to misuse case diagrams and attack trees, see Prof. Hof, "Security-Engineering in der IT"), so the first UI concept leaves it out and follows the ISO only. It may come back later as optional help for describing a threat.
 
 ## Where we are today
 
@@ -72,18 +72,21 @@ There is a second problem. The standard does not force the order asset, then dam
 1. **Asset, Definition tab:** the user ticks which properties are relevant for this asset. This is the list to choose from later.
 2. **Link asset to damage scenario:** the user marks which of the asset's properties, if lost, lead to this damage. One link can mark several. This is one row of the Annex H table.
 3. **Link asset to threat scenario:** the user marks which property the threat compromises. One property per link, as in RQ-15-03.
-4. **Damage scenario, Definition tab:** the checkboxes are removed. It shows a read-only list of the affected assets with their properties.
+4. **Damage scenario, Definition tab:** the checkboxes are removed. It lists the affected assets with their properties, and the user can link an asset, remove a link and mark the properties right there. It is the same link as in step 2, so it is editable from both ends and a user who starts from the damage scenario does not have to switch to every asset.
 5. **Graph view:** each line between an asset and a damage or threat scenario carries the property marks (C / I / A).
 
 Because the property sits on the link, it does not matter whether the user starts at the asset, the damage scenario or the threat scenario.
 
-The proposed screens, each with an explanatory note, are in [cybersecurity-properties-wireframes.html](cybersecurity-properties-wireframes.html). Download the file and open it in a browser (GitHub only shows its source). It has six screens: asset definition, the asset's damage scenario links, damage scenario definition, threat scenario definition, a threat scenario started before any asset exists, and the graph view.
+The proposed screens, each with an explanatory note, are in [cybersecurity-properties-wireframes.html](cybersecurity-properties-wireframes.html). Download the file and open it in a browser (GitHub only shows its source). It has six screens: asset definition, the asset's damage scenario links, damage scenario definition, threat scenario definition, a threat scenario started before any asset exists, and the graph view. The threat scenario screen no longer has the STRIDE block.
+
+These screens are input for the wireframes, not the final design. Pascal carries the UI ideas into the updated wireframes in [#35](https://github.com/thi-taramisu/taramisu/issues/35).
 
 ### Schema change for #40 (proposal, for Lorenz)
 
 [PR #29](https://github.com/thi-taramisu/taramisu/pull/29) already covers most of option C: the property sits on the link, a link can only use a property enabled on the asset (foreign key), and only C / I / A are used. What is left:
 
-- **Threat scenario first:** in the ER diagram, `THREAT_SCENARIO_ASSET_PROPERTY` requires at least one link per threat scenario, and every asset needs at least one property. That blocks creating a threat scenario before an asset exists. The standard only requires the item definition (15.4.1.1), and Note 2 to RQ-15-02 allows deriving assets from threat scenarios. Proposal: make the threat link optional, and add a nullable `compromised_property` on `THREAT_SCENARIO` that is cleared when the asset link is created. "At least one link" is then a completeness check, not a schema rule.
+- **Threat scenario first:** the asset and property links are now optional at creation (0..N), and "at least one link" is an application-level completeness check. The standard only requires the item definition (15.4.1.1), and Note 2 to RQ-15-02 allows deriving assets from threat scenarios. No extra property field on `THREAT_SCENARIO`: the property is chosen when the asset is linked.
+- **Remaining cardinalities:** threat to damage scenario, threat to attack path, attack feasibility rating, risk value, treatment decision and impact rating still require a link at creation. Raised in PR #29 to switch them to 0..N as well.
 - **Property list:** `property_type` is a fixed enum (C / I / A). That is fine for now. 3.1.20 Note 1 says attributes "include" C / I / A, so the list is open, but extending it needs a migration.
 
 ## Decisions (2026-10-15)
@@ -93,8 +96,14 @@ To be confirmed with Lorenz (data model) and the stakeholders.
 1. **Three properties in the UI:** C / I / A only. The three extra flags in the draft data model are not used for now.
 2. **Relation level:** the property is stored on the links (option C).
 3. **Required or optional:** follow the standard. A link to a damage scenario carries at least one property (RQ-15-02). The item definition is the only prerequisite.
-4. **Threat scenario first:** allowed. The property is kept on the threat scenario until an asset link exists, then it moves to the link.
+4. **Threat scenario first:** allowed. The threat scenario can be created without an asset and without a property. The property is always a property of an asset (RQ-15-03), so it is chosen when the asset is linked or created from the threat scenario. Until then the threat scenario counts as incomplete (agreed with Lorenz in [PR #29](https://github.com/thi-taramisu/taramisu/pull/29)).
 5. **Starting points:** the hierarchical path (item, asset, damage scenario, threat scenario) is the first one we design. Other starting points are out of scope for #43, but the data model must not block them.
+
+Review of [PR #49](https://github.com/thi-taramisu/taramisu/pull/49) (Pascal, 2026-10-18):
+
+6. **Option C** confirmed.
+7. **Asset to damage scenario link:** editable from both ends, on the asset and on the damage scenario.
+8. **STRIDE:** left out of the first UI concept. It may be added later as optional help.
 
 ## Next steps
 
