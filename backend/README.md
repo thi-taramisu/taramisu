@@ -30,8 +30,8 @@ make migrate-diff name=my_change
 make sqlc
 ```
 
-`make up` starts the backend and Authentik using `iam/.env`; `make down` stops
-both and keeps their data. See [IAM setup](../iam/README.md).
+`make up` runs [`dev.sh`](dev.sh) to start the backend and Authentik using
+`iam/.env`; `make down` stops both and keeps their data. See [IAM setup](../iam/README.md).
 
 For `make run`, copy `.env.example` to `.env` and use the client ID, secret and
 `APP_URL` from `../iam/.env`. Stop the API container first with

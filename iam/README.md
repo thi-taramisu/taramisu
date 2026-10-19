@@ -30,7 +30,7 @@ SSO session active. Group synchronization and project permissions are not implem
 
 ```sh
 curl -f http://localhost:8080/health/ready
-sh iam/dev_test.sh
+sh backend/dev_test.sh
 make -C backend test
 TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make -C backend test
 ```

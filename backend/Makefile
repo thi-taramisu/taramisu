@@ -7,7 +7,7 @@ endif
 .DEFAULT_GOAL := test
 .PHONY: up down reset db run test migrate migrate-diff sqlc
 up:
-	../iam/dev.sh
+	./dev.sh
 down:
 	docker compose --env-file ../iam/.env -f ../iam/compose.yaml --profile tools down
 reset:

@@ -7,8 +7,8 @@ scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 export REAL_DOCKER="$(command -v docker)" COMMAND_LOG="$scratch/commands"
 mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend"
-cp dev.sh .env.example compose.yaml "$scratch/iam/"
-cp ../backend/compose.yaml ../backend/Makefile "$scratch/backend/"
+cp ../iam/.env.example ../iam/compose.yaml "$scratch/iam/"
+cp dev.sh compose.yaml Makefile "$scratch/backend/"
 
 cat > "$scratch/bin/docker" <<'SH'
 #!/bin/sh
@@ -35,7 +35,7 @@ export PATH="$scratch/bin:$PATH"
 unset APP_URL OIDC_ISSUER OIDC_CLIENT_ID OIDC_CLIENT_SECRET PG_PASS
 unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD
 
-run() { "$scratch/iam/dev.sh" > "$scratch/output" 2>&1; }
+run() { (cd "$scratch" && ./backend/dev.sh) > "$scratch/output" 2>&1; }
 expect_failure() {
     if run; then
         echo 'Expected startup to fail' >&2
@@ -67,7 +67,7 @@ grep -q '^down$' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$original"
 
 # Reject incomplete .env files without changing them.
-sed 's/^PG_PASS=$/PG_PASS=keep-existing/' .env.example > "$scratch/iam/.env"
+sed 's/^PG_PASS=$/PG_PASS=keep-existing/' ../iam/.env.example > "$scratch/iam/.env"
 partial=$(cksum "$scratch/iam/.env")
 : > "$COMMAND_LOG"
 expect_failure
