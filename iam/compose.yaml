@@ -18,6 +18,7 @@ x-authentik: &authentik
       condition: service_healthy
   volumes:
     - authentik_data:/data
+    - ./branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
   shm_size: 512mb
   healthcheck:
     test: [CMD, ak, healthcheck]
@@ -59,6 +60,7 @@ services:
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Set AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env; see iam/.env.example}
     volumes:
       - authentik_data:/data
+      - ./branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
       - ./blueprints:/blueprints/custom:ro
 
 volumes:

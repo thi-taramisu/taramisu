@@ -38,6 +38,7 @@ type session struct {
 	User    User
 	Expires time.Time
 }
+
 type login struct {
 	Nonce, Verifier string
 	Expires         time.Time
@@ -139,7 +140,6 @@ func (m *Manager) Callback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var responseError *oauth2.RetrieveError
 		if errors.As(err, &responseError) {
-			// Error() includes the provider response body, which may contain secrets.
 			slog.Warn("OIDC token exchange failed", "status", responseError.Response.StatusCode, "code", responseError.ErrorCode)
 		} else {
 			slog.Warn("OIDC token exchange failed", "error", err)
@@ -227,7 +227,6 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 }
 
 func (m *Manager) Logout(w http.ResponseWriter, r *http.Request) {
-	// Prevent logout CSRF.
 	if r.Header.Get("Origin") != m.origin {
 		fail(w, 403, "invalid origin")
 		return
