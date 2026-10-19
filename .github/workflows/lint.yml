@@ -77,7 +77,10 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Check job results
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: |
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled') ||
+          needs.changes.result != 'success'
         run: |
-          echo "At least one lint job failed or was cancelled."
+          echo "At least one lint job failed or was cancelled, or changes detection did not succeed."
           exit 1
