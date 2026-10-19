@@ -120,6 +120,7 @@ jobs:
           | :--- | :---: | :--- |
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
           | **Markdown** | ${{ needs.markdown.result == 'success' && '✅ Passed' || (needs.markdown.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `markdownlint-cli2` |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `oxlint` |
           EOF
 
       - name: Check job results
