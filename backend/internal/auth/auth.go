@@ -66,6 +66,8 @@ func New(ctx context.Context, cfg Config, users UserStore) (*Manager, error) {
 	if users == nil {
 		return nil, errors.New("IAM user store is required")
 	}
+	// Key fetches share a background context and need their own timeout.
+	ctx = oidc.ClientContext(ctx, &http.Client{Timeout: 5 * time.Second})
 	provider, err := oidc.NewProvider(ctx, cfg.Issuer)
 	if err != nil {
 		return nil, err

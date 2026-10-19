@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -41,6 +42,7 @@ type authFixture struct {
 	issuer           string
 	nonce, challenge string
 	claims           map[string]any
+	beforeKeys       func(*http.Request)
 }
 
 func newAuthFixture(t *testing.T) *authFixture {
@@ -64,6 +66,9 @@ func newAuthFixture(t *testing.T) *authFixture {
 				"id_token_signing_alg_values_supported": []string{"RS256"},
 			})
 		case "/keys":
+			if f.beforeKeys != nil {
+				f.beforeKeys(r)
+			}
 			json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}})
 		case "/token":
 			if err := r.ParseForm(); err != nil {
@@ -202,6 +207,39 @@ func TestLoginAndLogout(t *testing.T) {
 	}
 	if w := f.request("GET", "/api/v1/me", session); w.Code != 401 {
 		t.Fatal("session survived logout")
+	}
+}
+
+func TestJWKSFetchTimeoutAndRecovery(t *testing.T) {
+	f := newAuthFixture(t)
+	var requests atomic.Int32
+	canceled, release := make(chan struct{}), make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	f.beforeKeys = func(r *http.Request) {
+		if requests.Add(1) == 1 {
+			select {
+			case <-r.Context().Done():
+				close(canceled)
+			case <-release:
+			}
+		}
+	}
+
+	callback, cookie := f.login(t)
+	w := f.request("GET", callback+"&code=ok", cookie)
+	if w.Code != http.StatusUnauthorized || responseCookie(w, sessionCookie) != nil || f.users.calls != 0 || requests.Load() != 1 {
+		t.Fatalf("stalled key fetch did not reject login: %d %s", w.Code, w.Body.String())
+	}
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("key fetch remained active after the callback returned")
+	}
+
+	callback, cookie = f.login(t)
+	w = f.request("GET", callback+"&code=ok", cookie)
+	if w.Code != http.StatusFound || responseCookie(w, sessionCookie) == nil || f.users.calls != 1 || requests.Load() != 2 {
+		t.Fatalf("login did not recover with a new key fetch: %d %s", w.Code, w.Body.String())
 	}
 }
 
