@@ -1,11 +1,15 @@
+# up/down use iam/.env.
+ifeq ($(filter up down,$(MAKECMDGOALS)),)
 -include .env
 export
+endif
 
+.DEFAULT_GOAL := test
 .PHONY: up down reset db run test migrate migrate-diff sqlc
 up:
-	docker compose up --build -d api
+	../iam/dev.sh
 down:
-	docker compose --profile tools down
+	docker compose --env-file ../iam/.env -f ../iam/compose.yaml --profile tools down
 reset:
 	docker compose --profile tools down -v
 db:

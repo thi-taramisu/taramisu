@@ -16,6 +16,8 @@ Go HTTP API for Taramisu.
 
 ## Commands
 
+Run from `backend/`:
+
 ```bash
 cp .env.example .env
 make db migrate
@@ -28,9 +30,17 @@ make migrate-diff name=my_change
 make sqlc
 ```
 
-Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.
+`make up` starts the backend and Authentik using `iam/.env`; `make down` stops
+both and keeps their data. See [IAM setup](../iam/README.md).
 
-> **Warning:** `make reset` runs `docker compose down -v` and **deletes the local Postgres volume** (all data in the Compose `postgres_data` volume). Use it when you want a clean database, not for a normal stop.
+For `make run`, copy `.env.example` to `.env`. Stop the API container first with
+`docker compose --env-file ../iam/.env -f ../iam/compose.yaml stop api`.
+`make run` and `make test` load `.env`; bare `make` runs tests.
+
+`make db` uses a separate database on port 5432. Stop it with
+`docker compose --profile tools down` before starting the combined stack.
+
+> **Warning:** `make reset` deletes the standalone backend database volume. It does not reset the Authentik stack.
 
 ## Structure
 
@@ -42,4 +52,4 @@ internal/httpapi/              router, OpenAPI
 internal/httpapi/handlers/     HTTP handlers
 ```
 
-So far the API only has health checks: `GET /health/live` and `GET /health/ready` (readiness uses Postgres after migrate). No domain routes yet.
+Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
