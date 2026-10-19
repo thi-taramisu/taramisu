@@ -71,6 +71,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
       - name: Typecheck
@@ -87,6 +88,26 @@ jobs:
 
       - name: Run Playwright E2E tests
         run: npm run test:e2e
+
+      - name: Report frontend test & coverage summary
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          node -e '
+            const fs = require("fs");
+            let md = "### 🧪 Frontend Test & Coverage Summary\n\n";
+            try {
+              const cov = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
+              md += "| Metric | Covered | Total | Percentage | Minimum Threshold |\n";
+              md += "| :--- | :---: | :---: | :---: | :---: |\n";
+              md += `| **Lines** | ${cov.lines.covered} | ${cov.lines.total} | ${cov.lines.pct}% | 80% |\n`;
+              md += `| **Statements** | ${cov.statements.covered} | ${cov.statements.total} | ${cov.statements.pct}% | 80% |\n`;
+              md += `| **Functions** | ${cov.functions.covered} | ${cov.functions.total} | ${cov.functions.pct}% | 80% |\n`;
+              md += `| **Branches** | ${cov.branches.covered} | ${cov.branches.total} | ${cov.branches.pct}% | 80% |\n\n`;
+            } catch (e) {
+              md += "_Coverage report not generated._\n\n";
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          '
 
       - name: Upload Playwright report on failure
         if: failure()
@@ -124,7 +145,7 @@ jobs:
           | Component | Status | Details |
           | :--- | :---: | :--- |
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
-          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest & Build |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
           EOF
 
       - name: Check job results
