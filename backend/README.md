@@ -11,37 +11,56 @@ Go HTTP API for Taramisu.
 
 ## Prerequisites
 
-- Docker (Compose), Go 1.25+, make
+- Docker Compose v2.20+, Go 1.25+, make, OpenSSL and curl
 - [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — only to regenerate `internal/db/` after changing `db/queries/` or `db/schema.sql`
 
 ## Commands
 
-Run from `backend/`:
+Run from `backend/`, with ports 5432, 8080 and 9000 free:
 
 ```bash
-cp .env.example .env
-make db migrate
-make run
 make up
-make down
-make reset
-make test
+make migrate
 make migrate-diff name=my_change
 make sqlc
+make down
 ```
 
-`make up` runs [`dev.sh`](dev.sh) to start the backend and Authentik using
-`iam/.env`; `make down` stops both and keeps their data. See [IAM setup](../iam/README.md).
+`make up` runs [`dev.sh`](dev.sh) with [`compose.dev.yaml`](compose.dev.yaml),
+which combines the backend and Authentik using `iam/.env` and the `taramisu-iam` project.
+Startup provisions Authentik, applies migrations and waits for readiness.
+`make down` stops both and keeps their data. See [IAM configuration](../iam/README.md).
+All Compose commands use this stack and environment file. Run `make up` once
+to generate `iam/.env`; `make db` starts just the backend database in that stack.
 
-For `make run`, copy `.env.example` to `.env` and use the client ID, secret and
-`APP_URL` from `../iam/.env`. Stop the API container first with
-`docker compose --env-file ../iam/.env -f ../iam/compose.yaml stop api`.
+To run the API on the host, start the stack with `make up`, copy `.env.example`
+to `.env` and use the client ID, secret and `APP_URL` from `../iam/.env`.
+Stop the API container first with
+`docker compose --env-file ../iam/.env -f compose.dev.yaml stop api`, then run `make run`.
 `make run` and `make test` load `.env`; bare `make` runs tests.
 
-`make db` uses a separate database on port 5432. Stop it with
-`docker compose --profile tools down` before starting the combined stack.
+> **Warning:** `make reset` stops the whole stack and deletes backend and Authentik data. It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
 
-> **Warning:** `make reset` deletes the standalone backend database volume. It does not reset the Authentik stack.
+## Authentication
+
+Open <http://localhost:8080/auth/login> with user `dev` and `DEV_PASSWORD` from
+`../iam/.env`. Login returns `/api/v1/me` with the local user ID, issuer and subject.
+`APP_URL` must be an origin without a trailing slash and determines the callback URL.
+`POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
+Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
+SSO session active. Group synchronization and project permissions are not implemented.
+
+## Checks
+
+```sh
+curl -f http://localhost:8080/health/ready
+sh dev_test.sh
+make test
+TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make test
+```
+
+Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
+API logs: `docker compose --env-file ../iam/.env -f compose.dev.yaml logs api`.
 
 ## Structure
 
@@ -54,4 +73,3 @@ internal/httpapi/handlers/     HTTP handlers
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
-See [IAM setup](../iam/README.md) for login, logout and `/api/v1/me`.

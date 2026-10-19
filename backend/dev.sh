@@ -22,7 +22,7 @@ if [ ! -e ../iam/.env ]; then
     echo 'Generated local secrets in iam/.env (ignored by Git).'
 fi
 
-compose() { docker compose --env-file ../iam/.env -f ../iam/compose.yaml "$@"; }
+compose() { docker compose --env-file ../iam/.env -f compose.dev.yaml "$@"; }
 chmod 600 ../iam/.env
 compose config --quiet
 compose up -d --wait --wait-timeout 240 db server worker
@@ -44,7 +44,7 @@ rm ../iam/.blueprint.log
 compose up -d --build --wait --wait-timeout 180 api
 if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused \
     --retry-delay 1 --retry-max-time 30 http://localhost:8080/health/ready > /dev/null; then
-    echo 'Backend readiness failed. Inspect: docker compose --env-file iam/.env -f iam/compose.yaml logs api' >&2
+    echo 'Backend readiness failed. Inspect: docker compose --env-file iam/.env -f backend/compose.dev.yaml logs api' >&2
     exit 1
 fi
 

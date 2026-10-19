@@ -8,7 +8,7 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 export REAL_DOCKER="$(command -v docker)" COMMAND_LOG="$scratch/commands"
 mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend"
 cp ../iam/.env.example ../iam/compose.yaml "$scratch/iam/"
-cp dev.sh compose.yaml Makefile "$scratch/backend/"
+cp dev.sh compose.yaml compose.dev.yaml Makefile "$scratch/backend/"
 
 cat > "$scratch/bin/docker" <<'SH'
 #!/bin/sh
@@ -18,10 +18,15 @@ case " $* " in
         echo 'blueprint diagnosis: sentinel-secret'
         exit "${BLUEPRINT_FAIL:-0}" ;;
     *" printenv OIDC_REDIRECT_URI "*) echo 'http://localhost:8080/auth/callback' ;;
-    *" up "*) echo up >> "$COMMAND_LOG" ;;
-    *" --env-file ../iam/.env -f ../iam/compose.yaml --profile tools down "*)
-        "$REAL_DOCKER" compose --env-file ../iam/.env -f ../iam/compose.yaml config --quiet || exit 1
-        echo down >> "$COMMAND_LOG" ;;
+    *" --env-file ../iam/.env -f compose.dev.yaml up "*)
+        "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.dev.yaml config --quiet || exit 1
+        echo "$*" >> "$COMMAND_LOG" ;;
+    *" --env-file ../iam/.env -f compose.dev.yaml run --rm migrate "*)
+        "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.dev.yaml config --quiet || exit 1
+        echo "$*" >> "$COMMAND_LOG" ;;
+    *" --env-file ../iam/.env -f compose.dev.yaml --profile tools down "*)
+        "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.dev.yaml config --quiet || exit 1
+        echo "$*" >> "$COMMAND_LOG" ;;
     *) exit 1 ;;
 esac
 SH
@@ -63,7 +68,16 @@ ENV
 make -C "$scratch/backend" up > "$scratch/output" 2>&1
 grep -q '^Login:' "$scratch/output"
 make -C "$scratch/backend" down > "$scratch/output" 2>&1
-grep -q '^down$' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml --profile tools down' "$COMMAND_LOG"
+make -C "$scratch/backend" db > "$scratch/output" 2>&1
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml up -d --wait db' "$COMMAND_LOG"
+make -C "$scratch/backend" reset > "$scratch/output" 2>&1
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml --profile tools down -v' "$COMMAND_LOG"
+make -C "$scratch/backend" migrate > "$scratch/output" 2>&1
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml run --rm migrate' "$COMMAND_LOG"
+make -C "$scratch/backend" migrate-diff name=test-change > "$scratch/output" 2>&1
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml up -d --wait dev-db' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.dev.yaml run --rm migrate migrate diff test-change --env local' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$original"
 
 # Reject incomplete .env files without changing them.
@@ -90,7 +104,7 @@ grep -q 'Backend readiness failed' "$scratch/output"
 # Share client ID and callback settings with the API.
 APP_URL=http://127.0.0.1:8080 OIDC_CLIENT_ID=review-client \
     "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
-    -f "$scratch/iam/compose.yaml" config > "$scratch/rendered"
+    -f "$scratch/backend/compose.dev.yaml" config > "$scratch/rendered"
 test "$(grep -c 'OIDC_CLIENT_ID: review-client' "$scratch/rendered")" -eq 2
 grep -q 'APP_URL: http://127.0.0.1:8080' "$scratch/rendered"
 grep -q 'OIDC_REDIRECT_URI: http://127.0.0.1:8080/auth/callback' "$scratch/rendered"
