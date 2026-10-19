@@ -47,5 +47,6 @@ if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused \
     exit 1
 fi
 
-echo 'Backend ready: http://localhost:8080/health/ready'
+callback_url=$(compose exec -T worker printenv OIDC_REDIRECT_URI)
+echo "Login: ${callback_url%/auth/callback}/auth/login (dev; DEV_PASSWORD in iam/.env)"
 echo 'Authentik admin: http://authentik.localhost:9000 (akadmin; AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env)'

@@ -15,14 +15,16 @@ It generates secrets in ignored `iam/.env` on first run. If copying
 `make down` preserves both. This stack uses the `taramisu-iam` Compose project.
 
 - Admin: <http://authentik.localhost:9000>, user `akadmin`, password `AUTHENTIK_BOOTSTRAP_PASSWORD`.
-- Development user: `dev`, password `DEV_PASSWORD`.
+- Login: <http://localhost:8080/auth/login>, user `dev`, password `DEV_PASSWORD`.
 
 Passwords are in `iam/.env`. Startup reapplies the blueprint; the admin bootstrap
 password only takes effect on a fresh database. `APP_URL` must be an origin
 without a trailing slash and determines the callback URL.
 
-The blueprint provisions the OIDC client and development user. The backend
-currently exposes health checks; application login is not implemented yet.
+Login returns `/api/v1/me` with the local user ID, issuer and subject.
+`POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
+Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
+SSO session active. Group synchronization and project permissions are not implemented.
 
 ## Checks
 

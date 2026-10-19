@@ -33,7 +33,8 @@ make sqlc
 `make up` starts the backend and Authentik using `iam/.env`; `make down` stops
 both and keeps their data. See [IAM setup](../iam/README.md).
 
-For `make run`, copy `.env.example` to `.env`. Stop the API container first with
+For `make run`, copy `.env.example` to `.env` and use the client ID, secret and
+`APP_URL` from `../iam/.env`. Stop the API container first with
 `docker compose --env-file ../iam/.env -f ../iam/compose.yaml stop api`.
 `make run` and `make test` load `.env`; bare `make` runs tests.
 
@@ -53,3 +54,4 @@ internal/httpapi/handlers/     HTTP handlers
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
+See [IAM setup](../iam/README.md) for login, logout and `/api/v1/me`.

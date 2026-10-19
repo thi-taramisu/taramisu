@@ -17,6 +17,7 @@ case " $* " in
     *" ak apply_blueprint "*)
         echo 'blueprint diagnosis: sentinel-secret'
         exit "${BLUEPRINT_FAIL:-0}" ;;
+    *" printenv OIDC_REDIRECT_URI "*) echo 'http://localhost:8080/auth/callback' ;;
     *" up "*) echo up >> "$COMMAND_LOG" ;;
     *" --env-file ../iam/.env -f ../iam/compose.yaml --profile tools down "*)
         "$REAL_DOCKER" compose --env-file ../iam/.env -f ../iam/compose.yaml config --quiet || exit 1
@@ -40,11 +41,11 @@ expect_failure() {
         echo 'Expected startup to fail' >&2
         exit 1
     fi
-    ! grep -q '^Backend ready:' "$scratch/output"
+    ! grep -q '^Login:' "$scratch/output"
 }
 
 run
-grep -q '^Backend ready:' "$scratch/output"
+grep -q '^Login:' "$scratch/output"
 test -n "$(find "$scratch/iam/.env" -perm 600)"
 test ! -e "$scratch/iam/.blueprint.log"
 original=$(cksum "$scratch/iam/.env")
@@ -60,7 +61,7 @@ OIDC_CLIENT_ID=host-only
 OIDC_CLIENT_SECRET=
 ENV
 make -C "$scratch/backend" up > "$scratch/output" 2>&1
-grep -q '^Backend ready:' "$scratch/output"
+grep -q '^Login:' "$scratch/output"
 make -C "$scratch/backend" down > "$scratch/output" 2>&1
 grep -q '^down$' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$original"
