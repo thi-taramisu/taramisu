@@ -62,4 +62,3 @@ Our rules are defined in [`.markdownlint.yaml`](../../../.markdownlint.yaml) wit
 Every pull request runs the `markdown` job in [`.github/workflows/lint.yml`](../../../.github/workflows/lint.yml).
 The job only executes when Markdown files or lint configurations are touched (via `dorny/paths-filter`).
 Any lint error will block the aggregating `Lint result` status check.
-

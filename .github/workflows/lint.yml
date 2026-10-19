@@ -76,6 +76,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - name: Generate lint summary
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🔍 Lint Results Summary
+
+          | Component | Status | Tool |
+          | :--- | :---: | :--- |
+          | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
+          | **Markdown** | ${{ needs.markdown.result == 'success' && '✅ Passed' || (needs.markdown.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `markdownlint-cli2` |
+          EOF
+
       - name: Check job results
         if: |
           contains(needs.*.result, 'failure') ||
