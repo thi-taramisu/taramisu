@@ -7,7 +7,7 @@ Go HTTP API for Taramisu.
 - **PostgreSQL** + **pgx** — database
 - **sqlc** — queries in `db/queries/` → `internal/db/`
 - **Atlas** — migrations from `db/schema.sql` in `db/migrations/`
-- **Docker Compose** — Postgres, migrate, optional API container
+- **Docker Compose** — Postgres, migrate, optional API container, optional pgAdmin
 
 ## Prerequisites
 
@@ -19,6 +19,7 @@ Go HTTP API for Taramisu.
 ```bash
 cp .env.example .env
 make db migrate
+make pgadmin
 make run
 make up
 make down
@@ -30,6 +31,8 @@ make sqlc
 ```
 
 Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.
+
+`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at [http://localhost:5050](http://localhost:5050) (no login) with the Compose database pre-registered and connected. It is opt-in (`tools` profile), so `make up` does not start it; `make down` stops it.
 
 > **Warning:** `make reset` runs `docker compose down -v` and **deletes the local Postgres volume** (all data in the Compose `postgres_data` volume). Use it when you want a clean database, not for a normal stop.
 
