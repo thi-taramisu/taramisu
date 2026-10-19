@@ -9,7 +9,7 @@ server {
     add_header Cache-Control "public, immutable";
   }
 
-  # Unbekannte Pfade -> index.html
+  # Fallback unknown paths to index.html (SPA routing)
   location / {
     try_files $uri /index.html;
   }
