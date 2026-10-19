@@ -29,4 +29,4 @@ The only page so far is `/item-definition`, an example with hard-coded data. The
 
 ## API client
 
-Typed against the OpenAPI spec (`openapi/openapi.yaml`, currently a stub). See [ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). Base URL: `VITE_API_BASE_URL` (default `/api/v1`).
+The client is typed against the OpenAPI spec in `openapi/openapi.yaml`, which is only a stub for now. The reasoning behind the setup is in [ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). The base URL comes from `VITE_API_BASE_URL` and defaults to `/api/v1`.
