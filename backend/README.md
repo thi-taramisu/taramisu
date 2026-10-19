@@ -12,7 +12,7 @@ Go HTTP API for Taramisu.
 ## Prerequisites
 
 - Docker (Compose), Go 1.25+, make
-- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.29.0 — only to regenerate `internal/db/` after changing `db/queries/` or `db/schema.sql`
+- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — only to regenerate `internal/db/` after changing `db/queries/` or `db/schema.sql`
 
 ## Commands
 
