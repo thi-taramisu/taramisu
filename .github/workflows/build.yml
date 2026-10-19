@@ -99,6 +99,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
+      - name: Generate build summary
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🏗️ Build & Test Results Summary
+
+          | Component | Status | Details |
+          | :--- | :---: | :--- |
+          | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest & Build |
+          EOF
+
       - name: Check job results
         if: |
           contains(needs.*.result, 'failure') ||
