@@ -4,7 +4,8 @@ ifeq ($(filter up down db reset migrate migrate-diff,$(MAKECMDGOALS)),)
 export
 endif
 
-COMPOSE := docker compose --env-file ../iam/.env -f compose.dev.yaml
+COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
+IAM := docker compose --env-file ../iam/.env -f ../iam/compose.yaml
 
 .DEFAULT_GOAL := test
 .PHONY: up down reset db run test migrate migrate-diff sqlc
@@ -12,8 +13,10 @@ up:
 	./dev.sh
 down:
 	$(COMPOSE) --profile tools down
+	$(IAM) down
 reset:
 	$(COMPOSE) --profile tools down -v
+	$(IAM) down -v
 db:
 	$(COMPOSE) up -d --wait db
 run:

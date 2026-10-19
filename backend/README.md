@@ -26,17 +26,21 @@ make sqlc
 make down
 ```
 
-`make up` runs [`dev.sh`](dev.sh) with [`compose.dev.yaml`](compose.dev.yaml),
-which combines the backend and Authentik using `iam/.env` and the `taramisu-iam` project.
-Startup provisions Authentik, applies migrations and waits for readiness.
-`make down` stops both and keeps their data. See [IAM configuration](../iam/README.md).
-All Compose commands use this stack and environment file. Run `make up` once
-to generate `iam/.env`; `make db` starts just the backend database in that stack.
+`make up` runs [`dev.sh`](dev.sh) and starts two Compose projects using `iam/.env`:
+
+- `taramisu-backend`: API, backend database and migrations ([compose.yaml](compose.yaml)).
+- `taramisu-iam`: Authentik server, worker and database ([IAM configuration](../iam/README.md)).
+
+Startup provisions Authentik first, then starts the backend, applies migrations and
+waits for readiness. The API and Authentik server share the `taramisu-auth` network,
+created by the IAM project; each database stays on its own project's default network.
+`make down` stops the backend first, then IAM, and keeps their data.
+Run `make up` once to generate `iam/.env`; `make db` starts just the backend database.
 
 To run the API on the host, start the stack with `make up`, copy `.env.example`
 to `.env` and use the client ID, secret and `APP_URL` from `../iam/.env`.
 Stop the API container first with
-`docker compose --env-file ../iam/.env -f compose.dev.yaml stop api`, then run `make run`.
+`docker compose --env-file ../iam/.env -f compose.yaml stop api`, then run `make run`.
 `make run` and `make test` load `.env`; bare `make` runs tests.
 
 > **Warning:** `make reset` stops the whole stack and deletes backend and Authentik data. It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
@@ -60,7 +64,7 @@ TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=
 ```
 
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
-API logs: `docker compose --env-file ../iam/.env -f compose.dev.yaml logs api`.
+API logs: `docker compose --env-file ../iam/.env -f compose.yaml logs api`.
 
 ## Structure
 

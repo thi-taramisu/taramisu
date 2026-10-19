@@ -1,3 +1,5 @@
+name: taramisu-backend
+
 x-postgres: &postgres
   image: postgres:17-alpine
   environment:
@@ -35,6 +37,7 @@ services:
 
   api:
     build: .
+    networks: [default, iam]
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
       APP_URL: ${APP_URL:-http://localhost:8080}
@@ -46,6 +49,11 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+networks:
+  iam:
+    name: taramisu-auth
+    external: true
 
 volumes:
   postgres_data:
