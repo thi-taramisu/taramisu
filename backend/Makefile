@@ -6,9 +6,10 @@ endif
 
 COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
 IAM := docker compose --env-file ../iam/.env -f ../iam/compose.yaml
+OPENAPI := openapi.json
 
 .DEFAULT_GOAL := test
-.PHONY: up down reset db run test migrate migrate-diff sqlc
+.PHONY: up down reset db run test migrate migrate-diff sqlc openapi
 up:
 	./dev.sh
 down:
@@ -30,3 +31,7 @@ migrate-diff:
 	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 sqlc:
 	sqlc generate
+openapi:
+	@tmp=$$(mktemp "$(OPENAPI).XXXXXX") || exit 1; \
+	trap 'rm -f "$$tmp"' EXIT INT TERM; \
+	go run ./cmd/openapi > "$$tmp" && mv "$$tmp" $(OPENAPI)
