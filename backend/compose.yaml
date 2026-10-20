@@ -1,3 +1,5 @@
+name: taramisu-backend
+
 x-postgres: &postgres
   image: postgres:17-alpine
   environment:
@@ -35,13 +37,23 @@ services:
 
   api:
     build: .
+    networks: [default, iam]
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://authentik.localhost:9000/application/o/taramisu/}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+networks:
+  iam:
+    name: taramisu-auth
+    external: true
 
 volumes:
   postgres_data:

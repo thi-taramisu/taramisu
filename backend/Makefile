@@ -1,26 +1,34 @@
+# Compose targets use iam/.env.
+ifeq ($(filter up down db reset migrate migrate-diff,$(MAKECMDGOALS)),)
 -include .env
 export
+endif
 
+COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
+IAM := docker compose --env-file ../iam/.env -f ../iam/compose.yaml
 OPENAPI := openapi.json
 
+.DEFAULT_GOAL := test
 .PHONY: up down reset db run test migrate migrate-diff sqlc openapi
 up:
-	docker compose up --build -d api
+	./dev.sh
 down:
-	docker compose --profile tools down
+	$(COMPOSE) --profile tools down
+	$(IAM) down
 reset:
-	docker compose --profile tools down -v
+	$(COMPOSE) --profile tools down -v
+	$(IAM) down -v
 db:
-	docker compose up -d --wait db
+	$(COMPOSE) up -d --wait db
 run:
 	go run ./cmd/api
 test:
 	go test -race ./...
 migrate:
-	docker compose run --rm migrate
+	$(COMPOSE) run --rm migrate
 migrate-diff:
-	docker compose up -d --wait dev-db
-	docker compose run --rm migrate migrate diff "$(name)" --env local
+	$(COMPOSE) up -d --wait dev-db
+	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 sqlc:
 	sqlc generate
 openapi:
