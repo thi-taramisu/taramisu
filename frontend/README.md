@@ -1,42 +1,55 @@
 # Taramisu frontend
 
-React + TypeScript + Vite, with [React Flow](https://reactflow.dev) (`@xyflow/react`) for diagrams,
-Vitest for unit/component tests, and Playwright for end-to-end tests.
+React + TypeScript + Vite, with [shadcn/ui](https://ui.shadcn.com) and Tailwind CSS for UI components, [React Flow](https://reactflow.dev)
+(`@xyflow/react`) for diagrams Vitest for unit/component tests and Playwright for end-to-end tests.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev           # dev server on http://localhost:5173
-npm run typecheck     # strict TypeScript check (tsc -b)
-npm run build         # type check + production build
-npm run lint          # oxlint
+npm run dev        # dev server on http://localhost:5173
+npm run typecheck  # strict TypeScript check
+npm run build      # type check + production build
+npm run lint -- --deny-warnings
 npm run generate:api  # regenerate src/api/schema.d.ts from openapi/openapi.yaml
-npm test              # run unit/component tests once
-npm run test:coverage # run unit/component tests with enforced 70% V8 coverage thresholds
-npm run test:watch    # tests in watch mode
-npm run test:e2e      # run Playwright E2E tests against production preview
+npm test           # run tests once
+npm run test:watch # tests in watch mode
+npm run test:coverage # enforced 70% coverage thresholds
+npm run test:e2e   # Playwright against the production preview
 ```
 
-See [`docs/internal/dev-workflow/frontend-testing.md`](../docs/internal/dev-workflow/frontend-testing.md) for our testing strategy,
-coverage policy, and rules.
+See the [testing workflow](../docs/internal/dev-workflow/frontend-testing.md) for the coverage policy and test commands.
 
 ## Structure
 
 ```text
-e2e/                           # Playwright end-to-end tests
 src/
   api/                         # typed API client (openapi-fetch), generated schema.d.ts
+  components/ui/               # shadcn/ui components (added via the shadcn CLI, owned by us)
+  lib/                         # shared helpers
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health via openapi-react-query
+  features/assets/             # example: assets table and dialog built with shadcn/ui
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
 ```
 
-The only page so far is `/item-definition`, an example with hard-coded data. The route concept is in
+So far there are two example pages with hard-coded data: `/item-definition` and `/assets`. The route concept is in
 [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 ## API client
 
 The client is typed against the OpenAPI spec in `openapi/openapi.yaml`, which is only a stub for now. The reasoning behind the setup is in
 [ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). The base URL comes from `VITE_API_BASE_URL` and defaults to `/api/v1`.
+
+## UI components
+
+We use [shadcn/ui](https://ui.shadcn.com) (see [ADR 0002](../docs/internal/adr/0002-frontend-ui-library.md)). Add new components with the
+CLI, which puts the source into `src/components/ui`:
+
+```bash
+npx shadcn@latest add select
+```
+
+Import them via the `@/` alias, e.g. `import { Button } from '@/components/ui/button'`. Theme colours and radius are CSS variables in
+`src/index.css`.
