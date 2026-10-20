@@ -1,6 +1,6 @@
 # System Architecture & Design Decisions – Taramisu
 
-This document defines the target system architecture for the **Taramisu** web application (supporting the ISO/SAE 21434 TARA process). The architecture is designed around a **100% stateless backend tier** utilizing **Traefik** as a dynamic reverse proxy and load balancer.
+This document defines the target system architecture for the **Taramisu** web application (supporting the ISO/SAE 21434 TARA process). The architecture is designed around a **100% stateless backend tier** utilizing **Traefik or NGINX (tbd)** as a dynamic reverse proxy and load balancer.
 
 ---
 
@@ -17,7 +17,7 @@ flowchart TB
     %% EDGE / INGRESS LAYER
     %% ==========================================
     subgraph Edge_Layer ["1. Edge & Ingress Layer (Reverse Proxy & Load Balancer)"]
-        Traefik or ngninx ["Traefik (Container Auto-Discovery)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Round-Robin)<br/>• SSE Support for AI Streams"]
+        Traefik["Traefik or NGINX (tbd)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Round-Robin)<br/>• SSE Support for AI Streams"]
     end
 
     %% ==========================================
@@ -89,13 +89,13 @@ flowchart TB
 
 ## 2. Key Architectural Decisions & Justifications
 
-### 1. Traefik as Reverse Proxy & Load Balancer (Instead of NGINX)
-* **Decision:** Use **Traefik** as the central entrypoint and load balancer.
-* **Why:** Unlike traditional NGINX (which requires static configuration files and manual reloads when scaling containers), Traefik features **native Docker container auto-discovery**. When scaling the Go backend (`docker compose up --scale api=3`), Traefik automatically detects the new instances via the Docker socket and balances traffic instantly without changing configuration files. It also integrates smoothly with Authentik via Forward-Auth if needed.
+### 1. Traefik or NGINX (tbd) as Reverse Proxy & Load Balancer
+* **Decision:** Evaluate **Traefik or NGINX (tbd)** as the central entrypoint and load balancer.
+* **Why:** Both options are under consideration for the edge and ingress layer. While traditional NGINX is a proven and widely adopted standard, Traefik features **native Docker container auto-discovery** in its open-source version—automatically detecting scaled Go backend instances (`docker compose up --scale api=3`) via the Docker socket and balancing traffic without manual configuration reloads. The final decision will balance dynamic service discovery and load balancing capabilities in open-source setups against team familiarity and infrastructure requirements. Both support TLS termination and integration with Authentik via Forward-Auth.
 
 ### 2. 100% Stateless Go Backend (`1..N` Replicas)
 * **Decision:** The Go backend holds no local sessions, files, or persistent state.
-* **Why:** This allows seamless horizontal scaling behind Traefik's load balancer. If traffic increases or a container crashes, instances can be added or destroyed instantly without losing user data or session state.
+* **Why:** This allows seamless horizontal scaling behind the reverse proxy / load balancer (Traefik or NGINX (tbd)). If traffic increases or a container crashes, instances can be added or destroyed instantly without losing user data or session state.
 
 ### 3. PostgreSQL Database Isolation (`taramisu_db` vs. `authentik_db`)
 * **Decision:** Share a single PostgreSQL instance for cost/ops efficiency, but use **strictly isolated logical databases**.
