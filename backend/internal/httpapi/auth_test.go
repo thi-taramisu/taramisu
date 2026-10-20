@@ -62,3 +62,13 @@ func TestAuthRoutes(t *testing.T) {
 		t.Fatalf("missing auth configuration: %d", w.Code)
 	}
 }
+
+func TestAuthOpenAPI(t *testing.T) {
+	spec := OpenAPI()
+	for _, path := range []string{"/auth/login", "/auth/callback", "/auth/logout"} {
+		item := spec.Paths[path]
+		if item == nil || (path == "/auth/logout" && item.Post == nil) || (path != "/auth/logout" && item.Get == nil) {
+			t.Errorf("missing auth operation: %s", path)
+		}
+	}
+}

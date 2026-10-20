@@ -170,6 +170,91 @@
         "summary": "Get the current user"
       }
     },
+    "/auth/callback": {
+      "get": {
+        "operationId": "auth-callback",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "taramisu_login",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Clears taramisu_login, sets taramisu_session and redirects to /api/v1/me."
+          },
+          "400": {
+            "description": "Invalid, expired or rejected login attempt."
+          },
+          "401": {
+            "description": "Invalid identity token or claims."
+          },
+          "502": {
+            "description": "Token exchange failed or identity token missing."
+          },
+          "503": {
+            "description": "User database unavailable."
+          }
+        },
+        "summary": "Complete browser login"
+      }
+    },
+    "/auth/login": {
+      "get": {
+        "operationId": "auth-login",
+        "responses": {
+          "302": {
+            "description": "Sets taramisu_login and redirects to Authentik."
+          }
+        },
+        "summary": "Start browser login"
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "auth-logout",
+        "parameters": [
+          {
+            "description": "Must match APP_URL.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Clears taramisu_session. The Authentik SSO session remains active."
+          },
+          "403": {
+            "description": "Missing or invalid Origin header."
+          }
+        },
+        "summary": "End the backend session"
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "get-health-live",

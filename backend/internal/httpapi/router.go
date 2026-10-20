@@ -45,11 +45,7 @@ func newAPI(queries handlers.StatusReader, manager *auth.Manager) (*chi.Mux, hum
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
-	if manager != nil {
-		mux.Get("/auth/login", manager.Login)
-		mux.Get("/auth/callback", manager.Callback)
-		mux.Post("/auth/logout", manager.Logout)
-	}
+	registerAuth(api, manager)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user", Method: http.MethodGet, Path: "/api/v1/me",
 		Summary: "Get the current user", Security: []map[string][]string{{"session": {}}},
