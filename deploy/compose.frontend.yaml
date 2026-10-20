@@ -1,0 +1,9 @@
+services:
+  frontend:
+    build: ../frontend
+   # This has a declarative function rather than really exposing the port.
+   # Just to make it easier to find the frontend port through which frontend
+   # and nginx communicate  
+    expose:
+      - 5173
+  
