@@ -17,7 +17,7 @@ flowchart TB
     %% EDGE / INGRESS LAYER
     %% ==========================================
     subgraph Edge_Layer ["1. Edge & Ingress Layer (Reverse Proxy & Load Balancer)"]
-        Traefik["Traefik (Container Auto-Discovery)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Round-Robin)<br/>• SSE Support for AI Streams"]
+        Traefik / ngninx (tbd) ["Traefik (Container Auto-Discovery)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Round-Robin)<br/>• SSE Support for AI Streams"]
     end
 
     %% ==========================================
