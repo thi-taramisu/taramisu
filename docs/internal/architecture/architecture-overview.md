@@ -51,7 +51,7 @@ flowchart TB
     %% ==========================================
     subgraph Data_Layer ["4. Persistence & Shared State Layer"]
         PG[("PostgreSQL (+ pgvector)<br/>• DB 1: taramisu_db (App & TARA Data)<br/>• DB 2: authentik_db (IAM Data)")]
-        Redis[("Redis / Valkey<br/>• IAM Metadata Cache<br/>• Rate Limiting<br/>• Async LLM Task Queue")]
+        Redis[("Redis<br/>• IAM Metadata Cache<br/>• Rate Limiting<br/>• Async LLM Task Queue")]
         MinIO[("MinIO Object Storage (S3)<br/>• Architecture Diagrams<br/>• WP-09-01 / WP-10-01 Attachments")]
     end
 
