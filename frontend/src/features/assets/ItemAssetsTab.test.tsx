@@ -2,22 +2,25 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import App from '../App'
+import App from '../../App'
 
 function renderAssets() {
   render(
-    <MemoryRouter initialEntries={['/assets']}>
+    <MemoryRouter initialEntries={['/projects/headlamp/items/i-01/assets']}>
       <App />
     </MemoryRouter>,
   )
 }
 
-describe('AssetsPage', () => {
-  it('renders the headlamp assets table', () => {
+describe('ItemAssetsTab', () => {
+  it('renders the headlamp assets table with links to the assets', () => {
     renderAssets()
 
-    expect(screen.getByRole('heading', { name: /assets/i })).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'Headlamp on/off command' })).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByRole('link', { name: 'Camera image data' })).toHaveAttribute(
+      'href',
+      '/projects/headlamp/assets/a-03',
+    )
   })
 
   it('adds an asset through the dialog', async () => {

@@ -41,7 +41,7 @@ The setup in `frontend/`:
 - Tailwind CSS v4 via `@tailwindcss/vite`. The theme (colours, radius, font) is defined as CSS variables in `src/index.css`.
 - `components.json` holds the shadcn configuration, so `npx shadcn@latest add <component>` puts new components into `src/components/ui`.
 - The `@/` import alias points to `src/` (in `tsconfig*.json` and `vite.config.ts`).
-- `/assets` is a small example page using card, table, badge, dialog, input and label.
+- The assets tab of an item (`/projects/headlamp/items/i-01/assets`, first added as `/assets` and moved there in #30) is a small example using table, badge, dialog, input and label.
 
 ## Consequences
 
