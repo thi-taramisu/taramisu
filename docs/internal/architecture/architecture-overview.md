@@ -19,7 +19,7 @@ flowchart TB
     %% EDGE / INGRESS LAYER
     %% ==========================================
     subgraph Edge_Layer ["1. Edge & Ingress Layer (Reverse Proxy & Load Balancer)"]
-        Traefik["Traefik or NGINX (tbd)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Round-Robin)<br/>• SSE Support for AI Streams"]
+        Traefik["Traefik or NGINX (tbd)<br/>• TLS Termination & Routing<br/>• Dynamic Load Balancing (Least Connections)<br/>• SSE Support for AI Streams"]
     end
 
     %% ==========================================
@@ -54,7 +54,7 @@ flowchart TB
     subgraph Data_Layer ["4. Persistence & Shared State Layer"]
         AppDB[("PostgreSQL – taramisu-db<br/>(App & TARA Data)")]
         IAMDB[("PostgreSQL – authentik-db<br/>(IAM Data)")]
-        Redis[("Redis<br/>• IAM Metadata Cache<br/>• Rate Limiting<br/>• Async LLM Task Queue")]
+        Redis[("Redis<br/>• IAM Metadata Cache<br/>• Rate Limiting<br/>• Async LLM Task Queue & Pub/Sub")]
         MinIO[("MinIO Object Storage (S3)<br/>• Architecture Diagrams<br/>• Uploaded Documents")]
     end
 
@@ -66,22 +66,21 @@ flowchart TB
     %% Edge Routing
     Traefik -->|"/* (Static Assets)"| FE
     Traefik -->|"/auth/* (OIDC Login & UI)"| AuthServer
-    Traefik ==>|"/api/* (Dynamic Load Balancing)"| API1
-    Traefik ==>|"/api/* (Dynamic Load Balancing)"| API2
+    Traefik ==>|"/api/* (Least Connections LB)"| API1
+    Traefik ==>|"/api/* (Least Connections LB)"| API2
 
     %% Internal Service Communication
     API1 & API2 -.->|"JWKS Token Verify &<br/>User/Group Lookup API"| AuthServer
-    API1 & API2 -->|"Internal HTTP<br/>(RBAC-checked AI Requests)"| LLM
 
     %% Database & Storage Connections
     Atlas -->|"Applies SQL Migrations"| AppDB
     AuthServer & AuthWorker -->|"SQL"| IAMDB
 
     API1 & API2 -->|"SQL Queries"| AppDB
-    API1 & API2 -->|"Distributed Cache"| Redis
+    API1 & API2 -->|"Cache & Enqueue AI Jobs"| Redis
     API1 & API2 -->|"S3 API (Upload / Stream Download)"| MinIO
 
-    LLM -->|"Job Queue / Stream State"| Redis
+    LLM -->|"Dequeue AI Jobs & Publish Stream"| Redis
 ```
 
 ---
@@ -95,9 +94,8 @@ Every stateful component lives in its **own internal Docker network** that is sh
 | `proxy` | no | Reverse Proxy, Frontend, Go API, Authentik Server | Ingress routing from the edge |
 | `app-db` | yes | Go API, Atlas, `taramisu-db` | Application database access |
 | `iam-db` | yes | Authentik Server, Authentik Worker, `authentik-db` | IAM database access |
-| `cache` | yes | Go API, LLM Service, Redis | Shared cache, rate limiting, job queue |
+| `cache` | yes | Go API, LLM Service, Redis | Shared cache, rate limiting, async LLM job queue & pub/sub |
 | `storage` | yes | Go API, MinIO | Object storage access |
-| `llm` | yes | Go API, LLM Service | Internal AI requests |
 
 ```mermaid
 flowchart LR
@@ -128,8 +126,6 @@ flowchart LR
     LLM ---|cache| Redis
 
     API ---|storage| MinIO
-
-    API ---|llm| LLM
 ```
 
 > [!NOTE]
@@ -139,9 +135,9 @@ flowchart LR
 
 ## 3. Key Architectural Decisions & Justifications
 
-### 1. Traefik or NGINX (tbd) as Reverse Proxy & Load Balancer
-* **Decision:** Evaluate **Traefik or NGINX (tbd)** as the central entrypoint and load balancer.
-* **Why:** Both options are under consideration for the edge and ingress layer. While traditional NGINX is a proven and widely adopted standard, Traefik features **native Docker container auto-discovery** in its open-source version—automatically detecting scaled Go backend instances (`docker compose up --scale api=3`) via the Docker socket and balancing traffic without manual configuration reloads. The final decision will balance dynamic service discovery and load balancing capabilities in open-source setups against team familiarity and infrastructure requirements. Both support TLS termination and integration with Authentik via Forward-Auth.
+### 1. Traefik or NGINX (tbd) with Least Connections Load Balancing
+* **Decision:** Evaluate **Traefik or NGINX (tbd)** as the central entrypoint and load balancer using a **Least Connections** balancing strategy.
+* **Why:** Both options are under consideration for the edge and ingress layer. While traditional NGINX is a proven and widely adopted standard, Traefik features **native Docker container auto-discovery** in its open-source version—automatically detecting scaled Go backend instances (`docker compose up --scale api=3`) via the Docker socket and balancing traffic without manual configuration reloads. Because the Go API handles a mix of fast JSON queries, multi-megabyte file streams, and long-lived Server-Sent Events (SSE) streams for LLM responses, **Least Connections** is chosen over e.g. Round-Robin so new requests are always routed to the replica with the fewest active in-flight connections. Both proxies support TLS termination and integration with Authentik via Forward-Auth.
 
 ### 2. 100% Stateless Go Backend (`1..N` Replicas)
 * **Decision:** The Go backend holds no local sessions, files, or persistent state.
@@ -152,7 +148,7 @@ flowchart LR
 * **Why:** Full isolation of the IAM data from the application data: separate credentials, volumes, backups, upgrade cycles and resource limits. A compromised or misconfigured Go API has no network path to the Authentik database and vice versa. The additional operational overhead of a second PostgreSQL container is small compared to the security and lifecycle benefits.
 
 ### 4. Strict Network Segmentation
-* **Decision:** Only the reverse proxy is exposed; all stateful services sit in dedicated internal networks (see [Section 2](#2-network-segmentation)).
+* **Decision:** Only the reverse proxy is exposed; all stateful services sit in dedicated internal networks (see [Section 2](#2-network-segmentation)). The Go API and LLM Service communicate asynchronously via Redis in the `cache` network rather than direct HTTP calls.
 * **Why:** Minimizes the attack surface and enforces least privilege on the network level—each service can only reach the backends it actually needs.
 
 ### 5. Zero PII in Application Database (Authentik Integration)
@@ -175,7 +171,7 @@ flowchart LR
   | --- | --- |
   | Authentik user/group metadata (display name, e-mail) for rendering | Avoids one Authentik API call per displayed user; short TTL (e.g. 5–15 min) |
   | Rate-limiting counters | Must be shared across all API replicas |
-  | Async LLM task queue / stream state | Long-running jobs must survive replica switches |
+  | Async LLM task queue / stream state | Decouples the Go API from the LLM service and ensures long-running jobs survive replica switches |
 
 * **Explicitly not cached:**
   * **File contents** – Redis is not a blob store; the saving would be negligible (MinIO is already a fast local service) while memory usage would grow quickly. Repeated downloads are handled by HTTP caching instead (`ETag` + `Cache-Control: private`), so the browser revalidates but does not re-download unchanged files.
