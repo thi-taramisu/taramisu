@@ -3,13 +3,13 @@ server {
   root /usr/share/nginx/html;
   index index.html;
 
-  # Hash-benannte Assets lange cachen
+  # Cache hash-named assets for a long time
   location /assets/ {
     expires 1y;
     add_header Cache-Control "public, immutable";
   }
 
-  # Unbekannte Pfade -> index.html
+  # Fallback unknown paths to index.html (SPA routing)
   location / {
     try_files $uri /index.html;
   }
