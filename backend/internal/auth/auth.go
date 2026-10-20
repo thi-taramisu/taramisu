@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/danielgtaylor/huma/v2"
 	"golang.org/x/oauth2"
 )
 
@@ -85,10 +86,10 @@ func (m *Manager) cookie(w http.ResponseWriter, name, value string, seconds int)
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, Secure: m.secure, SameSite: http.SameSiteLaxMode, MaxAge: seconds})
 }
 func fail(w http.ResponseWriter, code int, message string) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	json.NewEncoder(w).Encode(huma.NewError(code, message))
 }
 
 func (m *Manager) pruneLocked() {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 )
 
@@ -42,6 +43,17 @@ func TestAuthRoutes(t *testing.T) {
 		handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != want {
 			t.Fatalf("GET %s: got %d, want %d", path, w.Code, want)
+		}
+		if path == "/api/v1/me" {
+			var problem huma.ErrorModel
+			decoder := json.NewDecoder(w.Body)
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&problem); err != nil {
+				t.Fatal(err)
+			}
+			if got := w.Header().Get("Content-Type"); got != "application/problem+json" {
+				t.Fatalf("Content-Type = %q, want application/problem+json", got)
+			}
 		}
 	}
 	for origin, want := range map[string]int{"": 403, "http://localhost:8080": 204} {
