@@ -3,7 +3,7 @@ export
 
 OPENAPI := openapi.json
 
-.PHONY: up down reset db run test migrate migrate-diff sqlc openapi
+.PHONY: up down reset db pgadmin run test migrate migrate-diff sqlc openapi
 up:
 	docker compose up --build -d api
 down:
@@ -12,6 +12,8 @@ reset:
 	docker compose --profile tools down -v
 db:
 	docker compose up -d --wait db
+pgadmin:
+	docker compose up -d pgadmin
 run:
 	go run ./cmd/api
 test:
