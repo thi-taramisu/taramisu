@@ -1,7 +1,9 @@
 -include .env
 export
 
-.PHONY: up down reset db run test migrate migrate-diff sqlc lint fmt
+OPENAPI := openapi.json
+
+.PHONY: up down reset db pgadmin run test migrate migrate-diff sqlc openapi lint fmt
 up:
 	docker compose up --build -d api
 down:
@@ -10,6 +12,8 @@ reset:
 	docker compose --profile tools down -v
 db:
 	docker compose up -d --wait db
+pgadmin:
+	docker compose up -d pgadmin
 run:
 	go run ./cmd/api
 test:
@@ -25,3 +29,7 @@ lint:
 	golangci-lint run ./...
 fmt:
 	golangci-lint fmt ./...
+openapi:
+	@tmp=$$(mktemp "$(OPENAPI).XXXXXX") || exit 1; \
+	trap 'rm -f "$$tmp"' EXIT INT TERM; \
+	go run ./cmd/openapi > "$$tmp" && mv "$$tmp" $(OPENAPI)

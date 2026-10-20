@@ -1,0 +1,29 @@
+name: Bug Report
+description: Report a reproducible bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Description
+      description: What happened, and what was expected instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Run '...'
+        2. Call endpoint or open view '...'
+        3. See error '...'
+    validations:
+      required: true
+  - type: textarea
+    id: environment-logs
+    attributes:
+      label: Error Logs / Screenshots / Environment
+      description: Stack traces, console logs, screenshots, or environment details (OS, branch, commit).
+    validations:
+      required: false
