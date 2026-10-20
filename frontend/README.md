@@ -29,12 +29,14 @@ src/
   lib/                         # shared helpers
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health via openapi-react-query
-  features/assets/             # example: assets table and dialog built with shadcn/ui
+  features/workspace/          # project workspace: layout with element tree, element pages with tabs, example data
+  features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
 ```
 
-So far there are two example pages with hard-coded data: `/item-definition` and `/assets`. The route concept is in
+All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
+`/projects/headlamp/items/i-01` for the item definition diagram. The route concept is in
 [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 ## API client

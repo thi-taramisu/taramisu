@@ -10,8 +10,8 @@ export interface Asset {
 }
 
 export const headlampAssets: Asset[] = [
-  { id: 'a1', name: 'Headlamp on/off command', component: 'Body control ECU', properties: ['I', 'A'] },
-  { id: 'a2', name: 'Body control ECU firmware', component: 'Body control ECU', properties: ['I'] },
-  { id: 'a3', name: 'Camera image data', component: 'Camera ECU', properties: ['I', 'A'] },
-  { id: 'a4', name: 'Diagnostic session key', component: 'Gateway ECU', properties: ['C', 'I'] },
+  { id: 'a-01', name: 'Headlamp on/off command', component: 'Body control ECU', properties: ['I', 'A'] },
+  { id: 'a-02', name: 'Body control ECU firmware', component: 'Body control ECU', properties: ['I'] },
+  { id: 'a-03', name: 'Camera image data', component: 'Camera ECU', properties: ['I', 'A'] },
+  { id: 'a-04', name: 'Diagnostic session key', component: 'Gateway ECU', properties: ['C', 'I'] },
 ]
