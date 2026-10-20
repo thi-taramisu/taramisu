@@ -28,7 +28,7 @@ The old tool (THIARA) used the same hierarchy, with per-project access levels (R
 | `/projects/:projectId/members` | Members and access | manage | Invite users, set access level |
 | `/projects/:projectId/items` | Item list | read | |
 | `/projects/:projectId/items/:itemId` | Item definition (diagram) | read, edit needs write | React Flow editor, **implemented as example at `/item-definition`** |
-| `/projects/:projectId/items/:itemId/assets` | Assets | read | Table with C / I / A |
+| `/projects/:projectId/items/:itemId/assets` | Assets | read | Table with C / I / A, **implemented as example at `/assets`** |
 | `/projects/:projectId/items/:itemId/damage-scenarios` | Damage scenarios and impact | read | Impact per category S / F / O / P |
 | `/projects/:projectId/items/:itemId/threat-scenarios` | Threat scenarios | read | |
 | `/projects/:projectId/items/:itemId/attack-paths` | Attack paths and feasibility | read | Graph view (React Flow) plus rating |
@@ -38,7 +38,7 @@ The old tool (THIARA) used the same hierarchy, with per-project access levels (R
 
 Auth values: public means no login, user means logged in, and read, write and manage are the project access levels.
 
-Currently implemented: only `/item-definition`, a standalone example with hard-coded headlamp data. Everything else is concept.
+Currently implemented: `/item-definition` and `/assets`, standalone examples with hard-coded headlamp data. Everything else is concept.
 
 ## Navigation sketch
 
