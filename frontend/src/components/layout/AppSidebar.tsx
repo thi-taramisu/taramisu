@@ -1,14 +1,22 @@
 ﻿
 import { Archive, FolderOpen, Plus, Search } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
 type AppSidebarProps = {
   collapsed: boolean
+  activeView: 'projects' | 'archive'
+  onShowProjects: () => void
+  onShowArchive: () => void
   onCreateProject: () => void
 }
 
-export function AppSidebar({ collapsed, onCreateProject }: AppSidebarProps) {
+export function AppSidebar({
+  collapsed,
+  activeView,
+  onShowProjects,
+  onShowArchive,
+  onCreateProject,
+}: AppSidebarProps) {
   return (
     <aside
       id="main-sidebar"
@@ -29,28 +37,41 @@ export function AppSidebar({ collapsed, onCreateProject }: AppSidebarProps) {
       )}
 
       <nav aria-label="Main navigation" className="space-y-2">
-        <NavLink
-          to="/projects"
+        <Button
+          type="button"
+          variant={activeView === 'projects' ? 'secondary' : 'ghost'}
+          className="w-full justify-start gap-2"
+          onClick={onShowProjects}
           aria-label="Projects"
+          aria-current={activeView === 'projects' ? 'page' : undefined}
           title={collapsed ? 'Projects' : undefined}
-          className="flex items-center gap-2 rounded-md p-2 text-sm hover:bg-muted"
         >
           <FolderOpen size={18} className="shrink-0" />
           {!collapsed && <span>Projects</span>}
-        </NavLink>
+        </Button>
 
-        <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+        <Button
+          type="button"
+          variant={activeView === 'archive' ? 'secondary' : 'ghost'}
+          className="w-full justify-start gap-2"
+          onClick={onShowArchive}
+          aria-label="Archive"
+          aria-current={activeView === 'archive' ? 'page' : undefined}
+          title={collapsed ? 'Archive' : undefined}
+        >
           <Archive size={18} className="shrink-0" />
           {!collapsed && <span>Archive</span>}
-        </div>
+        </Button>
       </nav>
 
       <div className="mt-auto pt-4">
         <Button
+          type="button"
           variant="outline"
           className="w-full"
           onClick={onCreateProject}
           aria-label="Create Project"
+          title={collapsed ? 'Create Project' : undefined}
         >
           <Plus size={16} />
           {!collapsed && <span>Create Project</span>}

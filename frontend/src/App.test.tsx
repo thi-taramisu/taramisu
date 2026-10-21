@@ -182,6 +182,95 @@ describe('routing', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('archives and restores a project while preserving its favorite status', async () => {
+    const user = userEvent.setup()
+    renderAt('/projects')
+
+    const favorites = screen
+      .getByRole('heading', { name: 'Favorites' })
+      .closest('section')!
+
+    const allProjects = screen
+      .getByRole('heading', { name: 'All Projects' })
+      .closest('section')!
+
+    // Battery Security is initially active and a favorite.
+    expect(within(favorites).getByText('Battery Security')).toBeInTheDocument()
+    expect(within(allProjects).getByText('Battery Security')).toBeInTheDocument()
+
+    // Archive Battery Security through its actions menu.
+    await user.click(
+      within(allProjects).getByRole('button', {
+        name: 'Actions for Battery Security',
+      }),
+    )
+
+    await user.click(
+      await screen.findByRole('menuitem', {
+        name: 'Archive Project',
+      }),
+    )
+
+    // Archived projects must disappear from the main overview.
+    expect(
+      within(allProjects).queryByText('Battery Security'),
+    ).not.toBeInTheDocument()
+
+    expect(
+      within(favorites).queryByText('Battery Security'),
+    ).not.toBeInTheDocument()
+
+    // Switch to the archive view.
+    await user.click(
+      screen.getByRole('button', { name: 'Archive' }),
+    )
+
+    const archive = screen
+      .getByRole('heading', { name: 'Archive' })
+      .closest('section')!
+
+    expect(within(archive).getByText('Battery Security')).toBeInTheDocument()
+
+    // Restore Battery Security.
+    await user.click(
+      within(archive).getByRole('button', {
+        name: 'Restore Battery Security',
+      }),
+    )
+
+    expect(
+      within(archive).queryByText('Battery Security'),
+    ).not.toBeInTheDocument()
+
+    // Switch back to Projects.
+    await user.click(
+      screen.getByRole('button', { name: 'Projects' }),
+    )
+
+    const restoredProjects = screen
+      .getByRole('heading', { name: 'All Projects' })
+      .closest('section')!
+
+    const restoredFavorites = screen
+      .getByRole('heading', { name: 'Favorites' })
+      .closest('section')!
+
+    expect(
+      within(restoredProjects).getByText('Battery Security'),
+    ).toBeInTheDocument()
+
+    // The favorite status must remain unchanged.
+    expect(
+      within(restoredFavorites).getByText('Battery Security'),
+    ).toBeInTheDocument()
+
+    expect(
+      within(restoredProjects).getByRole('button', {
+        name: 'Remove Battery Security from favorites',
+      }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows the workspace with the element tree', () => {
     renderAt(project)
 

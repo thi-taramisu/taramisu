@@ -1,7 +1,7 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Archive, Ellipsis, Star, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,9 +18,12 @@ import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { mockProjects, type Project } from '@/features/projects/mockProjects'
 import { exampleProject } from '../features/workspace/exampleProject'
 
-/** Start page: project overview with favorites and all projects. */
+type MainView = 'projects' | 'archive'
+
+/** Start page: project overview, favorites, and archived projects. */
 export function ProjectListPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeView, setActiveView] = useState<MainView>('projects')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
@@ -37,12 +40,13 @@ export function ProjectListPage() {
     }
 
     setProjects((previous) => [...previous, newProject])
+    setActiveView('projects')
   }
 
   function handleToggleFavorite(projectId: string) {
     setProjects((previous) =>
       previous.map((project) =>
-        project.id === projectId
+        project.id === projectId && !project.archived
           ? { ...project, favorite: !project.favorite }
           : project,
       ),
@@ -63,6 +67,16 @@ export function ProjectListPage() {
     )
   }
 
+  function handleRestoreProject(projectId: string) {
+    setProjects((previous) =>
+      previous.map((project) =>
+        project.id === projectId
+          ? { ...project, archived: false }
+          : project,
+      ),
+    )
+  }
+
   function handleDeleteProject() {
     if (!projectToDelete || projectToDelete.id === exampleProject.id) {
       return
@@ -75,8 +89,8 @@ export function ProjectListPage() {
     setProjectToDelete(null)
   }
 
-  // Archived projects are excluded from the main overview.
   const activeProjects = projects.filter((project) => !project.archived)
+  const archivedProjects = projects.filter((project) => project.archived)
 
   return (
     <>
@@ -88,117 +102,159 @@ export function ProjectListPage() {
       <div className="flex min-h-[calc(100vh-4rem)]">
         <AppSidebar
           collapsed={sidebarCollapsed}
+          activeView={activeView}
+          onShowProjects={() => setActiveView('projects')}
+          onShowArchive={() => setActiveView('archive')}
           onCreateProject={() => setCreateDialogOpen(true)}
         />
 
         <main className="min-w-0 flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-8">
-            <section className="space-y-4">
-              <h1 className="text-xl font-semibold">Favorites</h1>
+            {activeView === 'projects' ? (
+              <>
+                <section className="space-y-4">
+                  <h1 className="text-xl font-semibold">Favorites</h1>
 
-              <div className="flex flex-wrap gap-4">
-                {activeProjects
-                  .filter((project) => project.favorite)
-                  .map((project) => (
-                    <ProjectCard
-                      key={project.id}
-                      name={project.name}
-                      description={project.description}
-                      favorite={project.favorite}
-                      onToggleFavorite={() =>
-                        handleToggleFavorite(project.id)
-                      }
-                    />
-                  ))}
-              </div>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-xl font-semibold">All Projects</h2>
-
-              <div className="space-y-3">
-                {activeProjects.map((project) => {
-                  const projectDetails = (
-                    <div className="min-w-0 flex-1">
-                      <CardTitle>{project.name}</CardTitle>
-                      <CardDescription>
-                        {project.description} &middot; {project.owner}
-                      </CardDescription>
-                    </div>
-                  )
-
-                  return (
-                    <Card key={project.id} className="py-3">
-                      <CardHeader className="flex flex-row items-center gap-4">
-                        {project.id === exampleProject.id ? (
-                          <Link
-                            to={`/projects/${project.id}`}
-                            aria-label={`${project.name} (example)`}
-                            className="min-w-0 flex-1 hover:opacity-80"
-                          >
-                            {projectDetails}
-                          </Link>
-                        ) : (
-                          projectDetails
-                        )}
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0"
-                          onClick={() => handleToggleFavorite(project.id)}
-                          aria-label={
-                            project.favorite
-                              ? `Remove ${project.name} from favorites`
-                              : `Add ${project.name} to favorites`
+                  <div className="flex flex-wrap gap-4">
+                    {activeProjects
+                      .filter((project) => project.favorite)
+                      .map((project) => (
+                        <ProjectCard
+                          key={project.id}
+                          name={project.name}
+                          description={project.description}
+                          favorite={project.favorite}
+                          onToggleFavorite={() =>
+                            handleToggleFavorite(project.id)
                           }
-                          aria-pressed={project.favorite}
-                        >
-                          <Star
-                            className="size-5"
-                            fill={project.favorite ? 'currentColor' : 'none'}
-                          />
-                        </Button>
+                        />
+                      ))}
+                  </div>
+                </section>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                <section className="space-y-4">
+                  <h2 className="text-xl font-semibold">All Projects</h2>
+
+                  <div className="space-y-3">
+                    {activeProjects.map((project) => {
+                      const projectDetails = (
+                        <div className="min-w-0 flex-1">
+                          <CardTitle>{project.name}</CardTitle>
+                          <CardDescription>
+                            {project.description} &middot; {project.owner}
+                          </CardDescription>
+                        </div>
+                      )
+
+                      return (
+                        <Card key={project.id} className="py-3">
+                          <CardHeader className="flex flex-row items-center gap-4">
+                            {project.id === exampleProject.id ? (
+                              <Link
+                                to={`/projects/${project.id}`}
+                                aria-label={`${project.name} (example)`}
+                                className="min-w-0 flex-1 hover:opacity-80"
+                              >
+                                {projectDetails}
+                              </Link>
+                            ) : (
+                              projectDetails
+                            )}
+
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
                               className="shrink-0"
-                              aria-label={`Actions for ${project.name}`}
+                              onClick={() => handleToggleFavorite(project.id)}
+                              aria-label={
+                                project.favorite
+                                  ? `Remove ${project.name} from favorites`
+                                  : `Add ${project.name} to favorites`
+                              }
+                              aria-pressed={project.favorite}
                             >
-                              <Ellipsis className="size-5" />
+                              <Star
+                                className="size-5"
+                                fill={project.favorite ? 'currentColor' : 'none'}
+                              />
                             </Button>
-                          </DropdownMenuTrigger>
 
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={project.id === exampleProject.id}
-                              onSelect={() => handleArchiveProject(project.id)}
-                            >
-                              <Archive className="size-4" />
-                              Archive Project
-                            </DropdownMenuItem>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="shrink-0"
+                                  aria-label={`Actions for ${project.name}`}
+                                >
+                                  <Ellipsis className="size-5" />
+                                </Button>
+                              </DropdownMenuTrigger>
 
-                            <DropdownMenuItem
-                              variant="destructive"
-                              disabled={project.id === exampleProject.id}
-                              onSelect={() => setProjectToDelete(project)}
-                            >
-                              <Trash2 className="size-4" />
-                              Delete Project
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </CardHeader>
-                    </Card>
-                  )
-                })}
-              </div>
-            </section>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  disabled={project.id === exampleProject.id}
+                                  onSelect={() => handleArchiveProject(project.id)}
+                                >
+                                  <Archive className="size-4" />
+                                  Archive Project
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={project.id === exampleProject.id}
+                                  onSelect={() => setProjectToDelete(project)}
+                                >
+                                  <Trash2 className="size-4" />
+                                  Delete Project
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </CardHeader>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <section className="space-y-4">
+                <h1 className="text-xl font-semibold">Archive</h1>
+
+                {archivedProjects.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No archived projects.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {archivedProjects.map((project) => (
+                      <Card key={project.id} className="py-3">
+                        <CardHeader className="flex flex-row items-center gap-4">
+                          <div className="min-w-0 flex-1">
+                            <CardTitle>{project.name}</CardTitle>
+                            <CardDescription>
+                              {project.description} &middot; {project.owner}
+                            </CardDescription>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleRestoreProject(project.id)}
+                            aria-label={`Restore ${project.name}`}
+                          >
+                            <ArchiveRestore className="size-4" />
+                            Restore Project
+                          </Button>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         </main>
       </div>
