@@ -1,6 +1,7 @@
+
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Ellipsis, Star, Trash2 } from 'lucide-react'
+import { Archive, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +31,7 @@ export function ProjectListPage() {
       name,
       description: 'New TARA project',
       favorite: false,
+      archived: false,
       owner: 'Demo User',
       updatedAt: new Date().toISOString().slice(0, 10),
     }
@@ -47,6 +49,20 @@ export function ProjectListPage() {
     )
   }
 
+  function handleArchiveProject(projectId: string) {
+    if (projectId === exampleProject.id) {
+      return
+    }
+
+    setProjects((previous) =>
+      previous.map((project) =>
+        project.id === projectId
+          ? { ...project, archived: true }
+          : project,
+      ),
+    )
+  }
+
   function handleDeleteProject() {
     if (!projectToDelete || projectToDelete.id === exampleProject.id) {
       return
@@ -58,6 +74,9 @@ export function ProjectListPage() {
 
     setProjectToDelete(null)
   }
+
+  // Archived projects are excluded from the main overview.
+  const activeProjects = projects.filter((project) => !project.archived)
 
   return (
     <>
@@ -78,7 +97,7 @@ export function ProjectListPage() {
               <h1 className="text-xl font-semibold">Favorites</h1>
 
               <div className="flex flex-wrap gap-4">
-                {projects
+                {activeProjects
                   .filter((project) => project.favorite)
                   .map((project) => (
                     <ProjectCard
@@ -98,7 +117,7 @@ export function ProjectListPage() {
               <h2 className="text-xl font-semibold">All Projects</h2>
 
               <div className="space-y-3">
-                {projects.map((project) => {
+                {activeProjects.map((project) => {
                   const projectDetails = (
                     <div className="min-w-0 flex-1">
                       <CardTitle>{project.name}</CardTitle>
@@ -156,6 +175,14 @@ export function ProjectListPage() {
                           </DropdownMenuTrigger>
 
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              disabled={project.id === exampleProject.id}
+                              onSelect={() => handleArchiveProject(project.id)}
+                            >
+                              <Archive className="size-4" />
+                              Archive Project
+                            </DropdownMenuItem>
+
                             <DropdownMenuItem
                               variant="destructive"
                               disabled={project.id === exampleProject.id}
