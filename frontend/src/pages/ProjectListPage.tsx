@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { exampleProject } from '../features/workspace/exampleProject'
+import { mockProjects } from '@/features/projects/mockProjects'
 
 /** Start page: project overview with favorites and all projects. */
 export function ProjectListPage() {
@@ -25,11 +26,18 @@ export function ProjectListPage() {
             <section className="space-y-4">
               <h1 className="text-xl font-semibold">Favorites</h1>
 
-              <ProjectCard
-                name="Battery Security"
-                description="Edited 2 days ago"
-                favorite
-              />
+              <div className="flex flex-wrap gap-4">
+                {mockProjects
+                  .filter((project) => project.favorite)
+                  .map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      name={project.name}
+                      description={project.description}
+                      favorite={project.favorite}
+                    />
+                  ))}
+              </div>
             </section>
 
             <section className="space-y-4">
