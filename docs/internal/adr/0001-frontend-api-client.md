@@ -6,12 +6,14 @@
 
 ## Context
 
-So far the frontend (React 19, TypeScript, Vite, Vitest) doesn't talk to the backend at all. The backend is written in Go and publishes an OpenAPI spec, which is our API contract. Before everyone starts writing their own `fetch` calls, we should agree on one way to access the backend.
+So far the frontend (React 19, TypeScript, Vite, Vitest) doesn't talk to the backend at all. The backend is written in Go and publishes an
+OpenAPI spec, which is our API contract. Before everyone starts writing their own `fetch` calls, we should agree on one way to access the
+backend.
 
 What we want from the client:
 
 | # | Requirement |
-|---|-------------|
+| :--- | :--- |
 | R1 | Types follow the API contract, so a contract change breaks the build and not production |
 | R2 | Errors are handled the same way everywhere (typed error bodies, 401 handled in one place) |
 | R3 | Auth token handling doesn't depend on which IAM we pick (#46) |
@@ -21,19 +23,24 @@ What we want from the client:
 
 ## Options
 
-1. **Hand-written `fetch` wrapper with our own types.** No dependencies, but we'd be copying types by hand and they will drift from the spec sooner or later (R1). We'd also have to build caching and loading states ourselves (R4).
-2. **`openapi-typescript` + `openapi-fetch`, with TanStack Query via `openapi-react-query`.** The types are generated from the spec. `openapi-fetch` is a small (~6 KB) typed wrapper around `fetch` that supports middleware, and `openapi-react-query` gives us typed `useQuery`/`useMutation` hooks on top. Only types are generated, no runtime code.
-3. **Full code generation (Orval or `@hey-api/openapi-ts`).** Generates the client functions and, if you want, the query hooks too. Just as type safe as option 2, but it puts a lot of generated runtime code into the repo that someone has to review and configure (R6).
+1. **Hand-written `fetch` wrapper with our own types.** No dependencies, but we'd be copying types by hand and they will drift from the
+   spec sooner or later (R1). We'd also have to build caching and loading states ourselves (R4).
+2. **`openapi-typescript` + `openapi-fetch`, with TanStack Query via `openapi-react-query`.** The types are generated from the spec.
+   `openapi-fetch` is a small (~6 KB) typed wrapper around `fetch` that supports middleware, and `openapi-react-query` gives us typed
+   `useQuery`/`useMutation` hooks on top. Only types are generated, no runtime code.
+3. **Full code generation (Orval or `@hey-api/openapi-ts`).** Generates the client functions and, if you want, the query hooks too.
+   Just as type safe as option 2, but it puts a lot of generated runtime code into the repo that someone has to review and configure (R6).
 
-| | R1 types | R2 errors | R3 auth | R4 caching | R5 tests | R6 size |
-|---|---|---|---|---|---|---|
+| Option | R1 types | R2 errors | R3 auth | R4 caching | R5 tests | R6 size |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | 1. Manual fetch | ✗ by hand | by hand | by hand | by hand | ✓ | ✓ smallest |
 | 2. openapi-fetch + Query | ✓ | ✓ typed `error`, middleware | ✓ middleware | ✓ TanStack Query | ✓ inject `fetch` / MSW | ✓ only types generated |
 | 3. Full codegen | ✓ | ✓ | ✓ | ✓ if hooks are generated | ✓ | ✗ generated code |
 
 ## Decision
 
-I suggest we go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and components use `openapi-react-query` (on top of TanStack Query) for caching and loading states.
+I suggest we go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and
+components use `openapi-react-query` (on top of TanStack Query) for caching and loading states.
 
 `createApiClient()` in `src/api/client.ts` wraps `createClient<paths>` and adds a middleware with two hooks:
 
@@ -42,13 +49,19 @@ I suggest we go with option 2. `openapi-typescript` generates `src/api/schema.d.
 
 The tests mock the API with MSW, so no backend is needed to run them.
 
-For now `frontend/openapi/openapi.yaml` is just a stub with a single endpoint (`GET /health`). Since #62 the backend publishes its spec as `backend/openapi.json`. Its health endpoints are `/health/live` and `/health/ready`, so the stub doesn't match it yet. Once we switch over, regenerate with `npm run generate:api`.
+For now `frontend/openapi/openapi.yaml` is just a stub with a single endpoint (`GET /health`). Since #62 the backend publishes its spec as
+`backend/openapi.json`. Its health endpoints are `/health/live` and `/health/ready`, so the stub doesn't match it yet. Once we switch over,
+regenerate with `npm run generate:api`.
 
 ## Consequences
 
-- If the contract changes, we get TypeScript errors after regenerating `schema.d.ts`. The file is committed, so reviewers can see contract changes in the diff.
+- If the contract changes, we get TypeScript errors after regenerating `schema.d.ts`. The file is committed, so reviewers can see contract
+  changes in the diff.
 - New runtime dependencies: `openapi-fetch`, `@tanstack/react-query`, `openapi-react-query`. New dev dependencies: `openapi-typescript`, `msw`.
-- One thing to keep an eye on: the latest `openapi-typescript` (7.13.0) declares `typescript ^5` as its peer dependency, but we're on TypeScript 6. We only use it as a CLI at build time and generation works fine, so I overrode the peer range for just that package (`overrides` in `package.json`). We should remove the override once there's a release that supports TS 6.
+- One thing to keep an eye on: the latest `openapi-typescript` (7.13.0) declares `typescript ^5` as its peer dependency, but we're on
+  TypeScript 6. We only use it as a CLI at build time and generation works fine, so I overrode the peer range for just that package
+  (`overrides` in `package.json`). We should remove the override once there's a release that supports TS 6.
 - We still need to agree with the backend team on where the spec lives and whether `schema.d.ts` stays committed or gets generated in CI.
 - If the spec turns out not to work well with `openapi-typescript`, we can switch to option 3. The call sites would look pretty similar.
-- Picking a server-state library is part of this decision. If the team would rather not use TanStack Query yet, `openapi-fetch` works fine without it.
+- Picking a server-state library is part of this decision. If the team would rather not use TanStack Query yet, `openapi-fetch` works fine
+  without it.
