@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -5,13 +6,29 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
-import { mockProjects } from '@/features/projects/mockProjects'
+import { mockProjects, type Project } from '@/features/projects/mockProjects'
 import { exampleProject } from '../features/workspace/exampleProject'
 
 /** Start page: project overview with favorites and all projects. */
 export function ProjectListPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+
+  // Start with the existing mock projects.
+  const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
+
+  function handleCreateProject(name: string) {
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      name,
+      description: 'New TARA project',
+      favorite: false,
+      owner: 'Demo User',
+      updatedAt: new Date().toISOString().slice(0, 10),
+    }
+
+    setProjects((previous) => [...previous, newProject])
+  }
 
   return (
     <>
@@ -32,7 +49,7 @@ export function ProjectListPage() {
               <h1 className="text-xl font-semibold">Favorites</h1>
 
               <div className="flex flex-wrap gap-4">
-                {mockProjects
+                {projects
                   .filter((project) => project.favorite)
                   .map((project) => (
                     <ProjectCard
@@ -49,7 +66,7 @@ export function ProjectListPage() {
               <h2 className="text-xl font-semibold">All Projects</h2>
 
               <div className="space-y-3">
-                {mockProjects.map((project) => {
+                {projects.map((project) => {
                   const card = (
                     <Card className="py-3">
                       <CardHeader>
@@ -83,6 +100,7 @@ export function ProjectListPage() {
       <CreateProjectDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+        onCreateProject={handleCreateProject}
       />
     </>
   )

@@ -1,4 +1,5 @@
-﻿import { useState } from 'react'
+﻿
+import { useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -14,13 +15,25 @@ import { Label } from '@/components/ui/label'
 type CreateProjectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreateProject: (name: string) => void
 }
 
 export function CreateProjectDialog({
   open,
   onOpenChange,
+  onCreateProject,
 }: CreateProjectDialogProps) {
   const [name, setName] = useState('')
+
+  function handleCreate() {
+    const trimmedName = name.trim()
+
+    if (!trimmedName) return
+
+    onCreateProject(trimmedName)
+    setName('')
+    onOpenChange(false)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -43,10 +56,19 @@ export function CreateProjectDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button disabled={!name.trim()}>Create</Button>
+
+          <Button
+            disabled={!name.trim()}
+            onClick={handleCreate}
+          >
+            Create
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

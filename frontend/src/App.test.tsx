@@ -1,3 +1,4 @@
+
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -22,6 +23,35 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { name: 'Favorites' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'All Projects' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
+  })
+
+  it('creates a project through the dialog', async () => {
+    const user = userEvent.setup()
+    renderAt('/projects')
+
+    await user.click(screen.getByRole('button', { name: 'Create Project' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Create Project' })
+
+    expect(dialog).toBeInTheDocument()
+
+    const nameInput = within(dialog).getByRole('textbox', { name: 'Project name' })
+    const createButton = within(dialog).getByRole('button', { name: 'Create' })
+
+    expect(createButton).toBeDisabled()
+
+    await user.type(nameInput, 'My New TARA Project')
+
+    expect(createButton).toBeEnabled()
+
+    await user.click(createButton)
+
+    expect(screen.queryByRole('dialog', { name: 'Create Project' })).not.toBeInTheDocument()
+
+    const allProjects = screen.getByRole('heading', { name: 'All Projects' }).closest('section')
+
+    expect(allProjects).not.toBeNull()
+    expect(within(allProjects!).getByText('My New TARA Project')).toBeInTheDocument()
   })
 
   it('shows the workspace with the element tree', () => {
