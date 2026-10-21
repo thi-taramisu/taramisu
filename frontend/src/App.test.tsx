@@ -106,6 +106,82 @@ describe('routing', () => {
     ).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('deletes a project only after confirmation', async () => {
+    const user = userEvent.setup()
+    renderAt('/projects')
+
+    const favorites = screen
+      .getByRole('heading', { name: 'Favorites' })
+      .closest('section')!
+
+    const allProjects = screen
+      .getByRole('heading', { name: 'All Projects' })
+      .closest('section')!
+
+    // Battery Security initially exists in both sections.
+    expect(within(favorites).getByText('Battery Security')).toBeInTheDocument()
+    expect(within(allProjects).getByText('Battery Security')).toBeInTheDocument()
+
+    // Open the actions menu and select Delete Project.
+    await user.click(
+      within(allProjects).getByRole('button', {
+        name: 'Actions for Battery Security',
+      }),
+    )
+
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Delete Project' }),
+    )
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Delete Project?',
+    })
+
+    expect(within(dialog).getByText('Battery Security')).toBeInTheDocument()
+
+    // Cancel must preserve the project.
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Cancel' }),
+    )
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Delete Project?' }),
+    ).not.toBeInTheDocument()
+
+    expect(within(allProjects).getByText('Battery Security')).toBeInTheDocument()
+
+    // Reopen the actions menu.
+    await user.click(
+      within(allProjects).getByRole('button', {
+        name: 'Actions for Battery Security',
+      }),
+    )
+
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Delete Project' }),
+    )
+
+    const confirmationDialog = await screen.findByRole('dialog', {
+      name: 'Delete Project?',
+    })
+
+    // Confirm deletion.
+    await user.click(
+      within(confirmationDialog).getByRole('button', {
+        name: 'Delete Project',
+      }),
+    )
+
+    // The deleted project must disappear from both sections.
+    expect(
+      within(allProjects).queryByText('Battery Security'),
+    ).not.toBeInTheDocument()
+
+    expect(
+      within(favorites).queryByText('Battery Security'),
+    ).not.toBeInTheDocument()
+  })
+
   it('shows the workspace with the element tree', () => {
     renderAt(project)
 

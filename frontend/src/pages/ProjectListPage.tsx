@@ -1,13 +1,19 @@
-
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Star } from 'lucide-react'
+import { Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
+import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { mockProjects, type Project } from '@/features/projects/mockProjects'
 import { exampleProject } from '../features/workspace/exampleProject'
 
@@ -15,8 +21,8 @@ import { exampleProject } from '../features/workspace/exampleProject'
 export function ProjectListPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-
   const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
   function handleCreateProject(name: string) {
     const newProject: Project = {
@@ -39,6 +45,18 @@ export function ProjectListPage() {
           : project,
       ),
     )
+  }
+
+  function handleDeleteProject() {
+    if (!projectToDelete || projectToDelete.id === exampleProject.id) {
+      return
+    }
+
+    setProjects((previous) =>
+      previous.filter((project) => project.id !== projectToDelete.id),
+    )
+
+    setProjectToDelete(null)
   }
 
   return (
@@ -110,9 +128,7 @@ export function ProjectListPage() {
                           variant="ghost"
                           size="icon"
                           className="shrink-0"
-                          onClick={() =>
-                            handleToggleFavorite(project.id)
-                          }
+                          onClick={() => handleToggleFavorite(project.id)}
                           aria-label={
                             project.favorite
                               ? `Remove ${project.name} from favorites`
@@ -122,13 +138,34 @@ export function ProjectListPage() {
                         >
                           <Star
                             className="size-5"
-                            fill={
-                              project.favorite
-                                ? 'currentColor'
-                                : 'none'
-                            }
+                            fill={project.favorite ? 'currentColor' : 'none'}
                           />
                         </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="shrink-0"
+                              aria-label={`Actions for ${project.name}`}
+                            >
+                              <Ellipsis className="size-5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={project.id === exampleProject.id}
+                              onSelect={() => setProjectToDelete(project)}
+                            >
+                              <Trash2 className="size-4" />
+                              Delete Project
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </CardHeader>
                     </Card>
                   )
@@ -143,6 +180,16 @@ export function ProjectListPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onCreateProject={handleCreateProject}
+      />
+
+      <DeleteProjectDialog
+        projectName={projectToDelete?.name ?? null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProjectToDelete(null)
+          }
+        }}
+        onConfirm={handleDeleteProject}
       />
     </>
   )
