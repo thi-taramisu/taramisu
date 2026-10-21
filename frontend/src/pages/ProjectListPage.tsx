@@ -1,11 +1,12 @@
+
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
-import { exampleProject } from '../features/workspace/exampleProject'
 import { mockProjects } from '@/features/projects/mockProjects'
+import { exampleProject } from '../features/workspace/exampleProject'
 
 /** Start page: project overview with favorites and all projects. */
 export function ProjectListPage() {
@@ -43,14 +44,33 @@ export function ProjectListPage() {
             <section className="space-y-4">
               <h2 className="text-xl font-semibold">All Projects</h2>
 
-              <Link to={`/projects/${exampleProject.id}`} className="block">
-                <Card className="hover:bg-muted">
-                  <CardHeader>
-                    <CardTitle>{exampleProject.name}</CardTitle>
-                    <CardDescription>Hard-coded example project</CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
+              <div className="space-y-3">
+                {mockProjects.map((project) => {
+                  const card = (
+                    <Card className="py-3">
+                      <CardHeader>
+                        <CardTitle>{project.name}</CardTitle>
+                        <CardDescription>
+                          {project.description} · {project.owner}
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  )
+
+                  return project.id === exampleProject.id ? (
+                    <Link
+                      key={project.id}
+                      to={`/projects/${project.id}`}
+                      aria-label={`${project.name} (example)`}
+                      className="block hover:opacity-80"
+                    >
+                      {card}
+                    </Link>
+                  ) : (
+                    <div key={project.id}>{card}</div>
+                  )
+                })}
+              </div>
             </section>
           </div>
         </main>
