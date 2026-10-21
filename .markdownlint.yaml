@@ -1,0 +1,35 @@
+# Rule configuration for markdownlint (https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md).
+# Picked up by markdownlint-cli2 (CI + CLI) and the VS Code markdownlint extension.
+default: true
+
+# Line length: 140 chars for prose; code blocks, tables and headings are exempt.
+MD013:
+  line_length: 140
+  code_blocks: false
+  tables: false
+  headings: false
+
+# Allow a small set of inline HTML elements (e.g. collapsible sections, keyboard keys).
+MD033:
+  allowed_elements:
+    - "details"
+    - "summary"
+    - "br"
+    - "img"
+    - "kbd"
+    - "sub"
+    - "sup"
+
+# Allow the same heading text in different sections (e.g. "Example" below several chapters).
+MD024:
+  siblings_only: true
+
+# Ordered lists use increasing numbers (1. 2. 3.).
+MD029:
+  style: "ordered"
+
+# Allow question marks at the end of headings (FAQ style).
+MD026:
+  punctuation: ".,;:!"
+# First line does not need to be an H1 (GitHub PR/issue templates, files starting with badges or front matter).
+MD041: false
