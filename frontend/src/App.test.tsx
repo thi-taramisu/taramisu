@@ -19,7 +19,8 @@ describe('routing', () => {
   it('redirects / to the project list', () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Favorites' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'All Projects' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
   })
 
