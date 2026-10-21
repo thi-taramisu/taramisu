@@ -54,6 +54,58 @@ describe('routing', () => {
     expect(within(allProjects!).getByText('My New TARA Project')).toBeInTheDocument()
   })
 
+  it('adds and removes a project from favorites', async () => {
+    const user = userEvent.setup()
+    renderAt('/projects')
+
+    const favorites = screen
+      .getByRole('heading', { name: 'Favorites' })
+      .closest('section')
+
+    const allProjects = screen
+      .getByRole('heading', { name: 'All Projects' })
+      .closest('section')
+
+    expect(favorites).not.toBeNull()
+    expect(allProjects).not.toBeNull()
+
+    // Vehicle Gateway is not a favorite initially.
+    expect(within(favorites!).queryByText('Vehicle Gateway')).not.toBeInTheDocument()
+
+    // Add Vehicle Gateway to favorites.
+    await user.click(
+      within(allProjects!).getByRole('button', {
+        name: 'Add Vehicle Gateway to favorites',
+      }),
+    )
+
+    expect(within(favorites!).getByText('Vehicle Gateway')).toBeInTheDocument()
+
+    expect(
+      within(allProjects!).getByRole('button', {
+        name: 'Remove Vehicle Gateway from favorites',
+      }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    // Remove Vehicle Gateway using its favorite card.
+    await user.click(
+      within(favorites!).getByRole('button', {
+        name: 'Remove Vehicle Gateway from favorites',
+      }),
+    )
+
+    expect(within(favorites!).queryByText('Vehicle Gateway')).not.toBeInTheDocument()
+
+    // The project must still exist under All Projects.
+    expect(within(allProjects!).getByText('Vehicle Gateway')).toBeInTheDocument()
+
+    expect(
+      within(allProjects!).getByRole('button', {
+        name: 'Add Vehicle Gateway to favorites',
+      }),
+    ).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('shows the workspace with the element tree', () => {
     renderAt(project)
 

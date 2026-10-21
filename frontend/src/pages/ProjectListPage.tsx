@@ -1,7 +1,9 @@
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Star } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
@@ -14,7 +16,6 @@ export function ProjectListPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
-  // Start with the existing mock projects.
   const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
 
   function handleCreateProject(name: string) {
@@ -28,6 +29,16 @@ export function ProjectListPage() {
     }
 
     setProjects((previous) => [...previous, newProject])
+  }
+
+  function handleToggleFavorite(projectId: string) {
+    setProjects((previous) =>
+      previous.map((project) =>
+        project.id === projectId
+          ? { ...project, favorite: !project.favorite }
+          : project,
+      ),
+    )
   }
 
   return (
@@ -57,6 +68,9 @@ export function ProjectListPage() {
                       name={project.name}
                       description={project.description}
                       favorite={project.favorite}
+                      onToggleFavorite={() =>
+                        handleToggleFavorite(project.id)
+                      }
                     />
                   ))}
               </div>
@@ -67,28 +81,56 @@ export function ProjectListPage() {
 
               <div className="space-y-3">
                 {projects.map((project) => {
-                  const card = (
-                    <Card className="py-3">
-                      <CardHeader>
-                        <CardTitle>{project.name}</CardTitle>
-                        <CardDescription>
-                          {project.description} · {project.owner}
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
+                  const projectDetails = (
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{project.name}</CardTitle>
+                      <CardDescription>
+                        {project.description} &middot; {project.owner}
+                      </CardDescription>
+                    </div>
                   )
 
-                  return project.id === exampleProject.id ? (
-                    <Link
-                      key={project.id}
-                      to={`/projects/${project.id}`}
-                      aria-label={`${project.name} (example)`}
-                      className="block hover:opacity-80"
-                    >
-                      {card}
-                    </Link>
-                  ) : (
-                    <div key={project.id}>{card}</div>
+                  return (
+                    <Card key={project.id} className="py-3">
+                      <CardHeader className="flex flex-row items-center gap-4">
+                        {project.id === exampleProject.id ? (
+                          <Link
+                            to={`/projects/${project.id}`}
+                            aria-label={`${project.name} (example)`}
+                            className="min-w-0 flex-1 hover:opacity-80"
+                          >
+                            {projectDetails}
+                          </Link>
+                        ) : (
+                          projectDetails
+                        )}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() =>
+                            handleToggleFavorite(project.id)
+                          }
+                          aria-label={
+                            project.favorite
+                              ? `Remove ${project.name} from favorites`
+                              : `Add ${project.name} to favorites`
+                          }
+                          aria-pressed={project.favorite}
+                        >
+                          <Star
+                            className="size-5"
+                            fill={
+                              project.favorite
+                                ? 'currentColor'
+                                : 'none'
+                            }
+                          />
+                        </Button>
+                      </CardHeader>
+                    </Card>
                   )
                 })}
               </div>
