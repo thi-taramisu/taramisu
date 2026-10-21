@@ -43,7 +43,7 @@ export function AppSidebar({
           className="w-full justify-start gap-2"
           onClick={onShowProjects}
           aria-label="Projects"
-          aria-current={activeView === 'projects' ? 'page' : undefined}
+          aria-pressed={activeView === 'projects'}
           title={collapsed ? 'Projects' : undefined}
         >
           <FolderOpen size={18} className="shrink-0" />
@@ -56,7 +56,7 @@ export function AppSidebar({
           className="w-full justify-start gap-2"
           onClick={onShowArchive}
           aria-label="Archive"
-          aria-current={activeView === 'archive' ? 'page' : undefined}
+          aria-pressed={activeView === 'archive'}
           title={collapsed ? 'Archive' : undefined}
         >
           <Archive size={18} className="shrink-0" />
