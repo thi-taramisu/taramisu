@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 
 type AppSidebarProps = {
   collapsed: boolean
+  onCreateProject: () => void
 }
 
-export function AppSidebar({ collapsed }: AppSidebarProps) {
+export function AppSidebar({ collapsed, onCreateProject }: AppSidebarProps) {
   return (
     <aside
       id="main-sidebar"
@@ -48,9 +49,8 @@ export function AppSidebar({ collapsed }: AppSidebarProps) {
         <Button
           variant="outline"
           className="w-full"
-          disabled
+          onClick={onCreateProject}
           aria-label="Create Project"
-          title="Create Project will be implemented later"
         >
           <Plus size={16} />
           {!collapsed && <span>Create Project</span>}

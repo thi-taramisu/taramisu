@@ -1,16 +1,17 @@
-
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
+import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { mockProjects } from '@/features/projects/mockProjects'
 import { exampleProject } from '../features/workspace/exampleProject'
 
 /** Start page: project overview with favorites and all projects. */
 export function ProjectListPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   return (
     <>
@@ -20,7 +21,10 @@ export function ProjectListPage() {
       />
 
       <div className="flex min-h-[calc(100vh-4rem)]">
-        <AppSidebar collapsed={sidebarCollapsed} />
+        <AppSidebar
+          collapsed={sidebarCollapsed}
+          onCreateProject={() => setCreateDialogOpen(true)}
+        />
 
         <main className="min-w-0 flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-8">
@@ -75,6 +79,11 @@ export function ProjectListPage() {
           </div>
         </main>
       </div>
+
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
     </>
   )
 }
