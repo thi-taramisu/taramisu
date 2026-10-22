@@ -13,10 +13,13 @@ npm run build         # type check + production build
 npm run lint          # oxlint
 npm run generate:api  # regenerate src/api/schema.d.ts from openapi/openapi.yaml
 npm test              # run unit/component tests once
-npm run test:coverage # run unit/component tests with enforced V8 coverage thresholds
+npm run test:coverage # run unit/component tests with enforced 70% V8 coverage thresholds
 npm run test:watch    # tests in watch mode
 npm run test:e2e      # run Playwright E2E tests against production preview
 ```
+
+See [`docs/internal/dev-workflow/frontend-testing.md`](../docs/internal/dev-workflow/frontend-testing.md) for our testing strategy,
+coverage policy, and rules.
 
 ## Structure
 

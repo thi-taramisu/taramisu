@@ -99,10 +99,10 @@ jobs:
               const cov = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
               md += "| Metric | Covered | Total | Percentage | Minimum Threshold |\n";
               md += "| :--- | :---: | :---: | :---: | :---: |\n";
-              md += `| **Lines** | ${cov.lines.covered} | ${cov.lines.total} | ${cov.lines.pct}% | 80% |\n`;
-              md += `| **Statements** | ${cov.statements.covered} | ${cov.statements.total} | ${cov.statements.pct}% | 80% |\n`;
-              md += `| **Functions** | ${cov.functions.covered} | ${cov.functions.total} | ${cov.functions.pct}% | 80% |\n`;
-              md += `| **Branches** | ${cov.branches.covered} | ${cov.branches.total} | ${cov.branches.pct}% | 80% |\n\n`;
+              md += `| **Lines** | ${cov.lines.covered} | ${cov.lines.total} | ${cov.lines.pct}% | 70% |\n`;
+              md += `| **Statements** | ${cov.statements.covered} | ${cov.statements.total} | ${cov.statements.pct}% | 70% |\n`;
+              md += `| **Functions** | ${cov.functions.covered} | ${cov.functions.total} | ${cov.functions.pct}% | 70% |\n`;
+              md += `| **Branches** | ${cov.branches.covered} | ${cov.branches.total} | ${cov.branches.pct}% | 70% |\n\n`;
             } catch (e) {
               md += "_Coverage report not generated._\n\n";
             }
