@@ -8,7 +8,7 @@ tests in Playwright.
 
 ## 1. Quick Start & Commands
 
-Run all commands from `frontend/` (or via `npm --prefix frontend ...` from the repository root):
+Run all commands from `frontend/`:
 
 ```bash
 # Run unit and component tests once
