@@ -27,7 +27,7 @@ flowchart TB
     %% ==========================================
     subgraph App_Layer ["2. Stateless Application & IAM Layer"]
         FE["Frontend Static Server<br/>(React SPA Bundle)"]
-        
+
         subgraph IAM_Stack ["Identity & Access Management"]
             AuthServer["Authentik Server<br/>(OIDC / OAuth2 / JWKS)"]
             AuthWorker["Authentik Worker<br/>(Background Tasks)"]
@@ -131,6 +131,7 @@ flowchart LR
 ## 3. Key Architectural Decisions & Justifications
 
 ### 1. NGINX (Open Source >= 1.28) with Least Connections Load Balancing
+
 * **Decision:** Use **NGINX Open Source (stable >= 1.28)** as the central entrypoint, reverse proxy, and load balancer using the **Least Connections (`least_conn`)** balancing strategy and runtime DNS re-resolution (`resolve`).
 * **Why:**
   * **Runtime Upstream Re-Resolution:** Since NGINX 1.28 (April 2025), the open-source version natively supports the `resolve` parameter in `upstream` blocks. Combined with Docker's internal DNS (`resolver 127.0.0.11`), NGINX dynamically picks up new container IPs when backend replicas restart, crash, or scale (`docker compose up --scale api=3`) without requiring manual reloads.
@@ -140,37 +141,44 @@ flowchart LR
   * **Edge Capabilities:** Handles TLS termination, rate limiting (`limit_req_zone`), upload size limits (`client_max_body_size`), and unbuffered SSE streaming (`proxy_buffering off`).
 
 ### 2. 100% Stateless Go Backend (`1..N` Replicas)
+
 * **Decision:** The Go backend holds no local sessions, files, or persistent state.
 * **Why:** This allows seamless horizontal scaling behind NGINX. If traffic increases or a container crashes, instances can be added or destroyed instantly without losing user data or session state.
 
 ### 3. Separate PostgreSQL Containers (`taramisu-db` vs. `authentik-db`)
+
 * **Decision:** Run **two independent PostgreSQL containers**, one for the Taramisu application and one for Authentik, each in its own internal network (`app-db` / `iam-db`).
 * **Why:** Full isolation of the IAM data from the application data: separate credentials, volumes, backups, upgrade cycles and resource limits. A compromised or misconfigured Go API has no network path to the Authentik database and vice versa. The additional operational overhead of a second PostgreSQL container is small compared to the security and lifecycle benefits.
 
 ### 4. Strict Network Segmentation
+
 * **Decision:** Only NGINX is exposed; all stateful and internal services sit in dedicated internal networks (see [Section 2](#2-network-segmentation)).
 * **Why:** Minimizes the attack surface and enforces least privilege on the network level—each service can only reach the backends it actually needs.
 
 ### 5. Zero PII in Application Database (Authentik Integration)
+
 * **Decision:** Store only immutable external IDs (`external_iam_sub`, `external_iam_group_id`) in the Taramisu database.
 * **Why:** Personal Identifiable Information (such as emails and display names) remains strictly within Authentik (Separation of Concerns / GDPR compliance). User metadata is resolved on-the-fly via Authentik’s core API and cached in-memory with a short TTL.
 
 ### 6. MinIO (S3-Compatible Object Storage) for File Uploads
+
 * **Decision:** Store all binary files (architecture diagrams, PDFs, uploaded documents) in **MinIO** instead of the local container filesystem. MinIO is **only reachable by the Go API** (`storage` network); clients never talk to MinIO directly.
 * **Why:** Storing files locally would break horizontal scaling behind a load balancer (since Replica #2 wouldn't have access to files uploaded to Replica #1). S3 storage ensures any backend instance can access any uploaded artifact.
 
 ### 7. File Access Authorization via the Go API
+
 * **Decision:** Every file download goes through `GET /api/...` on the Go API. The API validates the JWT, resolves the file's owning `TARA_PROJECT`, checks the caller's `PROJECT_ROLE_ASSIGNMENT` and only then streams the object from MinIO to the client.
 * **Why:** Authorization is enforced on **every** request in one place (the same RBAC logic as for all other resources) and revoked access takes effect immediately. MinIO stays fully internal. For the expected file sizes (diagrams, PDFs in the low MB range) and user count, streaming through the API is not a bottleneck.
 * **Alternative (later, if needed):** The API performs the same RBAC check but answers with a redirect to a **short-lived presigned URL** (e.g. 60 s TTL). This offloads bandwidth from the API replicas but requires exposing MinIO via NGINX (e.g. under `/s3/*`) and means a URL that has already been issued stays valid until it expires.
 
 ### 8. Lean Caching Strategy (In-Memory per Replica, No External Cache Broker)
+
 * **Decision:** Avoid introducing an external distributed cache (such as Redis) for the current architecture phase. Instead, use lightweight **in-memory TTL caches** inside each Go API replica alongside standard HTTP caching:
 
   | Mechanism | Scope & Justification |
   | --- | --- |
-  | **In-memory TTL cache** (per Go replica) | • **JWKS signing keys:** Standard OIDC library behavior with periodic refresh.<br/>• **Authentik user/group display metadata (`sub` $
-ightarrow$ name, e-mail):** Cached for a short TTL (e.g. 5–10 min) for UI rendering. Even with multiple replicas, one initial lookup per replica every 10 minutes is negligible and avoids the operational overhead of running Redis. |
+  | **In-memory TTL cache: JWKS keys** (per Go replica) | Standard OIDC library behavior with periodic refresh. |
+  | **In-memory TTL cache: IAM metadata** (per Go replica) | Authentik user/group display metadata (`sub` → name, e-mail) cached for a short TTL (e.g. 5–10 min) for UI rendering. Even with multiple replicas, one initial lookup per replica every 10 minutes is negligible and avoids the operational overhead of running Redis. |
   | **Edge rate limiting** (NGINX) | Handled directly at the single NGINX ingress proxy (`limit_req_zone`) before traffic reaches the API replicas. |
   | **Browser HTTP caching** (`ETag` + `304`) | Used for file downloads (`Cache-Control: private`, `ETag = sha256`) so the browser revalidates access with the API on every request without re-transferring unchanged file blobs. |
 
