@@ -7,8 +7,10 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 # Configuration: add labels here and expose their secrets in the workflow's env.
 # Webhook URLs belong in environment variables / GitHub secrets
@@ -21,8 +23,8 @@ LABEL_WEBHOOKS = {
     "CI/CD": "DISCORD_DEVOPS_WEBHOOK",
 }
 WEBHOOK_TIMEOUT_SECONDS = 20
-EMBED_COLOR = 0x5865F2
-REVIEW_GUIDANCE = "Discuss questions here; record decisions and approvals on GitHub."
+ISSUE_COLOR = 0x238636
+PR_COLOR = 0x8957E5
 
 
 def event_item(event_name, event):
@@ -63,21 +65,41 @@ def destinations(labels, environ):
 
 def embed_payload(event_name, event, labels):
     item = event_item(event_name, event)
-    kind = "Issue" if event_name == "issues" else "Pull request"
-    action = "opened" if event["action"] == "opened" else "labeled"
+    is_issue = event_name == "issues"
+    kind = "🐛 Issue" if is_issue else "🔀 PR"
+    actor = event.get("sender", {}).get("login") or item["user"]["login"]
+    if event["action"] == "opened":
+        description = f"`{actor}` opened {'an issue' if is_issue else 'a pull request'}"
+    else:
+        label = event["label"]["name"].replace("`", "'")
+        description = f"`{actor}` added `{label}`"
+    fields = []
+    footer_parts = ["GitHub", *[f"[{label}]" for label in labels]]
+    if not is_issue:
+        head = item.get("head", {}).get("ref")
+        base = item.get("base", {}).get("ref")
+        if head and base:
+            branches = f"{head} → {base}".replace("`", "'")[:1022]
+            fields.append({"name": "Branches", "value": f"`{branches}`"})
+    embed = {
+        "title": f"{kind} #{item['number']} · {item['title']}"[:256],
+        "url": item["html_url"],
+        "description": description,
+        "color": ISSUE_COLOR if is_issue else PR_COLOR,
+        "fields": fields,
+        "footer": {
+            "text": " · ".join(footer_parts),
+            "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+        },
+    }
+    timestamp = item.get("created_at" if event["action"] == "opened" else "updated_at")
+    if timestamp:
+        local_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Berlin"))
+        footer_parts.append(local_time.strftime("%d.%m.%Y · %H:%M"))
+        embed["footer"]["text"] = " · ".join(footer_parts)
     return {
         "allowed_mentions": {"parse": [], "users": [], "roles": [], "replied_user": False},
-        "embeds": [{
-            "title": f"{kind} #{item['number']}: {item['title']}"[:256],
-            "url": item["html_url"],
-            "description": f"{kind} {action}. {REVIEW_GUIDANCE}",
-            "color": EMBED_COLOR,
-            "fields": [
-                {"name": "Repository", "value": event["repository"]["full_name"][:1024]},
-                {"name": "Author", "value": item["user"]["login"][:1024], "inline": True},
-                {"name": "Labels", "value": ", ".join(labels)[:1024], "inline": True},
-            ],
-        }],
+        "embeds": [embed],
     }
 
 
