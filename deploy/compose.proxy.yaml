@@ -1,6 +1,6 @@
 services:
   proxy:
-    image: nginx:1.27-alpine
+    image: nginx:1.28-alpine
     ports:
       - "127.0.0.1:80:80"
     volumes:
