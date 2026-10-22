@@ -5,5 +5,5 @@ services:
    # Just to make it easier to find the frontend port through which frontend
    # and nginx communicate  
     expose:
-      - 5173
+      - 80
   
