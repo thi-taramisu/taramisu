@@ -23,6 +23,7 @@ export function WorkspaceLayout() {
         <Link to={`/projects/${projectId}/settings`} className="text-sm text-muted-foreground hover:underline">
           Settings
         </Link>
+        <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">Colour schemes</Link>
         <div className="ml-auto flex items-center gap-2">
           <Switch
             id="graph-view"
