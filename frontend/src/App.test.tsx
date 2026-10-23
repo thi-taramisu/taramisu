@@ -34,11 +34,11 @@ describe('routing', () => {
     expect(within(tree).getByRole('link', { name: /AP-02/ })).toHaveAttribute('href', `${project}/attack-paths/ap-02`)
   })
 
-  it('shows the item definition diagram on the item route', () => {
+  it('shows the item definition diagram on the item route', async () => {
     renderAt(`${project}/items/i-01`)
 
     expect(screen.getByRole('heading', { name: 'I-01 Headlamp system' })).toBeInTheDocument()
-    expect(screen.getByText('Gateway ECU')).toBeInTheDocument()
+    expect(await screen.findByText('Gateway ECU')).toBeInTheDocument()
     expect(screen.getByText('Item boundary: Headlamp system')).toBeInTheDocument()
   })
 
