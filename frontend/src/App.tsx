@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
-import { ItemDefinitionFlow } from './features/item-definition/ItemDefinitionFlow'
+import { ItemDefinitionDiagram } from './features/item-definition/ItemDefinitionDiagram'
 import { ENTITY_TYPES, type EntityType } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
 import { Placeholder } from './features/workspace/Placeholder'
@@ -13,7 +13,7 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 
 // Tabs that already have content, everything else renders a placeholder.
 const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
-  'items/': <ItemDefinitionFlow />,
+  'items/': <ItemDefinitionDiagram />,
   'items/assets': <ItemAssetsTab />,
 }
 
