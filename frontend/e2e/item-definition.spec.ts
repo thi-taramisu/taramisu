@@ -21,7 +21,8 @@ test.describe('Item Definition page', () => {
   })
 
   test('returns a not-found page for unknown routes', async ({ page }) => {
-    await page.goto('/unknown-route')
+    const response = await page.goto('/unknown-route')
+    expect(response?.status()).toBe(404)
     await expect(page).toHaveURL(/\/unknown-route$/)
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
   })
