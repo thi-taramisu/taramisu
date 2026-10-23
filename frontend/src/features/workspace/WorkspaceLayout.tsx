@@ -1,29 +1,9 @@
-import { Link, NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { NotFoundPage } from '../../pages/NotFoundPage'
-import { entityPath } from './entities'
-import { exampleProject, type TreeNode } from './exampleProject'
-
-function TreeLinks({ nodes, search }: { nodes: TreeNode[]; search: string }) {
-  return (
-    <ul className="space-y-1 pl-3 first:pl-0">
-      {nodes.map((node) => (
-        <li key={`${node.type}/${node.id}`}>
-          <NavLink
-            to={{ pathname: entityPath(exampleProject.id, node.type, node.id), search }}
-            className={({ isActive }) =>
-              `block truncate rounded-md px-2 py-1 text-sm hover:bg-muted ${isActive ? 'bg-muted font-medium' : ''}`
-            }
-          >
-            <span className="text-xs text-muted-foreground">{node.code}</span> {node.name}
-          </NavLink>
-          {node.children && <TreeLinks nodes={node.children} search={search} />}
-        </li>
-      ))}
-    </ul>
-  )
-}
+import { Filetree } from './Filetree'
+import { exampleProject } from './exampleProject'
 
 /** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content. */
 export function WorkspaceLayout() {
@@ -53,8 +33,9 @@ export function WorkspaceLayout() {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Project elements" className="w-72 shrink-0 overflow-y-auto border-r p-3">
-          <TreeLinks nodes={exampleProject.tree} search={graphView ? '?view=graph' : ''} />
+        <nav aria-label="Project elements" className="w-72 shrink-0 overflow-y-auto border-r bg-sidebar p-2 text-sidebar-foreground">
+          <h2 className="mb-1 px-1.5 text-xs font-medium text-muted-foreground">Project elements</h2>
+          <Filetree nodes={exampleProject.tree} projectId={projectId} />
         </nav>
         <main className="min-w-0 flex-1 overflow-y-auto p-6">
           <Outlet />
