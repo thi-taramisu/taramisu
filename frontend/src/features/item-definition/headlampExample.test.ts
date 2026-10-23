@@ -17,7 +17,7 @@ describe('headlamp example data', () => {
 
   it('puts exactly the headlamp system inside the item boundary', () => {
     const inside = headlampNodes.filter((n) => n.parentId === BOUNDARY_ID).map((n) => n.id)
-    expect(inside.sort()).toEqual(
+    expect(inside.toSorted()).toEqual(
       [
         'body-control-ecu',
         'camera-ecu',
@@ -25,16 +25,15 @@ describe('headlamp example data', () => {
         'led-left',
         'led-right',
         'power-switch-actuator',
-      ].sort(),
+      ].toSorted(),
     )
   })
 
   it('lists parent nodes before their children', () => {
     const index = new Map(headlampNodes.map((n, i) => [n.id, i]))
-    for (const node of headlampNodes) {
-      if (node.parentId) {
-        expect(index.get(node.parentId)!).toBeLessThan(index.get(node.id)!)
-      }
+    const children = headlampNodes.filter((n) => n.parentId)
+    for (const node of children) {
+      expect(index.get(node.parentId!)!).toBeLessThan(index.get(node.id)!)
     }
   })
 })
