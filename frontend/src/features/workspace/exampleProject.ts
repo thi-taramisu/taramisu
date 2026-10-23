@@ -1,14 +1,6 @@
-import type { EntityType } from './entities'
+import type { EntityType, TreeNode } from './entities'
 
 // Hard-coded example project (headlamp system) for the sidebar tree, until the backend has the data.
-
-export interface TreeNode {
-  type: EntityType
-  id: string
-  code: string
-  name: string
-  children?: TreeNode[]
-}
 
 export const exampleProject = {
   id: 'headlamp',

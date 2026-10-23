@@ -52,7 +52,7 @@ describe('createApiClient', () => {
     server.use(
       http.get(`${baseUrl}/health`, () => HttpResponse.json({ message: 'nope' }, { status: 401 })),
     )
-    const onUnauthorized = vi.fn()
+    const onUnauthorized = vi.fn<() => void>()
 
     const { data, error } = await createApiClient({ baseUrl, onUnauthorized }).GET('/health')
 

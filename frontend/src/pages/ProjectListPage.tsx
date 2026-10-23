@@ -6,7 +6,10 @@ import { exampleProject } from '../features/workspace/exampleProject'
 export function ProjectListPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-4 p-6">
-      <h1 className="text-xl font-semibold">Projects</h1>
+      <header className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold">Projects</h1>
+        <Link to="/design-system/colors" className="text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">Colour schemes</Link>
+      </header>
       <Link to={`/projects/${exampleProject.id}`} className="block">
         <Card className="hover:bg-muted">
           <CardHeader>
