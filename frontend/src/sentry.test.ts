@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@sentry/react', () => ({ init: vi.fn() }))
+vi.mock('@sentry/react', () => ({ init: vi.fn<typeof Sentry.init>() }))
 
 describe('Sentry configuration', () => {
   beforeEach(() => {
