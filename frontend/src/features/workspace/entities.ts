@@ -4,6 +4,15 @@
 
 export type EntityType = 'items' | 'assets' | 'damage-scenarios' | 'threat-scenarios' | 'attack-paths'
 
+/** One occurrence of an entity in the navigation hierarchy; relations can have several parents. */
+export interface TreeNode {
+  type: EntityType
+  id: string
+  code: string
+  name: string
+  children?: TreeNode[]
+}
+
 export interface EntityTab {
   /** Path segment below the entity URL, '' is the index tab. */
   path: string
