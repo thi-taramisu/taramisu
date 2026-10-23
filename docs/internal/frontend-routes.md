@@ -4,6 +4,10 @@ Status: implemented with placeholder pages (#30). The routes follow the wirefram
 board](https://whimsical.com/taramisu-concept-MeRaRm6cqUmmG6KBFgjiim), sections "Concept 2: Hierarchical Workspace with Relations" and
 "Graph Concept". Backend endpoints are out of scope here.
 
+The additional design reference routes are `/design-system/colors` (all schemes) and `/design-system/colors/:schemeId` (`neutral`, `ocean`,
+`iris`). The project list and workspace link to them. Pages and Filetree navigation render in the browser through React Router.
+Deployment serves the static Vite build with an SPA fallback; see the [frontend README](../../frontend/README.md#client-rendering-and-deployment).
+
 ## Basis
 
 The elements follow the ISO/SAE 21434 steps in the project scope (see course slides):

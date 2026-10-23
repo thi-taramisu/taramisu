@@ -43,7 +43,8 @@ components look, and because the component code lives in our repo we can change 
 
 The setup in `frontend/`:
 
-- Tailwind CSS v4 via `@tailwindcss/vite`. The theme (colours, radius, font) is defined as CSS variables in `src/index.css`.
+- Tailwind CSS v4 via `@tailwindcss/vite`. `src/index.css` imports the CSS configuration in `src/styles/`: theme utilities, three proposed
+  UI palettes, shared TARA colours and base styles. See the [frontend colour sheet](../../../frontend/src/styles/README.md).
 - `components.json` holds the shadcn configuration, so `npx shadcn@latest add <component>` puts new components into `src/components/ui`.
 - The `@/` import alias points to `src/` (in `tsconfig*.json` and `vite.config.ts`).
 - The assets tab of an item (`/projects/headlamp/items/i-01/assets`, first added as `/assets` and moved there in #30) is a small example
@@ -55,7 +56,8 @@ The setup in `frontend/`:
   step.
 - The files in `src/components/ui` are generated, but they belong to us. Updating them means re-running `shadcn add` and checking the diff,
   there is no `npm update` for them. Small local changes are fine, bigger ones should go into a wrapper component.
-- Variant helpers in `button.tsx` and `badge.tsx` stay private; only components are exported so the wrappers pass `oxlint --deny-warnings`.
+- `button.tsx` and `badge.tsx` only export their components; unused variant exports are removed so the generated wrappers pass
+  `oxlint --deny-warnings` and retain fast refresh support.
 - New runtime dependencies: `radix-ui`, `class-variance-authority`, `cn`, `lucide-react` (icons), `tw-animate-css`,
   `@fontsource-variable/geist`, `shadcn` (for its base CSS). New dev dependencies: `tailwindcss`, `@tailwindcss/vite`.
 - For larger tables (sorting, filtering, paging) we'll add TanStack Table, which is what the shadcn data table example builds on. It fits
