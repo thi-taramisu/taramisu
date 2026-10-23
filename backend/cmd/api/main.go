@@ -10,16 +10,39 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
 func main() {
+	os.Exit(exitCode())
+}
+
+func exitCode() int {
+	logger, flush, err := logging.New(sentry.ClientOptions{
+		Dsn:         os.Getenv("SENTRY_DSN"),
+		Environment: os.Getenv("SENTRY_ENVIRONMENT"),
+		Release:     os.Getenv("SENTRY_RELEASE"),
+	}, os.Stderr)
+	if err != nil {
+		slog.Error("initialize logging", "error", err)
+		return 1
+	}
+	slog.SetDefault(logger)
+	defer func() {
+		if !flush(5 * time.Second) {
+			slog.New(slog.NewJSONHandler(os.Stderr, nil)).Warn("Sentry flush timed out")
+		}
+	}()
 	if err := run(); err != nil {
 		slog.Error("server stopped", "error", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func run() error {
@@ -34,7 +57,11 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	server := &http.Server{Addr: addr, Handler: httpapi.New(db.New(pool)), ReadHeaderTimeout: 5 * time.Second}
+	handler := httpapi.New(db.New(pool))
+	if os.Getenv("SENTRY_DSN") != "" {
+		handler = sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle(handler)
+	}
+	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
