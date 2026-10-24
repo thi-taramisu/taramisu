@@ -54,7 +54,8 @@ Open <http://localhost:8080/auth/login> with user `dev` and `DEV_PASSWORD` from
 `APP_URL` must be an origin without a trailing slash and determines the callback URL.
 `POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
 Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
-SSO session active. Group synchronization and project permissions are not implemented.
+SSO session active. Group synchronization is not implemented. Item definition routes enforce
+the project role assignments stored in the database; other routes do not yet implement project permissions.
 
 ## Checks
 
@@ -80,6 +81,52 @@ internal/httpapi/handlers/     HTTP handlers
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
+
+## Item definitions
+
+Requires the authentication foundation from PR #75. All routes below use the existing
+Authentik-backed session cookie and are under `/api/v1/projects/{project_id}/item-definitions`.
+
+| Method | Path suffix | Result |
+| --- | --- | --- |
+| GET | (none) | List items, with `limit` (default 50, maximum 100) and `offset` (default 0) |
+| POST | (none) | Create an item; return 201 and a `Location` header |
+| GET | `/{item_id}` | Read an item |
+| PUT | `/{item_id}` | Replace an existing item; omitted optional fields become null |
+| PATCH | `/{item_id}` | Update supplied fields; omitted fields stay unchanged |
+| DELETE | `/{item_id}` | Delete an item; return 204 |
+
+Create and replace require a nonblank `name` (up to 255 characters) and `scope_type`
+(`ITEM` or `COMPONENT`). Optional text fields are `lifecycle_phase`,
+`item_definition_wp_09_01`, `cybersecurity_specs_wp_10_01`, and `architectural_design`.
+PATCH accepts explicit `null` to clear optional fields; `name` and `scope_type` cannot be null.
+The database supplies `id` and `created_at`, which updates preserve.
+
+After logging in, use Swagger UI at `/docs` on the same origin to try the routes. Example
+request body for POST:
+
+```json
+{
+  "name": "Headlamp",
+  "scope_type": "ITEM",
+  "lifecycle_phase": "development"
+}
+```
+
+The user must have a `project_role_assignment` for the parent project, either directly or
+through an existing `iam_user_group_member` record. All assigned project roles can read;
+only `OWNER` and `EDITOR` can create, replace, update, or delete. Creating projects and
+managing role assignments are separate work: login does not automatically grant project access.
+Group membership is read from the local database, not synchronized from Authentik by this change.
+
+Invalid inputs return 422. Missing or inaccessible projects and items return 404. Deleting
+an item with dependent assets, scenarios, or attack paths returns 409; those records are not
+cascaded away. Responses use the existing problem JSON error format without database details.
+
+Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
+for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
+for PostgreSQL CRUD, pagination, role, group-access, and foreign-key tests. Database tests
+roll back their fixtures and do not require a live Authentik instance.
 
 ## OpenAPI contract
 
