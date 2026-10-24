@@ -2,29 +2,34 @@
 export
 
 OPENAPI := openapi.json
+COMPOSE := docker compose -f ../deploy/compose.backend.yaml
 
-.PHONY: up down reset db pgadmin run test migrate migrate-diff sqlc openapi
+.PHONY: up down reset db pgadmin run test migrate migrate-diff sqlc openapi lint fmt
 up:
-	docker compose up --build -d api
+	$(COMPOSE) up --build -d api
 down:
-	docker compose --profile tools down
+	$(COMPOSE) --profile tools down
 reset:
-	docker compose --profile tools down -v
+	$(COMPOSE) --profile tools down -v
 db:
-	docker compose up -d --wait db
+	$(COMPOSE) up -d --wait db
 pgadmin:
-	docker compose up -d pgadmin
+	$(COMPOSE) up -d pgadmin
 run:
 	go run ./cmd/api
 test:
 	go test -race ./...
 migrate:
-	docker compose run --rm migrate
+	$(COMPOSE) run --rm migrate
 migrate-diff:
-	docker compose up -d --wait dev-db
-	docker compose run --rm migrate migrate diff "$(name)" --env local
+	$(COMPOSE) up -d --wait dev-db
+	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 sqlc:
 	sqlc generate
+lint:
+	golangci-lint run ./...
+fmt:
+	golangci-lint fmt ./...
 openapi:
 	@tmp=$$(mktemp "$(OPENAPI).XXXXXX") || exit 1; \
 	trap 'rm -f "$$tmp"' EXIT INT TERM; \

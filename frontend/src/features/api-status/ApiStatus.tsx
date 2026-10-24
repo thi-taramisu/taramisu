@@ -5,6 +5,7 @@ import type { ApiClient } from '../../api/client'
 /** Example of a typed, cached API call: `GET /health` via openapi-react-query. */
 export function ApiStatus({ client }: { client: ApiClient }) {
   const $api = useMemo(() => createQueryClient(client), [client])
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { data, error, isPending } = $api.useQuery('get', '/health')
 
   if (isPending) return <p>Checking backend…</p>

@@ -49,7 +49,7 @@ services:
     image: arigaio/atlas:1.3.0
     working_dir: /app
     volumes:
-      - .:/app
+      - ../backend:/app
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
     command: ["migrate", "apply", "--env", "local"]
@@ -58,7 +58,8 @@ services:
         condition: service_healthy
 
   api:
-    build: .
+    build:
+      context: ../backend
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
       SENTRY_DSN: ${SENTRY_DSN:-}
