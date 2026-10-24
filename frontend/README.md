@@ -40,3 +40,13 @@ The only page so far is `/item-definition`, an example with hard-coded data. The
 
 The client is typed against the OpenAPI spec in `openapi/openapi.yaml`, which is only a stub for now. The reasoning behind the setup is in
 [ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). The base URL comes from `VITE_API_BASE_URL` and defaults to `/api/v1`.
+
+## Sentry
+
+Copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the `taramisu-frontend` project in the
+`thi-nf` organization. Sentry captures browser exceptions, unhandled rejections, and React render errors.
+An empty DSN disables reporting. Set `VITE_SENTRY_ENVIRONMENT` and optionally `VITE_SENTRY_RELEASE`
+to identify deployments. Vite embeds these values at build time; configure them before building and rebuild
+after changes. Never put a Sentry auth token in a `VITE_` variable.
+
+Source map upload is not configured yet; production stack traces may reference bundled code.
