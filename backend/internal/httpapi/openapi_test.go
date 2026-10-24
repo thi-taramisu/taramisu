@@ -31,7 +31,7 @@ func TestOpenAPIEndpointMatchesExport(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	httpapi.New(nil, nil).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	httpapi.New(nil, nil).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/openapi.json", http.NoBody))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /openapi.json status = %d, want %d", rr.Code, http.StatusOK)
 	}

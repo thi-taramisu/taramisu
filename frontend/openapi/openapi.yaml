@@ -1,0 +1,41 @@
+# STUB contract used to set up the frontend API client (#31).
+# Replace with the backend's published OpenAPI spec once it exists, then run `npm run generate:api`.
+openapi: 3.0.3
+info:
+  title: Taramisu API (stub)
+  version: 0.0.0
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string

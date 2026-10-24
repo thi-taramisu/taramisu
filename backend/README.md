@@ -7,7 +7,7 @@ Go HTTP API for Taramisu.
 - **PostgreSQL** + **pgx** — database
 - **sqlc** — queries in `db/queries/` → `internal/db/`
 - **Atlas** — migrations from `db/schema.sql` in `db/migrations/`
-- **Docker Compose** — Postgres, migrate, optional API container
+- **Docker Compose** — Postgres, migrate, optional API container, optional pgAdmin
 
 ## Prerequisites
 
@@ -20,11 +20,14 @@ Run from `backend/`, with ports 5432, 8080 and 9000 free:
 
 ```bash
 make up
+make pgadmin
 make migrate
 make test
 make openapi
 make migrate-diff name=my_change
 make sqlc
+make lint
+make fmt
 make down
 ```
 
@@ -38,6 +41,9 @@ waits for readiness. The API and Authentik server share the `taramisu-auth` netw
 created by the IAM project; each database stays on its own project's default network.
 `make down` stops the backend first, then IAM, and keeps their data.
 Run `make up` once to generate `iam/.env`; `make db` starts just the backend database.
+
+`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at [http://localhost:5050](http://localhost:5050) (no login) with the
+Compose database pre-registered and connected. It is opt-in (`tools` profile), so `make up` does not start it; `make down` stops it.
 
 To run the API on the host, start the stack with `make up`, copy `.env.example`
 to `.env` and use the client ID, secret and `APP_URL` from `../iam/.env`.
@@ -70,7 +76,7 @@ API logs: `docker compose --env-file ../iam/.env -f compose.yaml logs api`.
 
 ## Structure
 
-```
+```text
 cmd/api/                       entrypoint
 cmd/openapi/                   offline OpenAPI JSON export (stdout)
 db/                            schema, Atlas migrations, sqlc queries
@@ -83,6 +89,11 @@ Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Post
 
 ## OpenAPI contract
 
-With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at [http://localhost:8080/openapi.json](http://localhost:8080/openapi.json), UI at [/docs](http://localhost:8080/docs). Example: `curl -fsS "http://localhost:8080/openapi.json" -o openapi.json`.
+With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at
+[http://localhost:8080/openapi.json](http://localhost:8080/openapi.json), UI at [/docs](http://localhost:8080/docs).
+Example: `curl -fsS "http://localhost:8080/openapi.json" -o openapi.json`.
 
-For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file). API-changing PRs must include an updated spec; CI regenerates and fails if it is stale. Source of truth: `internal/httpapi/`.
+For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or
+`go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).
+API-changing PRs must include an updated spec; CI regenerates and fails if it is stale.
+Source of truth: `internal/httpapi/`.

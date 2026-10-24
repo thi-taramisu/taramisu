@@ -28,7 +28,7 @@ func TestReadiness(t *testing.T) {
 			return tc.message, tc.err
 		}), nil)
 		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, httptest.NewRequest("GET", "/health/ready", nil))
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/ready", http.NoBody))
 		if rr.Code != tc.code {
 			t.Errorf("status = %d, want %d", rr.Code, tc.code)
 		}

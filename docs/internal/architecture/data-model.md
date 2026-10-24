@@ -1,6 +1,7 @@
-# Entity-Relationship Schema (ER Schema) 
+# Entity-Relationship Schema (ER Schema)
 
-This document defines the Entity-Relationship (ER) schema for the **Threat Analysis and Risk Assessment (TARA)** process in accordance with **ISO/SAE 21434**.
+This document defines the Entity-Relationship (ER) schema for the **Threat Analysis and Risk Assessment (TARA)** process
+in accordance with **ISO/SAE 21434**.
 
 ---
 
@@ -226,21 +227,56 @@ erDiagram
 ## 2. Key Architectural & Normative Design Decisions
 
 ### 2.1 Project Container, Item Definitions & External IAM / RBAC Integration
-* **Project Hierarchy (`TARA_PROJECT` & `ITEM_DEFINITION`):** `TARA_PROJECT` represents a top-level organizational project (e.g., a vehicle platform) and acts as the authorization boundary for Role-Based Access Control (RBAC). A `TARA_PROJECT` contains one or more `ITEM_DEFINITION` instances. According to **Clause 15.1**, TARA methods are generic modules invoked at any point in the lifecycle of an *Item* or *Component*. `ITEM_DEFINITION` represents this specific assessment scope, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** / **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
-* **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled externally (e.g., via Keycloak or ORY Kratos). Following strict separation of concerns, no redundant user-specific metadata (such as emails or display names) is stored in the application database; it stores only immutable external references (`external_iam_sub`, `external_iam_group_id`).
-* **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`) on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
+
+* **Project Hierarchy (`TARA_PROJECT` & `ITEM_DEFINITION`):** `TARA_PROJECT` represents a top-level organizational
+  project (e.g., a vehicle platform) and acts as the authorization boundary for Role-Based Access Control (RBAC). A
+  `TARA_PROJECT` contains one or more `ITEM_DEFINITION` instances. According to **Clause 15.1**, TARA methods are
+  generic modules invoked at any point in the lifecycle of an *Item* or *Component*. `ITEM_DEFINITION` represents this
+  specific assessment scope, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** /
+  **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
+* **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
+  externally (e.g., via Keycloak or ORY Kratos). Following strict separation of concerns, no redundant user-specific
+  metadata (such as emails or display names) is stored in the application database; it stores only immutable external
+  references (`external_iam_sub`, `external_iam_group_id`).
+* **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`OWNER`, `EDITOR`, `REVIEWER`,
+  `VIEWER`) on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
 
 ### 2.2 Separation of Assets and Cybersecurity Properties (`[RQ-15-02]`, `[WP-15-02]`)
-* **Granular Property Modeling (`ASSET` & `ASSET_CYBERSECURITY_PROPERTY`):** **Clause 15.3.2 `[RQ-15-02]`** requires identifying assets along with the specific cybersecurity properties (*Confidentiality, Integrity, Availability*) whose compromise leads to a damage scenario (**15.3.2 EXAMPLE 1 & 2**). Modeling `ASSET_CYBERSECURITY_PROPERTY` as a dedicated entity ensures that both Damage Scenarios (`[RQ-15-02]`) and Threat Scenarios (`[RQ-15-03]`) reference an exact *(Asset + Property)* combination rather than an unspecific asset.
-* **Many-to-Many ($N:M$) Mapping to Damage Scenarios (`DAMAGE_SCENARIO_ASSET_PROPERTY`):** Per **Clause 3.1.2, Note 1** and **15.3.2 NOTE 1**, a single Damage Scenario can involve multiple relevant assets, and the compromise of a single asset property can lead to multiple distinct Damage Scenarios.
+
+* **Granular Property Modeling (`ASSET` & `ASSET_CYBERSECURITY_PROPERTY`):** **Clause 15.3.2 `[RQ-15-02]`** requires
+  identifying assets along with the specific cybersecurity properties (*Confidentiality, Integrity, Availability*) whose
+  compromise leads to a damage scenario (**15.3.2 EXAMPLE 1 & 2**). Modeling `ASSET_CYBERSECURITY_PROPERTY` as a
+  dedicated entity ensures that both Damage Scenarios (`[RQ-15-02]`) and Threat Scenarios (`[RQ-15-03]`) reference an
+  exact *(Asset + Property)* combination rather than an unspecific asset.
+* **Many-to-Many ($N:M$) Mapping to Damage Scenarios (`DAMAGE_SCENARIO_ASSET_PROPERTY`):** Per **Clause 3.1.2, Note 1**
+  and **15.3.2 NOTE 1**, a single Damage Scenario can involve multiple relevant assets, and the compromise of a single
+  asset property can lead to multiple distinct Damage Scenarios.
 
 ### 2.3 Many-to-Many ($N:M$) Threat Scenario Relationships (`[RQ-15-03]`, `15.4.2`)
-* **Threat Scenario $\leftrightarrow$ Asset Cybersecurity Property (`THREAT_SCENARIO_ASSET_PROPERTY`):** **Clause 15.4.2 `[RQ-15-03]`** requires each Threat Scenario to specify the targeted asset, the compromised cybersecurity property, and the cause of compromise. Furthermore, **15.4.2 NOTE 1** and **15.4.2 EXAMPLE** (*"Spoofing of CAN messages for the braking ECU leads to loss of integrity of the CAN messages and thereby to loss of integrity of the braking function"*) demonstrate that a single threat scenario can affect multiple interdependent assets or multiple properties (e.g., simultaneous loss of *Integrity* and *Availability*) through a single cause of compromise. The associative table `THREAT_SCENARIO_ASSET_PROPERTY` models this $N:M$ relationship cleanly.
-* **Threat Scenario $\leftrightarrow$ Damage Scenario (`THREAT_DAMAGE_LINK`):** Explicitly required by **15.4.2 NOTE 3**: *"A damage scenario can correspond to multiple threat scenarios and a threat scenario can lead to multiple damage scenarios."*
+
+* **Threat Scenario $\leftrightarrow$ Asset Cybersecurity Property (`THREAT_SCENARIO_ASSET_PROPERTY`):** **Clause 15.4.2
+  `[RQ-15-03]`** requires each Threat Scenario to specify the targeted asset, the compromised cybersecurity property,
+  and the cause of compromise. Furthermore, **15.4.2 NOTE 1** and **15.4.2 EXAMPLE** (*"Spoofing of CAN messages for the
+  braking ECU leads to loss of integrity of the CAN messages and thereby to loss of integrity of the braking function"*)
+  demonstrate that a single threat scenario can affect multiple interdependent assets or multiple properties (e.g.,
+  simultaneous loss of *Integrity* and *Availability*) through a single cause of compromise. The associative table
+  `THREAT_SCENARIO_ASSET_PROPERTY` models this $N:M$ relationship cleanly.
+* **Threat Scenario $\leftrightarrow$ Damage Scenario (`THREAT_DAMAGE_LINK`):** Explicitly required by **15.4.2 NOTE
+  3**: *"A damage scenario can correspond to multiple threat scenarios and a threat scenario can lead to multiple damage
+  scenarios."*
 
 ### 2.4 Separation of Attack Path Analysis (`15.6`) and Attack Feasibility Rating (`15.7`)
-* **Dedicated `ATTACK_PATH` Entity (`[WP-15-05]`):** Captures the structural path analysis required by **`[RQ-15-08]`** and **`[RQ-15-09]`**, including whether the path was derived top-down or bottom-up (**15.6.2 NOTE 1**), whether it is a partial path in early development stages (**15.6.2 NOTE 2 & 3**), and the ordered sequence of steps (`i, ii, iii` per **15.6.2 EXAMPLE**) and exploited weaknesses (`[WP-08-04]`, `[WP-10-05]`, `[WP-08-05]` per **15.6.1.2**). Because an attack path can realize multiple threat scenarios and a threat scenario can be realized by multiple attack paths (**`[RQ-15-09]`**, **15.8.2 NOTE 2**), they are linked via `THREAT_ATTACK_PATH_LINK` ($N:M$).
-* **Dedicated `ATTACK_FEASIBILITY_RATING` Entity (`[WP-15-06]`):** Kept separate from `ATTACK_PATH` ($1:1$ per **`[RQ-15-10]`**) to maintain narrow, cohesive tables and mirror the modular separation between Clause 15.6 and Clause 15.7. It implements the **Attack-potential-based approach (`[RC-15-11a]` & `[RC-15-12]`)** using numerical scores for the 5 core factors derived from ISO/IEC 18045 (**15.7.2 NOTE 2 & 3**):
+
+* **Dedicated `ATTACK_PATH` Entity (`[WP-15-05]`):** Captures the structural path analysis required by **`[RQ-15-08]`**
+  and **`[RQ-15-09]`**, including whether the path was derived top-down or bottom-up (**15.6.2 NOTE 1**), whether it is
+  a partial path in early development stages (**15.6.2 NOTE 2 & 3**), and the ordered sequence of steps (`i, ii, iii`
+  per **15.6.2 EXAMPLE**) and exploited weaknesses (`[WP-08-04]`, `[WP-10-05]`, `[WP-08-05]` per **15.6.1.2**). Because
+  an attack path can realize multiple threat scenarios and a threat scenario can be realized by multiple attack paths
+  (**`[RQ-15-09]`**, **15.8.2 NOTE 2**), they are linked via `THREAT_ATTACK_PATH_LINK` ($N:M$).
+* **Dedicated `ATTACK_FEASIBILITY_RATING` Entity (`[WP-15-06]`):** Kept separate from `ATTACK_PATH` ($1:1$ per
+  **`[RQ-15-10]`**) to maintain narrow, cohesive tables and mirror the modular separation between Clause 15.6 and Clause
+  15.7. It implements the **Attack-potential-based approach (`[RC-15-11a]` & `[RC-15-12]`)** using numerical scores for
+  the 5 core factors derived from ISO/IEC 18045 (**15.7.2 NOTE 2 & 3**):
   1. `ap_elapsed_time` (**`[RC-15-12a]`**)
   2. `ap_specialist_expertise` (**`[RC-15-12b]`**)
   3. `ap_knowledge_of_item` (**`[RC-15-12c]`**)
@@ -248,12 +284,28 @@ erDiagram
   5. `ap_equipment` (**`[RC-15-12e]`**)
 
 ### 2.5 Two-Stage Risk Value Determination: Granular Calculation & Maximum Aggregation (`15.8`)
-* **Stage 1 – Granular Risk Calculation per Impact Category (`RISK_VALUE`):** According to **`[RQ-15-15]`** and **15.8.2 NOTE 1**, if a threat scenario corresponds to multiple damage scenarios and/or has impacts across multiple impact categories (*Safety, Financial, Operational, Privacy* per **`[RQ-15-04]`**), a separate risk value (integer 1 to 5 per **`[RQ-15-16]`**) is determined for each associated `IMPACT_RATING` combined with the threat scenario's `aggregated_attack_feasibility` (**15.8.2 NOTE 2**).
-* **Stage 2 – Overall Maximum Risk Aggregation (`THREAT_SCENARIO.max_risk_score`):** For the overall evaluation of a Threat Scenario, the highest granular risk score across all associated Damage Scenarios and SFOP categories dominates (e.g., if Safety Risk = `5` and Operational Risk = `2`, the overall `max_risk_score` of the Threat Scenario is `5`). Storing the granular records in `RISK_VALUE` while maintaining `max_risk_score` on `THREAT_SCENARIO` provides full audit traceability per category alongside an immediate worst-case risk rating for decision-making.
+
+* **Stage 1 – Granular Risk Calculation per Impact Category (`RISK_VALUE`):** According to **`[RQ-15-15]`** and **15.8.2
+  NOTE 1**, if a threat scenario corresponds to multiple damage scenarios and/or has impacts across multiple impact
+  categories (*Safety, Financial, Operational, Privacy* per **`[RQ-15-04]`**), a separate risk value (integer 1 to 5 per
+  **`[RQ-15-16]`**) is determined for each associated `IMPACT_RATING` combined with the threat scenario's
+  `aggregated_attack_feasibility` (**15.8.2 NOTE 2**).
+* **Stage 2 – Overall Maximum Risk Aggregation (`THREAT_SCENARIO.max_risk_score`):** For the overall evaluation of a
+  Threat Scenario, the highest granular risk score across all associated Damage Scenarios and SFOP categories dominates
+  (e.g., if Safety Risk = `5` and Operational Risk = `2`, the overall `max_risk_score` of the Threat Scenario is `5`).
+  Storing the granular records in `RISK_VALUE` while maintaining `max_risk_score` on `THREAT_SCENARIO` provides full
+  audit traceability per category alongside an immediate worst-case risk rating for decision-making.
 
 ### 2.6 Risk Treatment Decision (`15.9`)
-* **Treatment on Threat Scenario Level (`RISK_TREATMENT_DECISION`):** Per **`[RQ-15-17]`**, for each threat scenario—considering its risk values—one or more risk treatment options (`AVOIDING`, `REDUCING`, `SHARING`, `RETAINING`) are selected. Linking `RISK_TREATMENT_DECISION` directly to `THREAT_SCENARIO` (with an optional reference `risk_value_id` to the dominant or category-specific `RISK_VALUE`) allows teams to treat the Threat Scenario as a whole based on its maximum risk (`max_risk_score`), while still permitting category-specific treatments (e.g., `SHARING` financial risk via insurance per **15.9.2 EXAMPLE 2**).
-* **Cybersecurity Claims (`is_cybersecurity_claim`):** Captures **15.9.2 NOTE**, requiring rationales for `RETAINING` and `SHARING` to be recorded as cybersecurity claims subject to Clause 8 monitoring.
+
+* **Treatment on Threat Scenario Level (`RISK_TREATMENT_DECISION`):** Per **`[RQ-15-17]`**, for each threat
+  scenario—considering its risk values—one or more risk treatment options (`AVOIDING`, `REDUCING`, `SHARING`,
+  `RETAINING`) are selected. Linking `RISK_TREATMENT_DECISION` directly to `THREAT_SCENARIO` (with an optional reference
+  `risk_value_id` to the dominant or category-specific `RISK_VALUE`) allows teams to treat the Threat Scenario as a
+  whole based on its maximum risk (`max_risk_score`), while still permitting category-specific treatments (e.g.,
+  `SHARING` financial risk via insurance per **15.9.2 EXAMPLE 2**).
+* **Cybersecurity Claims (`is_cybersecurity_claim`):** Captures **15.9.2 NOTE**, requiring rationales for `RETAINING`
+  and `SHARING` to be recorded as cybersecurity claims subject to Clause 8 monitoring.
 
 ---
 
