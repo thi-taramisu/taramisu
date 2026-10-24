@@ -1,0 +1,29 @@
+name: Discord notifications
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request_target:
+    branches: [main]
+    types: [opened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted base code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Deliver notifications
+        env:
+          DISCORD_BACKEND_WEBHOOK: ${{ secrets.DISCORD_BACKEND_WEBHOOK }}
+          DISCORD_FRONTEND_WEBHOOK: ${{ secrets.DISCORD_FRONTEND_WEBHOOK }}
+          DISCORD_DEVOPS_WEBHOOK: ${{ secrets.DISCORD_DEVOPS_WEBHOOK }}
+        run: python3 .github/scripts/discord_notifications.py --deliver

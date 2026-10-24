@@ -1,6 +1,6 @@
 ## What we are trying to address
 
-- Describe the current behaviour that you are modifying, 
+- Describe the current behaviour that you are modifying,
   and link to work item.
 
 ## Description of Changes
