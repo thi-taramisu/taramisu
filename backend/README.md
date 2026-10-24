@@ -41,6 +41,47 @@ Compose database pre-registered and connected. It is opt-in (`tools` profile), s
 > **Warning:** `make reset` runs `docker compose down -v` and **deletes the local Postgres volume** (all data in the
 > Compose `postgres_data` volume). Use it when you want a clean database, not for a normal stop.
 
+## Tests and coverage
+
+Run unit tests with `make test`. Without `TEST_DATABASE_URL`, `TestPostgresReadiness` skips;
+with it set, the test connects to PostgreSQL and checks `/health/ready` against the migrated database.
+
+For local integration testing, start and migrate the Compose database, then run (Bash):
+
+```bash
+make db migrate
+export TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable'
+go test -race -v ./...
+```
+
+This uses the local development database. To use a separate test database, create it first, then apply
+the committed migrations with Atlas 1.3.0 and use the same URL for the tests:
+
+```bash
+export TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu_test?sslmode=disable'
+atlas migrate apply --dir file://db/migrations --url "$TEST_DATABASE_URL"
+go test -race -v ./...
+```
+
+From `backend/`, generate and inspect statement coverage:
+
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+go tool cover -html=coverage.out
+# Same test and coverage gate as CI (Python 3 required):
+go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
+python3 scripts/check_coverage.py coverage.out
+```
+
+CI starts a dedicated `postgres:17-alpine` service with a fresh `taramisu_test` database, waits for
+readiness, and applies Atlas migrations before testing. `TEST_DATABASE_URL` enables the integration test.
+The coverage checker enforces at least **80% statement coverage per package** under `internal/httpapi/...`
+and future `internal/service/...`, using exact statement counts. CLI entrypoints (`cmd/`) and
+`internal/db/` (including sqlc-generated `models.go` and `*.sql.go`) are excluded from the gate.
+It prints a Markdown table and appends it to the GitHub Actions step summary, including when the gate
+fails. Missing or empty domain coverage fails the check. The raw profile still contains all tested packages.
+
 ## Structure
 
 ```text
