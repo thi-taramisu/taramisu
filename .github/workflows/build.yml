@@ -174,7 +174,7 @@ jobs:
         id: deps
         run: |
           go mod verify
-          git diff --exit-code go.mod go.sum
+          go mod tidy -diff
 
       - name: Build backend binaries
         id: build
@@ -217,7 +217,7 @@ jobs:
 
           | Check | Status | Tool / Command |
           | :--- | :---: | :--- |
-          | **Go Module Dependencies** | ${{ steps.deps.outcome == 'success' && '✅ Verified' || (steps.deps.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go mod verify` |
+          | **Go Module Dependencies** | ${{ steps.deps.outcome == 'success' && '✅ Verified' || (steps.deps.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go mod verify` & `go mod tidy -diff` |
           | **Binary Compilation** | ${{ steps.build.outcome == 'success' && '✅ Built' || (steps.build.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go build ./cmd/...` |
           | **Database Migrations** | ${{ steps.migrate.outcome == 'success' && '✅ Applied' || (steps.migrate.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `atlas migrate apply` |
           | **Domain Coverage (80% minimum)** | ${{ steps.coverage.outcome == 'success' && '✅ Passed' || (steps.coverage.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `python3 scripts/check_coverage.py coverage.out` |
