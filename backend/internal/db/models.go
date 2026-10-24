@@ -4,7 +4,646 @@
 
 package db
 
+import (
+	"database/sql/driver"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type AnalysisApproach string
+
+const (
+	AnalysisApproachTOPDOWN  AnalysisApproach = "TOP_DOWN"
+	AnalysisApproachBOTTOMUP AnalysisApproach = "BOTTOM_UP"
+)
+
+func (e *AnalysisApproach) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AnalysisApproach(s)
+	case string:
+		*e = AnalysisApproach(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AnalysisApproach: %T", src)
+	}
+	return nil
+}
+
+type NullAnalysisApproach struct {
+	AnalysisApproach AnalysisApproach
+	Valid            bool // Valid is true if AnalysisApproach is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAnalysisApproach) Scan(value interface{}) error {
+	if value == nil {
+		ns.AnalysisApproach, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AnalysisApproach.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAnalysisApproach) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AnalysisApproach), nil
+}
+
+type AttackFeasibility string
+
+const (
+	AttackFeasibilityHIGH    AttackFeasibility = "HIGH"
+	AttackFeasibilityMEDIUM  AttackFeasibility = "MEDIUM"
+	AttackFeasibilityLOW     AttackFeasibility = "LOW"
+	AttackFeasibilityVERYLOW AttackFeasibility = "VERY_LOW"
+)
+
+func (e *AttackFeasibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AttackFeasibility(s)
+	case string:
+		*e = AttackFeasibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AttackFeasibility: %T", src)
+	}
+	return nil
+}
+
+type NullAttackFeasibility struct {
+	AttackFeasibility AttackFeasibility
+	Valid             bool // Valid is true if AttackFeasibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAttackFeasibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.AttackFeasibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AttackFeasibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAttackFeasibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AttackFeasibility), nil
+}
+
+type CybersecurityPropertyType string
+
+const (
+	CybersecurityPropertyTypeCONFIDENTIALITY CybersecurityPropertyType = "CONFIDENTIALITY"
+	CybersecurityPropertyTypeINTEGRITY       CybersecurityPropertyType = "INTEGRITY"
+	CybersecurityPropertyTypeAVAILABILITY    CybersecurityPropertyType = "AVAILABILITY"
+)
+
+func (e *CybersecurityPropertyType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CybersecurityPropertyType(s)
+	case string:
+		*e = CybersecurityPropertyType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CybersecurityPropertyType: %T", src)
+	}
+	return nil
+}
+
+type NullCybersecurityPropertyType struct {
+	CybersecurityPropertyType CybersecurityPropertyType
+	Valid                     bool // Valid is true if CybersecurityPropertyType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCybersecurityPropertyType) Scan(value interface{}) error {
+	if value == nil {
+		ns.CybersecurityPropertyType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CybersecurityPropertyType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCybersecurityPropertyType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CybersecurityPropertyType), nil
+}
+
+type ElicitationMethod string
+
+const (
+	ElicitationMethodGROUPDISCUSSION  ElicitationMethod = "GROUP_DISCUSSION"
+	ElicitationMethodMALICIOUSUSECASE ElicitationMethod = "MALICIOUS_USE_CASE"
+	ElicitationMethodEVITA            ElicitationMethod = "EVITA"
+	ElicitationMethodTVRA             ElicitationMethod = "TVRA"
+	ElicitationMethodPASTA            ElicitationMethod = "PASTA"
+	ElicitationMethodSTRIDE           ElicitationMethod = "STRIDE"
+	ElicitationMethodOTHER            ElicitationMethod = "OTHER"
+)
+
+func (e *ElicitationMethod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ElicitationMethod(s)
+	case string:
+		*e = ElicitationMethod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ElicitationMethod: %T", src)
+	}
+	return nil
+}
+
+type NullElicitationMethod struct {
+	ElicitationMethod ElicitationMethod
+	Valid             bool // Valid is true if ElicitationMethod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullElicitationMethod) Scan(value interface{}) error {
+	if value == nil {
+		ns.ElicitationMethod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ElicitationMethod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullElicitationMethod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ElicitationMethod), nil
+}
+
+type IdentificationSource string
+
+const (
+	IdentificationSourceITEMDEF       IdentificationSource = "ITEM_DEF"
+	IdentificationSourceIMPACTRATING  IdentificationSource = "IMPACT_RATING"
+	IdentificationSourceTHREATDERIVED IdentificationSource = "THREAT_DERIVED"
+	IdentificationSourceCATALOGUE     IdentificationSource = "CATALOGUE"
+)
+
+func (e *IdentificationSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IdentificationSource(s)
+	case string:
+		*e = IdentificationSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IdentificationSource: %T", src)
+	}
+	return nil
+}
+
+type NullIdentificationSource struct {
+	IdentificationSource IdentificationSource
+	Valid                bool // Valid is true if IdentificationSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIdentificationSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.IdentificationSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IdentificationSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIdentificationSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IdentificationSource), nil
+}
+
+type ImpactCategory string
+
+const (
+	ImpactCategorySAFETY      ImpactCategory = "SAFETY"
+	ImpactCategoryFINANCIAL   ImpactCategory = "FINANCIAL"
+	ImpactCategoryOPERATIONAL ImpactCategory = "OPERATIONAL"
+	ImpactCategoryPRIVACY     ImpactCategory = "PRIVACY"
+)
+
+func (e *ImpactCategory) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ImpactCategory(s)
+	case string:
+		*e = ImpactCategory(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ImpactCategory: %T", src)
+	}
+	return nil
+}
+
+type NullImpactCategory struct {
+	ImpactCategory ImpactCategory
+	Valid          bool // Valid is true if ImpactCategory is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullImpactCategory) Scan(value interface{}) error {
+	if value == nil {
+		ns.ImpactCategory, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ImpactCategory.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullImpactCategory) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ImpactCategory), nil
+}
+
+type ImpactRatingValue string
+
+const (
+	ImpactRatingValueSEVERE     ImpactRatingValue = "SEVERE"
+	ImpactRatingValueMAJOR      ImpactRatingValue = "MAJOR"
+	ImpactRatingValueMODERATE   ImpactRatingValue = "MODERATE"
+	ImpactRatingValueNEGLIGIBLE ImpactRatingValue = "NEGLIGIBLE"
+	ImpactRatingValueOMITTED    ImpactRatingValue = "OMITTED"
+)
+
+func (e *ImpactRatingValue) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ImpactRatingValue(s)
+	case string:
+		*e = ImpactRatingValue(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ImpactRatingValue: %T", src)
+	}
+	return nil
+}
+
+type NullImpactRatingValue struct {
+	ImpactRatingValue ImpactRatingValue
+	Valid             bool // Valid is true if ImpactRatingValue is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullImpactRatingValue) Scan(value interface{}) error {
+	if value == nil {
+		ns.ImpactRatingValue, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ImpactRatingValue.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullImpactRatingValue) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ImpactRatingValue), nil
+}
+
+type ProjectRole string
+
+const (
+	ProjectRoleOWNER    ProjectRole = "OWNER"
+	ProjectRoleEDITOR   ProjectRole = "EDITOR"
+	ProjectRoleREVIEWER ProjectRole = "REVIEWER"
+	ProjectRoleVIEWER   ProjectRole = "VIEWER"
+)
+
+func (e *ProjectRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProjectRole(s)
+	case string:
+		*e = ProjectRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProjectRole: %T", src)
+	}
+	return nil
+}
+
+type NullProjectRole struct {
+	ProjectRole ProjectRole
+	Valid       bool // Valid is true if ProjectRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProjectRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProjectRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProjectRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProjectRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProjectRole), nil
+}
+
+type RiskDeterminationMethod string
+
+const (
+	RiskDeterminationMethodRISKMATRIX  RiskDeterminationMethod = "RISK_MATRIX"
+	RiskDeterminationMethodRISKFORMULA RiskDeterminationMethod = "RISK_FORMULA"
+)
+
+func (e *RiskDeterminationMethod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RiskDeterminationMethod(s)
+	case string:
+		*e = RiskDeterminationMethod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RiskDeterminationMethod: %T", src)
+	}
+	return nil
+}
+
+type NullRiskDeterminationMethod struct {
+	RiskDeterminationMethod RiskDeterminationMethod
+	Valid                   bool // Valid is true if RiskDeterminationMethod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRiskDeterminationMethod) Scan(value interface{}) error {
+	if value == nil {
+		ns.RiskDeterminationMethod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RiskDeterminationMethod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRiskDeterminationMethod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RiskDeterminationMethod), nil
+}
+
+type RiskTreatmentOption string
+
+const (
+	RiskTreatmentOptionAVOIDING  RiskTreatmentOption = "AVOIDING"
+	RiskTreatmentOptionREDUCING  RiskTreatmentOption = "REDUCING"
+	RiskTreatmentOptionSHARING   RiskTreatmentOption = "SHARING"
+	RiskTreatmentOptionRETAINING RiskTreatmentOption = "RETAINING"
+)
+
+func (e *RiskTreatmentOption) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RiskTreatmentOption(s)
+	case string:
+		*e = RiskTreatmentOption(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RiskTreatmentOption: %T", src)
+	}
+	return nil
+}
+
+type NullRiskTreatmentOption struct {
+	RiskTreatmentOption RiskTreatmentOption
+	Valid               bool // Valid is true if RiskTreatmentOption is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRiskTreatmentOption) Scan(value interface{}) error {
+	if value == nil {
+		ns.RiskTreatmentOption, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RiskTreatmentOption.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRiskTreatmentOption) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RiskTreatmentOption), nil
+}
+
+type ScopeType string
+
+const (
+	ScopeTypeITEM      ScopeType = "ITEM"
+	ScopeTypeCOMPONENT ScopeType = "COMPONENT"
+)
+
+func (e *ScopeType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ScopeType(s)
+	case string:
+		*e = ScopeType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ScopeType: %T", src)
+	}
+	return nil
+}
+
+type NullScopeType struct {
+	ScopeType ScopeType
+	Valid     bool // Valid is true if ScopeType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullScopeType) Scan(value interface{}) error {
+	if value == nil {
+		ns.ScopeType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ScopeType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullScopeType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ScopeType), nil
+}
+
+type Asset struct {
+	ID                   pgtype.UUID
+	ItemDefinitionID     pgtype.UUID
+	Name                 string
+	Description          *string
+	IdentificationSource *IdentificationSource
+}
+
+type AssetCybersecurityProperty struct {
+	ID           pgtype.UUID
+	AssetID      pgtype.UUID
+	PropertyType CybersecurityPropertyType
+	Description  *string
+}
+
+type AttackFeasibilityRating struct {
+	ID                    pgtype.UUID
+	AttackPathID          pgtype.UUID
+	ApElapsedTime         *int32
+	ApSpecialistExpertise *int32
+	ApKnowledgeOfItem     *int32
+	ApWindowOfOpportunity *int32
+	ApEquipment           *int32
+	ApTotalScore          *int32
+	FeasibilityRating     *AttackFeasibility
+	Rationale             *string
+}
+
+type AttackPath struct {
+	ID                       pgtype.UUID
+	ItemDefinitionID         pgtype.UUID
+	Title                    string
+	AnalysisApproach         *AnalysisApproach
+	IsPartialEarlyStage      bool
+	AttackStepsAndWeaknesses []byte
+}
+
+type DamageScenario struct {
+	ID                           pgtype.UUID
+	ItemDefinitionID             pgtype.UUID
+	Title                        string
+	FunctionalityAdverseRelation *string
+	RoadUserHarmDescription      *string
+}
+
+type DamageScenarioAssetProperty struct {
+	ID                           pgtype.UUID
+	DamageScenarioID             pgtype.UUID
+	AssetCybersecurityPropertyID pgtype.UUID
+	CompromiseMechanismNote      *string
+}
+
+type IamGroup struct {
+	ID                 pgtype.UUID
+	ExternalIamGroupID string
+}
+
+type IamUser struct {
+	ID             pgtype.UUID
+	ExternalIamSub string
+}
+
+type IamUserGroupMember struct {
+	UserID  pgtype.UUID
+	GroupID pgtype.UUID
+}
+
+type ImpactRating struct {
+	ID                         pgtype.UUID
+	DamageScenarioID           pgtype.UUID
+	ImpactCategory             ImpactCategory
+	RatingValue                *ImpactRatingValue
+	IsOmittedByPm1507          bool
+	OmissionOrRatingRationale  *string
+	ReusedFromFunctionalSafety bool
+}
+
+type ItemDefinition struct {
+	ID                       pgtype.UUID
+	TaraProjectID            pgtype.UUID
+	Name                     string
+	ScopeType                ScopeType
+	LifecyclePhase           *string
+	ItemDefinitionWp0901     *string
+	CybersecuritySpecsWp1001 *string
+	ArchitecturalDesign      *string
+	CreatedAt                pgtype.Timestamptz
+}
+
+type ProjectRoleAssignment struct {
+	ID            pgtype.UUID
+	TaraProjectID pgtype.UUID
+	UserID        pgtype.UUID
+	GroupID       pgtype.UUID
+	ProjectRole   ProjectRole
+	AssignedAt    pgtype.Timestamptz
+}
+
+type RiskTreatmentDecision struct {
+	ID                   pgtype.UUID
+	ThreatScenarioID     pgtype.UUID
+	RiskValueID          pgtype.UUID
+	TreatmentOption      RiskTreatmentOption
+	DecisionRationale    *string
+	IsCybersecurityClaim bool
+}
+
+type RiskValue struct {
+	ID                  pgtype.UUID
+	ThreatScenarioID    pgtype.UUID
+	ImpactRatingID      pgtype.UUID
+	RiskScore           int32
+	DeterminationMethod RiskDeterminationMethod
+}
+
 type ServiceStatus struct {
 	ID      bool
 	Message string
+}
+
+type TaraProject struct {
+	ID          pgtype.UUID
+	Name        string
+	Description *string
+	CreatedAt   pgtype.Timestamptz
+}
+
+type ThreatAttackPathLink struct {
+	ID               pgtype.UUID
+	ThreatScenarioID pgtype.UUID
+	AttackPathID     pgtype.UUID
+}
+
+type ThreatDamageLink struct {
+	ID               pgtype.UUID
+	ThreatScenarioID pgtype.UUID
+	DamageScenarioID pgtype.UUID
+}
+
+type ThreatScenario struct {
+	ID                          pgtype.UUID
+	ItemDefinitionID            pgtype.UUID
+	Title                       string
+	CauseOfCompromise           *string
+	ElicitationMethod           *ElicitationMethod
+	TechnicalNotes              *string
+	AggregatedAttackFeasibility *AttackFeasibility
+	MaxRiskScore                *int32
+}
+
+type ThreatScenarioAssetProperty struct {
+	ID                           pgtype.UUID
+	ThreatScenarioID             pgtype.UUID
+	AssetCybersecurityPropertyID pgtype.UUID
 }

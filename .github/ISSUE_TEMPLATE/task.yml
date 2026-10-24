@@ -1,0 +1,30 @@
+name: Task / Feature
+description: Track planned features, technical tasks, or schema designs
+title: "[Task]: "
+labels: ["task"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Objective
+      description: What needs to be done and why? (1-2 sentences)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Acceptance Criteria / Scope
+      description: Checklist defining the Definition of Done (DoD).
+      placeholder: |
+        - [ ] Deliverable A completed
+        - [ ] Deliverable B completed
+        - [ ] Review conducted
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Context / References
+      description: Links to specs, standards (e.g. ISO 21434), or related items.
+    validations:
+      required: false
