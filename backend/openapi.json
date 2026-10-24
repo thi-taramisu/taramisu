@@ -210,7 +210,10 @@
             "description": "Error"
           }
         },
-        "summary": "List API tara projects"
+        "summary": "List API tara projects",
+        "tags": [
+          "Tara Project"
+        ]
       },
       "post": {
         "operationId": "post-api-tara-projects",
@@ -246,7 +249,10 @@
             "description": "Error"
           }
         },
-        "summary": "Post API tara projects"
+        "summary": "Post API tara projects",
+        "tags": [
+          "Tara Project"
+        ]
       }
     },
     "/api/tara-projects/{id}": {
@@ -278,7 +284,10 @@
             "description": "Error"
           }
         },
-        "summary": "Delete API tara projects by ID"
+        "summary": "Delete API tara projects by ID",
+        "tags": [
+          "Tara Project"
+        ]
       },
       "get": {
         "operationId": "get-api-tara-projects-by-id",
@@ -315,7 +324,10 @@
             "description": "Error"
           }
         },
-        "summary": "Get API tara projects by ID"
+        "summary": "Get API tara projects by ID",
+        "tags": [
+          "Tara Project"
+        ]
       },
       "patch": {
         "operationId": "patch-api-tara-projects-by-id",
@@ -362,7 +374,10 @@
             "description": "Error"
           }
         },
-        "summary": "Patch API tara projects by ID"
+        "summary": "Patch API tara projects by ID",
+        "tags": [
+          "Tara Project"
+        ]
       },
       "put": {
         "operationId": "put-api-tara-projects-by-id",
@@ -409,7 +424,10 @@
             "description": "Error"
           }
         },
-        "summary": "Put API tara projects by ID"
+        "summary": "Put API tara projects by ID",
+        "tags": [
+          "Tara Project"
+        ]
       }
     },
     "/health/live": {
@@ -468,5 +486,11 @@
         "summary": "Get health ready"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "Create, read, replace, update and delete TARA projects.",
+      "name": "Tara Project"
+    }
+  ]
 }

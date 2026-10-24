@@ -26,16 +26,18 @@ func newAPI(status handlers.StatusReader, projects handlers.TaraProjectStore) (*
 	cfg := huma.DefaultConfig("Taramisu API", "1.0.0")
 	cfg.DocsRenderer = huma.DocsRendererSwaggerUI
 	cfg.CreateHooks = nil
+	cfg.Tags = []*huma.Tag{{Name: "Tara Project", Description: "Create, read, replace, update and delete TARA projects."}}
 	api := humachi.New(mux, cfg)
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
 
-	huma.Get(api, "/api/tara-projects", tp.List)
-	huma.Post(api, "/api/tara-projects", tp.Create, func(o *huma.Operation) { o.DefaultStatus = http.StatusCreated })
-	huma.Get(api, "/api/tara-projects/{id}", tp.Get)
-	huma.Put(api, "/api/tara-projects/{id}", tp.Replace)
-	huma.Patch(api, "/api/tara-projects/{id}", tp.Update)
-	huma.Delete(api, "/api/tara-projects/{id}", tp.Delete, func(o *huma.Operation) { o.DefaultStatus = http.StatusNoContent })
+	tagProject := func(o *huma.Operation) { o.Tags = []string{"Tara Project"} }
+	huma.Get(api, "/api/tara-projects", tp.List, tagProject)
+	huma.Post(api, "/api/tara-projects", tp.Create, tagProject, func(o *huma.Operation) { o.DefaultStatus = http.StatusCreated })
+	huma.Get(api, "/api/tara-projects/{id}", tp.Get, tagProject)
+	huma.Put(api, "/api/tara-projects/{id}", tp.Replace, tagProject)
+	huma.Patch(api, "/api/tara-projects/{id}", tp.Update, tagProject)
+	huma.Delete(api, "/api/tara-projects/{id}", tp.Delete, tagProject, func(o *huma.Operation) { o.DefaultStatus = http.StatusNoContent })
 	return mux, api
 }
