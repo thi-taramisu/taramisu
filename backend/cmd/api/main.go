@@ -34,7 +34,8 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	server := &http.Server{Addr: addr, Handler: httpapi.New(db.New(pool)), ReadHeaderTimeout: 5 * time.Second}
+	queries := db.New(pool)
+	server := &http.Server{Addr: addr, Handler: httpapi.New(queries, queries), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
