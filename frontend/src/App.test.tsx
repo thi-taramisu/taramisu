@@ -70,20 +70,39 @@ describe('routing', () => {
     expect(screen.getByRole('link', { name: /A-01/ })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
   })
 
+  it('toggles the graph view with the header switch', async () => {
+    const user = userEvent.setup()
+    renderAt(`${project}/damage-scenarios/ds-01`)
+
+    await user.click(screen.getByRole('switch', { name: 'Graph' }))
+    expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('switch', { name: 'Graph' }))
+    expect(screen.getByRole('navigation', { name: 'Damage scenario tabs' })).toBeInTheDocument()
+  })
+
   it('routes the project settings sections', async () => {
     const user = userEvent.setup()
     renderAt(`${project}/settings`)
 
-    expect(screen.getByRole('heading', { name: 'Settings: Headlamp system (example)', level: 1 })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'General', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects')
+    expect(screen.getByRole('heading', { name: 'General', level: 1 })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Members' }))
 
     expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { name: 'Members', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Members', level: 1 })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Back' })).toHaveAttribute('href', project)
   })
 
-  it.each(['/does-not-exist', '/projects/unknown', `${project}/items/i-01/unknown-tab`, '/item-definition'])(
+  it.each([
+    '/does-not-exist',
+    '/projects/unknown',
+    '/projects/unknown/settings',
+    `${project}/items/i-01/unknown-tab`,
+    '/item-definition',
+  ])(
     'shows the not found page for %s',
     (path) => {
       renderAt(path)
