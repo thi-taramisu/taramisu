@@ -24,7 +24,7 @@ only one way to look at the data and an element has no single parent.
 ## Route table
 
 | Route | Page | Wireframe | Auth |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `/` | Redirect to `/projects` | | |
 | `/login` | Login | | public, depends on the IAM decision (#46), not routed yet |
 | `/projects` | Project list | Project / Start | user |
