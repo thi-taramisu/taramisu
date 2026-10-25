@@ -3,7 +3,23 @@ set -eu
 umask 077
 cd "$(dirname "$0")"
 
+case "${1:-}" in
+    '') ;;
+    --init) ;;
+    *) echo 'Usage: deploy/dev.sh [--init]' >&2; exit 2 ;;
+esac
+
 if [ ! -e ../iam/.env ]; then
+    # Never pair an existing database with freshly generated credentials.
+    if ! docker info --format '{{.ServerVersion}}' > /dev/null 2>&1; then
+        echo 'Docker must be running to check for existing IAM data before generating iam/.env.' >&2
+        exit 1
+    fi
+    project=${COMPOSE_PROJECT_NAME:-taramisu}
+    if docker volume inspect "$project-iam_authentik_database" > /dev/null 2>&1; then
+        echo 'Existing Authentik database found, but iam/.env is missing. Restore its secrets before starting; no new secrets were generated.' >&2
+        exit 1
+    fi
     pg_pass=$(openssl rand -hex 32)
     authentik_key=$(openssl rand -hex 48)
     client_secret=$(openssl rand -hex 32)
@@ -22,16 +38,21 @@ if [ ! -e ../iam/.env ]; then
     echo 'Generated local secrets in iam/.env (ignored by Git).'
 fi
 
-backend() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
-iam() { docker compose --env-file ../iam/.env -f ../iam/compose.yaml "$@"; }
+compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
 chmod 600 ../iam/.env
-backend config --quiet
-iam config --quiet
-iam up -d --wait --wait-timeout 240 server worker
+compose config --quiet
+if [ "${1:-}" = --init ]; then
+    exit 0
+fi
+if ! compose up -d --wait --wait-timeout 60 authentik-db; then
+    echo 'Authentik database readiness failed. Check database logs and PG_PASS in iam/.env; an existing volume keeps its original database password.' >&2
+    exit 1
+fi
+compose up -d --wait --wait-timeout 240 authentik-server authentik-worker
 # Blueprint output may contain secrets.
 : > ../iam/.blueprint.log
 chmod 600 ../iam/.blueprint.log
-if ! iam exec -T worker ak apply_blueprint \
+if ! compose exec -T authentik-worker ak apply_blueprint \
     /blueprints/system/providers-oauth2.yaml \
     /blueprints/default/flow-password-change.yaml \
     /blueprints/default/flow-default-authentication-flow.yaml \
@@ -43,13 +64,16 @@ if ! iam exec -T worker ak apply_blueprint \
     exit 1
 fi
 rm ../iam/.blueprint.log
-backend up -d --build --wait --wait-timeout 180 api
+compose up -d --build --wait --wait-timeout 180 api
 if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused \
     --retry-delay 1 --retry-max-time 30 http://localhost:8080/health/ready > /dev/null; then
-    echo 'Backend readiness failed. Inspect: docker compose --env-file iam/.env -f backend/compose.yaml logs api' >&2
+    echo 'Backend readiness failed. Inspect: docker compose --env-file iam/.env -f deploy/compose.yaml logs api' >&2
     exit 1
 fi
 
-callback_url=$(iam exec -T worker printenv OIDC_REDIRECT_URI)
+compose up -d --build --wait --wait-timeout 180 frontend proxy
+
+callback_url=$(compose exec -T authentik-worker printenv OIDC_REDIRECT_URI)
 echo "Login: ${callback_url%/auth/callback}/auth/login (dev; DEV_PASSWORD in iam/.env)"
 echo 'Authentik admin: http://authentik.localhost:9000 (akadmin; AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env)'
+echo 'Frontend: http://localhost'

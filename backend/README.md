@@ -11,12 +11,13 @@ Go HTTP API for Taramisu.
 
 ## Prerequisites
 
-- Docker Compose v2.20+, Go 1.25+, make, OpenSSL and curl
-- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — only to regenerate `internal/db/` after changing `db/queries/` or `db/schema.sql`
+- Docker Compose v2.23.1+, Go 1.25+, make, OpenSSL and curl
+- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — only to regenerate `internal/db/` after
+  changing `db/queries/` or `db/schema.sql`
 
 ## Commands
 
-Run from `backend/`, with ports 5432, 8080 and 9000 free:
+Run from `backend/`. The full stack uses ports 80, 5432, 8080 and 9000; optional pgAdmin uses 5050.
 
 ```bash
 make up
@@ -31,27 +32,27 @@ make fmt
 make down
 ```
 
-`make up` runs [`dev.sh`](dev.sh) and starts two Compose projects using `iam/.env`:
+`make up` delegates to [`deploy/dev.sh`](../deploy/dev.sh) and starts the `taramisu` Compose project:
+API, backend database and migrations, Authentik, frontend, and proxy. Startup provisions Authentik before starting the API.
+See the [deployment README](../deploy/README.md) for setup, networking, and migration from the former two-project layout.
 
-- `taramisu-backend`: API, backend database and migrations ([compose.yaml](compose.yaml)).
-- `taramisu-iam`: Authentik server, worker and database ([IAM configuration](../iam/README.md)).
+Container commands use `iam/.env`; `make init` generates it without starting services.
+`make db` starts only the backend database, and `make migrate` applies its migrations.
+These commands initialize the configuration automatically if needed.
 
-Startup provisions Authentik first, then starts the backend, applies migrations and
-waits for readiness. The API and Authentik server share the `taramisu-auth` network,
-created by the IAM project; each database stays on its own project's default network.
-`make down` stops the backend first, then IAM, and keeps their data.
-Run `make up` once to generate `iam/.env`; `make db` starts just the backend database.
+`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at <http://localhost:5050> (no login),
+connected to the backend database. It remains opt-in through the `tools` profile.
 
-`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at [http://localhost:5050](http://localhost:5050) (no login) with the
-Compose database pre-registered and connected. It is opt-in (`tools` profile), so `make up` does not start it; `make down` stops it.
+To run the API on the host, first start the stack with `make up`, copy `.env.example`
+to `.env`, and copy the OIDC settings and `APP_URL` from `../iam/.env`.
+Stop the API container with
+`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, then run `make run`.
+`make run` and `make test` load the backend `.env`; bare `make` runs tests.
 
-To run the API on the host, start the stack with `make up`, copy `.env.example`
-to `.env` and use the client ID, secret and `APP_URL` from `../iam/.env`.
-Stop the API container first with
-`docker compose --env-file ../iam/.env -f compose.yaml stop api`, then run `make run`.
-`make run` and `make test` load `.env`; bare `make` runs tests.
+`make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
 
-> **Warning:** `make reset` stops the whole stack and deletes backend and Authentik data. It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
+> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
+> It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
 
 ## Authentication
 
@@ -66,13 +67,13 @@ SSO session active. Group synchronization and project permissions are not implem
 
 ```sh
 curl -f http://localhost:8080/health/ready
-sh dev_test.sh
+make -C ../deploy test
 make test
 TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make test
 ```
 
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
-API logs: `docker compose --env-file ../iam/.env -f compose.yaml logs api`.
+API logs: `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml logs api`.
 
 ## Structure
 
