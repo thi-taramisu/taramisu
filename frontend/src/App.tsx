@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
 import { ItemDefinitionDiagram } from './features/item-definition/ItemDefinitionDiagram'
+import { GeneralSettings } from './features/project-settings/GeneralSettings'
 import { ENTITY_TYPES, type EntityType } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
 import { Placeholder } from './features/workspace/Placeholder'
@@ -27,7 +28,7 @@ export default function App() {
       <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />
       <Route path="/projects" element={<ProjectListPage />} />
       <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />}>
-        <Route index element={<Placeholder title="General" />} />
+        <Route index element={<GeneralSettings />} />
         <Route path="members" element={<Placeholder title="Members" />} />
       </Route>
       <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
