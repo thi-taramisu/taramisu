@@ -19,7 +19,7 @@ func TestLiveness(t *testing.T) {
 	h := httpapi.New(statusFunc(func(context.Context) (string, error) {
 		t.Fatal("liveness must not query the database")
 		return "", nil
-	}))
+	}), nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/live", http.NoBody))
 	if rr.Code != http.StatusOK {
