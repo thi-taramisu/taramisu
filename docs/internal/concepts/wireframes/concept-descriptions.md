@@ -41,6 +41,7 @@
     * C/I/A are no longer set on the Damage Scenario. They are set on the Asset → Damage link, in line with the Cybersecurity Properties Concept.
     * A Damage Scenario can have multiple assets and properties.
     * The Threat Scenario selects its targets through the causes of the linked Damage Scenarios (block "Damage Scenarios & Targets"). Each target asset has exactly one property (strict interpretation of RQ-15-03), but multiple target assets are allowed.
+    If a threat compromises multiple properties of the same asset, this could be modeled by creating separate threat scenarios.
     * The Threat Scenario has an "Elicitation" field (Group discussion, Malicious use case, EVITA, TVRA, PASTA, STRIDE, Other) instead of STRIDE checkboxes.
     * The feasibility rating method can be selected (Attack Potential, CVSS, or Attack Vector per Annex G). The project default is set in the settings, and each Attack Path can deviate from it.
     * Treatment is decided once per Threat Scenario. The view shows which risk values it covers.
