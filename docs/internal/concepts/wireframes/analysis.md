@@ -3,7 +3,7 @@
 
 ``` mermaid
 graph TD
-    0[0. Item Definition] --> 1[1. Asset Identification]
+    0[Item Definition] --> 1[1. Asset Identification]
     1 --> 2[2. Damage Scenario Identification]
     1 --> 4[4. Threat Scenario Identification]
     2 --> 3[3. Impact Rating]
@@ -15,12 +15,11 @@ graph TD
     classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#0369a1;
 ```
 
-## Clause 9
+## Clause 9 (Item Definition)
 
-0. Item Definition
-    * *Objective:* Understand architecture and system scope
-    * *Activities:* Defining system boundaries, functions, and preconditions
-    * *Output:* Architecture of system and external interfaces
+* *Objective:* Understand architecture and system scope
+* *Activities:* Defining system boundaries, functions, and preconditions
+* *Output:* Architecture of system and external interfaces
 
 ## Clause 15
 
