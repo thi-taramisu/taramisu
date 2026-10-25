@@ -70,10 +70,17 @@ describe('routing', () => {
     expect(screen.getByRole('link', { name: /A-01/ })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
   })
 
-  it('routes the project settings sections', () => {
-    renderAt(`${project}/settings/members`)
+  it('routes the project settings sections', async () => {
+    const user = userEvent.setup()
+    renderAt(`${project}/settings`)
 
-    expect(screen.getByText('Members: not implemented yet')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settings: Headlamp system (example)', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'General', level: 2 })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Members' }))
+
+    expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: 'Members', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '← Back' })).toHaveAttribute('href', project)
   })
 
   it.each(['/does-not-exist', '/projects/unknown', `${project}/items/i-01/unknown-tab`, '/item-definition'])(
