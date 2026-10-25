@@ -1,0 +1,14 @@
+# markdownlint-cli2 options (file selection). Rule configuration lives in .markdownlint.yaml.
+# Used identically by CI (DavidAnson/markdownlint-cli2-action), `npx markdownlint-cli2` and the VS Code extension.
+globs:
+  - "**/*.md"
+
+# Respect .gitignore files (root and nested, e.g. frontend/.gitignore) so that node_modules, build output
+# and local scratch folders like tmp/ are never linted.
+gitignore: true
+
+ignores:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/CHANGELOG.md"

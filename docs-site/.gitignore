@@ -1,8 +1,0 @@
-node_modules/
-build/
-.docusaurus/
-.cache/
-npm-debug.log*
-.env
-.env.*
-!.env.example
