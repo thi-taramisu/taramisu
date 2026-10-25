@@ -43,11 +43,13 @@ These commands initialize the configuration automatically if needed.
 `make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at <http://localhost:5050> (no login),
 connected to the backend database. It remains opt-in through the `tools` profile.
 
-To run the API on the host, first start the stack with `make up`, copy `.env.example`
-to `.env`, and copy the OIDC settings and `APP_URL` from `../iam/.env`.
+To run the API on the host, copy `.env.example` to `.env` and copy the OIDC settings from `../iam/.env`.
+Set `APP_URL=http://localhost:8080` in both files, then run `make up` to update the Authentik callback.
 Stop the API container with
 `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, then run `make run`.
 `make run` and `make test` load the backend `.env`; bare `make` runs tests.
+Use port 8080 directly in this mode. To return to the full Compose stack, restore `APP_URL=http://localhost`
+in `../iam/.env` and run `make up`.
 
 `make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
 
@@ -56,8 +58,9 @@ Stop the API container with
 
 ## Authentication
 
-Open <http://localhost:8080/auth/login> with user `dev` and `DEV_PASSWORD` from
+Open <http://localhost/auth/login> with user `dev` and `DEV_PASSWORD` from
 `../iam/.env`. Login returns `/api/v1/me` with the local user ID, issuer and subject.
+The Compose proxy forwards `/api/v1/` and `/auth/` to the backend without stripping their prefixes.
 `APP_URL` must be an origin without a trailing slash and determines the callback URL.
 `POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
 Sessions last eight hours and are lost on API restart. Logout leaves the Authentik

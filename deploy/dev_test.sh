@@ -31,7 +31,9 @@ case " $* " in
     *" ak apply_blueprint "*)
         echo 'blueprint diagnosis: sentinel-secret'
         exit "${BLUEPRINT_FAIL:-0}" ;;
-    *" printenv OIDC_REDIRECT_URI "*) echo 'http://localhost:8080/auth/callback' ;;
+    *" printenv OIDC_REDIRECT_URI "*) echo 'http://localhost/auth/callback' ;;
+    *" proxy nginx -t "*) exit "${PROXY_CONFIG_FAIL:-0}" ;;
+    *" proxy nginx -s reload "*) exit "${PROXY_RELOAD_FAIL:-0}" ;;
     *" up "*|*" run --rm migrate "*|*" down "*)
         "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.yaml config --quiet
         case " $* " in
@@ -54,6 +56,7 @@ unset APP_URL OIDC_ISSUER OIDC_CLIENT_ID OIDC_CLIENT_SECRET PG_PASS
 unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD
 unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES
 unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
+unset PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL
 unset EXISTING_IAM_VOLUME DOCKER_UNAVAILABLE
 
 run() { (cd "$scratch" && ./deploy/dev.sh "$@") > "$scratch/output" 2>&1; }
@@ -91,7 +94,9 @@ awk '
     /up .* api$/ { api = NR }
     /^readiness$/ { ready = NR }
     /up .*frontend proxy/ { web = NR }
-    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < ready && ready < web) }
+    /proxy nginx -t$/ { validate = NR }
+    /proxy nginx -s reload$/ { reload = NR }
+    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < ready && ready < web && web < validate && validate < reload) }
 ' "$COMMAND_LOG"
 grep -q '^Login:' "$scratch/output"
 test ! -e "$scratch/iam/.blueprint.log"
@@ -160,13 +165,16 @@ grep -q 'sentinel-secret' "$scratch/iam/.blueprint.log"
 test -n "$(find "$scratch/iam/.blueprint.log" -perm 600)"
 ! grep -q 'sentinel-secret' "$scratch/output"
 
-for failure in API_FAIL READY_FAIL WEB_FAIL; do
+for failure in API_FAIL READY_FAIL WEB_FAIL PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL; do
     export "$failure=1"
     : > "$COMMAND_LOG"
     expect_failure
     unset "$failure"
-    if [ "$failure" != WEB_FAIL ]; then
+    if [ "$failure" = API_FAIL ] || [ "$failure" = READY_FAIL ]; then
         ! grep -q ' up .*frontend proxy' "$COMMAND_LOG"
+    fi
+    if [ "$failure" = PROXY_CONFIG_FAIL ]; then
+        ! grep -q 'proxy nginx -s reload' "$COMMAND_LOG"
     fi
 done
 
@@ -230,6 +238,8 @@ expected_volumes = {
 assert {key: value['name'] for key, value in model['volumes'].items()} == expected_volumes
 isolated = json.loads((root / 'isolated.json').read_text())
 assert isolated['name'] == 'isolated-check'
+assert isolated['services']['api']['environment']['APP_URL'] == 'http://localhost'
+assert isolated['services']['authentik-worker']['environment']['OIDC_REDIRECT_URI'] == 'http://localhost/auth/callback'
 assert all(v['name'].startswith('isolated-check-') for v in isolated['volumes'].values())
 assert all(n['name'].startswith('isolated-check_') for n in isolated['networks'].values())
 PY

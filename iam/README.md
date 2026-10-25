@@ -19,7 +19,10 @@ If copying [`.env.example`](.env.example) manually, fill all five blank values (
 Keep `.env` with the database volumes; `make -C deploy down` preserves both.
 
 - Admin: <http://authentik.localhost:9000>, user `akadmin`, password `AUTHENTIK_BOOTSTRAP_PASSWORD`.
-- Application login: <http://localhost:8080/auth/login>, user `dev`, password `DEV_PASSWORD`.
+- Application login: <http://localhost/auth/login>, user `dev`, password `DEV_PASSWORD`.
+
+Use `APP_URL=http://localhost` in `iam/.env` for the Compose stack. After changing it, run `make -C deploy up`
+to update both the backend and Authentik callback. Preserve all existing secrets.
 
 Passwords are in `iam/.env`. Startup reapplies the blueprints; the admin bootstrap
 password only takes effect on a fresh database.

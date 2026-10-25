@@ -83,13 +83,16 @@ func New(ctx context.Context, cfg Config, users UserStore) (*Manager, error) {
 }
 
 func (m *Manager) cookie(w http.ResponseWriter, name, value string, seconds int) {
+	// #nosec G124 -- Secure follows APP_URL: HTTPS enables it; local HTTP development requires it disabled.
 	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, Secure: m.secure, SameSite: http.SameSiteLaxMode, MaxAge: seconds})
 }
 func fail(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(huma.NewError(code, message))
+	if err := json.NewEncoder(w).Encode(huma.NewError(code, message)); err != nil {
+		slog.Warn("write authentication error response", "error", err)
+	}
 }
 
 func (m *Manager) pruneLocked() {

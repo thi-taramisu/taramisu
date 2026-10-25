@@ -45,7 +45,11 @@ func TestIAMUserMapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			t.Error(err)
+		}
+	}()
 	queries := db.New(tx)
 	subject := "test-" + rand.Text()
 	first, err := queries.UpsertIAMUser(ctx, subject)

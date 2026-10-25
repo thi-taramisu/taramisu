@@ -72,6 +72,10 @@ if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused \
 fi
 
 compose up -d --build --wait --wait-timeout 180 frontend proxy
+# Compose does not recreate an existing proxy when its bind-mounted config changes.
+# Reload also resolves the current API container address after a rebuild.
+compose exec -T proxy nginx -t
+compose exec -T proxy nginx -s reload
 
 callback_url=$(compose exec -T authentik-worker printenv OIDC_REDIRECT_URI)
 echo "Login: ${callback_url%/auth/callback}/auth/login (dev; DEV_PASSWORD in iam/.env)"

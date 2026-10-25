@@ -36,6 +36,7 @@ Startup first verifies a password-authenticated query to the Authentik database,
 It applies the built-in and custom blueprints before starting the API.
 The API waits for backend migrations and Authentik health. The script additionally checks `/health/ready`
 before starting frontend and proxy.
+It validates and reloads nginx so configuration changes and rebuilt API containers take effect on repeat starts.
 A provisioning failure stops startup and writes a private `iam/.blueprint.log`, which may contain secrets.
 
 Use `make up` for initial startup and configuration changes. A raw `docker compose up` does not generate secrets
@@ -51,14 +52,17 @@ docker compose --env-file iam/.env -f deploy/compose.yaml stop api
 Current local addresses:
 
 - Frontend: <http://localhost>
+- API through the proxy: <http://localhost/api/v1/me> (requires login)
 - API and Swagger: <http://localhost:8080/docs>
-- Login: <http://localhost:8080/auth/login>
+- Login: <http://localhost/auth/login>
 - Authentik: <http://authentik.localhost:9000>
 
-`APP_URL` defaults to `http://localhost:8080` and defines the callback and logout origin.
+`APP_URL` defaults to `http://localhost` and defines the callback and logout origin.
 The issuer remains `http://authentik.localhost:9000/application/o/taramisu/`, reachable from the browser and API container.
-The proxy's existing API-prefix rewrite and missing `/auth/` route still need the separate routing change;
-use port 8080 for authentication until that change is in place.
+The proxy preserves `/api/v1/` and forwards `/auth/` to the backend. Frontend and authentication share the same origin.
+For an existing checkout, change only `APP_URL=http://localhost` in `iam/.env` and run `make -C deploy up`;
+this updates the backend origin and Authentik callback without replacing secrets or data.
+Port 8080 remains available for backend diagnostics and Swagger.
 
 ## Networks and data
 
