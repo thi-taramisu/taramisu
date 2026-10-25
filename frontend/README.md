@@ -32,6 +32,7 @@ src/
   features/api-status/         # example: typed GET /health via openapi-react-query
   features/workspace/          # project workspace: layout with element tree, element pages with tabs, example data
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
+  features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
