@@ -18,8 +18,13 @@ Project
 ```
 
 In Concept 2 this hierarchy is the tree in the sidebar of the project workspace. Selecting an element opens its page on the right, with
-tabs. The relations are many-to-many though (a threat scenario can belong to several damage scenarios, see #43 and PR #29), so the tree is
-only one way to look at the data and an element has no single parent.
+tabs. Relations between scenarios are many-to-many (see #43 and PR #29), so an entity can appear under several relation branches. These
+navigation branches do not define ownership.
+
+Assets, damage scenarios, threat scenarios and attack paths each belong to exactly one item through `item_definition_id`, as defined in
+the [data model](architecture/data-model.md) and `backend/db/schema.sql`. In the URL, `projectId` identifies the workspace and access-control
+scope; it does not replace that item ownership. The owning item and breadcrumb context come from entity data. Future API lookups must
+verify that the entity's owning item belongs to the requested project; the current mock routes do not implement authorization guards.
 
 ## Route table
 
@@ -63,9 +68,9 @@ These were the open questions in the first draft of this page. The wireframes an
 2. **Several items per project?** Yes, the tree shows several items per project, so items have their own id in the URL.
 3. **Deep links to single entities?** Yes, every element has its own URL. Creating elements ("+ New") happens in dialogs without their own
    route.
-4. **Flat or nested URLs?** Flat per type under the project (`/projects/:projectId/threat-scenarios/:id`), not nested along the tree.
-   Because of the many-to-many relations there is no single parent path, and a nested URL would break as soon as a relation changes. The
-   path shown above the title (breadcrumb chips in the wireframes) comes from the data, not from the URL.
+4. **Flat or nested URLs?** Flat per type under the project (`/projects/:projectId/threat-scenarios/:id`). This is a routing convention;
+   each entity still has one owning item. Keeping the variable asset/scenario relation chain out of the URL allows links to stay stable
+   when those relations change. The owning item and breadcrumb chips come from the data, not from the URL.
 5. **Where do graphs live?** The "Graph" switch in the header turns the selected element's page into a graph of its relations (Graph
    Concept). This is a view mode, so it is a query parameter (`?view=graph`) and not a separate route. It stays on when you select another
    element in the tree. The item definition diagram (React Flow) is the Definition tab of an item.
