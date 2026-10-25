@@ -2,3 +2,7 @@ include:
   - ./compose.backend.yaml
   - ./compose.frontend.yaml
   - ./compose.proxy.yaml
+  - ./compose.docs.yaml
+
+networks:
+  taramisu-proxy:
