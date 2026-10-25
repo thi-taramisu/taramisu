@@ -86,13 +86,18 @@ flowchart TB
 
 ## 2. Network Segmentation
 
-Every stateful or internal component lives in its **own internal Docker network** that is shared only with the services that actually need
-it. Only NGINX publishes ports to the host. Databases, MinIO, and the LLM service are **never** attached to the proxy network and therefore
-cannot be reached from the edge.
+The container topology strictly separates ingress and persistence layers into dedicated Docker networks. NGINX is the sole service
+attached to the non-internal `edge` network to publish host ports (`:80`, `:443`). All internal application routing occurs across the
+`internal: true` `proxy` network, completely blocking outbound internet egress for the Go API and Frontend.
+
+Every stateful or internal backend component sits in its **own isolated `internal: true` Docker network** shared only with the services
+that directly require it. Databases, MinIO, and the LLM service are **never** attached to the `edge` or `proxy` networks and cannot be
+reached from the edge.
 
 | Network | `internal` | Members | Purpose |
 | --- | --- | --- | --- |
-| `proxy` | no | NGINX, Frontend, Go API, Authentik Server | Ingress routing from the edge |
+| `edge` | no | NGINX *(+ optional Authentik/LLM for egress)* | Ingress from host/internet (`ports:`) & outbound internet access (egress) |
+| `proxy` | yes | NGINX, Frontend, Go API, Authentik Server | Internal ingress routing from NGINX & Go API $\leftrightarrow$ Authentik (no internet egress) |
 | `app-db` | yes | Go API, Atlas, `taramisu-db` | Application database access |
 | `iam-db` | yes | Authentik Server, Authentik Worker, `authentik-db` | IAM database access |
 | `storage` | yes | Go API, MinIO | Object storage access |
@@ -100,36 +105,36 @@ cannot be reached from the edge.
 
 ```mermaid
 flowchart LR
-    Proxy["NGINX Reverse Proxy"]
-    FE["Frontend"]
-    API["Go API (1..N)"]
-    AS["Authentik Server"]
-    AW["Authentik Worker"]
-    Atlas["Atlas"]
-    LLM["LLM Service"]
-    AppDB[("taramisu-db")]
-    IAMDB[("authentik-db")]
-    MinIO[("MinIO")]
+    Host([Host / Internet]) ==>|":443"| Proxy["NGINX Reverse Proxy"]
 
-    Proxy ---|proxy| FE
-    Proxy ---|proxy| API
-    Proxy ---|proxy| AS
-    API ---|proxy| AS
+    subgraph net_edge ["edge (internal: false — Host Ports & Optional Egress)"]
+        Proxy
+    end
 
-    API ---|app-db| AppDB
-    Atlas ---|app-db| AppDB
+    subgraph net_proxy ["proxy (internal: true — NO Internet Egress)"]
+        Proxy --- FE["Frontend"]
+        Proxy --- API["Go API (1..N)"]
+        Proxy --- AS["Authentik Server"]
+        API -.->|"JWKS & User Lookup<br/>(via internal proxy net)"| AS
+    end
 
-    AS ---|iam-db| IAMDB
-    AW ---|iam-db| IAMDB
+    API ---|app-db| AppDB[("taramisu-db")]
+    Atlas["Atlas"] ---|app-db| AppDB
 
-    API ---|storage| MinIO
+    AS ---|iam-db| IAMDB[("authentik-db")]
+    AW["Authentik Worker"] ---|iam-db| IAMDB
 
-    API ---|llm| LLM
+    API ---|storage| MinIO[("MinIO")]
+
+    API ---|llm| LLM["LLM Service"]
 ```
 
 > [!NOTE]
-> Docker networks with `internal: true` have **no outbound internet access**. Services that need egress (e.g. Authentik Worker for e-mail
-> delivery, or the LLM service if it calls an external model API) must additionally be attached to a non-internal network.
+> Docker networks with `internal: true` have **no outbound internet access (egress)**. Because `proxy` is `internal: true`, neither the
+> Go API nor the Frontend can initiate outbound connections to the internet (protecting against reverse shells and direct data
+> exfiltration in case of compromise).
+> Services that explicitly require egress in later phases (e.g. Authentik Worker for SMTP email delivery or external SSO/IdP federation,
+> or the LLM service if connecting to an external THI model API from the production VM) will be attached additionally to `edge`.
 
 ---
 
@@ -167,12 +172,13 @@ flowchart LR
   limits. A compromised or misconfigured Go API has no network path to the Authentik database and vice versa. The additional operational
   overhead of a second PostgreSQL container is small compared to the security and lifecycle benefits.
 
-### 4. Strict Network Segmentation
+### 4. Strict Network Segmentation & Outbound Egress Isolation
 
-* **Decision:** Only NGINX is exposed; all stateful and internal services sit in dedicated internal networks (see
-  [Section 2](#2-network-segmentation)).
-* **Why:** Minimizes the attack surface and enforces least privilege on the network level—each service can only reach the backends it
-  actually needs.
+* **Decision:** Only NGINX is exposed on the non-internal `edge` network; the internal `proxy` network as well as all persistence networks
+  (`app-db`, `iam-db`, `storage`, `llm`) are configured with `internal: true` (see [Section 2](#2-network-segmentation)).
+* **Why:** Minimizes the attack surface and enforces least privilege on the network level. Each service can only reach the backends it
+  actually needs, and application containers (Go API, Frontend) cannot initiate outbound connections to the internet, preventing reverse
+  shells and direct data exfiltration in the event of container compromise.
 
 ### 5. Zero PII in Application Database (Authentik Integration)
 
