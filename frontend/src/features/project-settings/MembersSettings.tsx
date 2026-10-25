@@ -26,7 +26,7 @@ export function MembersSettings() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">Members</h2>
+        <h1 className="text-lg font-semibold">Members</h1>
         <AddMemberDialog
           onAdd={(member) =>
             setMembers((prev) => [...prev, { ...member, id: crypto.randomUUID(), added: new Date().toISOString().slice(0, 10) }])

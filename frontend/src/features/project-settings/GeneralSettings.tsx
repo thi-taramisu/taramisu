@@ -12,7 +12,7 @@ function handleSubmit(event: FormEvent<HTMLFormElement>) {
 export function GeneralSettings() {
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <h2 className="text-lg font-semibold">General</h2>
+      <h1 className="text-lg font-semibold">General</h1>
       <div className="grid gap-2">
         <Label htmlFor="project-name">Name</Label>
         {/* The pattern also rejects names that only contain spaces. */}
