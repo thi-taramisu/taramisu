@@ -25,7 +25,7 @@ migrate-diff:
 	$(COMPOSE) up -d --wait dev-db
 	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 migrate-validate:
-	$(COMPOSE) run --rm --no-deps migrate migrate validate --env local
+	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
 sqlc:
 	sqlc generate
 sqlc-diff:
