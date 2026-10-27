@@ -61,6 +61,16 @@ An empty DSN disables reporting. Set `VITE_SENTRY_ENVIRONMENT` and optionally `V
 to identify deployments. Vite embeds these values at build time; configure them before building and rebuild
 after changes. Never put a Sentry auth token in a `VITE_` variable.
 
+Docker builds accept these settings as build arguments. To build with Compose using your frontend
+environment file, run this from the repository root:
+
+```bash
+docker compose --env-file frontend/.env.local -f deploy/compose.frontend.yaml build frontend
+```
+
+Compose also accepts `VITE_SENTRY_*` values exported in your shell. Container runtime variables do not
+change the compiled frontend; rebuild the image after changing these settings.
+
 Source map upload is not configured yet; production stack traces may reference bundled code.
 
 ## UI components
