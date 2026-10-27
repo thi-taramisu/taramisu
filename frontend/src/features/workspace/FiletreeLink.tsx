@@ -13,6 +13,7 @@ interface FiletreeLinkProps {
 export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }: FiletreeLinkProps) {
   const label = useRef<HTMLSpanElement>(null)
   const animation = useRef<Animation | null>(null)
+  const interaction = useRef({ hovered: false, focused: false })
 
   function stopScrolling() {
     animation.current?.cancel()
@@ -20,7 +21,7 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
   }
 
   function startScrolling() {
-    stopScrolling()
+    if (animation.current) return
     const text = label.current
     const viewport = text?.parentElement
     if (!text || !viewport || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
@@ -38,6 +39,12 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
     ], { duration, iterations: Infinity, direction: 'alternate', easing: 'linear' })
   }
 
+  function updateScrolling(source: 'hovered' | 'focused', active: boolean) {
+    interaction.current[source] = active
+    if (interaction.current.hovered || interaction.current.focused) startScrolling()
+    else stopScrolling()
+  }
+
   useEffect(() => () => animation.current?.cancel(), [])
 
   return (
@@ -45,10 +52,10 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
       to={{ pathname: entityPath(projectId, node.type, node.id), search }}
       title={`${ENTITY_TYPES[node.type].label}: ${node.code} ${node.name}`}
       onKeyDown={onKeyDown}
-      onMouseEnter={startScrolling}
-      onMouseLeave={stopScrolling}
-      onFocus={startScrolling}
-      onBlur={stopScrolling}
+      onMouseEnter={() => updateScrolling('hovered', true)}
+      onMouseLeave={() => updateScrolling('hovered', false)}
+      onFocus={() => updateScrolling('focused', true)}
+      onBlur={() => updateScrolling('focused', false)}
       className={({ isActive }) =>
         `group/filetree-link flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-[5px] text-[13px] leading-[18px] outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring ${isActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : ''}`
       }

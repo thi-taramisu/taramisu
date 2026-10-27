@@ -162,6 +162,38 @@ describe('Filetree', () => {
     expect(cancel).toHaveBeenCalledTimes(2)
   })
 
+  it.each(['hover', 'focus'] as const)('keeps scrolling while hover and focus overlap (%s first)', (first) => {
+    renderTree()
+    const link = screen.getByRole('link', { name: 'A-01 Long asset name' })
+    const label = within(link).getByText('Long asset name')
+    const cancel = vi.fn<() => void>()
+    const animate = vi.fn<() => Pick<Animation, 'cancel'>>().mockReturnValue({ cancel })
+    Object.defineProperty(label, 'scrollWidth', { value: 300 })
+    Object.defineProperty(label.parentElement, 'clientWidth', { value: 100 })
+    Object.defineProperty(label, 'animate', { value: animate })
+
+    if (first === 'hover') {
+      fireEvent.mouseEnter(link)
+      fireEvent.focus(link)
+    } else {
+      fireEvent.focus(link)
+      fireEvent.mouseEnter(link)
+    }
+    expect(animate).toHaveBeenCalledOnce()
+    fireEvent.blur(link)
+    expect(cancel).not.toHaveBeenCalled()
+    fireEvent.focus(link)
+    expect(animate).toHaveBeenCalledOnce()
+
+    fireEvent.mouseLeave(link)
+    expect(cancel).not.toHaveBeenCalled()
+    fireEvent.blur(link)
+    expect(cancel).toHaveBeenCalledOnce()
+
+    fireEvent.mouseEnter(link)
+    expect(animate).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps labels still when reduced motion is requested', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const user = userEvent.setup()
