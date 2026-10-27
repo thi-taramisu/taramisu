@@ -59,7 +59,7 @@ func TestLoadFailures(t *testing.T) {
 		},
 		{
 			name:        "malformed database URL",
-			databaseURL: "postgres://user:pass%zz@localhost/taramisu",
+			databaseURL: "postgres://user%zz@localhost/taramisu",
 			wantError:   "invalid DATABASE_URL",
 		},
 		{

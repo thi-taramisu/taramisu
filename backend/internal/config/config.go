@@ -70,4 +70,3 @@ func validateDatabaseURL(rawURL string) error {
 	}
 	return nil
 }
-}
