@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
@@ -57,7 +59,17 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	handler := httpapi.New(db.New(pool))
+	queries := db.New(pool)
+	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	iam, err := auth.New(authCtx, auth.Config{
+		Issuer: os.Getenv("OIDC_ISSUER"), ClientID: os.Getenv("OIDC_CLIENT_ID"),
+		ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"), AppURL: os.Getenv("APP_URL"),
+	}, queries)
+	if err != nil {
+		return fmt.Errorf("configure authentication: %w", err)
+	}
+	handler := httpapi.New(queries, iam)
 	if os.Getenv("SENTRY_DSN") != "" {
 		handler = sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle(handler)
 	}

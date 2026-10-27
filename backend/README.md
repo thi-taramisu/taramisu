@@ -11,21 +11,19 @@ Go HTTP API for Taramisu.
 
 ## Prerequisites
 
-- Docker (Compose), Go 1.25+, make
+- Docker Compose v2.23.1+, Go 1.25+, make, OpenSSL and curl
 - [Atlas](https://atlasgo.io/getting-started#installation) v1.3.0 — optional locally (Compose runs `arigaio/atlas:1.3.0`)
 - [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — to regenerate or verify `internal/db/` after
   changing `db/queries/` or `db/schema.sql`
 
 ## Commands
 
+Run from `backend/`. The full stack uses ports 80, 5432, 8080 and 9000; optional pgAdmin uses 5050.
+
 ```bash
-cp .env.example .env
-make db migrate
-make pgadmin
-make run
 make up
-make down
-make reset
+make pgadmin
+make migrate
 make test
 make openapi
 make migrate-diff name=my_change
@@ -34,15 +32,54 @@ make sqlc
 make sqlc-diff
 make lint
 make fmt
+make down
 ```
 
-Copy `.env.example` once; the Makefile loads `.env` for `make run` and `make test`. `make down` stops Compose but keeps Postgres data.
+`make up` delegates to [`deploy/dev.sh`](../deploy/dev.sh) and starts the `taramisu` Compose project:
+API, backend database and migrations, Authentik, frontend, and proxy. Startup provisions Authentik before starting the API.
+See the [deployment README](../deploy/README.md) for setup, networking, and migration from the former two-project layout.
 
-`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at [http://localhost:5050](http://localhost:5050) (no login) with the
-Compose database pre-registered and connected. It is opt-in (`tools` profile), so `make up` does not start it; `make down` stops it.
+Container commands use `iam/.env`; `make init` generates it without starting services.
+`make db` starts only the backend database, and `make migrate` applies its migrations.
+These commands initialize the configuration automatically if needed.
 
-> **Warning:** `make reset` runs `docker compose down -v` and **deletes the local Postgres volume** (all data in the
-> Compose `postgres_data` volume). Use it when you want a clean database, not for a normal stop.
+`make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at <http://localhost:5050> (no login),
+connected to the backend database. It remains opt-in through the `tools` profile.
+
+To run the API on the host, copy `.env.example` to `.env` and copy the OIDC settings from `../iam/.env`.
+Set `APP_URL=http://localhost:8080` in both files, then run `make up` to update the Authentik callback.
+Stop the API container with
+`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, then run `make run`.
+`make run` and `make test` load the backend `.env`; bare `make` runs tests.
+Use port 8080 directly in this mode. To return to the full Compose stack, restore `APP_URL=http://localhost`
+in `../iam/.env` and run `make up`.
+
+`make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
+
+> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
+> It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
+
+## Authentication
+
+Open <http://localhost/auth/login> with user `dev` and `DEV_PASSWORD` from
+`../iam/.env`. Login returns `/api/v1/me` with the local user ID, issuer and subject.
+The Compose proxy forwards `/api/v1/` and `/auth/` to the backend without stripping their prefixes.
+`APP_URL` must be an origin without a trailing slash and determines the callback URL.
+`POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
+Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
+SSO session active. Group synchronization and project permissions are not implemented.
+
+## Checks
+
+```sh
+curl -f http://localhost:8080/health/ready
+make -C ../deploy test
+make test
+TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make test
+```
+
+Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
+API logs: `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml logs api`.
 
 ## Database migrations and sqlc drift detection
 
@@ -137,8 +174,7 @@ internal/httpapi/              router, OpenAPI
 internal/httpapi/handlers/     HTTP handlers
 ```
 
-So far the API only has health checks: `GET /health/live` and `GET /health/ready` (readiness uses Postgres after
-migrate). No domain routes yet.
+Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
 ## Logging
 
