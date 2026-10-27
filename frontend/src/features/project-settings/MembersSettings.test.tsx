@@ -44,6 +44,7 @@ describe('MembersSettings', () => {
     renderMembers()
 
     await user.click(screen.getByRole('button', { name: 'Remove kim@example.com' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('kim@example.com loses access to this project.')
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     expect(screen.getByRole('cell', { name: 'kim@example.com' })).toBeInTheDocument()
 
