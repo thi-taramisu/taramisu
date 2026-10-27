@@ -11,18 +11,29 @@ and pushes these images to GitHub Container Registry (GHCR):
 
 Each image includes `linux/amd64` and `linux/arm64` in one manifest, so Docker
 selects the matching architecture when pulling it. Each service has its own
-GitHub Actions layer cache. Builds use the existing service Dockerfiles.
+GitHub Actions layer cache. Go cross-compiles for the target architecture, while
+the frontend and docs generate static assets on the builder's native architecture.
+This keeps compilation out of QEMU; runtime images still match the target platform.
 
 ## Run a build
 
 In GitHub, open **Actions → Publish Docker images → Run workflow**. Select the
 branch or tag to build, choose `all`, `api`, `frontend`, or `docs`, and optionally
-enter a stable version such as `v1.2.3` or `1.2.3`. The version labels the selected
-commit; it does not create a Git tag or change which commit is checked out.
-Leave it empty for a development build. Prerelease versions are not supported.
+enter a version such as `v1.2.3` or `1.2.3` to produce `v1.2.3-SNAPSHOT`.
+Manual runs never publish official release tags, even when run on a Git tag.
+Leave the version empty to publish SHA/latest tags only. Prerelease inputs are
+not supported.
 
 Pushes to `main` publish all three images. Pushing a release Git tag such as
-`v1.2.3` also publishes all three images from that tag.
+`v1.2.3` also publishes all three images from that tag. Official releases require
+an annotated Git tag; lightweight tags are rejected before publishing:
+
+```sh
+git tag -a v1.2.3 -m "Release v1.2.3"
+git push origin v1.2.3
+```
+
+Runs on the same branch or tag are serialized regardless of the selected image.
 
 ## Tags and rollbacks
 
@@ -30,8 +41,8 @@ Pushes to `main` publish all three images. Pushing a release Git tag such as
 | --- | --- |
 | Push to `main`, or manual run on `main` without a version | `latest`, `sha-<7-character-commit>` |
 | Manual run on another branch without a version | `sha-<7-character-commit>` |
-| Push of `v1.2.3` | `v1.2.3`, `v1.2`, `sha-<7-character-commit>` |
-| Manual run with version `1.2.3` | `v1.2.3`, `v1.2`, `sha-<7-character-commit>`, plus `latest` if run on `main` |
+| Push of annotated tag `v1.2.3` | `v1.2.3`, `v1.2`, `sha-<7-character-commit>` |
+| Manual run with version `1.2.3` | `v1.2.3-SNAPSHOT`, `sha-<7-character-commit>`, plus `latest` if run on `main` |
 
 `latest` follows the default branch; publishing a Git tag does not move it.
 Use SHA tags to select a commit for rollback, for example

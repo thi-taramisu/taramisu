@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Optional release version (vX.Y.Z or X.Y.Z); empty publishes SHA/latest only'
+        description: 'Optional snapshot version (vX.Y.Z or X.Y.Z); publishes vX.Y.Z-SNAPSHOT'
         type: string
         required: false
       image:
@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-${{ github.ref }}-${{ inputs.image || 'all' }}
+  group: publish-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -34,7 +34,13 @@ jobs:
     outputs:
       matrix: ${{ steps.config.outputs.matrix }}
       version: ${{ steps.config.outputs.version }}
+      snapshot: ${{ steps.config.outputs.snapshot }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - name: Validate version and select images
         id: config
         env:
@@ -45,14 +51,21 @@ jobs:
           import json
           import os
           import re
+          import subprocess
 
-          version = os.environ['INPUT_VERSION']
-          if os.environ['GITHUB_REF_TYPE'] == 'tag':
-              version = os.environ['GITHUB_REF_NAME']
-          if version:
-              if not re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
-                  raise SystemExit('Version must be a stable release: vX.Y.Z or X.Y.Z')
-              version = version.removeprefix('v')
+          release = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF_TYPE'] == 'tag'
+          requested = os.environ['GITHUB_REF_NAME'] if release else os.environ['INPUT_VERSION']
+          if requested and not re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', requested):
+              raise SystemExit('Version must have the form vX.Y.Z or X.Y.Z')
+          version = ''
+          snapshot = ''
+          if release:
+              kind = subprocess.check_output(['git', 'cat-file', '-t', os.environ['GITHUB_REF']], text=True).strip()
+              if kind != 'tag':
+                  raise SystemExit('Releases require an annotated Git tag; create one with git tag -a')
+              version = requested.removeprefix('v')
+          elif requested:
+              snapshot = 'v' + requested.removeprefix('v') + '-SNAPSHOT'
 
           images = [
               {'image': 'api', 'context': 'backend', 'file': 'backend/Dockerfile'},
@@ -67,6 +80,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('matrix=' + json.dumps({'include': images}) + '\n')
               output.write('version=' + version + '\n')
+              output.write('snapshot=' + snapshot + '\n')
           PY
 
   publish:
@@ -108,6 +122,7 @@ jobs:
           tags: |
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ needs.prepare.outputs.snapshot }},enable=${{ needs.prepare.outputs.snapshot != '' }}
             type=semver,pattern=v{{version}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
             type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
 
