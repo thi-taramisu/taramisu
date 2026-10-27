@@ -12,7 +12,8 @@ Go HTTP API for Taramisu.
 ## Prerequisites
 
 - Docker Compose v2.23.1+, Go 1.25+, make, OpenSSL and curl
-- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — only to regenerate `internal/db/` after
+- [Atlas](https://atlasgo.io/getting-started#installation) v1.3.0 — optional locally (Compose runs `arigaio/atlas:1.3.0`)
+- [sqlc](https://docs.sqlc.dev/en/latest/overview/install.html) v1.31.1 — to regenerate or verify `internal/db/` after
   changing `db/queries/` or `db/schema.sql`
 
 ## Commands
@@ -26,7 +27,9 @@ make migrate
 make test
 make openapi
 make migrate-diff name=my_change
+make migrate-validate
 make sqlc
+make sqlc-diff
 make lint
 make fmt
 make down
@@ -78,6 +81,46 @@ TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
 API logs: `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml logs api`.
 
+## Database migrations and sqlc drift detection
+
+After editing `db/schema.sql` or `db/queries/`, generate the corresponding Atlas migration and refresh the `sqlc` models:
+
+```bash
+make migrate-diff name=my_change
+make sqlc
+```
+
+CI verifies that migrations and generated Go models are in sync with `db/schema.sql` and `db/queries/`:
+
+1. **Migration directory integrity (`atlas.sum`):**
+
+   ```bash
+   make migrate-validate
+   # or directly with Atlas CLI:
+   atlas migrate validate --dir file://db/migrations
+   ```
+
+2. **No pending schema drift between `db/migrations/` and `db/schema.sql`:**
+
+   ```bash
+   make migrate-diff name=drift_check
+   git status --porcelain -- db/migrations
+   # or directly with Atlas CLI against an empty dev database:
+   atlas migrate diff drift_check \
+     --dir file://db/migrations \
+     --to file://db/schema.sql \
+     --dev-url "$TEST_DATABASE_URL"
+   test -z "$(git status --porcelain -- db/migrations)"
+   ```
+
+3. **`sqlc` generated code in `internal/db/` is up to date:**
+
+   ```bash
+   make sqlc-diff
+   # or directly:
+   sqlc diff
+   ```
+
 ## Tests and coverage
 
 Run unit tests with `make test`. Without `TEST_DATABASE_URL`, `TestPostgresReadiness` skips;
@@ -112,7 +155,8 @@ python3 scripts/check_coverage.py coverage.out
 ```
 
 CI starts a dedicated `postgres:17-alpine` service with a fresh `taramisu_test` database, waits for
-readiness, and applies Atlas migrations before testing. `TEST_DATABASE_URL` enables the integration test.
+readiness, validates Atlas migration integrity and schema drift, checks `sqlc` code freshness, and applies
+Atlas migrations before testing. `TEST_DATABASE_URL` enables the integration test.
 The coverage checker enforces at least **80% statement coverage per package** under `internal/httpapi/...`
 and future `internal/service/...`, using exact statement counts. CLI entrypoints (`cmd/`) and
 `internal/db/` (including sqlc-generated `models.go` and `*.sql.go`) are excluded from the gate.
