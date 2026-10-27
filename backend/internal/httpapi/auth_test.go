@@ -21,10 +21,12 @@ func (testUsers) UpsertIAMUser(context.Context, string) (string, error) {
 func TestAuthRoutes(t *testing.T) {
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"issuer":                 "http://" + r.Host,
 			"authorization_endpoint": "http://" + r.Host + "/authorize",
-		})
+		}); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer provider.Close()
 	manager, err := auth.New(context.Background(), auth.Config{
@@ -40,7 +42,7 @@ func TestAuthRoutes(t *testing.T) {
 		"/auth/login": 302, "/auth/callback": 400, "/auth/logout": 405,
 	} {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, http.NoBody))
 		if w.Code != want {
 			t.Fatalf("GET %s: got %d, want %d", path, w.Code, want)
 		}
@@ -57,7 +59,7 @@ func TestAuthRoutes(t *testing.T) {
 		}
 	}
 	for origin, want := range map[string]int{"": 403, "http://localhost:8080": 204} {
-		r := httptest.NewRequest("POST", "/auth/logout", nil)
+		r := httptest.NewRequest(http.MethodPost, "/auth/logout", http.NoBody)
 		r.Header.Set("Origin", origin)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -69,7 +71,7 @@ func TestAuthRoutes(t *testing.T) {
 		t.Fatal("OpenAPI does not document session authentication")
 	}
 	w := httptest.NewRecorder()
-	New(nil, nil).ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/me", nil))
+	New(nil, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody))
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("missing auth configuration: %d", w.Code)
 	}

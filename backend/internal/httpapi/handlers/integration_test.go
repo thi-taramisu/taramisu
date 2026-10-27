@@ -24,7 +24,7 @@ func TestPostgresReadiness(t *testing.T) {
 	}
 	defer pool.Close()
 	rr := httptest.NewRecorder()
-	httpapi.New(db.New(pool), nil).ServeHTTP(rr, httptest.NewRequest("GET", "/health/ready", nil))
+	httpapi.New(db.New(pool), nil).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/ready", http.NoBody))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("readiness failed: %d %s", rr.Code, rr.Body.String())
 	}
@@ -45,7 +45,11 @@ func TestIAMUserMapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil {
+			t.Error(err)
+		}
+	}()
 	queries := db.New(tx)
 	subject := "test-" + rand.Text()
 	first, err := queries.UpsertIAMUser(ctx, subject)

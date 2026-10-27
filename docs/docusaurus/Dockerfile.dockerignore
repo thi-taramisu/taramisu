@@ -1,0 +1,14 @@
+# Dockerfile-specific allowlist; independent of any root .dockerignore.
+**
+!docs/
+!docs/docusaurus/
+!docs/docusaurus/**
+!docs/external/
+!docs/external/**
+docs/docusaurus/node_modules/
+docs/docusaurus/build/
+docs/docusaurus/.docusaurus/
+docs/docusaurus/.cache/
+docs/docusaurus/.env
+docs/docusaurus/.env.*
+docs/docusaurus/npm-debug.log*

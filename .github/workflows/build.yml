@@ -1,0 +1,283 @@
+name: Build and Test
+
+# Central build & test workflow. Every component (frontend, backend, docs-site, ...) gets its own job,
+# gated by a path filter so only affected components are built and tested. All jobs run in parallel.
+#
+# Branch protection: mark only the "Build result" job as required. It aggregates all component jobs,
+# so jobs skipped by the path filter do not block merging.
+
+on:
+  # No branch filter: stacked PRs (base != main) must be checked as well.
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded runs on PRs, but let every run on main finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lists PR files via the API
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/build.yml'
+            backend:
+              - 'backend/**'
+              - '.github/workflows/build.yml'
+
+  frontend:
+    name: Frontend
+    needs: changes
+    # Outside of PRs (push to main, manual run) everything is built and tested as a safety net.
+    if: needs.changes.outputs.frontend == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit & component tests with coverage
+        run: npm run test:coverage
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+
+      - name: Report frontend test & coverage summary
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          node -e '
+            const fs = require("fs");
+            let md = "### 🧪 Frontend Test & Coverage Summary\n\n";
+            try {
+              const cov = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
+              md += "| Metric | Covered | Total | Percentage | Minimum Threshold |\n";
+              md += "| :--- | :---: | :---: | :---: | :---: |\n";
+              md += `| **Lines** | ${cov.lines.covered} | ${cov.lines.total} | ${cov.lines.pct}% | 70% |\n`;
+              md += `| **Statements** | ${cov.statements.covered} | ${cov.statements.total} | ${cov.statements.pct}% | 70% |\n`;
+              md += `| **Functions** | ${cov.functions.covered} | ${cov.functions.total} | ${cov.functions.pct}% | 70% |\n`;
+              md += `| **Branches** | ${cov.branches.covered} | ${cov.branches.total} | ${cov.branches.pct}% | 70% |\n\n`;
+            } catch (e) {
+              md += "_Coverage report not generated._\n\n";
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          '
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload production build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  backend:
+    name: Backend
+    needs: changes
+    # Outside of PRs (push to main, manual run) everything is built and tested as a safety net.
+    if: needs.changes.outputs.backend == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TEST_DATABASE_URL: postgres://taramisu:taramisu@localhost:5432/taramisu_test?sslmode=disable
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: taramisu
+          POSTGRES_PASSWORD: taramisu
+          POSTGRES_DB: taramisu_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taramisu -d taramisu_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify Go module dependencies
+        id: deps
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+      - name: Build backend binaries
+        id: build
+        run: go build -v ./cmd/...
+
+      - name: Set up Atlas
+        uses: ariga/setup-atlas@v0
+        with:
+          version: v1.3.0
+
+      - name: Validate Atlas migration directory integrity
+        id: migrate_validate
+        run: atlas migrate validate --dir file://db/migrations
+
+      - name: Verify Atlas migrations match declarative schema
+        id: schema_drift
+        run: |
+          atlas migrate diff drift_check \
+            --dir file://db/migrations \
+            --to file://db/schema.sql \
+            --dev-url "$TEST_DATABASE_URL"
+          git status --porcelain -- db/migrations
+          test -z "$(git status --porcelain -- db/migrations)"
+
+      - name: Set up sqlc
+        uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.31.1"
+
+      - name: Verify sqlc generated code is up to date
+        id: sqlc
+        run: sqlc diff
+
+      - name: Apply test database migrations
+        id: migrate
+        run: atlas migrate apply --dir file://db/migrations --url "$TEST_DATABASE_URL"
+
+      - name: Test coverage checker
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Run tests with race detector and coverage
+        id: test
+        run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Report coverage and enforce 80% per domain package
+        id: coverage
+        if: always() && steps.test.outcome != 'skipped'
+        run: python3 scripts/check_coverage.py coverage.out
+
+      - name: Regenerate OpenAPI spec
+        run: make openapi
+
+      - name: Verify committed OpenAPI spec is up to date
+        id: openapi
+        working-directory: ${{ github.workspace }}
+        run: git diff --exit-code -- backend/openapi.json
+
+      - name: Report backend build & test summary
+        if: always()
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### 🐹 Backend Build & Test Summary
+
+          | Check | Status | Tool / Command |
+          | :--- | :---: | :--- |
+          | **Go Module Dependencies** | ${{ steps.deps.outcome == 'success' && '✅ Verified' || (steps.deps.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go mod verify` & `go mod tidy -diff` |
+          | **Binary Compilation** | ${{ steps.build.outcome == 'success' && '✅ Built' || (steps.build.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go build ./cmd/...` |
+          | **Migration Integrity** | ${{ steps.migrate_validate.outcome == 'success' && '✅ Valid' || (steps.migrate_validate.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `atlas migrate validate` |
+          | **Schema Drift Detection** | ${{ steps.schema_drift.outcome == 'success' && '✅ In Sync' || (steps.schema_drift.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `atlas migrate diff` & `git status` |
+          | **sqlc Code Freshness** | ${{ steps.sqlc.outcome == 'success' && '✅ In Sync' || (steps.sqlc.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `sqlc diff` |
+          | **Database Migrations** | ${{ steps.migrate.outcome == 'success' && '✅ Applied' || (steps.migrate.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `atlas migrate apply` |
+          | **Domain Coverage (80% minimum)** | ${{ steps.coverage.outcome == 'success' && '✅ Passed' || (steps.coverage.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `python3 scripts/check_coverage.py coverage.out` |
+          | **Unit & Concurrency Tests** | ${{ steps.test.outcome == 'success' && '✅ Passed' || (steps.test.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `go test -race ./...` |
+          | **OpenAPI Spec Freshness** | ${{ steps.openapi.outcome == 'success' && '✅ In Sync' || (steps.openapi.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `make openapi` & `git diff` |
+          EOF
+
+  result:
+    name: Build result
+    if: always()
+    needs:
+      - changes
+      - frontend
+      - backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Generate build summary
+        run: |
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ## 🏗️ Build & Test Results Summary
+
+          | Component | Status | Details |
+          | :--- | :---: | :--- |
+          | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
+          | **Backend** | ${{ needs.backend.result == 'success' && '✅ Passed' || (needs.backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Go Module Verify, Build, Atlas & sqlc Drift Check, PostgreSQL Integration, Race Tests, Coverage (80%) & OpenAPI Spec |
+          EOF
+
+      - name: Check job results
+        if: |
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled') ||
+          needs.changes.result != 'success'
+        run: |
+          echo "At least one build or test job failed or was cancelled, or changes detection did not succeed."
+          exit 1

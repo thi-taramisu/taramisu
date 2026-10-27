@@ -60,16 +60,23 @@ func newAuthFixture(t *testing.T) *authFixture {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			json.NewEncoder(w).Encode(map[string]any{
+			if err := json.NewEncoder(w).Encode(map[string]any{
 				"issuer": f.issuer, "authorization_endpoint": f.issuer + "/authorize",
 				"token_endpoint": f.issuer + "/token", "jwks_uri": f.issuer + "/keys",
 				"id_token_signing_alg_values_supported": []string{"RS256"},
-			})
+			}); err != nil {
+				t.Error(err)
+			}
 		case "/keys":
 			if f.beforeKeys != nil {
 				f.beforeKeys(r)
 			}
-			json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}})
+			if r.Context().Err() != nil {
+				return
+			}
+			if err := json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}); err != nil {
+				t.Error(err)
+			}
 		case "/token":
 			if err := r.ParseForm(); err != nil {
 				t.Error(err)
@@ -83,10 +90,13 @@ func newAuthFixture(t *testing.T) *authFixture {
 			}
 			if r.Form.Get("code") == "rejected" {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				// #nosec G101 -- Synthetic token sentinel verifies that provider credentials never reach logs.
+				if err := json.NewEncoder(w).Encode(map[string]string{
 					"error": "invalid_grant", "error_description": "do-not-log-provider-details",
 					"access_token": "do-not-log-token",
-				})
+				}); err != nil {
+					t.Error(err)
+				}
 				return
 			}
 			claims := map[string]any{
@@ -107,7 +117,9 @@ func newAuthFixture(t *testing.T) *authFixture {
 			if r.Form.Get("code") == "bad-signature" {
 				raw = raw[:len(raw)-8] + "tampered"
 			}
-			json.NewEncoder(w).Encode(map[string]string{"access_token": "unused", "token_type": "Bearer", "id_token": raw})
+			if err := json.NewEncoder(w).Encode(map[string]string{"access_token": "unused", "token_type": "Bearer", "id_token": raw}); err != nil {
+				t.Error(err)
+			}
 		default:
 			http.NotFound(w, r)
 		}
@@ -125,14 +137,16 @@ func newAuthFixture(t *testing.T) *authFixture {
 	mux.HandleFunc("GET /auth/callback", manager.Callback)
 	mux.HandleFunc("POST /auth/logout", manager.Logout)
 	mux.Handle("GET /api/v1/me", manager.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(UserFromContext(r.Context()))
+		if err := json.NewEncoder(w).Encode(UserFromContext(r.Context())); err != nil {
+			t.Error(err)
+		}
 	})))
 	f.handler = mux
 	return f
 }
 
 func (f *authFixture) request(method, target string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, target, nil)
+	r := httptest.NewRequest(method, target, http.NoBody)
 	for _, cookie := range cookies {
 		r.AddCookie(cookie)
 	}
@@ -152,7 +166,7 @@ func responseCookie(w *httptest.ResponseRecorder, name string) *http.Cookie {
 
 func (f *authFixture) login(t *testing.T) (string, *http.Cookie) {
 	t.Helper()
-	w := f.request("GET", "/auth/login")
+	w := f.request(http.MethodGet, "/auth/login")
 	redirect, err := url.Parse(w.Header().Get("Location"))
 	if err != nil || w.Code != http.StatusFound || redirect.Scheme+"://"+redirect.Host != f.issuer {
 		t.Fatalf("login redirect: %d %s", w.Code, w.Header().Get("Location"))
@@ -168,11 +182,11 @@ func (f *authFixture) login(t *testing.T) (string, *http.Cookie) {
 
 func TestLoginAndLogout(t *testing.T) {
 	f := newAuthFixture(t)
-	if w := f.request("GET", "/api/v1/me"); w.Code != http.StatusUnauthorized {
+	if w := f.request(http.MethodGet, "/api/v1/me"); w.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated request: %d", w.Code)
 	}
 	callback, loginCookie := f.login(t)
-	w := f.request("GET", callback+"&code=ok", loginCookie)
+	w := f.request(http.MethodGet, callback+"&code=ok", loginCookie)
 	session := responseCookie(w, "taramisu_session")
 	if w.Code != 302 || w.Header().Get("Location") != "/api/v1/me" || session == nil {
 		t.Fatalf("callback failed: %d %s", w.Code, w.Body.String())
@@ -180,7 +194,7 @@ func TestLoginAndLogout(t *testing.T) {
 	if !session.HttpOnly || session.SameSite != http.SameSiteLaxMode || session.MaxAge <= 0 {
 		t.Fatal("missing session cookie protections")
 	}
-	w = f.request("GET", "/api/v1/me", session)
+	w = f.request(http.MethodGet, "/api/v1/me", session)
 	var user User
 	if err := json.Unmarshal(w.Body.Bytes(), &user); err != nil {
 		t.Fatal(err)
@@ -191,13 +205,13 @@ func TestLoginAndLogout(t *testing.T) {
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("authenticated response must not be cached")
 	}
-	if w := f.request("GET", callback+"&code=ok", loginCookie); w.Code != 400 {
+	if w := f.request(http.MethodGet, callback+"&code=ok", loginCookie); w.Code != 400 {
 		t.Fatal("callback replay accepted")
 	}
-	if w := f.request("POST", "/auth/logout", session); w.Code != 403 {
+	if w := f.request(http.MethodPost, "/auth/logout", session); w.Code != 403 {
 		t.Fatal("logout without same-origin protection accepted")
 	}
-	r := httptest.NewRequest("POST", "/auth/logout", nil)
+	r := httptest.NewRequest(http.MethodPost, "/auth/logout", http.NoBody)
 	r.Header.Set("Origin", "http://localhost:8080")
 	r.AddCookie(session)
 	w = httptest.NewRecorder()
@@ -205,8 +219,33 @@ func TestLoginAndLogout(t *testing.T) {
 	if cookie := responseCookie(w, "taramisu_session"); w.Code != 204 || cookie == nil || cookie.MaxAge >= 0 {
 		t.Fatal("logout did not clear the session cookie")
 	}
-	if w := f.request("GET", "/api/v1/me", session); w.Code != 401 {
+	if w := f.request(http.MethodGet, "/api/v1/me", session); w.Code != 401 {
 		t.Fatal("session survived logout")
+	}
+}
+
+func TestCookieSecurityFollowsAppURL(t *testing.T) {
+	f := newAuthFixture(t)
+	for _, origin := range []string{"http://localhost", "https://app.example"} {
+		t.Run(origin, func(t *testing.T) {
+			m, err := New(context.Background(), Config{
+				Issuer: f.issuer, ClientID: "taramisu", ClientSecret: "secret", AppURL: origin,
+			}, &f.users)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{loginCookie, sessionCookie} {
+				for _, maxAge := range []int{300, -1} {
+					w := httptest.NewRecorder()
+					m.cookie(w, name, "test-value", maxAge)
+					cookie := responseCookie(w, name)
+					if cookie == nil || cookie.Secure != strings.HasPrefix(origin, "https://") ||
+						!cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != maxAge {
+						t.Fatalf("incorrect cookie protections for %s (MaxAge %d)", name, maxAge)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -226,7 +265,7 @@ func TestJWKSFetchTimeoutAndRecovery(t *testing.T) {
 	}
 
 	callback, cookie := f.login(t)
-	w := f.request("GET", callback+"&code=ok", cookie)
+	w := f.request(http.MethodGet, callback+"&code=ok", cookie)
 	if w.Code != http.StatusUnauthorized || responseCookie(w, sessionCookie) != nil || f.users.calls != 0 || requests.Load() != 1 {
 		t.Fatalf("stalled key fetch did not reject login: %d %s", w.Code, w.Body.String())
 	}
@@ -237,7 +276,7 @@ func TestJWKSFetchTimeoutAndRecovery(t *testing.T) {
 	}
 
 	callback, cookie = f.login(t)
-	w = f.request("GET", callback+"&code=ok", cookie)
+	w = f.request(http.MethodGet, callback+"&code=ok", cookie)
 	if w.Code != http.StatusFound || responseCookie(w, sessionCookie) == nil || f.users.calls != 1 || requests.Load() != 2 {
 		t.Fatalf("login did not recover with a new key fetch: %d %s", w.Code, w.Body.String())
 	}
@@ -262,7 +301,7 @@ func TestCallbackRejectsInvalidIdentity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f.claims = tt.claims
 			callback, cookie := f.login(t)
-			w := f.request("GET", callback+"&code="+tt.code, cookie)
+			w := f.request(http.MethodGet, callback+"&code="+tt.code, cookie)
 			if w.Code != tt.want || responseCookie(w, "taramisu_session") != nil || f.users.calls != 0 {
 				t.Fatalf("invalid identity reached session/database: %d %s", w.Code, w.Body.String())
 			}
@@ -273,13 +312,17 @@ func TestCallbackRejectsInvalidIdentity(t *testing.T) {
 func TestCallbackStateAndDatabaseFailure(t *testing.T) {
 	f := newAuthFixture(t)
 	callback, cookie := f.login(t)
-	for _, cookies := range [][]*http.Cookie{nil, {{Name: "taramisu_login", Value: "wrong"}}} {
-		if w := f.request("GET", callback+"&code=ok", cookies...); w.Code != 400 || f.users.calls != 0 {
+	for _, cookieHeader := range []string{"", loginCookie + "=wrong"} {
+		r := httptest.NewRequest(http.MethodGet, callback+"&code=ok", http.NoBody)
+		r.Header.Set("Cookie", cookieHeader)
+		w := httptest.NewRecorder()
+		f.handler.ServeHTTP(w, r)
+		if w.Code != 400 || f.users.calls != 0 {
 			t.Fatal("callback accepted without matching login state")
 		}
 	}
 	f.users.err = errors.New("database unavailable")
-	w := f.request("GET", callback+"&code=ok", cookie)
+	w := f.request(http.MethodGet, callback+"&code=ok", cookie)
 	if w.Code != 503 || responseCookie(w, "taramisu_session") != nil || f.users.calls != 1 {
 		t.Fatalf("database failure created a session: %d", w.Code)
 	}
@@ -292,7 +335,7 @@ func TestExchangeFailureLogsSafeDiagnostics(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(previous) })
 	f := newAuthFixture(t)
 	callback, cookie := f.login(t)
-	w := f.request("GET", callback+"&code=rejected", cookie)
+	w := f.request(http.MethodGet, callback+"&code=rejected", cookie)
 	if w.Code != 502 || !strings.Contains(logs.String(), "invalid_grant") || !strings.Contains(logs.String(), "status=400") {
 		t.Fatal("missing exchange failure diagnostics")
 	}
@@ -316,8 +359,8 @@ func TestExpiredCredentials(t *testing.T) {
 		logins:   map[string]login{"expired": {Expires: time.Now().Add(-time.Second)}},
 	}
 	for _, value := range []string{"expired", "forged"} {
-		r := httptest.NewRequest("GET", "/api/v1/me", nil)
-		r.AddCookie(&http.Cookie{Name: sessionCookie, Value: value})
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody)
+		r.Header.Set("Cookie", sessionCookie+"="+value)
 		w := httptest.NewRecorder()
 		m.Require(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("invalid session reached handler")
@@ -326,8 +369,8 @@ func TestExpiredCredentials(t *testing.T) {
 			t.Fatalf("invalid session: %d", w.Code)
 		}
 	}
-	r := httptest.NewRequest("GET", "/auth/callback?state=expired&code=ok", nil)
-	r.AddCookie(&http.Cookie{Name: loginCookie, Value: "expired"})
+	r := httptest.NewRequest(http.MethodGet, "/auth/callback?state=expired&code=ok", http.NoBody)
+	r.Header.Set("Cookie", loginCookie+"=expired")
 	w := httptest.NewRecorder()
 	m.Callback(w, r)
 	if w.Code != 400 {

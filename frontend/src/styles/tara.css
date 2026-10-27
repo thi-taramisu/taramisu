@@ -1,0 +1,76 @@
+/* Presentation tokens based on the repository data model, not a risk matrix.
+ * Always show the numeric score / rating label as well as colour.
+ * Entity colours identify types, not severity. Palettes do not change these meanings. */
+
+:root,
+[data-color-scheme] {
+  --risk-1: #eff6ff;
+  --risk-1-foreground: #1e40af;
+  --risk-1-border: #2563eb;
+  --risk-2: #ecfeff;
+  --risk-2-foreground: #155e75;
+  --risk-2-border: #0891b2;
+  --risk-3: #fffbeb;
+  --risk-3-foreground: #92400e;
+  --risk-3-border: #b45309;
+  --risk-4: #fff7ed;
+  --risk-4-foreground: #9a3412;
+  --risk-4-border: #c2410c;
+  --risk-5: #fef2f2;
+  --risk-5-foreground: #991b1b;
+  --risk-5-border: #b91c1c;
+  --rating-unknown: #f4f4f5;
+  --rating-unknown-foreground: #52525b;
+  --rating-unknown-border: #71717a;
+  --entity-item: #eef2ff;
+  --entity-item-foreground: #3730a3;
+  --entity-item-border: #6366f1;
+  --entity-asset: #ecfeff;
+  --entity-asset-foreground: #155e75;
+  --entity-asset-border: #0891b2;
+  --entity-damage: #fff7ed;
+  --entity-damage-foreground: #9a3412;
+  --entity-damage-border: #c2410c;
+  --entity-threat: #fff1f2;
+  --entity-threat-foreground: #9f1239;
+  --entity-threat-border: #e11d48;
+  --entity-attack: #faf5ff;
+  --entity-attack-foreground: #6b21a8;
+  --entity-attack-border: #9333ea;
+}
+
+.dark {
+  --risk-1: #172554;
+  --risk-1-foreground: #bfdbfe;
+  --risk-1-border: #60a5fa;
+  --risk-2: #083344;
+  --risk-2-foreground: #a5f3fc;
+  --risk-2-border: #22d3ee;
+  --risk-3: #451a03;
+  --risk-3-foreground: #fde68a;
+  --risk-3-border: #fbbf24;
+  --risk-4: #431407;
+  --risk-4-foreground: #fed7aa;
+  --risk-4-border: #fb923c;
+  --risk-5: #450a0a;
+  --risk-5-foreground: #fecaca;
+  --risk-5-border: #f87171;
+  --rating-unknown: #27272a;
+  --rating-unknown-foreground: #d4d4d8;
+  --rating-unknown-border: #a1a1aa;
+  --entity-item: #1e1b4b;
+  --entity-item-foreground: #c7d2fe;
+  --entity-item-border: #818cf8;
+  --entity-asset: #083344;
+  --entity-asset-foreground: #a5f3fc;
+  --entity-asset-border: #22d3ee;
+  --entity-damage: #431407;
+  --entity-damage-foreground: #fed7aa;
+  --entity-damage-border: #fb923c;
+  --entity-threat: #4c0519;
+  --entity-threat-foreground: #fecdd3;
+  --entity-threat-border: #fb7185;
+  --entity-attack: #3b0764;
+  --entity-attack-foreground: #e9d5ff;
+  --entity-attack-border: #c084fc;
+}
