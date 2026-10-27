@@ -1,4 +1,12 @@
+name: taramisu
+
 include:
   - ./compose.backend.yaml
+  - ./compose.iam.yaml
   - ./compose.frontend.yaml
   - ./compose.proxy.yaml
+
+networks:
+  backend:
+  iam:
+  auth:
