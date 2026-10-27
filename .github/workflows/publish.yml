@@ -1,0 +1,126 @@
+name: Publish Docker images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional release version (vX.Y.Z or X.Y.Z); empty publishes SHA/latest only'
+        type: string
+        required: false
+      image:
+        description: Image to publish
+        type: choice
+        default: all
+        options:
+          - all
+          - api
+          - frontend
+          - docs
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}-${{ inputs.image || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.config.outputs.matrix }}
+      version: ${{ steps.config.outputs.version }}
+    steps:
+      - name: Validate version and select images
+        id: config
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_IMAGE: ${{ inputs.image || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+
+          version = os.environ['INPUT_VERSION']
+          if os.environ['GITHUB_REF_TYPE'] == 'tag':
+              version = os.environ['GITHUB_REF_NAME']
+          if version:
+              if not re.fullmatch(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+                  raise SystemExit('Version must be a stable release: vX.Y.Z or X.Y.Z')
+              version = version.removeprefix('v')
+
+          images = [
+              {'image': 'api', 'context': 'backend', 'file': 'backend/Dockerfile'},
+              {'image': 'frontend', 'context': 'frontend', 'file': 'frontend/Dockerfile'},
+              {'image': 'docs', 'context': '.', 'file': 'docs/docusaurus/Dockerfile'},
+          ]
+          selection = os.environ['INPUT_IMAGE']
+          if selection not in ('all', 'api', 'frontend', 'docs'):
+              raise SystemExit('Unknown image selection')
+          if selection != 'all':
+              images = [image for image in images if image['image'] == selection]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps({'include': images}) + '\n')
+              output.write('version=' + version + '\n')
+          PY
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/thi-taramisu/taramisu-${{ matrix.image }}
+          flavor: latest=false
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern=v{{version}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
+            type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.prepare.outputs.version }},enable=${{ needs.prepare.outputs.version != '' }}
+
+      - name: Build and push both architectures
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            DOCS_SITE_URL=${{ vars.DOCS_SITE_URL || 'http://localhost:8080' }}
+          cache-from: type=gha,scope=publish-${{ matrix.image }}
+          cache-to: type=gha,scope=publish-${{ matrix.image }},mode=max
