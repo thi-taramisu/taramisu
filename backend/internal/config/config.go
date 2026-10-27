@@ -56,13 +56,18 @@ func validateHTTPAddr(addr string) error {
 func validateDatabaseURL(rawURL string) error {
 	databaseURL, err := url.Parse(rawURL)
 	if err != nil {
-		return err
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			return urlErr.Err
+		}
+		return errors.New("must be a valid URL")
 	}
 	if databaseURL.Scheme != "postgres" && databaseURL.Scheme != "postgresql" {
 		return errors.New("scheme must be postgres or postgresql")
 	}
-	if databaseURL.Host == "" {
+	if databaseURL.Hostname() == "" {
 		return errors.New("host is required")
 	}
 	return nil
+}
 }

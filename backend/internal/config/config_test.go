@@ -52,8 +52,24 @@ func TestLoadFailures(t *testing.T) {
 			wantError:   "invalid HTTP_ADDR",
 		},
 		{
+			name:        "out of range HTTP port",
+			httpAddr:    ":70000",
+			databaseURL: "postgres://user@localhost/taramisu",
+			wantError:   "invalid HTTP_ADDR",
+		},
+		{
+			name:        "malformed database URL",
+			databaseURL: "postgres://user:pass%zz@localhost/taramisu",
+			wantError:   "invalid DATABASE_URL",
+		},
+		{
 			name:        "invalid database URL",
 			databaseURL: "mysql://user@localhost/taramisu",
+			wantError:   "invalid DATABASE_URL",
+		},
+		{
+			name:        "missing database host",
+			databaseURL: "postgres:///taramisu",
 			wantError:   "invalid DATABASE_URL",
 		},
 	}
