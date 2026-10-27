@@ -7,9 +7,6 @@ import { AddMemberDialog } from './AddMemberDialog'
 import { headlampMembers, type Member, PROJECT_ROLES, type ProjectRole } from './headlampSettings'
 import { RemoveMemberDialog } from './RemoveMemberDialog'
 
-// Fixed locale and time zone, so dates match the English UI and do not shift between machines.
-const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeZone: 'UTC' })
-
 export function MembersSettings() {
   const [members, setMembers] = useState<Member[]>(headlampMembers)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
@@ -61,7 +58,9 @@ export function MembersSettings() {
                   ))}
                 </NativeSelect>
               </TableCell>
-              <TableCell>{dateFormat.format(new Date(member.added))}</TableCell>
+              <TableCell>
+                <time dateTime={member.added}>{member.added}</time>
+              </TableCell>
               <TableCell className="text-right">
                 <Button variant="ghost" size="icon" aria-label={`Remove ${member.email}`} onClick={() => setMemberToRemove(member)}>
                   <CircleX aria-hidden="true" />

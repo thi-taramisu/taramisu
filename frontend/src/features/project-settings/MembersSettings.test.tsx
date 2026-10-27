@@ -21,7 +21,7 @@ describe('MembersSettings', () => {
     renderMembers()
 
     expect(screen.getByRole('combobox', { name: 'Role for sam@example.com' })).toHaveDisplayValue('Editor')
-    expect(within(row('kim@example.com')).getByText('10/10/2026')).toBeInTheDocument()
+    expect(within(row('kim@example.com')).getByText('2026-10-10')).toBeInTheDocument()
   })
 
   it('adds a member through the dialog', async () => {
