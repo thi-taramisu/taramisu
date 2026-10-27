@@ -1,6 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Box, ChevronRight, FileWarning, Folder, Route, ShieldAlert } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { entityPath, type EntityType, type TreeNode } from './entities'
@@ -14,34 +14,34 @@ const icons = {
   'attack-paths': Route,
 } satisfies Record<EntityType, typeof Folder>
 
-function containsRoute(nodes: readonly TreeNode[], projectId: string, pathname: string): boolean {
+function containsRoute(nodes: readonly TreeNode[], projectId: string, selectedPath: string): boolean {
   return nodes.some((node) => {
     const path = entityPath(projectId, node.type, node.id)
-    return pathname === path || pathname.startsWith(`${path}/`) ||
-      (node.children ? containsRoute(node.children, projectId, pathname) : false)
+    return selectedPath === path ||
+      (node.children ? containsRoute(node.children, projectId, selectedPath) : false)
   })
 }
 
 interface BranchProps {
   node: TreeNode
   projectId: string
-  pathname: string
+  selectedPath: string
   search: string
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
 }
 
-function FiletreeBranch({ node, projectId, pathname, search, onKeyDown }: BranchProps) {
-  const [branch, setBranch] = useState({ pathname, expanded: true })
+function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: BranchProps) {
+  const [branch, setBranch] = useState({ selectedPath, expanded: true })
   const hasChildren = Boolean(node.children?.length)
   const Icon = icons[node.type]
 
-  // Back/forward navigation and links outside the tree must reveal the selected entity.
-  const reveal = branch.pathname !== pathname && node.children && containsRoute(node.children, projectId, pathname)
+  // Reveal a newly selected entity; tab switches must preserve manual collapse choices.
+  const reveal = branch.selectedPath !== selectedPath && node.children && containsRoute(node.children, projectId, selectedPath)
   const expanded = branch.expanded || Boolean(reveal)
-  if (branch.pathname !== pathname) setBranch({ pathname, expanded })
+  if (branch.selectedPath !== selectedPath) setBranch({ selectedPath, expanded })
 
   return (
-    <Collapsible asChild open={expanded} onOpenChange={(open) => setBranch({ pathname, expanded: open })}>
+    <Collapsible asChild open={expanded} onOpenChange={(open) => setBranch({ selectedPath, expanded: open })}>
       <li>
         <div data-filetree-row className="flex min-w-0 items-center gap-0.5 rounded-md">
           {hasChildren ? (
@@ -64,7 +64,7 @@ function FiletreeBranch({ node, projectId, pathname, search, onKeyDown }: Branch
           <CollapsibleContent asChild forceMount hidden={!expanded}>
             <ul className="mt-[3px] ml-3 space-y-[3px] border-l border-sidebar-border pl-1">
               {node.children?.map((child) => (
-                <FiletreeBranch key={`${child.type}/${child.id}`} node={child} projectId={projectId} pathname={pathname} search={search} onKeyDown={onKeyDown} />
+                <FiletreeBranch key={`${child.type}/${child.id}`} node={child} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={onKeyDown} />
               ))}
             </ul>
           </CollapsibleContent>
@@ -77,6 +77,7 @@ function FiletreeBranch({ node, projectId, pathname, search, onKeyDown }: Branch
 /** Disclosure navigation: native Tab/Enter/Space, with optional arrow-key navigation. */
 export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; projectId: string }) {
   const { pathname, search } = useLocation()
+  const selectedPath = matchPath('/projects/:projectId/:type/:entityId/*', pathname)?.pathnameBase ?? pathname
   const root = useRef<HTMLUListElement>(null)
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -119,7 +120,7 @@ export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; pro
   return (
     <ul ref={root} className="space-y-[3px]">
       {nodes.map((node) => (
-        <FiletreeBranch key={`${node.type}/${node.id}`} node={node} projectId={projectId} pathname={pathname} search={search} onKeyDown={handleKeyDown} />
+        <FiletreeBranch key={`${node.type}/${node.id}`} node={node} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={handleKeyDown} />
       ))}
     </ul>
   )

@@ -24,6 +24,10 @@ function renderTree(path = project, tree = nodes) {
     <MemoryRouter initialEntries={[path]}>
       <nav aria-label="Project elements"><Filetree projectId="test-project" nodes={tree} /></nav>
       <Link to={`${project}/damage-scenarios/ds-01/impact`}>Open impact externally</Link>
+      <Link to={`${project}/assets/a-01/risks`}>Open asset risks</Link>
+      <Link to={`${project}/assets/a-01/relations`}>Open asset relations</Link>
+      <Link to={`${project}/assets/a-01`}>Open asset definition</Link>
+      <Link to={`${project}/assets/a-01/?view=graph`}>Open asset graph</Link>
     </MemoryRouter>,
   )
 }
@@ -100,6 +104,21 @@ describe('Filetree', () => {
 
     expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('preserves a manual collapse when switching tabs or graph view on the same entity', async () => {
+    const user = userEvent.setup()
+    renderTree(`${project}/assets/a-01`)
+    await user.click(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' }))
+
+    for (const name of ['Open asset risks', 'Open asset relations', 'Open asset definition', 'Open asset graph']) {
+      await user.click(screen.getByRole('link', { name }))
+      expect(screen.getByRole('button', { name: 'Expand I-01 Headlamp' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('link', { name: 'A-01 Long asset name' })).not.toBeInTheDocument()
+    }
+
+    await user.click(screen.getByRole('link', { name: 'Open impact externally' }))
+    expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('keeps shared entities independently expandable under different parents', async () => {
