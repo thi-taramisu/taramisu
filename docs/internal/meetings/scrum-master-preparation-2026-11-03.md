@@ -75,6 +75,11 @@ und Verantwortlichem notieren.
 
 ## Konkrete Vorbereitungsthemen aus GitHub
 
+Die [offenen PRs in der Meeting-Vorlage](onsite-2026-11-03.md#open-pull-requests)
+sind mit Stand **28. Oktober 2026** nach Eröffnung vor bzw. ab dem 27. Oktober
+aufgeteilt. Entwürfe sind als solche markiert. Diese Liste vor dem Termin erneut
+aktualisieren.
+
 **Momentaufnahme vom 27. Oktober 2026, vor dem kommenden Reviewzeitraum.**
 Alle unten genannten PRs und Issues waren beim Abruf offen. Das sind Kandidaten
 für Nachfragen, keine feststehenden Sprintaufgaben oder abgeschlossenen Ergebnisse.
