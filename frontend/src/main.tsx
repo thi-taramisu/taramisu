@@ -4,22 +4,28 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
-import { retryUnlessNotFound } from './features/items/itemApi'
-import { ItemApiProvider } from './features/items/ItemApiProvider'
-import { createMockItemApi } from './features/items/mockItemApi'
+import { type Api, ApiProvider } from './api/ApiProvider'
+import { createApiClient } from './api/client'
+import { retryUnlessNotFound } from './api/errors'
+import { createMockItemApi } from './api/mocks/mockItemApi'
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryUnlessNotFound } } })
-// Mock until the item routes (#83) are wired to the generated API client (#118).
-const itemApi = createMockItemApi()
+
+const api: Api = {
+  // Real: the generated client against the backend.
+  client: createApiClient(),
+  // Mocked until the item routes (#83) are in `backend/openapi.json`.
+  ...createMockItemApi(),
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ItemApiProvider api={itemApi}>
+      <ApiProvider api={api}>
         <BrowserRouter>
           <App />
         </BrowserRouter>
-      </ItemApiProvider>
+      </ApiProvider>
     </QueryClientProvider>
   </StrictMode>,
 )

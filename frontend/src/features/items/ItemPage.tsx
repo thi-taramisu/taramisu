@@ -1,8 +1,8 @@
 import { Link, useParams } from 'react-router-dom'
 import { EntityPage } from '../workspace/EntityPage'
 import { DeleteItemDialog } from './DeleteItemDialog'
-import { isNotFound } from './itemApi'
-import { useItem, useItemAssets } from './queries'
+import { isNotFound } from '../../api/errors'
+import { useItem, useItemAssets } from '../../api/queries/items'
 
 /** Item page: header from the item API, delete action and the asset count on the Assets tab. */
 export function ItemPage() {

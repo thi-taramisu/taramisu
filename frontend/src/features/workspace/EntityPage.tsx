@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
-import { useProjectTree } from '../items/queries'
-import { ENTITY_TYPES, entityTitle, type EntityType } from './entities'
-import { findNode } from './exampleProject'
+import { useProjectTree } from '../../api/queries/items'
+import type { EntityType } from '../../api/models/tree'
+import { ENTITY_TYPES, entityTitle, findNode } from './entities'
 import { Placeholder } from './Placeholder'
 
 interface EntityPageProps {

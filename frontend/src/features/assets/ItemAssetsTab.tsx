@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
-import { useAddAsset, useItemAssets } from '../items/queries'
+import { useAddAsset, useItemAssets } from '../../api/queries/items'
 import { entityPath } from '../workspace/entities'
 import { AddAssetDialog } from './AddAssetDialog'
 

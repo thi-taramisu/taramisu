@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
-import { createMockItemApi } from './mockItemApi'
+import { createMockItemApi } from '../../api/mocks/mockItemApi'
 
 const project = '/projects/headlamp'
 

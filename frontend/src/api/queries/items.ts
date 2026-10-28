@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { TreeNode } from '../workspace/entities'
-import type { ItemDefinitionBody, NewAsset, PatchItemDefinitionBody } from './itemApi'
-import { useItemApi } from './ItemApiProvider'
+import { useApi } from '../ApiProvider'
+import type { NewAsset } from '../models/asset'
+import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
+import type { TreeNode } from '../models/tree'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
 // views together.
@@ -15,7 +16,7 @@ const keys = {
 
 /** Sidebar tree: the items of the project with the elements below them. */
 export function useProjectTree(projectId: string, { enabled = true } = {}) {
-  const api = useItemApi()
+  const api = useApi()
   return useQuery({
     enabled,
     queryKey: keys.tree(projectId),
@@ -35,17 +36,17 @@ export function useProjectTree(projectId: string, { enabled = true } = {}) {
 }
 
 export function useItem(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   return useQuery({ queryKey: keys.item(projectId, itemId), queryFn: () => api.items.get(projectId, itemId) })
 }
 
 export function useItemAssets(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   return useQuery({ queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
 }
 
 export function useItemRisks(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   return useQuery({ queryKey: keys.risks(projectId, itemId), queryFn: () => api.content.risks(projectId, itemId) })
 }
 
@@ -55,13 +56,13 @@ function useInvalidateProject(projectId: string) {
 }
 
 export function useCreateItem(projectId: string) {
-  const api = useItemApi()
+  const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({ mutationFn: (body: ItemDefinitionBody) => api.items.create(projectId, body), onSuccess: invalidate })
 }
 
 export function useUpdateItem(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({
     mutationFn: (body: PatchItemDefinitionBody) => api.items.update(projectId, itemId, body),
@@ -70,7 +71,7 @@ export function useUpdateItem(projectId: string, itemId: string) {
 }
 
 export function useDeleteItem(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => api.items.delete(projectId, itemId),
@@ -85,7 +86,7 @@ export function useDeleteItem(projectId: string, itemId: string) {
 }
 
 export function useAddAsset(projectId: string, itemId: string) {
-  const api = useItemApi()
+  const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({ mutationFn: (asset: NewAsset) => api.content.addAsset(projectId, itemId, asset), onSuccess: invalidate })
 }
