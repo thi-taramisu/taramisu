@@ -56,7 +56,7 @@ flowchart TB
     subgraph Data_Layer ["4. Persistence & Storage Layer"]
         AppDB[("PostgreSQL – taramisu-db<br/>(App & TARA Data)")]
         IAMDB[("PostgreSQL – authentik-db<br/>(IAM Data)")]
-        MinIO[("MinIO Object Storage (S3)<br/>• Architecture Diagrams<br/>• Uploaded Documents")]
+        ObjStore[("S3-Compatible Object Storage<br/>• Architecture Diagrams<br/>• Uploaded Documents")]
     end
 
     %% ==========================================
@@ -79,7 +79,7 @@ flowchart TB
     AuthServer & AuthWorker -->|"SQL"| IAMDB
 
     API1 & API2 -->|"SQL Queries"| AppDB
-    API1 & API2 -->|"S3 API (Upload / Stream Download)"| MinIO
+    API1 & API2 -->|"S3 API (Upload / Stream Download)"| ObjStore
 ```
 
 ---
@@ -91,7 +91,7 @@ attached to the non-internal `edge` network to publish host ports (`:80`, `:443`
 `internal: true` `proxy` network, completely blocking outbound internet egress for the Go API and Frontend.
 
 Every stateful or internal backend component sits in its **own isolated `internal: true` Docker network** shared only with the services
-that directly require it. Databases, MinIO, and the LLM service are **never** attached to the `edge` or `proxy` networks and cannot be
+that directly require it. Databases, object storage, and the LLM service are **never** attached to the `edge` or `proxy` networks and cannot be
 reached from the edge.
 
 | Network | `internal` | Members | Purpose |
@@ -100,7 +100,7 @@ reached from the edge.
 | `proxy` | yes | NGINX, Frontend, Go API, Authentik Server | Internal ingress routing from NGINX & Go API $\leftrightarrow$ Authentik (no internet egress) |
 | `app-db` | yes | Go API, Atlas, `taramisu-db` | Application database access |
 | `iam-db` | yes | Authentik Server, Authentik Worker, `authentik-db` | IAM database access |
-| `storage` | yes | Go API, MinIO | Object storage access |
+| `storage` | yes | Go API, Object Storage | S3-compatible object storage access |
 | `llm` | yes | Go API, LLM Service | Internal AI requests (Placeholder) |
 
 ```mermaid
@@ -124,7 +124,7 @@ flowchart LR
     AS ---|iam-db| IAMDB[("authentik-db")]
     AW["Authentik Worker"] ---|iam-db| IAMDB
 
-    API ---|storage| MinIO[("MinIO")]
+    API ---|storage| ObjStore[("S3 Storage")]
 
     API ---|llm| LLM["LLM Service"]
 ```
@@ -152,7 +152,7 @@ flowchart LR
     long-lived Server-Sent Events (SSE) streams for LLM responses, `least_conn` ensures new requests are always routed to the replica with
     the fewest active in-flight connections.
   * **No Sticky Sessions Required:** While open-source NGINX lacks native cookie-based sticky sessions, our Go backend is 100% stateless
-    (JWT-based auth, externalized storage in PostgreSQL and MinIO), making session affinity unnecessary.
+    (JWT-based auth, externalized storage in PostgreSQL and S3-compatible object storage), making session affinity unnecessary.
   * **Passive Health Checks:** NGINX's built-in passive health checks (`max_fails` / `fail_timeout`) automatically failover to healthy
     replicas if an instance becomes unresponsive, which is fully sufficient for our use case without needing active health probing.
   * **Edge Capabilities:** Handles TLS termination, rate limiting (`limit_req_zone`), upload size limits (`client_max_body_size`), and
@@ -186,23 +186,28 @@ flowchart LR
 * **Why:** Personal Identifiable Information (such as emails and display names) remains strictly within Authentik (Separation of Concerns /
   GDPR compliance). User metadata is resolved on-the-fly via Authentik’s core API and cached in-memory with a short TTL.
 
-### 6. MinIO (S3-Compatible Object Storage) for File Uploads
+### 6. S3-Compatible Object Storage for File Uploads
 
-* **Decision:** Store all binary files (architecture diagrams, PDFs, uploaded documents) in **MinIO** instead of the local container
-  filesystem. MinIO is **only reachable by the Go API** (`storage` network); clients never talk to MinIO directly.
+* **Decision:** Store all binary files (architecture diagrams, PDFs, uploaded documents) in a dedicated **S3-compatible object storage**
+  instead of the local container filesystem. The object storage is **only reachable by the Go API** (`storage` network); clients never
+  talk to the storage service directly.
 * **Why:** Storing files locally would break horizontal scaling behind a load balancer (since Replica #2 wouldn't have access to files
-  uploaded to Replica #1). S3 storage ensures any backend instance can access any uploaded artifact.
+  uploaded to Replica #1). Standard S3-compliant APIs ensure any backend instance can access any uploaded artifact via standard S3 client
+  libraries, keeping the backend code decoupled from any specific storage implementation.
+* **Engine Evaluation / Replacement:** Rather than coupling the setup to MinIO (which has become less suited due to maintenance / licensing
+  considerations), the architecture treats object storage generically. Modern lightweight and actively maintained S3-compatible alternatives
+  (such as **Garage** or **SeaweedFS**) are targeted and can be plugged in without requiring architectural or application-code adjustments.
 
 ### 7. File Access Authorization via the Go API
 
 * **Decision:** Every file download goes through `GET /api/...` on the Go API. The API validates the JWT, resolves the file's owning
-  `TARA_PROJECT`, checks the caller's `PROJECT_ROLE_ASSIGNMENT` and only then streams the object from MinIO to the client.
+  `TARA_PROJECT`, checks the caller's `PROJECT_ROLE_ASSIGNMENT` and only then streams the object from the object storage to the client.
 * **Why:** Authorization is enforced on **every** request in one place (the same RBAC logic as for all other resources) and revoked access
-  takes effect immediately. MinIO stays fully internal. For the expected file sizes (diagrams, PDFs in the low MB range) and user count,
-  streaming through the API is not a bottleneck.
+  takes effect immediately. The object storage stays fully internal. For the expected file sizes (diagrams, PDFs in the low MB range) and
+  user count, streaming through the API is not a bottleneck.
 * **Alternative (later, if needed):** The API performs the same RBAC check but answers with a redirect to a **short-lived presigned URL**
-  (e.g. 60 s TTL). This offloads bandwidth from the API replicas but requires exposing MinIO via NGINX (e.g. under `/s3/*`) and means a URL
-  that has already been issued stays valid until it expires.
+  (e.g. 60 s TTL). This offloads bandwidth from the API replicas but requires exposing the object storage via NGINX (e.g. under `/s3/*`) and
+  means a URL that has already been issued stays valid until it expires.
 
 ### 8. Lean Caching Strategy (In-Memory per Replica, No External Cache Broker)
 
