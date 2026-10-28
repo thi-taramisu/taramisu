@@ -7,7 +7,7 @@ a content source. This is a separate npm project from the application frontend.
 ## Local use
 
 Use Node.js **24.x** with npm. The major is selected in `.nvmrc`, `package.json`,
-the GitHub workflow, and the optional Dockerfile. Install an available security
+the GitHub workflow, and the Dockerfile. Install an available security
 patch release within this major. Docusaurus itself requires Node.js 20 or newer;
 the Node.js 24 choice is a baseline for this scaffold, not a meeting decision.
 
@@ -61,35 +61,37 @@ DOCS_SITE_URL=https://tara.security.science DOCS_BASE_URL=/ npm run build
 The review identifies `tara.security.science` as the intended deployment domain.
 Set `DOCS_SITE_URL` in GitHub repository variables when deployment is configured;
 use `DOCS_BASE_URL` for the agreed documentation path. The `/` example assumes
-root hosting; the final documentation route still needs to match the server.
+root hosting for npm builds; the shared Compose stack uses `/docs/`.
 A changed origin or path requires a rebuild.
 For a subpath build, the web server must mount the output at the same public
-subpath. The initial Docker example below supports root hosting (`/`) only.
+subpath. The container build fixes this path to `/docs/` to match the reverse proxy.
 
-## Optional Docker preview
+## Docker deployment
 
 Requires Docker with Compose; Node.js and npm run inside the build container
 and do not need to be installed on the host. From the **repository root**:
 
 ```sh
-docker compose -f docs/docusaurus/compose.yaml up --build -d
-docker compose -f docs/docusaurus/compose.yaml ps
+docker compose -f deploy/compose.yaml up --build -d
+docker compose -f deploy/compose.yaml ps
 ```
 
-Open <http://localhost:8080> and <http://localhost:8080/healthz>.
-The port is bound to the local host. This is a standalone preview, not the team's
-application Compose bundle or a public deployment.
+Open <http://localhost/docs/>. This starts the application stack, including the
+documentation service. The reverse proxy exposes the site on `/docs/`; the docs
+container does not bind a host port. Its `/healthz` endpoint is used internally
+by Docker's health check.
 
 ```sh
-docker compose -f docs/docusaurus/compose.yaml down
+docker compose -f deploy/compose.yaml down
 ```
 
 The build context is the repository root because `docs/external` sits outside
-this directory. Compose resolves `context: ../..` relative to this file in
-`docs/docusaurus/`. `Dockerfile.dockerignore` limits the context; the Dockerfile
+this directory. Compose resolves `context: ..` relative to `deploy/compose.docs.yaml`.
+`Dockerfile.dockerignore` limits the context; the Dockerfile
 copies only external content. The runtime image contains Nginx and static files.
-Moving to a public domain, configuring TLS/proxy routing, and integrating this
-service into the shared Compose bundle belong to the infrastructure hand-off.
+See [the deployment guide](../../deploy/README.md) for network details, public
+origin configuration, rebuilding the site, and validation. Public DNS and TLS
+termination remain deployment-specific.
 Image tags select a release line and may change; pin reviewed digests later if
 the team requires bit-for-bit container reproducibility.
 
