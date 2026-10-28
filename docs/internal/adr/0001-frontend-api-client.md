@@ -1,6 +1,6 @@
 # ADR 0001: Frontend API client
 
-- Status: Proposed, still needs to be agreed on in the team
+- Status: Accepted, agreed with the frontend team
 - Issue: #31
 - Related: #6 (wireframes / API contract), #46 (IAM evaluation), #32 (UI library, [ADR 0002](0002-frontend-ui-library.md))
 
