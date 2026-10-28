@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AddMemberDialog } from './AddMemberDialog'
-import { headlampMembers, type Member, PROJECT_ROLES, type ProjectRole } from './headlampSettings'
+import { headlampMembers } from '../../api/mocks/data/projectSettings'
+import type { Member, ProjectRole } from '../../api/models/project'
+import { PROJECT_ROLES } from './roles'
 import { RemoveMemberDialog } from './RemoveMemberDialog'
 
 export function MembersSettings() {

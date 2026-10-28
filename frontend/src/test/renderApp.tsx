@@ -3,8 +3,9 @@ import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from '../App'
-import { ItemApiProvider } from '../features/items/ItemApiProvider'
-import { createMockItemApi } from '../features/items/mockItemApi'
+import { ApiProvider } from '../api/ApiProvider'
+import { createApiClient } from '../api/client'
+import { createMockItemApi } from '../api/mocks/mockItemApi'
 
 // eslint-disable-next-line react/only-export-components
 function LocationDisplay() {
@@ -18,12 +19,12 @@ export function renderApp(path: string, api = createMockItemApi()) {
   const user = userEvent.setup()
   render(
     <QueryClientProvider client={queryClient}>
-      <ItemApiProvider api={api}>
+      <ApiProvider api={{ client: createApiClient({ baseUrl: 'http://api.test' }), ...api }}>
         <MemoryRouter initialEntries={[path]}>
           <App />
           <LocationDisplay />
         </MemoryRouter>
-      </ItemApiProvider>
+      </ApiProvider>
     </QueryClientProvider>,
   )
   return { api, user }

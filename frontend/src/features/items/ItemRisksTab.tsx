@@ -1,9 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { entityPath, type EntityType } from '../workspace/entities'
-import type { EntityRef } from './itemApi'
-import { useItemRisks } from './queries'
+import type { EntityRef, EntityType } from '../../api/models/tree'
+import { useItemRisks } from '../../api/queries/items'
+import { entityPath } from '../workspace/entities'
 import { RiskBadge } from './RiskBadge'
 
 function EntityLink({ projectId, type, entity }: { projectId: string; type: EntityType; entity: EntityRef }) {

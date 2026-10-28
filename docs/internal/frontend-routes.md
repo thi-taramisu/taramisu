@@ -59,9 +59,9 @@ Auth values: public means no login, user means logged in, and read, write and ma
 tool). Route guards come with the IAM decision (#46).
 
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
-Everything else renders a placeholder. Items come from the item API in `frontend/src/features/items/`, an in-memory mock seeded with the
-headlamp example (`frontend/src/features/workspace/exampleProject.ts`, project id `headlamp`) until the item routes (#83) are wired to the
-generated client (#118). The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
+Everything else renders a placeholder. Items come from the item API in `frontend/src/api/`, an in-memory mock
+(`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
+item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 ## Decisions
 

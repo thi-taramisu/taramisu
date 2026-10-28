@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { headlampDetails } from './headlampSettings'
+import { headlampDetails } from '../../api/mocks/data/projectSettings'
 
 function handleSubmit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault()

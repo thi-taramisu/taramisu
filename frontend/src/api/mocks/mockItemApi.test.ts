@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, retryUnlessNotFound } from './itemApi'
+import { ApiError, retryUnlessNotFound } from '../errors'
 import { createMockItemApi } from './mockItemApi'
 
 const project = 'headlamp'

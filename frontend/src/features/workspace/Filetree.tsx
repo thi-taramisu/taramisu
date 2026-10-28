@@ -3,7 +3,8 @@ import { Box, ChevronRight, FileWarning, Folder, Route, ShieldAlert } from 'luci
 import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { entityPath, entityTitle, type EntityType, type TreeNode } from './entities'
+import type { EntityType, TreeNode } from '../../api/models/tree'
+import { entityPath, entityTitle } from './entities'
 import { FiletreeLink } from './FiletreeLink'
 
 const icons = {

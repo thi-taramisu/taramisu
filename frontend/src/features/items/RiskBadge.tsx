@@ -1,4 +1,4 @@
-import type { CiaProperty } from './itemApi'
+import type { CiaProperty } from '../../api/models/asset'
 
 const RISK_CLASSES: Record<number, string> = {
   1: 'border-risk-1-border bg-risk-1 text-risk-1-foreground',

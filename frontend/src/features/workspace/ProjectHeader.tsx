@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { exampleProject } from './exampleProject'
+import { exampleProject } from '../../api/mocks/data/headlamp'
 
 /** Top bar of a project (workspace and settings); page-specific controls go into `children` on the right. */
 export function ProjectHeader({ projectId, children }: { projectId: string; children?: ReactNode }) {

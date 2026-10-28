@@ -13,7 +13,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { DEFAULT_PROJECT_ROLE, type Member, PROJECT_ROLES, type ProjectRole } from './headlampSettings'
+import type { Member, ProjectRole } from '../../api/models/project'
+import { DEFAULT_PROJECT_ROLE, PROJECT_ROLES } from './roles'
 
 export function AddMemberDialog({ onAdd }: { onAdd: (member: Omit<Member, 'id' | 'added'>) => void }) {
   const [open, setOpen] = useState(false)

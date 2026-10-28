@@ -38,7 +38,7 @@ The relevant components are located in the frontend:
 | `src/features/projects/ProjectCard.tsx` | Project card display |
 | `src/features/projects/CreateProjectDialog.tsx` | Project creation |
 | `src/features/projects/DeleteProjectDialog.tsx` | Deletion confirmation |
-| `src/features/projects/mockProjects.ts` | Temporary project data |
+| `src/api/mocks/data/projects.ts` | Temporary project data (mock) |
 | `src/components/ui/dropdown-menu.tsx` | Project action menu |
 
 The implementation uses React, TypeScript, Tailwind CSS,
