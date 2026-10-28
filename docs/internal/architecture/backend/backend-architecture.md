@@ -2,7 +2,6 @@
 
 ## Architecture
 
-
 ``` text
 router.go
    |
