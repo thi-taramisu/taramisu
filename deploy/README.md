@@ -1,6 +1,6 @@
 # Local development stack
 
-The `taramisu` Compose project includes the backend, Authentik, frontend, and proxy.
+The `taramisu` Compose project includes the backend, Authentik, frontend, proxy, and documentation.
 `compose.yaml` is the entry point; the included files describe each component.
 Use Docker Compose v2.23.1+ (includes and inline pgAdmin configs), make, OpenSSL, and curl.
 
@@ -10,7 +10,7 @@ Run from the repository root:
 
 ```sh
 make -C deploy init          # Generate missing secrets and validate configuration; no containers
-make -C deploy up            # Provision Authentik, start the API, then frontend and proxy
+make -C deploy up            # Provision Authentik, start the API, then frontend, docs, and proxy
 make -C deploy db            # Start only the backend database
 make -C deploy migrate       # Apply backend migrations
 make -C deploy pgadmin       # Optional database UI on localhost:5050
@@ -53,6 +53,7 @@ docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.
 Current local addresses:
 
 - Frontend: <http://localhost>
+- Documentation: <http://localhost/docs/>
 - API through the proxy: <http://localhost/api/v1/me> (requires login)
 - API and Swagger: <http://localhost:8080/docs>
 - Login: <http://localhost/auth/login>
@@ -73,12 +74,12 @@ with the project name (for example `taramisu_proxy`); no externally created netw
 | Network | `internal` | Members | Purpose |
 | --- | --- | --- | --- |
 | `edge` | no | proxy | published ports and internet access |
-| `proxy` | yes | proxy, frontend, API, Authentik server | proxy forwards requests; API reaches Authentik as `authentik.localhost` |
+| `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests; API reaches Authentik as `authentik.localhost` |
 | `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
 | `iam-db` | yes | Authentik server, worker, and database | IAM database |
 | `dev` | no | db, pgAdmin, API, Authentik server | only from `compose.dev.yaml`, so these services can publish ports locally |
 
-Two containers can only reach each other if they share a network. The proxy can reach the frontend, the API and Authentik, but no
+Two containers can only reach each other if they share a network. The proxy can reach the frontend, the API, docs and Authentik, but no
 database; the API cannot reach the Authentik database. Internal networks have no internet access, and containers that are only in
 internal networks cannot publish ports. `compose.dev.yaml` therefore adds the `dev` network together with the local ports
 (db 5432, pgAdmin 5050, API 8080, Authentik 9000). `dev.sh` and the Makefile always load it; without it only the proxy publishes a port.
@@ -125,3 +126,36 @@ A socket-based `pg_isready` check cannot detect this mismatch.
 If logs report `password authentication failed for user "authentik"`, restore the matching `iam/.env` or deliberately update the database
 role password to the configured value. Keep the other original Authentik secrets as well. For disposable local data, `make -C deploy reset`
 removes all stack data volumes; the next `make up` initializes them with the current secrets.
+
+## Documentation service
+
+`compose.docs.yaml` builds from the repository root and publishes only
+`docs/external/`. Nginx forwards `/docs/` over the internal `proxy`
+network. Docs has no host port binding; port 8080 belongs to the backend.
+
+`DOCS_SITE_URL` defaults to `http://localhost`. Set it to the public origin
+(e.g. `https://tara.security.science`) when building. The container fixes
+`DOCS_BASE_URL=/docs/`. DNS and TLS require separate configuration.
+
+After changing the content or origin, rebuild and reload the proxy:
+
+```sh
+docker compose --env-file iam/.env -f deploy/compose.yaml up --build -d docs
+docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -t
+docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -s reload
+```
+
+The reload refreshes the docs container address.
+
+## Standalone author preview
+
+With Node.js 24 and npm, no application stack needed:
+
+```sh
+cd docs/docusaurus
+npm ci
+npm start
+```
+
+Open <http://localhost:3001> for live preview at `/`.
+See the [tooling guide](../docs/docusaurus/README.md) for other build options.

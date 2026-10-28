@@ -34,6 +34,7 @@ docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE" >/dev/n
 echo "Allowed:"
 check proxy  frontend:80              open "proxy forwards to the frontend"
 check proxy  api:8080                 open "proxy forwards to the API"
+check proxy  docs:80                  open "proxy forwards to the docs"
 check proxy  authentik.localhost:9000 open "API reaches Authentik"
 check app-db db:5432                  open "API reaches the database"
 check iam-db authentik-db:5432        open "Authentik reaches its database"
@@ -46,8 +47,9 @@ check app-db authentik-db:5432        closed "API cannot reach the Authentik dat
 check iam-db db:5432                  closed "Authentik cannot reach the application database"
 check edge   api:8080                 closed "edge cannot reach the API directly"
 check edge   frontend:80              closed "edge cannot reach the frontend directly"
+check edge   docs:80                  closed "edge cannot reach the docs directly"
 check edge   db:5432                  closed "edge cannot reach the database"
-check proxy  "$INTERNET"              closed "API, frontend and Authentik server have no internet access"
+check proxy  "$INTERNET"              closed "API, frontend, docs and Authentik server have no internet access"
 check app-db "$INTERNET"              closed "database network has no internet access"
 check iam-db "$INTERNET"              closed "Authentik database network has no internet access"
 

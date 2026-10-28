@@ -5,6 +5,7 @@ include:
   - ./compose.iam.yaml
   - ./compose.frontend.yaml
   - ./compose.proxy.yaml
+  - ./compose.docs.yaml
 
 # Network segmentation from the architecture overview (#87).
 # Only edge has published ports and internet access; the others are internal.
