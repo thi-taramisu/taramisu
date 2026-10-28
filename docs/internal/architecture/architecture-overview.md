@@ -91,8 +91,8 @@ attached to the non-internal `edge` network to publish host ports (`:80`, `:443`
 `internal: true` `proxy` network, completely blocking outbound internet egress for the Go API and Frontend.
 
 Every stateful or internal backend component sits in its **own isolated `internal: true` Docker network** shared only with the services
-that directly require it. Databases, object storage, and the LLM service are **never** attached to the `edge` or `proxy` networks and cannot be
-reached from the edge.
+that directly require it. Databases, object storage, and the LLM service are **never** attached to the `edge` or `proxy` networks and
+cannot be reached from the edge.
 
 | Network | `internal` | Members | Purpose |
 | --- | --- | --- | --- |
@@ -194,9 +194,10 @@ flowchart LR
 * **Why:** Storing files locally would break horizontal scaling behind a load balancer (since Replica #2 wouldn't have access to files
   uploaded to Replica #1). Standard S3-compliant APIs ensure any backend instance can access any uploaded artifact via standard S3 client
   libraries, keeping the backend code decoupled from any specific storage implementation.
-* **Engine Evaluation / Replacement:** Rather than coupling the setup to MinIO (which has become less suited due to maintenance / licensing
-  considerations), the architecture treats object storage generically. Modern lightweight and actively maintained S3-compatible alternatives
-  (such as **Garage** or **SeaweedFS**) are targeted and can be plugged in without requiring architectural or application-code adjustments.
+* **Engine Evaluation / Replacement:** Rather than coupling the setup to MinIO (which has become less suited due to maintenance /
+  licensing considerations), the architecture treats object storage generically. Modern lightweight and actively maintained
+  S3-compatible alternatives (such as **Garage** or **SeaweedFS**) are targeted and can be plugged in without requiring architectural
+  or application-code adjustments.
 
 ### 7. File Access Authorization via the Go API
 
