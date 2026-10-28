@@ -1,4 +1,5 @@
-FROM node:24-bookworm-slim AS builder
+# Build context: repository root.
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS builder
 WORKDIR /workspace/docs/docusaurus
 COPY docs/docusaurus/package.json docs/docusaurus/package-lock.json ./
 RUN npm ci --no-audit --no-fund
