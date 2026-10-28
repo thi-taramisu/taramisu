@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
-import { ItemDefinitionDiagram } from './features/item-definition/ItemDefinitionDiagram'
+import { ItemDefinitionTab } from './features/items/ItemDefinitionTab'
+import { ItemPage } from './features/items/ItemPage'
+import { ItemRisksTab } from './features/items/ItemRisksTab'
 import { GeneralSettings } from './features/project-settings/GeneralSettings'
 import { MembersSettings } from './features/project-settings/MembersSettings'
 import { ENTITY_TYPES, type EntityType } from './features/workspace/entities'
@@ -15,8 +17,9 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 
 // Tabs that already have content, everything else renders a placeholder.
 const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
-  'items/': <ItemDefinitionDiagram />,
+  'items/': <ItemDefinitionTab />,
   'items/assets': <ItemAssetsTab />,
+  'items/risks': <ItemRisksTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md
@@ -35,7 +38,11 @@ export default function App() {
       <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
         <Route index element={<Placeholder title="Select an element in the tree" />} />
         {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
-          <Route key={type} path={`${type}/:entityId`} element={<EntityPage type={type} />}>
+          <Route
+            key={type}
+            path={`${type}/:entityId`}
+            element={type === 'items' ? <ItemPage /> : <EntityPage type={type} />}
+          >
             {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
               const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
               return path ? (
