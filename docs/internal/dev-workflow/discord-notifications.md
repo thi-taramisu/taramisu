@@ -3,9 +3,14 @@
 GitHub Actions notifies Discord when matching labels are added to issues,
 including during creation. Issues use only `labeled` events, not `opened`, to
 avoid duplicate creation notifications. PRs targeting `main` notify on both
-opening with matching labels and adding labels. Adding a label notifies only
+opening with matching labels, adding labels, and being merged. Adding a label notifies only
 its destination. Labels are case-sensitive; unknown labels are ignored.
 Multiple added labels can each send a message, even to the same channel.
+
+Merged PRs send a celebratory **🎉 PR merged** message to the destinations of
+their matching labels, once per webhook, without role pings. The message links
+to the PR, credits the merge actor, and displays the merge time. Closing a PR
+without merging it sends no message. PRs without matching labels remain silent.
 
 ## Setup
 

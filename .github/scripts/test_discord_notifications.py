@@ -26,7 +26,59 @@ class NotificationTests(unittest.TestCase):
         workflow_path = Path(__file__).resolve().parents[1] / "workflows" / "discord-notifications.yml"
         workflow = workflow_path.read_text(encoding="utf-8")
         self.assertIn("  issues:\n    types: [labeled]\n", workflow)
-        self.assertIn("  pull_request_target:\n    branches: [main]\n    types: [opened, labeled]\n", workflow)
+        self.assertIn("  pull_request_target:\n    branches: [main]\n    types: [opened, labeled, closed]\n", workflow)
+        self.assertIn("if: github.event.action != 'closed' || github.event.pull_request.merged == true", workflow)
+
+    def test_merged_pr_celebrates_with_merge_time_without_mentions(self):
+        event = event_payload("pull_request_target", "closed", ["backend", "IAM"])
+        event.pop("label")
+        event["sender"] = {"login": "merger"}
+        event["pull_request"].update({
+            "merged": True,
+            "merged_at": "2026-10-28T09:00:00Z",
+            "updated_at": "2026-10-28T10:00:00Z",
+        })
+        labels = matching_labels("pull_request_target", event)
+        self.assertEqual(labels, ["backend", "IAM"])
+        payload = embed_payload("pull_request_target", event, labels)
+        self.assertNotIn("content", payload)
+        self.assertEqual(payload["allowed_mentions"], {
+            "parse": [], "users": [], "roles": [], "replied_user": False,
+        })
+        embed = payload["embeds"][0]
+        self.assertTrue(embed["title"].startswith("🎉 PR merged #42"))
+        self.assertEqual(embed["description"], "`merger` merged this pull request. Great work, team! 🥳")
+        self.assertEqual(embed["url"], event["pull_request"]["html_url"])
+        self.assertIn("28.10.2026 · 10:00", embed["footer"]["text"])
+        self.assertEqual(embed["fields"], [
+            {"name": "Branches", "value": "`feature/example → main`"},
+        ])
+
+    def test_closed_unmerged_pr_is_ignored(self):
+        for merged in (False, None, "true"):
+            with self.subTest(merged=merged):
+                event = event_payload("pull_request_target", "closed", ["backend"])
+                event["pull_request"]["merged"] = merged
+                self.assertEqual(matching_labels("pull_request_target", event), [])
+
+    def test_closed_issue_is_ignored_even_with_merged_flag(self):
+        event = event_payload(action="closed", labels=["backend"])
+        event["issue"]["merged"] = True
+        self.assertEqual(matching_labels("issues", event), [])
+
+    def test_merged_pr_groups_labels_by_destination(self):
+        event = event_payload("pull_request_target", "closed", ["backend", "IAM", "CI/CD", "IAM"])
+        event["pull_request"]["merged"] = True
+        routed = destinations(matching_labels("pull_request_target", event), {
+            "DISCORD_BACKEND_WEBHOOK": "backend-url",
+            "DISCORD_DEVOPS_WEBHOOK": "devops-url",
+        })
+        self.assertEqual(routed, {"backend-url": ["backend"], "devops-url": ["IAM", "CI/CD"]})
+
+    def test_merged_pr_without_matching_labels_is_ignored(self):
+        event = event_payload("pull_request_target", "closed", ["documentation"])
+        event["pull_request"]["merged"] = True
+        self.assertEqual(matching_labels("pull_request_target", event), [])
 
     def test_each_configured_issue_role_is_explicitly_allowlisted(self):
         expected_roles = {

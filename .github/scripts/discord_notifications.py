@@ -37,11 +37,13 @@ PR_COLOR = 0x8957E5
 def event_item(event_name, event):
     if event_name not in ("issues", "pull_request_target"):
         return None
-    if event.get("action") not in ("opened", "labeled"):
+    if event.get("action") not in ("opened", "labeled", "closed"):
         return None
     key = "issue" if event_name == "issues" else "pull_request"
     item = event.get(key)
     if not isinstance(item, dict) or (key == "issue" and "pull_request" in item):
+        return None
+    if event["action"] == "closed" and (key != "pull_request" or item.get("merged") is not True):
         return None
     return item
 
@@ -73,10 +75,15 @@ def destinations(labels, environ):
 def embed_payload(event_name, event, labels):
     item = event_item(event_name, event)
     is_issue = event_name == "issues"
+    is_merged = event["action"] == "closed"
     kind = "🐛 Issue" if is_issue else "🔀 PR"
+    if is_merged:
+        kind = "🎉 PR merged"
     actor = event.get("sender", {}).get("login") or item["user"]["login"]
     if event["action"] == "opened":
         description = f"`{actor}` opened {'an issue' if is_issue else 'a pull request'}"
+    elif is_merged:
+        description = f"`{actor}` merged this pull request. Great work, team! 🥳"
     else:
         label = event["label"]["name"].replace("`", "'")
         description = f"`{actor}` added `{label}`"
@@ -99,7 +106,8 @@ def embed_payload(event_name, event, labels):
             "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
         },
     }
-    timestamp = item.get("created_at" if event["action"] == "opened" else "updated_at")
+    timestamp_key = "merged_at" if is_merged else "created_at" if event["action"] == "opened" else "updated_at"
+    timestamp = item.get(timestamp_key)
     if timestamp:
         local_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Berlin"))
         footer_parts.append(local_time.strftime("%d.%m.%Y · %H:%M"))

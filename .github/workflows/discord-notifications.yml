@@ -5,13 +5,14 @@ on:
     types: [labeled]
   pull_request_target:
     branches: [main]
-    types: [opened, labeled]
+    types: [opened, labeled, closed]
 
 permissions:
   contents: read
 
 jobs:
   notify:
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
