@@ -5,7 +5,7 @@ test.describe('Item Definition page', () => {
     await page.goto('/projects/headlamp/items/i-01')
 
     await expect(
-      page.getByRole('heading', { name: /I-01 Headlamp system/i }),
+      page.getByRole('heading', { name: 'Headlamp system', exact: true }),
     ).toBeVisible()
 
     const diagram = page.locator('.react-flow')
