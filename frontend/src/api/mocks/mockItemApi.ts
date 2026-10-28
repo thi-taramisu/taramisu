@@ -1,14 +1,13 @@
-import { headlampAssets, headlampRisks } from '../assets/headlampAssets'
-import { exampleProject } from '../workspace/exampleProject'
-import type { TreeNode } from '../workspace/entities'
-import {
-  ApiError,
-  ITEM_NAME_MAX_LENGTH,
-  type ItemApi,
-  type ItemAsset,
-  type ItemDefinition,
-  type RiskGroup,
-} from './itemApi'
+import { ApiError } from '../errors'
+import type { ItemAsset } from '../models/asset'
+import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
+import type { RiskGroup } from '../models/risk'
+import type { TreeNode } from '../models/tree'
+import type { ItemApi } from '../services/items'
+import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
+
+// MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
+// once the item routes (#83) are in `backend/openapi.json`.
 
 interface StoredItem {
   item: ItemDefinition
@@ -19,22 +18,8 @@ interface StoredItem {
 
 function seed(): Map<string, StoredItem> {
   const [headlamp] = exampleProject.tree
-  const item: ItemDefinition = {
-    id: headlamp.id,
-    tara_project_id: exampleProject.id,
-    name: headlamp.name,
-    scope_type: 'ITEM',
-    lifecycle_phase: 'Concept',
-    item_definition_wp_09_01: null,
-    cybersecurity_specs_wp_10_01: null,
-    architectural_design: null,
-    boundary: 'Headlamp system incl. body control ECU, power switch actuator and lamps. Gateway ECU, camera ECU and navigation ECU are outside the boundary.',
-    functions: 'Switch low and high beam on driver request; automatic high beam based on camera data.',
-    operational_environment: 'Passenger car at day and night; vehicle CAN bus behind the gateway; workshop diagnostics via OBD-II.',
-    created_at: '2026-10-01T08:00:00Z',
-  }
-  const entry = structuredClone({ item, children: headlamp.children ?? [], assets: headlampAssets, risks: headlampRisks })
-  return new Map([[item.id, entry]])
+  const entry = structuredClone({ item: headlampItem, children: headlamp.children ?? [], assets: headlampAssets, risks: headlampRisks })
+  return new Map([[headlampItem.id, entry]])
 }
 
 function validateName(name: string | undefined) {

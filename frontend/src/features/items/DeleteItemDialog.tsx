@@ -13,9 +13,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import type { TreeNode } from '../workspace/entities'
-import type { ItemDefinition } from './itemApi'
-import { useDeleteItem, useProjectTree } from './queries'
+import type { ItemDefinition } from '../../api/models/item'
+import type { TreeNode } from '../../api/models/tree'
+import { useDeleteItem, useProjectTree } from '../../api/queries/items'
 
 function countBelow(nodes: readonly TreeNode[] = []): number {
   return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)

@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { entityPath } from '../workspace/entities'
-import { ITEM_NAME_MAX_LENGTH, type ScopeType } from './itemApi'
-import { useCreateItem } from './queries'
+import { ITEM_NAME_MAX_LENGTH, type ScopeType } from '../../api/models/item'
+import { useCreateItem } from '../../api/queries/items'
 
 const SCOPE_TYPES: { value: ScopeType; label: string }[] = [
   { value: 'ITEM', label: 'Item (item definition, WP-09-01)' },

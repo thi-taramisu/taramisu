@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { exampleProject } from '../features/workspace/exampleProject'
+import { exampleProject } from '../api/mocks/data/headlamp'
 import { ProjectHeader } from '../features/workspace/ProjectHeader'
 import { NotFoundPage } from './NotFoundPage'
 

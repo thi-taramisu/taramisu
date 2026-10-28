@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ComponentType, type KeyboardEventHandler } from 'react'
 import { NavLink } from 'react-router-dom'
-import { ENTITY_TYPES, entityPath, entityTitle, type TreeNode } from './entities'
+import type { TreeNode } from '../../api/models/tree'
+import { ENTITY_TYPES, entityPath, entityTitle } from './entities'
 
 interface FiletreeLinkProps {
   node: TreeNode

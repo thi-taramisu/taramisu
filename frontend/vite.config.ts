@@ -11,6 +11,13 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  // Same routing as proxy/nginx.conf for `npm run dev` without Compose: the backend serves these paths
+  // itself, so they are forwarded without a rewrite. /health is only proxied here, for local checks.
+  server: {
+    proxy: Object.fromEntries(
+      ['/api', '/auth', '/health'].map((prefix) => [prefix, process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080']),
+    ),
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

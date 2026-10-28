@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Filetree } from './Filetree'
-import type { TreeNode } from './entities'
+import type { TreeNode } from '../../api/models/tree'
 
 const project = '/projects/test-project'
 const nodes: TreeNode[] = [
