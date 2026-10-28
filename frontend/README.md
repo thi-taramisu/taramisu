@@ -41,8 +41,8 @@ src/
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
-`/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload. The route concept is in
-[`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
+`/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
+The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
 entity independently expandable, highlights the active entity on its subpages, and preserves URL query parameters (including graph view).
