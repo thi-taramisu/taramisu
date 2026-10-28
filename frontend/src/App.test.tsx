@@ -62,8 +62,7 @@ describe('routing', () => {
   })
 
   it('toggles the graph view with the header switch', async () => {
-    const user = userEvent.setup()
-    renderAt(`${project}/damage-scenarios/ds-01`)
+    const { user } = renderAt(`${project}/damage-scenarios/ds-01`)
 
     await user.click(screen.getByRole('switch', { name: 'Graph' }))
     expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
@@ -73,8 +72,7 @@ describe('routing', () => {
   })
 
   it('routes the project settings sections', async () => {
-    const user = userEvent.setup()
-    renderAt(`${project}/settings`)
+    const { user } = renderAt(`${project}/settings`)
 
     expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
