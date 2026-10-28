@@ -2,7 +2,7 @@ name: Discord notifications
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
   pull_request_target:
     branches: [main]
     types: [opened, labeled]

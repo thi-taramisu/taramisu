@@ -1,8 +1,11 @@
 # Discord notifications
 
-GitHub Actions notifies Discord when issues or PRs targeting `main` are opened
-with matching labels, or when those labels are added. Adding a label notifies
-only its destination. Labels are case-sensitive; unknown labels are ignored.
+GitHub Actions notifies Discord when matching labels are added to issues,
+including during creation. Issues use only `labeled` events, not `opened`, to
+avoid duplicate creation notifications. PRs targeting `main` notify on both
+opening with matching labels and adding labels. Adding a label notifies only
+its destination. Labels are case-sensitive; unknown labels are ignored.
+Multiple added labels can each send a message, even to the same channel.
 
 ## Setup
 

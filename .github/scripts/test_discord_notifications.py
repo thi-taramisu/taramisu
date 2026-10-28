@@ -1,6 +1,7 @@
 """Offline regression tests for label routing and issue role mentions."""
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from discord_notifications import LABEL_ROLES, destinations, embed_payload, matching_labels
@@ -21,6 +22,12 @@ def event_payload(event_name="issues", action="opened", labels=None, added_label
 
 
 class NotificationTests(unittest.TestCase):
+    def test_workflow_uses_only_label_events_for_issues(self):
+        workflow_path = Path(__file__).resolve().parents[1] / "workflows" / "discord-notifications.yml"
+        workflow = workflow_path.read_text(encoding="utf-8")
+        self.assertIn("  issues:\n    types: [labeled]\n", workflow)
+        self.assertIn("  pull_request_target:\n    branches: [main]\n    types: [opened, labeled]\n", workflow)
+
     def test_each_configured_issue_role_is_explicitly_allowlisted(self):
         expected_roles = {
             "backend": "1563190105974513765",
