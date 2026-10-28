@@ -24,7 +24,7 @@ case "$1" in
         if [ "${EXISTING_IAM_VOLUME:-0}" = 1 ]; then exit 0; else exit 1; fi ;;
 esac
 # Every operation must use the same entry point and explicit environment file.
-test "$1 $2 $3 $4 $5" = 'compose --env-file ../iam/.env -f compose.yaml'
+test "$1 $2 $3 $4 $5 $6 $7" = 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml'
 echo "$*" >> "$COMMAND_LOG"
 case " $* " in
     *" config --quiet "*) exec "$REAL_DOCKER" "$@" ;;
@@ -35,7 +35,7 @@ case " $* " in
     *" proxy nginx -t "*) exit "${PROXY_CONFIG_FAIL:-0}" ;;
     *" proxy nginx -s reload "*) exit "${PROXY_RELOAD_FAIL:-0}" ;;
     *" up "*|*" run --rm migrate "*|*" down "*)
-        "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.yaml config --quiet
+        "$REAL_DOCKER" compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml config --quiet
         case " $* " in
             *" authentik-db "*) exit "${DB_FAIL:-0}" ;;
             *" authentik-server authentik-worker "*) exit "${IAM_FAIL:-0}" ;;
@@ -117,18 +117,18 @@ grep -q '^Login:' "$scratch/output"
 for directory in backend deploy; do
     : > "$COMMAND_LOG"
     make -C "$scratch/$directory" down > "$scratch/output" 2>&1
-    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env -f compose.yaml --profile tools down'
+    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml --profile tools down'
     : > "$COMMAND_LOG"
     make -C "$scratch/$directory" reset > "$scratch/output" 2>&1
-    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env -f compose.yaml --profile tools down -v'
+    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml --profile tools down -v'
 done
 : > "$COMMAND_LOG"
 make -C "$scratch/backend" db pgadmin migrate migrate-diff name=test-change > "$scratch/output" 2>&1
-grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml up -d --wait db' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml up -d pgadmin' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml run --rm migrate' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml up -d --wait dev-db' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml run --rm migrate migrate diff test-change --env local' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml up -d --wait db' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml up -d pgadmin' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml run --rm migrate' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml up -d --wait dev-db' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml run --rm migrate migrate diff test-change --env local' "$COMMAND_LOG"
 ! grep -q ' up .*authentik-server' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$original"
 
@@ -183,6 +183,8 @@ APP_URL=http://127.0.0.1:8080 OIDC_CLIENT_ID=review-client \
     "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
     -f "$scratch/deploy/compose.yaml" --profile tools config --format json > "$scratch/model.json"
 "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
+    -f "$scratch/deploy/compose.yaml" -f "$scratch/deploy/compose.dev.yaml" --profile tools config --format json > "$scratch/dev.json"
+"$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
     -p isolated-check -f "$scratch/deploy/compose.yaml" config --format json > "$scratch/isolated.json"
 python3 - "$scratch" <<'PY'
 import json
@@ -196,15 +198,27 @@ assert model['name'] == 'taramisu'
 assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy',
                          'authentik-server', 'authentik-worker', 'authentik-db'}
 expected_networks = {
-    'api': {'default', 'backend', 'auth'},
-    'db': {'backend'}, 'dev-db': {'backend'}, 'migrate': {'backend'}, 'pgadmin': {'backend'},
-    'frontend': {'default'}, 'proxy': {'default'},
-    'authentik-server': {'auth', 'iam'}, 'authentik-worker': {'iam'}, 'authentik-db': {'iam'},
+    'api': {'proxy', 'app-db'},
+    'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
+    'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
+    'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
 }
 for service, networks in expected_networks.items():
     assert set(services[service]['networks']) == networks, service
 assert not any(network.get('external') for network in model['networks'].values())
-assert 'authentik.localhost' in services['authentik-server']['networks']['auth']['aliases']
+assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
+    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True}
+assert 'authentik.localhost' in services['authentik-server']['networks']['proxy']['aliases']
+# Without the dev override only the proxy publishes a port.
+assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}
+dev = json.loads((root / 'dev.json').read_text())
+assert not dev['networks']['dev'].get('internal')
+expected_ports = {'proxy': '80', 'db': '5432', 'pgadmin': '5050', 'api': '8080', 'authentik-server': '9000'}
+for name, service in dev['services'].items():
+    published = {port['published'] for port in service.get('ports', [])}
+    assert published == ({expected_ports[name]} if name in expected_ports else set()), name
+    assert set(service['networks']) == expected_networks[name] | ({'dev'} if name in expected_ports and name != 'proxy' else set()), name
+assert all(port['host_ip'] == '127.0.0.1' for service in dev['services'].values() for port in service.get('ports', []))
 api = services['api']
 worker = services['authentik-worker']
 assert api['environment']['APP_URL'] == 'http://127.0.0.1:8080'
@@ -243,4 +257,4 @@ assert isolated['services']['authentik-worker']['environment']['OIDC_REDIRECT_UR
 assert all(v['name'].startswith('isolated-check-') for v in isolated['volumes'].values())
 assert all(n['name'].startswith('isolated-check_') for n in isolated['networks'].values())
 PY
-echo 'PASS: unified Compose model, isolated networks/volumes, startup order, commands, secrets, and failures.'
+echo 'PASS: unified Compose model, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'

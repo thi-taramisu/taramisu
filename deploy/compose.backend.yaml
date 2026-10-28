@@ -12,28 +12,24 @@ x-postgres: &postgres
 services:
   db:
     <<: *postgres
-    networks: [backend]
-    ports:
-      - "127.0.0.1:5432:5432"
+    networks: [app-db]
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   dev-db:
     <<: *postgres
-    networks: [backend]
+    networks: [app-db]
     profiles: [tools]
 
   pgadmin:
     image: dpage/pgadmin4:9
-    networks: [backend]
+    networks: [app-db]
     profiles: [tools]
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: taramisu
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
-    ports:
-      - "127.0.0.1:5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     configs:
@@ -50,7 +46,7 @@ services:
 
   migrate:
     image: arigaio/atlas:1.3.0
-    networks: [backend]
+    networks: [app-db]
     working_dir: /app
     volumes:
       - ../backend:/app
@@ -62,7 +58,7 @@ services:
         condition: service_healthy
 
   api:
-    networks: [default, backend, auth]
+    networks: [proxy, app-db]
     build:
       context: ../backend
     environment:
@@ -71,8 +67,6 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-http://authentik.localhost:9000/application/o/taramisu/}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in iam/.env; run make -C deploy init}
-    ports:
-      - "127.0.0.1:8080:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully

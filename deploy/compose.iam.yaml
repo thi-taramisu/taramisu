@@ -24,7 +24,7 @@ x-authentik: &authentik
 
 services:
   authentik-db:
-    networks: [iam]
+    networks: [iam-db]
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: authentik
@@ -43,15 +43,13 @@ services:
     <<: *authentik
     command: server
     networks:
-      iam:
-      auth:
+      iam-db:
+      proxy:
         aliases: [authentik.localhost]
-    ports:
-      - '127.0.0.1:9000:9000'
   authentik-worker:
     <<: *authentik
     command: worker
-    networks: [iam]
+    networks: [iam-db]
     environment:
       <<: *authentik-environment
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}

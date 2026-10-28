@@ -1,7 +1,7 @@
-COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
+COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml
 
 .DEFAULT_GOAL := up
-.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate test
+.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate test check-networks
 init:
 	./dev.sh --init
 up:
@@ -23,3 +23,5 @@ migrate-validate: init
 	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
 test:
 	sh dev_test.sh
+check-networks:
+	./check-networks.sh
