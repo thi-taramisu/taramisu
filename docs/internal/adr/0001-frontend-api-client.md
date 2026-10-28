@@ -39,7 +39,7 @@ What we want from the client:
 
 ## Decision
 
-I suggest we go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and
+We go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and
 components use `openapi-react-query` (on top of TanStack Query) for caching and loading states.
 
 `createApiClient()` in `src/api/client.ts` wraps `createClient<paths>` and adds a middleware with two hooks:
@@ -60,7 +60,7 @@ in `src/api/mocks/`; `src/main.tsx` decides between real and mock (see `frontend
   changes in the diff.
 - New runtime dependencies: `openapi-fetch`, `@tanstack/react-query`, `openapi-react-query`. New dev dependencies: `openapi-typescript`, `msw`.
 - One thing to keep an eye on: the latest `openapi-typescript` (7.13.0) declares `typescript ^5` as its peer dependency, but we're on
-  TypeScript 6. We only use it as a CLI at build time and generation works fine, so I overrode the peer range for just that package
+  TypeScript 6. We only use it as a CLI at build time and generation works fine, so we override the peer range for just that package
   (`overrides` in `package.json`). We should remove the override once there's a release that supports TS 6.
 - The spec lives in `backend/openapi.json` and `schema.d.ts` stays committed. CI regenerates it and fails if the committed file differs,
   also when only `backend/openapi.json` changed (#118).
