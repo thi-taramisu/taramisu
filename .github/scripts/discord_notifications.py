@@ -22,6 +22,13 @@ LABEL_WEBHOOKS = {
     "infrastructure": "DISCORD_DEVOPS_WEBHOOK",
     "CI/CD": "DISCORD_DEVOPS_WEBHOOK",
 }
+LABEL_ROLES = {
+    "backend": "1563190105974513765",
+    "frontend": "1563190563342258296",
+    "CI/CD": "1563190406554984498",
+    "infrastructure": "1563190449810833448",
+    "IAM": "1563190604408553522",
+}
 WEBHOOK_TIMEOUT_SECONDS = 20
 ISSUE_COLOR = 0x238636
 PR_COLOR = 0x8957E5
@@ -97,10 +104,16 @@ def embed_payload(event_name, event, labels):
         local_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Berlin"))
         footer_parts.append(local_time.strftime("%d.%m.%Y · %H:%M"))
         embed["footer"]["text"] = " · ".join(footer_parts)
-    return {
-        "allowed_mentions": {"parse": [], "users": [], "roles": [], "replied_user": False},
+    roles = list(dict.fromkeys(
+        LABEL_ROLES[label] for label in labels if LABEL_ROLES.get(label)
+    )) if is_issue else []
+    payload = {
+        "allowed_mentions": {"parse": [], "users": [], "roles": roles, "replied_user": False},
         "embeds": [embed],
     }
+    if roles:
+        payload["content"] = " ".join(f"<@&{role}>" for role in roles)
+    return payload
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
