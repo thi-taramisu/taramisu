@@ -46,6 +46,8 @@ jobs:
           filters: |
             frontend:
               - 'frontend/**'
+              # The frontend types are generated from it, so an API change is checked against them.
+              - 'backend/openapi.json'
               - '.github/workflows/build.yml'
             backend:
               - 'backend/**'
@@ -77,6 +79,14 @@ jobs:
       - name: Install dependencies
         id: install
         run: npm ci
+
+      - name: Regenerate API types from backend/openapi.json
+        run: npm run generate:api
+
+      - name: Verify committed API types are up to date
+        id: api_types
+        working-directory: ${{ github.workspace }}
+        run: git diff --exit-code -- frontend/src/api/schema.d.ts
 
       - name: Typecheck
         run: npm run typecheck
@@ -269,7 +279,7 @@ jobs:
           | Component | Status | Details |
           | :--- | :---: | :--- |
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
-          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | API types drift check, Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
           | **Backend** | ${{ needs.backend.result == 'success' && '✅ Passed' || (needs.backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Go Module Verify, Build, Atlas & sqlc Drift Check, PostgreSQL Integration, Race Tests, Coverage (80%) & OpenAPI Spec |
           EOF
 
