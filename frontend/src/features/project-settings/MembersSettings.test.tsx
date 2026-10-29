@@ -57,9 +57,28 @@ describe('MembersSettings', () => {
     const user = userEvent.setup()
     renderMembers()
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Role for alex@example.com' }), 'Reviewer')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Role for kim@example.com' }), 'Reviewer')
 
-    expect(screen.getByRole('combobox', { name: 'Role for alex@example.com' })).toHaveDisplayValue('Reviewer')
+    expect(screen.getByRole('combobox', { name: 'Role for kim@example.com' })).toHaveDisplayValue('Reviewer')
     expect(screen.getByRole('combobox', { name: 'Role for sam@example.com' })).toHaveDisplayValue('Editor')
+  })
+
+  it('keeps the last owner', () => {
+    renderMembers()
+
+    expect(screen.getByRole('button', { name: 'Remove alex@example.com' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Role for alex@example.com' })).toBeDisabled()
+  })
+
+  it('removes an owner when another owner exists', async () => {
+    const user = userEvent.setup()
+    renderMembers()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Role for sam@example.com' }), 'Owner')
+    await user.click(screen.getByRole('button', { name: 'Remove alex@example.com' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
+
+    expect(screen.queryByRole('cell', { name: 'alex@example.com' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove sam@example.com' })).toBeDisabled()
   })
 })
