@@ -81,7 +81,7 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 	_, f.api = humatest.New(t)
 	queries := db.New(tx)
 	handlers.NewAssets(queries).Register(f.api)
-	handlers.NewAssetProperties(queries).Register(f.api)
+	handlers.NewAssetCybersecurityProperties(queries).Register(f.api)
 	handlers.NewDamageScenarioAssetProperties(queries).Register(f.api)
 	handlers.NewThreatScenarioAssetProperties(queries).Register(f.api)
 	return f
@@ -121,7 +121,7 @@ func propertyConflict(t *testing.T, f propertyFixture, request func() *httptest.
 	}
 }
 
-func TestAssetPropertyPostgresCRUD(t *testing.T) {
+func TestAssetCybersecurityPropertyPostgresCRUD(t *testing.T) {
 	f := newPropertyFixture(t)
 	collection := "/api/v1/item-definitions/" + f.item + "/assets/" + f.asset + "/cybersecurity-properties"
 	created := f.api.Post(collection, map[string]any{"property_type": "INTEGRITY", "description": "original"})

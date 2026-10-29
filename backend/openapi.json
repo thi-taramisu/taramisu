@@ -77,7 +77,7 @@
         ],
         "type": "object"
       },
-      "AssetProperty": {
+      "AssetCybersecurityProperty": {
         "additionalProperties": false,
         "properties": {
           "asset_id": {
@@ -111,7 +111,7 @@
         ],
         "type": "object"
       },
-      "AssetPropertyBody": {
+      "AssetCybersecurityPropertyBody": {
         "additionalProperties": false,
         "properties": {
           "description": {
@@ -333,6 +333,26 @@
         ],
         "type": "object"
       },
+      "UpdateAssetCybersecurityPropertyInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "property_type": {
+            "enum": [
+              "CONFIDENTIALITY",
+              "INTEGRITY",
+              "AVAILABILITY"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateAssetInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -358,26 +378,6 @@
           "name": {
             "minLength": 1,
             "pattern": "\\S",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "UpdateAssetPropertyInputBody": {
-        "additionalProperties": false,
-        "properties": {
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "property_type": {
-            "enum": [
-              "CONFIDENTIALITY",
-              "INTEGRITY",
-              "AVAILABILITY"
-            ],
             "type": "string"
           }
         },
@@ -733,7 +733,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/AssetProperty"
+                    "$ref": "#/components/schemas/AssetCybersecurityProperty"
                   },
                   "type": [
                     "array",
@@ -843,7 +843,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssetPropertyBody"
+                "$ref": "#/components/schemas/AssetCybersecurityPropertyBody"
               }
             }
           },
@@ -854,7 +854,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetProperty"
+                  "$ref": "#/components/schemas/AssetCybersecurityProperty"
                 }
               }
             },
@@ -1089,7 +1089,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetProperty"
+                  "$ref": "#/components/schemas/AssetCybersecurityProperty"
                 }
               }
             },
@@ -1205,7 +1205,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateAssetPropertyInputBody"
+                "$ref": "#/components/schemas/UpdateAssetCybersecurityPropertyInputBody"
               }
             }
           },
@@ -1216,7 +1216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetProperty"
+                  "$ref": "#/components/schemas/AssetCybersecurityProperty"
                 }
               }
             },
@@ -1331,7 +1331,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AssetPropertyBody"
+                "$ref": "#/components/schemas/AssetCybersecurityPropertyBody"
               }
             }
           },
@@ -1342,7 +1342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AssetProperty"
+                  "$ref": "#/components/schemas/AssetCybersecurityProperty"
                 }
               }
             },

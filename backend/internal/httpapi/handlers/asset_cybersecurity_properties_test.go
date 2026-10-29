@@ -119,7 +119,7 @@ func propertyRouteCases(s *propertyErrorStore) []propertyRouteCase {
 	root := "/api/v1/item-definitions/" + itemID
 	propertyCollection := root + "/assets/" + assetID + "/cybersecurity-properties"
 	return []propertyRouteCase{
-		{"property", propertyCollection, propertyCollection + "/" + assetID, `{"property_type":"INTEGRITY"}`, handlers.NewAssetProperties(s).Register},
+		{"property", propertyCollection, propertyCollection + "/" + assetID, `{"property_type":"INTEGRITY"}`, handlers.NewAssetCybersecurityProperties(s).Register},
 		{"damage", root + "/damage-scenario-asset-properties", root + "/damage-scenario-asset-properties/" + assetID,
 			`{"damage_scenario_id":"` + assetID + `","asset_cybersecurity_property_id":"` + assetID + `"}`, handlers.NewDamageScenarioAssetProperties(s).Register},
 		{"threat", root + "/threat-scenario-asset-properties", root + "/threat-scenario-asset-properties/" + assetID,
@@ -127,7 +127,7 @@ func propertyRouteCases(s *propertyErrorStore) []propertyRouteCase {
 	}
 }
 
-func TestAssetPropertyErrors(t *testing.T) {
+func TestAssetCybersecurityPropertyErrors(t *testing.T) {
 	for _, dbError := range []struct {
 		name   string
 		err    error
@@ -163,7 +163,7 @@ func TestAssetPropertyErrors(t *testing.T) {
 	}
 }
 
-func TestAssetPropertyValidation(t *testing.T) {
+func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 	s := &propertyErrorStore{}
 	for _, route := range propertyRouteCases(s) {
 		cases := []struct{ method, path, body string }{

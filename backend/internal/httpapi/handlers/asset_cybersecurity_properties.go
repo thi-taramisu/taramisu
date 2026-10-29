@@ -9,7 +9,7 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
-type AssetPropertyStore interface {
+type AssetCybersecurityPropertyStore interface {
 	CreateAssetCybersecurityProperty(context.Context, db.CreateAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error)
 	GetAssetCybersecurityProperty(context.Context, db.GetAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error)
 	ListAssetCybersecurityProperties(context.Context, db.ListAssetCybersecurityPropertiesParams) ([]db.AssetCybersecurityProperty, error)
@@ -18,13 +18,15 @@ type AssetPropertyStore interface {
 	DeleteAssetCybersecurityProperty(context.Context, db.DeleteAssetCybersecurityPropertyParams) (pgtype.UUID, error)
 }
 
-type AssetProperties struct{ queries AssetPropertyStore }
-
-func NewAssetProperties(queries AssetPropertyStore) *AssetProperties {
-	return &AssetProperties{queries: queries}
+type AssetCybersecurityProperties struct {
+	queries AssetCybersecurityPropertyStore
 }
 
-func (h *AssetProperties) Register(api huma.API) {
+func NewAssetCybersecurityProperties(queries AssetCybersecurityPropertyStore) *AssetCybersecurityProperties {
+	return &AssetCybersecurityProperties{queries: queries}
+}
+
+func (h *AssetCybersecurityProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/assets/{asset_id}/cybersecurity-properties"
 	const member = collection + "/{id}"
 	op := func(id, method, path, summary string) huma.Operation {
@@ -40,64 +42,64 @@ func (h *AssetProperties) Register(api huma.API) {
 	huma.Register(api, del, h.Delete)
 }
 
-type AssetPropertyBody struct {
+type AssetCybersecurityPropertyBody struct {
 	PropertyType db.CybersecurityPropertyType `json:"property_type" enum:"CONFIDENTIALITY,INTEGRITY,AVAILABILITY"`
 	Description  *string                      `json:"description,omitempty" nullable:"true"`
 }
 
-type AssetProperty struct {
+type AssetCybersecurityProperty struct {
 	ID           string                       `json:"id" format:"uuid"`
 	AssetID      string                       `json:"asset_id" format:"uuid"`
 	PropertyType db.CybersecurityPropertyType `json:"property_type" enum:"CONFIDENTIALITY,INTEGRITY,AVAILABILITY"`
 	Description  *string                      `json:"description" nullable:"true"`
 }
 
-type AssetPropertyParentPath struct {
+type AssetCybersecurityPropertyParentPath struct {
 	AssetParentPath
 	AssetID assetUUID `path:"asset_id"`
 }
 
-type AssetPropertyIDInput struct {
-	AssetPropertyParentPath
+type AssetCybersecurityPropertyIDInput struct {
+	AssetCybersecurityPropertyParentPath
 	ID assetUUID `path:"id"`
 }
 
-type CreateAssetPropertyInput struct {
-	AssetPropertyParentPath
-	Body AssetPropertyBody
+type CreateAssetCybersecurityPropertyInput struct {
+	AssetCybersecurityPropertyParentPath
+	Body AssetCybersecurityPropertyBody
 }
 
-type ReplaceAssetPropertyInput struct {
-	AssetPropertyIDInput
-	Body AssetPropertyBody
+type ReplaceAssetCybersecurityPropertyInput struct {
+	AssetCybersecurityPropertyIDInput
+	Body AssetCybersecurityPropertyBody
 }
 
-type UpdateAssetPropertyInput struct {
-	AssetPropertyIDInput
+type UpdateAssetCybersecurityPropertyInput struct {
+	AssetCybersecurityPropertyIDInput
 	Body struct {
 		PropertyType Optional[db.CybersecurityPropertyType] `json:"property_type,omitempty" enum:"CONFIDENTIALITY,INTEGRITY,AVAILABILITY" nullable:"false"`
 		Description  Optional[string]                       `json:"description,omitempty"`
 	}
 }
 
-type ListAssetPropertiesInput struct {
-	AssetPropertyParentPath
+type ListAssetCybersecurityPropertiesInput struct {
+	AssetCybersecurityPropertyParentPath
 	Limit  int32 `query:"limit" default:"50" minimum:"1" maximum:"100"`
 	Offset int32 `query:"offset" default:"0" minimum:"0" maximum:"2147483647"`
 }
 
-type AssetPropertyOutput struct{ Body AssetProperty }
-type ListAssetPropertiesOutput struct{ Body []AssetProperty }
-type CreateAssetPropertyOutput struct {
+type AssetCybersecurityPropertyOutput struct{ Body AssetCybersecurityProperty }
+type ListAssetCybersecurityPropertiesOutput struct{ Body []AssetCybersecurityProperty }
+type CreateAssetCybersecurityPropertyOutput struct {
 	Location string `header:"Location"`
-	Body     AssetProperty
+	Body     AssetCybersecurityProperty
 }
 
-func assetPropertyBody(p db.AssetCybersecurityProperty) AssetProperty {
-	return AssetProperty{ID: p.ID.String(), AssetID: p.AssetID.String(), PropertyType: p.PropertyType, Description: p.Description}
+func assetCybersecurityPropertyBody(p db.AssetCybersecurityProperty) AssetCybersecurityProperty {
+	return AssetCybersecurityProperty{ID: p.ID.String(), AssetID: p.AssetID.String(), PropertyType: p.PropertyType, Description: p.Description}
 }
 
-func (h *AssetProperties) Create(ctx context.Context, in *CreateAssetPropertyInput) (*CreateAssetPropertyOutput, error) {
+func (h *AssetCybersecurityProperties) Create(ctx context.Context, in *CreateAssetCybersecurityPropertyInput) (*CreateAssetCybersecurityPropertyOutput, error) {
 	p, err := h.queries.CreateAssetCybersecurityProperty(ctx, db.CreateAssetCybersecurityPropertyParams{
 		ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID),
 		PropertyType: in.Body.PropertyType, Description: in.Body.Description})
@@ -105,42 +107,42 @@ func (h *AssetProperties) Create(ctx context.Context, in *CreateAssetPropertyInp
 		return nil, propertyError(err)
 	}
 	location := itemCollection(in.ItemDefinitionID, "assets/"+p.AssetID.String()+"/cybersecurity-properties/"+p.ID.String())
-	return &CreateAssetPropertyOutput{Location: location, Body: assetPropertyBody(p)}, nil
+	return &CreateAssetCybersecurityPropertyOutput{Location: location, Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
-func (h *AssetProperties) Get(ctx context.Context, in *AssetPropertyIDInput) (*AssetPropertyOutput, error) {
+func (h *AssetCybersecurityProperties) Get(ctx context.Context, in *AssetCybersecurityPropertyIDInput) (*AssetCybersecurityPropertyOutput, error) {
 	p, err := h.queries.GetAssetCybersecurityProperty(ctx, db.GetAssetCybersecurityPropertyParams{
 		ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID)})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetPropertyOutput{Body: assetPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
-func (h *AssetProperties) List(ctx context.Context, in *ListAssetPropertiesInput) (*ListAssetPropertiesOutput, error) {
+func (h *AssetCybersecurityProperties) List(ctx context.Context, in *ListAssetCybersecurityPropertiesInput) (*ListAssetCybersecurityPropertiesOutput, error) {
 	rows, err := h.queries.ListAssetCybersecurityProperties(ctx, db.ListAssetCybersecurityPropertiesParams{
 		ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID), PageLimit: in.Limit, PageOffset: in.Offset})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	out := &ListAssetPropertiesOutput{Body: make([]AssetProperty, 0, len(rows))}
+	out := &ListAssetCybersecurityPropertiesOutput{Body: make([]AssetCybersecurityProperty, 0, len(rows))}
 	for _, row := range rows {
-		out.Body = append(out.Body, assetPropertyBody(row))
+		out.Body = append(out.Body, assetCybersecurityPropertyBody(row))
 	}
 	return out, nil
 }
 
-func (h *AssetProperties) Replace(ctx context.Context, in *ReplaceAssetPropertyInput) (*AssetPropertyOutput, error) {
+func (h *AssetCybersecurityProperties) Replace(ctx context.Context, in *ReplaceAssetCybersecurityPropertyInput) (*AssetCybersecurityPropertyOutput, error) {
 	p, err := h.queries.ReplaceAssetCybersecurityProperty(ctx, db.ReplaceAssetCybersecurityPropertyParams{
 		ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID),
 		PropertyType: in.Body.PropertyType, Description: in.Body.Description})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetPropertyOutput{Body: assetPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
-func (h *AssetProperties) Update(ctx context.Context, in *UpdateAssetPropertyInput) (*AssetPropertyOutput, error) {
+func (h *AssetCybersecurityProperties) Update(ctx context.Context, in *UpdateAssetCybersecurityPropertyInput) (*AssetCybersecurityPropertyOutput, error) {
 	if in.Body.PropertyType.Set && in.Body.PropertyType.Value == nil {
 		return nil, huma.Error422UnprocessableEntity("property_type cannot be null")
 	}
@@ -150,10 +152,10 @@ func (h *AssetProperties) Update(ctx context.Context, in *UpdateAssetPropertyInp
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetPropertyOutput{Body: assetPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
-func (h *AssetProperties) Delete(ctx context.Context, in *AssetPropertyIDInput) (*struct{}, error) {
+func (h *AssetCybersecurityProperties) Delete(ctx context.Context, in *AssetCybersecurityPropertyIDInput) (*struct{}, error) {
 	_, err := h.queries.DeleteAssetCybersecurityProperty(ctx, db.DeleteAssetCybersecurityPropertyParams{
 		ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID)})
 	if err != nil {

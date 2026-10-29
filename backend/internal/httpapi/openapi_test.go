@@ -49,7 +49,7 @@ func TestOpenAPIEndpointMatchesExport(t *testing.T) {
 	}
 }
 
-func TestAssetPropertyOpenAPI(t *testing.T) {
+func TestAssetCybersecurityPropertyOpenAPI(t *testing.T) {
 	spec := httpapi.OpenAPI()
 	const prefix = "/api/v1/item-definitions/{item_definition_id}"
 	for _, collection := range []string{
