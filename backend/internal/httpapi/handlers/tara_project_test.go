@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 )
@@ -86,6 +87,7 @@ func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, e
 
 func TestTaraProjectRoutes(t *testing.T) {
 	base := "/api/tara-projects"
+	manager, session := authtest.Login(t)
 	for _, tc := range []struct {
 		name   string
 		found  bool
@@ -109,9 +111,10 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"delete missing", false, http.MethodDelete, base + "/" + projectID, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(nil, newFakeProjects(tc.found), nil)
+			h := httpapi.New(nil, newFakeProjects(tc.found), manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(session)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 			if rr.Code != tc.code {
@@ -122,8 +125,11 @@ func TestTaraProjectRoutes(t *testing.T) {
 }
 
 func TestTaraProjectListBody(t *testing.T) {
+	manager, session := authtest.Login(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tara-projects", http.NoBody)
+	req.AddCookie(session)
 	rr := httptest.NewRecorder()
-	httpapi.New(nil, newFakeProjects(false), nil).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/tara-projects", http.NoBody))
+	httpapi.New(nil, newFakeProjects(false), manager).ServeHTTP(rr, req)
 	var got []any
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil || got == nil || len(got) != 0 {
 		t.Fatalf("body = %s, want []", rr.Body.String())
