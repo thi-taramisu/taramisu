@@ -193,12 +193,13 @@ root = Path(sys.argv[1]).resolve()
 model = json.loads((root / 'model.json').read_text())
 services = model['services']
 assert model['name'] == 'taramisu'
-assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy',
+assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
                          'authentik-server', 'authentik-worker', 'authentik-db'}
 expected_networks = {
     'api': {'default', 'backend', 'auth'},
     'db': {'backend'}, 'dev-db': {'backend'}, 'migrate': {'backend'}, 'pgadmin': {'backend'},
-    'frontend': {'default'}, 'proxy': {'default'},
+    'frontend': {'default'}, 'proxy': {'default', 'taramisu-proxy'},
+    'docs': {'taramisu-proxy'},
     'authentik-server': {'auth', 'iam'}, 'authentik-worker': {'iam'}, 'authentik-db': {'iam'},
 }
 for service, networks in expected_networks.items():
@@ -220,6 +221,9 @@ assert probe[0] == 'CMD-SHELL'
 assert 'POSTGRES_PASSWORD' in probe[1] and 'psql -h authentik-db' in probe[1]
 assert Path(api['build']['context']).resolve() == root / 'backend'
 assert Path(services['frontend']['build']['context']).resolve() == root / 'frontend'
+assert Path(services['docs']['build']['context']).resolve() == root
+assert 'docs' in services['proxy']['depends_on']
+assert not services['docs'].get('ports')
 for service, target, source in [
     ('migrate', '/app', root / 'backend'),
     ('authentik-worker', '/blueprints/custom', root / 'iam/blueprints'),

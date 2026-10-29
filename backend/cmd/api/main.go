@@ -15,6 +15,7 @@ import (
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/config"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
@@ -48,13 +49,13 @@ func exitCode() int {
 }
 
 func run() error {
-	addr := os.Getenv("HTTP_ADDR")
-	if addr == "" {
-		addr = ":8080"
+	cfg, err := config.Load()
+	if err != nil {
+		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func run() error {
 	if os.Getenv("SENTRY_DSN") != "" {
 		handler = sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle(handler)
 	}
-	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -82,7 +83,7 @@ func run() error {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
 	}()
-	slog.Info("HTTP server listening", "address", addr)
+	slog.Info("HTTP server listening", "address", cfg.HTTPAddr)
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
