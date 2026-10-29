@@ -52,7 +52,7 @@ func Login(t testing.TB) (*auth.Manager, *http.Cookie) {
 		case "/keys":
 			body = jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}
 		case "/token":
-			payload, _ := json.Marshal(map[string]any{ //todo this token will change in the future
+			payload, _ := json.Marshal(map[string]any{ // todo this token will change in the future
 				"iss": issuer, "sub": subject, "aud": clientID, "nonce": nonce,
 				"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
 			})
