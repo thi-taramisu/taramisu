@@ -15,6 +15,8 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
+// propertyFixture holds a test API, database transaction, and IDs from two separate item definitions.
+// The second item provides records used to verify that references cannot cross item boundaries.
 type propertyFixture struct {
 	tx                                              pgx.Tx
 	api                                             humatest.TestAPI
@@ -24,6 +26,8 @@ type propertyFixture struct {
 	threat, secondThreat, otherThreat               string
 }
 
+// newPropertyFixture creates sample assets, properties, and scenarios in a migrated PostgreSQL database.
+// It skips when TEST_DATABASE_URL is unset and rolls back its transaction after the test.
 func newPropertyFixture(t *testing.T) propertyFixture {
 	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -45,6 +49,7 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 			t.Error(err)
 		}
 	})
+	// Insert a fixture record and capture its database-generated UUID.
 	insertID := func(query string, args ...any) string {
 		t.Helper()
 		var id string
@@ -79,6 +84,7 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		*row.dest = insertID("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'threat') RETURNING id", row.item)
 	}
 	_, f.api = humatest.New(t)
+	// Use the same transaction for fixture setup and handler queries so all changes roll back together.
 	queries := db.New(tx)
 	handlers.NewAssets(queries).Register(f.api)
 	handlers.NewAssetCybersecurityProperties(queries).Register(f.api)
@@ -87,6 +93,7 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 	return f
 }
 
+// propertyResponse checks the response status and decodes a single JSON record for further assertions.
 func propertyResponse(t *testing.T, response *httptest.ResponseRecorder, status int) map[string]any {
 	t.Helper()
 	if response.Code != status {
@@ -99,6 +106,7 @@ func propertyResponse(t *testing.T, response *httptest.ResponseRecorder, status 
 	return body
 }
 
+// propertyStatus checks the HTTP status for responses whose JSON body is not needed.
 func propertyStatus(t *testing.T, response *httptest.ResponseRecorder, status int) {
 	t.Helper()
 	if response.Code != status {
@@ -106,6 +114,8 @@ func propertyStatus(t *testing.T, response *httptest.ResponseRecorder, status in
 	}
 }
 
+// propertyConflict expects HTTP 409 and rolls back to a savepoint afterward.
+// PostgreSQL marks a transaction as failed after a uniqueness violation; the savepoint lets the test continue.
 func propertyConflict(t *testing.T, f propertyFixture, request func() *httptest.ResponseRecorder) {
 	t.Helper()
 	ctx := context.Background()
@@ -121,6 +131,8 @@ func propertyConflict(t *testing.T, f propertyFixture, request func() *httptest.
 	}
 }
 
+// TestAssetCybersecurityPropertyPostgresCRUD exercises real SQL through the property API.
+// It checks duplicates, PUT/PATCH semantics, pagination, parent isolation, and cascading link deletion.
 func TestAssetCybersecurityPropertyPostgresCRUD(t *testing.T) {
 	f := newPropertyFixture(t)
 	collection := "/api/v1/item-definitions/" + f.item + "/assets/" + f.asset + "/cybersecurity-properties"
@@ -206,6 +218,8 @@ func TestAssetCybersecurityPropertyPostgresCRUD(t *testing.T) {
 	propertyStatus(t, f.api.Get("/api/v1/item-definitions/"+f.item+"/assets/"+f.asset), 200)
 }
 
+// TestScenarioAssetPropertyPostgresCRUD exercises both scenario link APIs against PostgreSQL.
+// It checks reference changes, duplicates, partial updates, item isolation, and link deletion.
 func TestScenarioAssetPropertyPostgresCRUD(t *testing.T) {
 	for _, kind := range []string{"damage", "threat"} {
 		t.Run(kind, func(t *testing.T) {

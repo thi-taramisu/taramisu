@@ -26,6 +26,8 @@ type CreateAssetCybersecurityPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Insert a property only if the asset belongs to the requested item definition.
+// INSERT ... SELECT returns no row when the parent does not match, which the API maps to 404.
 func (q *Queries) CreateAssetCybersecurityProperty(ctx context.Context, arg CreateAssetCybersecurityPropertyParams) (AssetCybersecurityProperty, error) {
 	row := q.db.QueryRow(ctx, createAssetCybersecurityProperty,
 		arg.PropertyType,
@@ -56,6 +58,8 @@ type DeleteAssetCybersecurityPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Delete the matching property and return its ID. Existing ON DELETE CASCADE foreign keys
+// also remove its damage/threat links, while the asset and scenarios remain.
 func (q *Queries) DeleteAssetCybersecurityProperty(ctx context.Context, arg DeleteAssetCybersecurityPropertyParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, deleteAssetCybersecurityProperty, arg.ID, arg.AssetID, arg.ItemDefinitionID)
 	var id pgtype.UUID
@@ -76,6 +80,7 @@ type GetAssetCybersecurityPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Read one property only when its asset and item definition match the URL parents.
 func (q *Queries) GetAssetCybersecurityProperty(ctx context.Context, arg GetAssetCybersecurityPropertyParams) (AssetCybersecurityProperty, error) {
 	row := q.db.QueryRow(ctx, getAssetCybersecurityProperty, arg.ID, arg.AssetID, arg.ItemDefinitionID)
 	var i AssetCybersecurityProperty
@@ -102,6 +107,7 @@ type ListAssetCybersecurityPropertiesParams struct {
 	PageLimit        int32
 }
 
+// List properties for the URL parents in a stable UUID order, with limit/offset pagination.
 func (q *Queries) ListAssetCybersecurityProperties(ctx context.Context, arg ListAssetCybersecurityPropertiesParams) ([]AssetCybersecurityProperty, error) {
 	rows, err := q.db.Query(ctx, listAssetCybersecurityProperties,
 		arg.AssetID,
@@ -149,6 +155,8 @@ type ReplaceAssetCybersecurityPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Replace both editable values, preserving the property ID and owning asset.
+// A NULL description clears the stored text, including when PUT omits the optional field.
 func (q *Queries) ReplaceAssetCybersecurityProperty(ctx context.Context, arg ReplaceAssetCybersecurityPropertyParams) (AssetCybersecurityProperty, error) {
 	row := q.db.QueryRow(ctx, replaceAssetCybersecurityProperty,
 		arg.PropertyType,
@@ -186,6 +194,8 @@ type UpdateAssetCybersecurityPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Partially update a property: COALESCE preserves an omitted required type.
+// The separate set_description flag distinguishes omission (preserve) from explicit NULL (clear).
 func (q *Queries) UpdateAssetCybersecurityProperty(ctx context.Context, arg UpdateAssetCybersecurityPropertyParams) (AssetCybersecurityProperty, error) {
 	row := q.db.QueryRow(ctx, updateAssetCybersecurityProperty,
 		arg.PropertyType,

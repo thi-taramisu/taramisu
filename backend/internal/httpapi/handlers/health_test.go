@@ -19,6 +19,7 @@ func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) 
 type healthQueries struct {
 	statusReaderFunc
 	handlers.AssetStore
+	// Satisfy the router database interface; health tests do not call these embedded stores.
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore

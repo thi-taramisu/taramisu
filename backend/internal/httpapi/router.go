@@ -15,6 +15,7 @@ import (
 type Queries interface {
 	handlers.StatusReader
 	handlers.AssetStore
+	// Property and scenario-link handlers share this database implementation.
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
@@ -55,6 +56,7 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	huma.Get(api, "/health/ready", h.Ready)
 	registerAuth(api, manager)
 	handlers.NewAssets(queries).Register(api)
+	// Register issue #160 property and link routes with Huma for validation, dispatch, and OpenAPI.
 	handlers.NewAssetCybersecurityProperties(queries).Register(api)
 	handlers.NewDamageScenarioAssetProperties(queries).Register(api)
 	handlers.NewThreatScenarioAssetProperties(queries).Register(api)

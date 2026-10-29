@@ -28,6 +28,8 @@ type CreateThreatScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Connect an existing threat scenario and asset property only when both belong to the requested item.
+// Checking the property through its asset prevents references to properties from another item.
 func (q *Queries) CreateThreatScenarioAssetProperty(ctx context.Context, arg CreateThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, createThreatScenarioAssetProperty, arg.ThreatScenarioID, arg.AssetCybersecurityPropertyID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
@@ -47,6 +49,8 @@ type DeleteThreatScenarioAssetPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Delete only the link after checking both references belong to the requested item.
+// The referenced threat scenario and property are preserved.
 func (q *Queries) DeleteThreatScenarioAssetProperty(ctx context.Context, arg DeleteThreatScenarioAssetPropertyParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, deleteThreatScenarioAssetProperty, arg.ID, arg.ItemDefinitionID)
 	var id pgtype.UUID
@@ -68,6 +72,7 @@ type GetThreatScenarioAssetPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Read one link, verifying both the scenario and the property belong to the requested item.
 func (q *Queries) GetThreatScenarioAssetProperty(ctx context.Context, arg GetThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, getThreatScenarioAssetProperty, arg.ID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
@@ -91,6 +96,7 @@ type ListThreatScenarioAssetPropertiesParams struct {
 	PageLimit        int32
 }
 
+// List links whose two references belong to the requested item, ordered by UUID and paginated.
 func (q *Queries) ListThreatScenarioAssetProperties(ctx context.Context, arg ListThreatScenarioAssetPropertiesParams) ([]ThreatScenarioAssetProperty, error) {
 	rows, err := q.db.Query(ctx, listThreatScenarioAssetProperties, arg.ItemDefinitionID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
@@ -132,6 +138,8 @@ type ReplaceThreatScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Replace both references while preserving the link ID. old_t/old_p/old_a check the existing
+// link, and t/p/a check the replacement references; both sets must belong to the requested item.
 func (q *Queries) ReplaceThreatScenarioAssetProperty(ctx context.Context, arg ReplaceThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, replaceThreatScenarioAssetProperty,
 		arg.ThreatScenarioID,
@@ -167,6 +175,8 @@ type UpdateThreatScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Update only supplied references; COALESCE keeps each omitted reference.
+// Check both the old and resulting references against the requested item before changing the link.
 func (q *Queries) UpdateThreatScenarioAssetProperty(ctx context.Context, arg UpdateThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, updateThreatScenarioAssetProperty,
 		arg.ThreatScenarioID,

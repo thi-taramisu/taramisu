@@ -49,6 +49,8 @@ func TestOpenAPIEndpointMatchesExport(t *testing.T) {
 	}
 }
 
+// TestAssetCybersecurityPropertyOpenAPI checks that all property and link operations are documented
+// with session security, shared errors, and the expected create/delete success statuses.
 func TestAssetCybersecurityPropertyOpenAPI(t *testing.T) {
 	spec := httpapi.OpenAPI()
 	const prefix = "/api/v1/item-definitions/{item_definition_id}"

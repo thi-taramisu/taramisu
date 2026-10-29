@@ -1,3 +1,5 @@
+-- Connect an existing threat scenario and asset property only when both belong to the requested item.
+-- Checking the property through its asset prevents references to properties from another item.
 -- name: CreateThreatScenarioAssetProperty :one
 INSERT INTO threat_scenario_asset_property (threat_scenario_id, asset_cybersecurity_property_id)
 SELECT t.id, p.id
@@ -8,6 +10,7 @@ WHERE t.id = sqlc.arg(threat_scenario_id) AND p.id = sqlc.arg(asset_cybersecurit
     AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING *;
 
+-- Read one link, verifying both the scenario and the property belong to the requested item.
 -- name: GetThreatScenarioAssetProperty :one
 SELECT l.* FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
@@ -16,6 +19,7 @@ JOIN asset a ON a.id = p.asset_id
 WHERE l.id = sqlc.arg(id) AND t.item_definition_id = sqlc.arg(item_definition_id)
     AND a.item_definition_id = sqlc.arg(item_definition_id);
 
+-- List links whose two references belong to the requested item, ordered by UUID and paginated.
 -- name: ListThreatScenarioAssetProperties :many
 SELECT l.* FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
@@ -25,6 +29,8 @@ WHERE t.item_definition_id = sqlc.arg(item_definition_id)
     AND a.item_definition_id = sqlc.arg(item_definition_id)
 ORDER BY l.id LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
+-- Replace both references while preserving the link ID. old_t/old_p/old_a check the existing
+-- link, and t/p/a check the replacement references; both sets must belong to the requested item.
 -- name: ReplaceThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
 SET threat_scenario_id = sqlc.arg(threat_scenario_id), asset_cybersecurity_property_id = sqlc.arg(asset_cybersecurity_property_id)
@@ -38,6 +44,8 @@ WHERE l.id = sqlc.arg(id) AND old_t.id = l.threat_scenario_id AND old_p.id = l.a
     AND t.item_definition_id = sqlc.arg(item_definition_id) AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING l.*;
 
+-- Update only supplied references; COALESCE keeps each omitted reference.
+-- Check both the old and resulting references against the requested item before changing the link.
 -- name: UpdateThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
 SET threat_scenario_id = COALESCE(sqlc.narg(threat_scenario_id)::uuid, l.threat_scenario_id),
@@ -53,6 +61,8 @@ WHERE l.id = sqlc.arg(id) AND old_t.id = l.threat_scenario_id AND old_p.id = l.a
     AND t.item_definition_id = sqlc.arg(item_definition_id) AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING l.*;
 
+-- Delete only the link after checking both references belong to the requested item.
+-- The referenced threat scenario and property are preserved.
 -- name: DeleteThreatScenarioAssetProperty :one
 DELETE FROM threat_scenario_asset_property l USING threat_scenario t, asset_cybersecurity_property p, asset a
 WHERE l.id = sqlc.arg(id) AND t.id = l.threat_scenario_id AND p.id = l.asset_cybersecurity_property_id AND a.id = p.asset_id

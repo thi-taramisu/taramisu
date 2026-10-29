@@ -15,106 +15,128 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
+// propertyErrorStore is a fake database shared by property and link handler tests.
+// Each method counts calls and returns the configured error without accessing PostgreSQL.
 type propertyErrorStore struct {
 	err   error
 	calls int
 }
 
+// CreateAssetCybersecurityProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) CreateAssetCybersecurityProperty(context.Context, db.CreateAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error) {
 	s.calls++
 	return db.AssetCybersecurityProperty{}, s.err
 }
 
+// GetAssetCybersecurityProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) GetAssetCybersecurityProperty(context.Context, db.GetAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error) {
 	s.calls++
 	return db.AssetCybersecurityProperty{}, s.err
 }
 
+// ListAssetCybersecurityProperties records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ListAssetCybersecurityProperties(context.Context, db.ListAssetCybersecurityPropertiesParams) ([]db.AssetCybersecurityProperty, error) {
 	s.calls++
 	return nil, s.err
 }
 
+// ReplaceAssetCybersecurityProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ReplaceAssetCybersecurityProperty(context.Context, db.ReplaceAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error) {
 	s.calls++
 	return db.AssetCybersecurityProperty{}, s.err
 }
 
+// UpdateAssetCybersecurityProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) UpdateAssetCybersecurityProperty(context.Context, db.UpdateAssetCybersecurityPropertyParams) (db.AssetCybersecurityProperty, error) {
 	s.calls++
 	return db.AssetCybersecurityProperty{}, s.err
 }
 
+// DeleteAssetCybersecurityProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) DeleteAssetCybersecurityProperty(context.Context, db.DeleteAssetCybersecurityPropertyParams) (pgtype.UUID, error) {
 	s.calls++
 	return pgtype.UUID{}, s.err
 }
 
+// CreateDamageScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) CreateDamageScenarioAssetProperty(context.Context, db.CreateDamageScenarioAssetPropertyParams) (db.DamageScenarioAssetProperty, error) {
 	s.calls++
 	return db.DamageScenarioAssetProperty{}, s.err
 }
 
+// GetDamageScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) GetDamageScenarioAssetProperty(context.Context, db.GetDamageScenarioAssetPropertyParams) (db.DamageScenarioAssetProperty, error) {
 	s.calls++
 	return db.DamageScenarioAssetProperty{}, s.err
 }
 
+// ListDamageScenarioAssetProperties records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ListDamageScenarioAssetProperties(context.Context, db.ListDamageScenarioAssetPropertiesParams) ([]db.DamageScenarioAssetProperty, error) {
 	s.calls++
 	return nil, s.err
 }
 
+// ReplaceDamageScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ReplaceDamageScenarioAssetProperty(context.Context, db.ReplaceDamageScenarioAssetPropertyParams) (db.DamageScenarioAssetProperty, error) {
 	s.calls++
 	return db.DamageScenarioAssetProperty{}, s.err
 }
 
+// UpdateDamageScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) UpdateDamageScenarioAssetProperty(context.Context, db.UpdateDamageScenarioAssetPropertyParams) (db.DamageScenarioAssetProperty, error) {
 	s.calls++
 	return db.DamageScenarioAssetProperty{}, s.err
 }
 
+// DeleteDamageScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) DeleteDamageScenarioAssetProperty(context.Context, db.DeleteDamageScenarioAssetPropertyParams) (pgtype.UUID, error) {
 	s.calls++
 	return pgtype.UUID{}, s.err
 }
 
+// CreateThreatScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) CreateThreatScenarioAssetProperty(context.Context, db.CreateThreatScenarioAssetPropertyParams) (db.ThreatScenarioAssetProperty, error) {
 	s.calls++
 	return db.ThreatScenarioAssetProperty{}, s.err
 }
 
+// GetThreatScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) GetThreatScenarioAssetProperty(context.Context, db.GetThreatScenarioAssetPropertyParams) (db.ThreatScenarioAssetProperty, error) {
 	s.calls++
 	return db.ThreatScenarioAssetProperty{}, s.err
 }
 
+// ListThreatScenarioAssetProperties records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ListThreatScenarioAssetProperties(context.Context, db.ListThreatScenarioAssetPropertiesParams) ([]db.ThreatScenarioAssetProperty, error) {
 	s.calls++
 	return nil, s.err
 }
 
+// ReplaceThreatScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) ReplaceThreatScenarioAssetProperty(context.Context, db.ReplaceThreatScenarioAssetPropertyParams) (db.ThreatScenarioAssetProperty, error) {
 	s.calls++
 	return db.ThreatScenarioAssetProperty{}, s.err
 }
 
+// UpdateThreatScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) UpdateThreatScenarioAssetProperty(context.Context, db.UpdateThreatScenarioAssetPropertyParams) (db.ThreatScenarioAssetProperty, error) {
 	s.calls++
 	return db.ThreatScenarioAssetProperty{}, s.err
 }
 
+// DeleteThreatScenarioAssetProperty records a fake database call and returns the configured error.
 func (s *propertyErrorStore) DeleteThreatScenarioAssetProperty(context.Context, db.DeleteThreatScenarioAssetPropertyParams) (pgtype.UUID, error) {
 	s.calls++
 	return pgtype.UUID{}, s.err
 }
 
+// propertyRouteCase describes one resource so the same assertions can exercise all three APIs.
 type propertyRouteCase struct {
 	name, collection, member, body string
 	register                       func(huma.API)
 }
 
+// propertyRouteCases builds valid example requests and registration functions for properties and both link types.
 func propertyRouteCases(s *propertyErrorStore) []propertyRouteCase {
 	root := "/api/v1/item-definitions/" + itemID
 	propertyCollection := root + "/assets/" + assetID + "/cybersecurity-properties"
@@ -127,6 +149,8 @@ func propertyRouteCases(s *propertyErrorStore) []propertyRouteCase {
 	}
 }
 
+// TestAssetCybersecurityPropertyErrors verifies database-to-HTTP error mapping for every operation.
+// It also checks that internal database error details are not returned to clients.
 func TestAssetCybersecurityPropertyErrors(t *testing.T) {
 	for _, dbError := range []struct {
 		name   string
@@ -163,6 +187,8 @@ func TestAssetCybersecurityPropertyErrors(t *testing.T) {
 	}
 }
 
+// TestAssetCybersecurityPropertyValidation checks invalid bodies, IDs, enums, and pagination.
+// Invalid requests must be rejected before any database method is called.
 func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 	s := &propertyErrorStore{}
 	for _, route := range propertyRouteCases(s) {

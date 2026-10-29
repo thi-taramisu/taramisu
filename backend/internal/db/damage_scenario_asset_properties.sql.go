@@ -29,6 +29,8 @@ type CreateDamageScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Connect an existing damage scenario and asset property only when both belong to the requested item.
+// Checking the property through its asset prevents references to properties from another item.
 func (q *Queries) CreateDamageScenarioAssetProperty(ctx context.Context, arg CreateDamageScenarioAssetPropertyParams) (DamageScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, createDamageScenarioAssetProperty,
 		arg.CompromiseMechanismNote,
@@ -58,6 +60,8 @@ type DeleteDamageScenarioAssetPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Delete only the link after checking both references belong to the requested item.
+// The referenced damage scenario and property are preserved.
 func (q *Queries) DeleteDamageScenarioAssetProperty(ctx context.Context, arg DeleteDamageScenarioAssetPropertyParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, deleteDamageScenarioAssetProperty, arg.ID, arg.ItemDefinitionID)
 	var id pgtype.UUID
@@ -79,6 +83,7 @@ type GetDamageScenarioAssetPropertyParams struct {
 	ItemDefinitionID pgtype.UUID
 }
 
+// Read one link, verifying both the scenario and the property belong to the requested item.
 func (q *Queries) GetDamageScenarioAssetProperty(ctx context.Context, arg GetDamageScenarioAssetPropertyParams) (DamageScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, getDamageScenarioAssetProperty, arg.ID, arg.ItemDefinitionID)
 	var i DamageScenarioAssetProperty
@@ -107,6 +112,7 @@ type ListDamageScenarioAssetPropertiesParams struct {
 	PageLimit        int32
 }
 
+// List links whose two references belong to the requested item, ordered by UUID and paginated.
 func (q *Queries) ListDamageScenarioAssetProperties(ctx context.Context, arg ListDamageScenarioAssetPropertiesParams) ([]DamageScenarioAssetProperty, error) {
 	rows, err := q.db.Query(ctx, listDamageScenarioAssetProperties, arg.ItemDefinitionID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
@@ -156,6 +162,9 @@ type ReplaceDamageScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Replace the references and optional note while preserving the link ID.
+// old_d/old_p/old_a check the existing link; d/p/a check the replacement references.
+// Both sets must belong to the requested item, so replacement cannot move an out-of-scope link.
 func (q *Queries) ReplaceDamageScenarioAssetProperty(ctx context.Context, arg ReplaceDamageScenarioAssetPropertyParams) (DamageScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, replaceDamageScenarioAssetProperty,
 		arg.DamageScenarioID,
@@ -201,6 +210,9 @@ type UpdateDamageScenarioAssetPropertyParams struct {
 	ItemDefinitionID             pgtype.UUID
 }
 
+// Update only supplied values; COALESCE keeps omitted references.
+// The note presence flag distinguishes omission from explicit NULL. Check both old and resulting
+// references against the requested item before changing the link.
 func (q *Queries) UpdateDamageScenarioAssetProperty(ctx context.Context, arg UpdateDamageScenarioAssetPropertyParams) (DamageScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, updateDamageScenarioAssetProperty,
 		arg.DamageScenarioID,
