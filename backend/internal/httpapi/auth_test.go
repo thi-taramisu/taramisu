@@ -35,7 +35,7 @@ func TestAuthRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := New(nil, manager)
+	handler := New(nil, nil, manager)
 	for path, want := range map[string]int{
 		"/health/live": 200, "/openapi.json": 200,
 		"/api/v1/me": 401, "/api/v1/unknown": 401,
@@ -71,7 +71,7 @@ func TestAuthRoutes(t *testing.T) {
 		t.Fatal("OpenAPI does not document session authentication")
 	}
 	w := httptest.NewRecorder()
-	New(nil, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody))
+	New(nil, nil, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody))
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("missing auth configuration: %d", w.Code)
 	}
