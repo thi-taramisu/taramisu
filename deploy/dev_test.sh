@@ -98,6 +98,8 @@ awk '
     /proxy nginx -s reload$/ { reload = NR }
     END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < ready && ready < web && web < validate && validate < reload) }
 ' "$COMMAND_LOG"
+grep -q '/blueprints/custom/enrollment.yaml' "$COMMAND_LOG"
+grep -q '/blueprints/default/flow-default-user-settings-flow.yaml' "$COMMAND_LOG"
 grep -q '^Login:' "$scratch/output"
 test ! -e "$scratch/iam/.blueprint.log"
 run
