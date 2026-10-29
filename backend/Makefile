@@ -1,31 +1,23 @@
+# Compose targets use iam/.env.
+ifeq ($(filter init up down db reset pgadmin migrate migrate-diff migrate-validate,$(MAKECMDGOALS)),)
 -include .env
 export
+endif
 
 OPENAPI := openapi.json
-COMPOSE := docker compose -f ../deploy/compose.backend.yaml
 
-.PHONY: up down reset db pgadmin run test migrate migrate-diff sqlc openapi lint fmt
-up:
-	$(COMPOSE) up --build -d api
-down:
-	$(COMPOSE) --profile tools down
-reset:
-	$(COMPOSE) --profile tools down -v
-db:
-	$(COMPOSE) up -d --wait db
-pgadmin:
-	$(COMPOSE) up -d pgadmin
+.DEFAULT_GOAL := test
+.PHONY: init up down reset db pgadmin run test migrate migrate-diff migrate-validate sqlc sqlc-diff openapi lint fmt
+init up down reset db pgadmin migrate migrate-diff migrate-validate:
+	$(MAKE) -C ../deploy $@
 run:
 	go run ./cmd/api
 test:
 	go test -race ./...
-migrate:
-	$(COMPOSE) run --rm migrate
-migrate-diff:
-	$(COMPOSE) up -d --wait dev-db
-	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 sqlc:
 	sqlc generate
+sqlc-diff:
+	sqlc diff
 lint:
 	golangci-lint run ./...
 fmt:
