@@ -40,6 +40,9 @@ func TestAuthRoutes(t *testing.T) {
 	for path, want := range map[string]int{
 		"/health/live": 200, "/openapi.json": 200,
 		"/api/v1/me": 401, "/api/v1/unknown": 401,
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/assets/00000000-0000-4000-8000-000000000002/cybersecurity-properties": 401,
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/damage-scenario-asset-properties":                                     401,
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/threat-scenario-asset-properties":                                     401,
 		"/auth/login": 302, "/auth/callback": 400, "/auth/logout": 405,
 	} {
 		w := httptest.NewRecorder()

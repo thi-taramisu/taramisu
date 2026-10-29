@@ -69,6 +69,13 @@ The Compose proxy forwards `/api/v1/` and `/auth/` to the backend without stripp
 Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
 SSO session active. Group synchronization and project permissions are not implemented.
 
+## Asset and cybersecurity property routes
+
+Authenticated asset CRUD is available under `/api/v1/item-definitions/{item_definition_id}/assets`.
+The same item prefix exposes asset cybersecurity properties and their links to damage and threat scenarios.
+See the [frontend route handoff](../docs/internal/dev-workflow/asset-properties-api.md) for all paths,
+request bodies, PUT/PATCH behavior, pagination, and error responses.
+
 ## Checks
 
 ```sh

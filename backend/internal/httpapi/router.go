@@ -15,6 +15,9 @@ import (
 type Queries interface {
 	handlers.StatusReader
 	handlers.AssetStore
+	handlers.AssetPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 }
 
 func New(queries Queries, manager *auth.Manager) http.Handler {
@@ -52,6 +55,9 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	huma.Get(api, "/health/ready", h.Ready)
 	registerAuth(api, manager)
 	handlers.NewAssets(queries).Register(api)
+	handlers.NewAssetProperties(queries).Register(api)
+	handlers.NewDamageScenarioAssetProperties(queries).Register(api)
+	handlers.NewThreatScenarioAssetProperties(queries).Register(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user", Method: http.MethodGet, Path: "/api/v1/me",
 		Summary: "Get the current user", Security: []map[string][]string{{"session": {}}},

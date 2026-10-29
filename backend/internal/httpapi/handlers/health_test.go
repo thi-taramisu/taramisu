@@ -19,6 +19,9 @@ func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) 
 type healthQueries struct {
 	statusReaderFunc
 	handlers.AssetStore
+	handlers.AssetPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {
