@@ -7,16 +7,20 @@ import { AddMemberDialog } from './AddMemberDialog'
 import { headlampMembers, type Member, PROJECT_ROLES, type ProjectRole } from './headlampSettings'
 import { RemoveMemberDialog } from './RemoveMemberDialog'
 
+function isLastOwner(member: Member, members: Member[]) {
+  return member.role === 'OWNER' && members.filter((m) => m.role === 'OWNER').length === 1
+}
+
 export function MembersSettings() {
   const [members, setMembers] = useState<Member[]>(headlampMembers)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
 
   function changeRole(id: string, role: ProjectRole) {
-    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)))
+    setMembers((prev) => prev.map((m) => (m.id === id && !isLastOwner(m, prev) ? { ...m, role } : m)))
   }
 
   function remove(member: Member) {
-    setMembers((prev) => prev.filter((m) => m.id !== member.id))
+    setMembers((prev) => (isLastOwner(member, prev) ? prev : prev.filter((m) => m.id !== member.id)))
     setMemberToRemove(null)
   }
 
@@ -49,6 +53,7 @@ export function MembersSettings() {
                 <NativeSelect
                   aria-label={`Role for ${member.email}`}
                   value={member.role}
+                  disabled={isLastOwner(member, members)}
                   onChange={(event) => changeRole(member.id, event.target.value as ProjectRole)}
                 >
                   {PROJECT_ROLES.map(({ value, label }) => (
@@ -62,7 +67,13 @@ export function MembersSettings() {
                 <time dateTime={member.added}>{member.added}</time>
               </TableCell>
               <TableCell className="text-right">
-                <Button variant="ghost" size="icon" aria-label={`Remove ${member.email}`} onClick={() => setMemberToRemove(member)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${member.email}`}
+                  disabled={isLastOwner(member, members)}
+                  onClick={() => setMemberToRemove(member)}
+                >
                   <CircleX aria-hidden="true" />
                 </Button>
               </TableCell>
@@ -70,6 +81,7 @@ export function MembersSettings() {
           ))}
         </TableBody>
       </Table>
+      <p className="text-sm text-muted-foreground">Every project needs at least one owner.</p>
       <RemoveMemberDialog member={memberToRemove} onCancel={() => setMemberToRemove(null)} onConfirm={remove} />
     </div>
   )
