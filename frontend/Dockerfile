@@ -5,6 +5,9 @@ COPY ./package* ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 COPY . .
+ARG VITE_SENTRY_DSN=
+ARG VITE_SENTRY_ENVIRONMENT=production
+ARG VITE_SENTRY_RELEASE=
 RUN npm run build
 
 # Stage 2: Runtime

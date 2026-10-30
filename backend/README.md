@@ -176,6 +176,20 @@ internal/httpapi/handlers/     HTTP handlers
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
+## Logging
+
+The API writes JSON logs to stderr using `log/slog`. Set `SENTRY_DSN` in `.env` to also send Info, Warn
+and Error logs to Sentry Logs through the official Sentry slog integration. Without a DSN, logging stays
+local. Both `make run` and the Compose API container use these settings.
+
+Copy the DSN from your Sentry project settings. Set `SENTRY_ENVIRONMENT` (example: `development`) and
+optionally `SENTRY_RELEASE` to identify deployments. Logs are flushed for up to five seconds on shutdown,
+including startup failures. An invalid DSN fails startup. Avoid logging credentials or personal data.
+
+Use the `taramisu-backend` project in the `thi-nf` organization. HTTP panics are captured with
+request context before being rethrown to Go's HTTP server. Set the DSN in the deployment environment
+as well as locally. Error-level logs remain Sentry Logs; captured panics appear under Issues.
+
 ## OpenAPI contract
 
 With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at

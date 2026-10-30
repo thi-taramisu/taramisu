@@ -53,6 +53,26 @@ on leave; reduced-motion preferences disable the animation.
 The client is typed against the OpenAPI spec in `openapi/openapi.yaml`, which is only a stub for now. The reasoning behind the setup is in
 [ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). The base URL comes from `VITE_API_BASE_URL` and defaults to `/api/v1`.
 
+## Sentry
+
+Copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the `taramisu-frontend` project in the
+`thi-nf` organization. Sentry captures browser exceptions, unhandled rejections, and React render errors.
+An empty DSN disables reporting. Set `VITE_SENTRY_ENVIRONMENT` and optionally `VITE_SENTRY_RELEASE`
+to identify deployments. Vite embeds these values at build time; configure them before building and rebuild
+after changes. Never put a Sentry auth token in a `VITE_` variable.
+
+Docker builds accept these settings as build arguments. To build with Compose using your frontend
+environment file, run this from the repository root:
+
+```bash
+docker compose --env-file frontend/.env.local -f deploy/compose.frontend.yaml build frontend
+```
+
+Compose also accepts `VITE_SENTRY_*` values exported in your shell. Container runtime variables do not
+change the compiled frontend; rebuild the image after changing these settings.
+
+Source map upload is not configured yet; production stack traces may reference bundled code.
+
 ## UI components
 
 We use [shadcn/ui](https://ui.shadcn.com) (see [ADR 0002](../docs/internal/adr/0002-frontend-ui-library.md)). Add new components with the
