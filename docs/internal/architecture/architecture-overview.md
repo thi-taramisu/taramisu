@@ -6,6 +6,9 @@ The architecture is designed around a **100% stateless backend tier** utilizing 
 Typical request flows (login, authenticated API calls, file upload/download, LLM requests) are visualized in
 [request-flows.md](./request-flows.md).
 
+For the current registration and approval implementation, see
+[Registration flow](iam/registration-flow.md).
+
 ---
 
 ## 1. System Architecture Diagram
