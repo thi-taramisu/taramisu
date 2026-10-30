@@ -209,7 +209,7 @@
   "paths": {
     "/api/tara-projects": {
       "get": {
-        "operationId": "list-api-tara-projects",
+        "operationId": "list-tara-projects",
         "responses": {
           "200": {
             "content": {
@@ -238,13 +238,18 @@
             "description": "Error"
           }
         },
-        "summary": "List API tara projects",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "List TARA projects",
         "tags": [
           "Tara Project"
         ]
       },
       "post": {
-        "operationId": "post-api-tara-projects",
+        "operationId": "create-tara-project",
         "requestBody": {
           "content": {
             "application/json": {
@@ -277,7 +282,12 @@
             "description": "Error"
           }
         },
-        "summary": "Post API tara projects",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Create a TARA project",
         "tags": [
           "Tara Project"
         ]
@@ -285,7 +295,7 @@
     },
     "/api/tara-projects/{id}": {
       "delete": {
-        "operationId": "delete-api-tara-projects-by-id",
+        "operationId": "delete-tara-project",
         "parameters": [
           {
             "in": "path",
@@ -312,13 +322,18 @@
             "description": "Error"
           }
         },
-        "summary": "Delete API tara projects by ID",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Delete a TARA project",
         "tags": [
           "Tara Project"
         ]
       },
       "get": {
-        "operationId": "get-api-tara-projects-by-id",
+        "operationId": "get-tara-project",
         "parameters": [
           {
             "in": "path",
@@ -352,13 +367,18 @@
             "description": "Error"
           }
         },
-        "summary": "Get API tara projects by ID",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Get a TARA project",
         "tags": [
           "Tara Project"
         ]
       },
       "patch": {
-        "operationId": "patch-api-tara-projects-by-id",
+        "operationId": "update-tara-project",
         "parameters": [
           {
             "in": "path",
@@ -402,13 +422,18 @@
             "description": "Error"
           }
         },
-        "summary": "Patch API tara projects by ID",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Partially update a TARA project",
         "tags": [
           "Tara Project"
         ]
       },
       "put": {
-        "operationId": "put-api-tara-projects-by-id",
+        "operationId": "replace-tara-project",
         "parameters": [
           {
             "in": "path",
@@ -452,7 +477,12 @@
             "description": "Error"
           }
         },
-        "summary": "Put API tara projects by ID",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Replace a TARA project",
         "tags": [
           "Tara Project"
         ]

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -26,6 +27,28 @@ type TaraProject struct {
 
 func NewTaraProject(store TaraProjectStore) *TaraProject {
 	return &TaraProject{store: store}
+}
+
+func (h *TaraProject) Register(api huma.API) {
+	const collection = "/api/tara-projects"
+	const member = collection + "/{id}"
+	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
+		Name: "Tara Project", Description: "Create, read, replace, update and delete TARA projects.",
+	})
+	op := func(id, method, path, summary string) huma.Operation {
+		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
+			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"session": {}}}}
+	}
+	huma.Register(api, op("list-tara-projects", http.MethodGet, collection, "List TARA projects"), h.List)
+	create := op("create-tara-project", http.MethodPost, collection, "Create a TARA project")
+	create.DefaultStatus = http.StatusCreated
+	huma.Register(api, create, h.Create)
+	huma.Register(api, op("get-tara-project", http.MethodGet, member, "Get a TARA project"), h.Get)
+	huma.Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), h.Replace)
+	huma.Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), h.Update)
+	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
+	del.DefaultStatus = http.StatusNoContent
+	huma.Register(api, del, h.Delete)
 }
 
 type TaraProjectBody struct {

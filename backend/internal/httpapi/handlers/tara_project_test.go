@@ -19,6 +19,7 @@ import (
 const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
+	statusReaderFunc
 	project db.TaraProject
 	found   bool
 }
@@ -111,7 +112,7 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"delete missing", false, http.MethodDelete, base + "/" + projectID, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(nil, newFakeProjects(tc.found), manager)
+			h := httpapi.New(newFakeProjects(tc.found), manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.AddCookie(session)
@@ -129,7 +130,7 @@ func TestTaraProjectListBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/tara-projects", http.NoBody)
 	req.AddCookie(session)
 	rr := httptest.NewRecorder()
-	httpapi.New(nil, newFakeProjects(false), manager).ServeHTTP(rr, req)
+	httpapi.New(newFakeProjects(false), manager).ServeHTTP(rr, req)
 	var got []any
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil || got == nil || len(got) != 0 {
 		t.Fatalf("body = %s, want []", rr.Body.String())

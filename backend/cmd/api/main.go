@@ -47,7 +47,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.New(queries, queries, iam), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.New(queries, iam), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
