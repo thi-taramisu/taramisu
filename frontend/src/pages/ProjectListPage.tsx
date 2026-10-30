@@ -1,5 +1,5 @@
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Archive, ArchiveRestore, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +28,9 @@ export function ProjectListPage() {
   const [createDialogOpener, setCreateDialogOpener] =
     useState<HTMLButtonElement | null>(null)
   const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
+  const actionsButtons = useRef(new Map<string, HTMLButtonElement>())
+  const [deleteDialogOpener, setDeleteDialogOpener] =
+    useState<HTMLButtonElement | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
   function handleCreateProject(name: string) {
@@ -201,6 +204,13 @@ export function ProjectListPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="shrink-0"
+                                  ref={(button) => {
+                                    if (button) {
+                                      actionsButtons.current.set(project.id, button)
+                                    } else {
+                                      actionsButtons.current.delete(project.id)
+                                    }
+                                  }}
                                   aria-label={`Actions for ${project.name}`}
                                 >
                                   <Ellipsis className="size-5" />
@@ -219,7 +229,10 @@ export function ProjectListPage() {
                                 <DropdownMenuItem
                                   variant="destructive"
                                   disabled={project.id === exampleProject.id}
-                                  onSelect={() => setProjectToDelete(project)}
+                                  onSelect={() => {
+                                    setDeleteDialogOpener(actionsButtons.current.get(project.id) ?? null)
+                                    setProjectToDelete(project)
+                                  }}
                                 >
                                   <Trash2 className="size-4" />
                                   Delete Project
@@ -288,6 +301,7 @@ export function ProjectListPage() {
           }
         }}
         onConfirm={handleDeleteProject}
+        returnFocusTo={deleteDialogOpener}
       />
     </>
   )
