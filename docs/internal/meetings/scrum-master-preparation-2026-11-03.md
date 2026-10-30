@@ -1,14 +1,17 @@
 # Scrum-Master-Vorbereitung – 3. November 2026
 
 Diese Vorbereitung orientiert sich an euren Onsite-Protokollen vom
-[13. Oktober](onsite-2026-10-13.md) und [20. Oktober](onsite-2026-10-20.md).
+[13. Oktober](onsite-2026-10-13.md), [20. Oktober](onsite-2026-10-20.md) und
+[27. Oktober](onsite-2026-10-27.md) sowie am [Online-Sync vom 30. Oktober](online-2026-10-30.md).
 Die englische [Meeting-Vorlage](onsite-2026-11-03.md) bleibt im bisherigen Stil;
 dieser deutsche Leitfaden ist deine Hilfe beim Moderieren.
 
-Datum: Dienstag, 3. November 2026, KW45. Uhrzeit und Sprintnummer noch bestätigen.
-Nach der bisherigen Wochenfolge wäre der Review für Sprint 4 vom 28. Oktober
-bis 3. November und die Planung für Sprint 5 vom 4. bis 10. November.
-Die tatsächlichen Vereinbarungen aus der vorherigen Planung haben Vorrang.
+Datum: Dienstag, 3. November 2026, KW45. Scrum Master: Matthias, laut Auswahl vom
+27. Oktober. Die vorherige Planung bestätigt Sprint 4 vom 27. Oktober bis
+3. November. Ein Sprintziel wurde dort nicht dokumentiert; das vereinbarte Ziel
+mit dem Team klären. Uhrzeit noch bestätigen.
+Für Sprint 5 ist der 3. bis 10. November ein Vorschlag anhand der bisherigen
+Planungsweise; Zeitraum und Ziel werden gemeinsam vereinbart.
 
 ## Dein Ziel als Moderator
 
@@ -22,8 +25,10 @@ Fragen selbst beantworten.
 
 - [ ] Übergabe mit dem bisherigen Scrum Master: Sprintziel, ausgewählte Tickets,
   offene Beschlüsse, Termin und verfügbare Zeit klären.
-- [ ] Prüfen, ob es inzwischen ein Protokoll vom 27. Oktober gibt. Beim Erstellen
-  dieses Entwurfs war lokal keines vorhanden.
+- [x] Protokoll vom 27. Oktober liegt vor; Sprintzeitraum und Scrum Master wurden
+  in die Meeting-Vorlage übernommen.
+- [ ] Die Updates vom 30. Oktober vor dem Review aktualisieren: gemeldete Ergebnisse,
+  geplante Arbeit und offene Entscheidungen getrennt prüfen.
 - [ ] Die ausgewählten Sprint-Tickets im Board prüfen. Eine offene Backlog-Aufgabe
   ist nicht automatisch Teil des Sprints.
 - [ ] Pro Beitrag Demo-Verantwortliche und einen kurzen Ablauf klären:
@@ -73,26 +78,37 @@ Halte Abweichungen sachlich fest, ohne neue Ziele rückwirkend zum alten Sprintz
 zu erklären. Lange technische Lösungsdiskussionen als Folgetermin mit Beteiligten
 und Verantwortlichem notieren.
 
-## Konkrete Vorbereitungsthemen aus GitHub
+## Konkrete Vorbereitungsthemen
 
-Die [offenen PRs in der Meeting-Vorlage](onsite-2026-11-03.md#open-pull-requests)
-sind mit Stand **28. Oktober 2026** nach Eröffnung vor bzw. ab dem 27. Oktober
-aufgeteilt. Entwürfe sind als solche markiert. Diese Liste vor dem Termin erneut
-aktualisieren.
+Die PR-Listen in der Meeting-Vorlage wurden am **30. Oktober 2026** mit GitHub
+abgeglichen: [Sprint Results](onsite-2026-11-03.md#sprint-results) enthalten 13 offene
+PRs, darunter ein Entwurf, sowie 8 geschlossene PRs.
+Die Kategorien heißen wie am 27. Oktober **Completed:** und **Open:**;
+beide Listen sind aufsteigend nach PR-Nummer sortiert.
+**Open:** enthält alle aktuell offenen PRs. **Completed:** führt seit dem 27. Oktober
+um 00:00 Uhr (Europe/Berlin) geschlossene PRs auf; gemergte PRs sind abgehakt.
+Ohne Merge geschlossene PRs bleiben unabgehakt und sind entsprechend gekennzeichnet.
+In der geschlossenen Liste bleibt bereits im Abschnitt **Completed** vom 27. Oktober
+behandeltes Ergebnis ausgeschlossen, einschließlich der bisherigen Architektur-,
+Filetree- und Accessibility-Arbeit.
+Diese Listen vor dem Termin erneut aktualisieren.
 
-**Momentaufnahme vom 27. Oktober 2026, vor dem kommenden Reviewzeitraum.**
-Alle unten genannten PRs und Issues waren beim Abruf offen. Das sind Kandidaten
-für Nachfragen, keine feststehenden Sprintaufgaben oder abgeschlossenen Ergebnisse.
-Vor dem Termin Status und Sprintzuordnung erneut prüfen.
+Die folgenden Nachfragen basieren auf den Protokollen vom **27. und 30. Oktober**.
+Gemeldete Implementierungen im Review zeigen lassen und den Merge-Status prüfen.
+Geplante CRUD- und S3-Arbeit bleibt als geplant erfasst, bis neue Ergebnisse vorliegen.
 
-| Bereich | Referenzen | Sinnvolle Nachfrage / möglicher Nachweis |
+| Bereich | Bekannter Stand / Referenzen | Sinnvolle Nachfrage / möglicher Nachweis |
 | --- | --- | --- |
-| Frontend | [PR #120](https://github.com/thi-taramisu/taramisu/pull/120), [PR #142](https://github.com/thi-taramisu/taramisu/pull/142) | Hauptseite und Projekteinstellungen zeigen: Was ist schon integriert, welche Daten sind noch Beispiele? |
-| Domänen-API | [PR #138](https://github.com/thi-taramisu/taramisu/pull/138), [PR #134](https://github.com/thi-taramisu/taramisu/pull/134) | Item-/Projekt-CRUD und Berechtigungen demonstrieren; Reviewstatus und nächsten Schritt klären. |
-| API-Anbindung | [Issue #118](https://github.com/thi-taramisu/taramisu/issues/118) | Wie kommen aktuelle Backend-Typen ins Frontend, und was blockiert die Verbindung? |
-| Betrieb | [PR #128](https://github.com/thi-taramisu/taramisu/pull/128), [PR #141](https://github.com/thi-taramisu/taramisu/pull/141), [PR #140](https://github.com/thi-taramisu/taramisu/pull/140) | Monitoring, Image-Publishing und Docs-Integration: Was ist getestet, was tatsächlich veröffentlicht oder gestartet? |
-| Architektur / Infrastruktur | [PR #87](https://github.com/thi-taramisu/taramisu/pull/87), [Issue #100](https://github.com/thi-taramisu/taramisu/issues/100), [Issue #110](https://github.com/thi-taramisu/taramisu/issues/110) | Sind Netzwerktopologie und Zuständigkeiten geklärt? Welche Abhängigkeit verhindert den nächsten integrierten Stand? |
-| Berechtigungen | [Issue #143](https://github.com/thi-taramisu/taramisu/issues/143) | Welche Entscheidung braucht das Team zu Rollen, Gruppen und Zugriffsrechten? |
+| Frontend / Johannes | Offene [PRs #150](https://github.com/thi-taramisu/taramisu/pull/150) und [#158](https://github.com/thi-taramisu/taramisu/pull/158): Item-Page mit Mock-Daten, OpenAPI-Anbindung für #118, GitHub Action und Trennung echter/gemockter Daten. | Item-Page und Schema-Workflow zeigen lassen: Welche Aufrufe nutzen echte Daten, welche noch Mocks? |
+| Authentik / Lasse | [PR #165](https://github.com/thi-taramisu/taramisu/pull/165) zur Benutzerregistrierung mit Admin-Freigabe ist offen. | Registrierung demonstrieren und Review-Rückmeldungen prüfen. |
+| CRUD-API | Backend soll die Logik aus [PR #134](https://github.com/thi-taramisu/taramisu/pull/134) umsetzen; Lasse plant ein CRUD-Issue. | Was wurde inzwischen umgesetzt? Aufgabenabgrenzung und Issue-Links klären. |
+| S3 / Datei-Upload | Lasse plant das S3-Issue; vom 27. Oktober ist ein Ticket für den Backend-Datei-Upload nachzuverfolgen. | Welche Tickets gehören zusammen, wer übernimmt welchen Teil, und gibt es Ergebnisse? |
+| Dokumentation / Tim | Backend-Dokumentation ergänzt und [PR #154](https://github.com/thi-taramisu/taramisu/pull/154) reviewed. | Änderungen zeigen lassen und offene Review-Rückmeldungen prüfen. |
+| JWT und Zugriffsrechte / Lorenz | Zustandslose JWT-Authentifizierung mit Authentik besprochen; Rollen, Berechtigungen und Gruppenzugriffe noch festzulegen. | Was ist bereits vereinbart? Offene Entscheidungen und Verantwortliche festhalten. |
+| VM / Bootstrap / Thomas | Am 30. Oktober noch keine Ergebnisse; Bootstrap-Skript kann auch in einem Docker-Container getestet werden. | Gibt es inzwischen einen Testlauf oder eine konkrete Blockade? |
+| Infrastruktur | Entwicklungsumgebung mit Basti statt direktem Produktions-SSH; Load Balancing erforderlich; Proxy-Evaluation und Compose-Aufräumen unter `deploy/` nachverfolgen. Authentik bleibt ein eigenständiger Dienst. | Sind Umgebung und Zuständigkeiten geklärt? Welche Abhängigkeiten sind noch offen? |
+| Betrieb | Sentry-[PR #128](https://github.com/thi-taramisu/taramisu/pull/128) offen; Image-Publishing [#141](https://github.com/thi-taramisu/taramisu/pull/141) und Docs-Integration [#140](https://github.com/thi-taramisu/taramisu/pull/140) gemergt. Proxy-Vergleich [#119](https://github.com/thi-taramisu/taramisu/pull/119) ohne Merge geschlossen. | Gemergte Ergebnisse zeigen lassen; offene Monitoring-Arbeit und Ergebnis des Proxy-Vergleichs klären. |
+| LLM / Ilyass | Surya angeschrieben, Stand 30. Oktober ohne Antwort. LLM bleibt im Scope; ein bis zwei Wochen weiter beobachten. | Rückmeldung erfragen, Zuständigkeit für die Beobachtung klären; Scope zwischen dem 6. und 13. November erneut bewerten. Vorgabe zu selbst gehosteten/lokalen Modellen berücksichtigen. |
 
 ## Retrospektive: frühere Vereinbarungen wieder aufgreifen
 
@@ -102,6 +118,8 @@ PR-Aufmerksamkeit und verteilte technische Diskussionen angesprochen.
 - „Hat sich die Wartezeit auf Reviews verbessert? Welches konkrete Beispiel gibt es?“
 - „Arbeiten wir auf zugewiesenen Tickets, und sehen wir Abhängigkeiten früh genug?“
 - „Sind technische Entscheidungen im zugehörigen PR nachvollziehbar dokumentiert?“
+- „Sind die Übergaben per Follow-up-Ticket aus der Retrospektive vom 27. Oktober
+  nachvollziehbar, und wurde die Arbeit vor dem Commit auf Vollständigkeit geprüft?“
 - „Was wollen wir nächste Woche beibehalten, stoppen oder anfangen?“
 
 Wählt ein bis zwei Verbesserungen statt einer langen Wunschliste. Jede Maßnahme
@@ -112,7 +130,9 @@ Arbeitstag eine Rückmeldung oder einen vereinbarten Reviewtermin.“
 ## Planung und Abschluss
 
 Für die Planung zuerst Verfügbarkeit und Prioritäten klären, dann ein gemeinsames
-Sprintziel formulieren. Zu jedem ausgewählten Ticket festhalten: erwartetes
+Sprintziel formulieren. Felix ist nicht mehr Teil der Gruppe; Lasse hat seinen PR
+übernommen. Diese Übergabe und Lasses geplante CRUD-/S3-Arbeit bei der Kapazität
+berücksichtigen. Zu jedem ausgewählten Ticket festhalten: erwartetes
 Ergebnis, Verantwortlicher, Abhängigkeit und benötigtes Review. Offene Arbeit nicht
 automatisch vollständig in den nächsten Sprint übernehmen.
 
