@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 )
 
@@ -45,6 +46,36 @@ func TestOpenAPIEndpointMatchesExport(t *testing.T) {
 	}
 	if !jsonEqual(fromHTTP, fromExport) {
 		t.Fatal("GET /openapi.json body differs from httpapi.OpenAPI() JSON")
+	}
+}
+
+// TestAssetCybersecurityPropertyOpenAPI checks that all property and link operations are documented
+// with session security, shared errors, and the expected create/delete success statuses.
+func TestAssetCybersecurityPropertyOpenAPI(t *testing.T) {
+	spec := httpapi.OpenAPI()
+	const prefix = "/api/v1/item-definitions/{item_definition_id}"
+	for _, collection := range []string{
+		prefix + "/assets/{asset_id}/cybersecurity-properties",
+		prefix + "/damage-scenario-asset-properties",
+		prefix + "/threat-scenario-asset-properties",
+	} {
+		list, member := spec.Paths[collection], spec.Paths[collection+"/{id}"]
+		if list == nil || member == nil {
+			t.Fatalf("missing property routes: %s", collection)
+		}
+		for _, op := range []*huma.Operation{list.Get, list.Post, member.Get, member.Put, member.Patch, member.Delete} {
+			if op == nil || len(op.Security) != 1 || op.Security[0]["session"] == nil {
+				t.Fatalf("missing operation or session security for %s: %+v", collection, op)
+			}
+			for _, status := range []string{"401", "404", "409", "422", "503"} {
+				if op.Responses[status] == nil {
+					t.Errorf("%s does not document %s", op.OperationID, status)
+				}
+			}
+		}
+		if list.Post.Responses["201"] == nil || member.Delete.Responses["204"] == nil {
+			t.Fatalf("missing create/delete success status for %s", collection)
+		}
 	}
 }
 

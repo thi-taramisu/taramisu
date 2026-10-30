@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -39,6 +40,10 @@ func TestAuthRoutes(t *testing.T) {
 	for path, want := range map[string]int{
 		"/health/live": 200, "/openapi.json": 200,
 		"/api/v1/me": 401, "/api/v1/unknown": 401,
+		// The new property and scenario-link collections require an authenticated session.
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/assets/00000000-0000-4000-8000-000000000002/cybersecurity-properties": 401,
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/damage-scenario-asset-properties":                                     401,
+		"/api/v1/item-definitions/00000000-0000-4000-8000-000000000001/threat-scenario-asset-properties":                                     401,
 		"/auth/login": 302, "/auth/callback": 400, "/auth/logout": 405,
 	} {
 		w := httptest.NewRecorder()
@@ -56,6 +61,21 @@ func TestAuthRoutes(t *testing.T) {
 			if got := w.Header().Get("Content-Type"); got != "application/problem+json" {
 				t.Fatalf("Content-Type = %q, want application/problem+json", got)
 			}
+		}
+	}
+	// Every asset operation must be rejected before it can touch the database.
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets"},
+		{http.MethodPost, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets"},
+		{http.MethodGet, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets/00000000-0000-4000-8000-000000000001"},
+		{http.MethodPut, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets/00000000-0000-4000-8000-000000000001"},
+		{http.MethodPatch, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets/00000000-0000-4000-8000-000000000001"},
+		{http.MethodDelete, "/api/v1/item-definitions/00000000-0000-4000-8000-000000000002/assets/00000000-0000-4000-8000-000000000001"},
+	} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(route.method, route.path, http.NoBody))
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s: got %d", route.method, route.path, w.Code)
 		}
 	}
 	for origin, want := range map[string]int{"": 403, "http://localhost:8080": 204} {
@@ -84,5 +104,54 @@ func TestAuthOpenAPI(t *testing.T) {
 		if item == nil || (path == "/auth/logout" && item.Post == nil) || (path != "/auth/logout" && item.Get == nil) {
 			t.Errorf("missing auth operation: %s", path)
 		}
+	}
+}
+
+func TestAssetOpenAPI(t *testing.T) {
+	spec := OpenAPI()
+	collection := spec.Paths["/api/v1/item-definitions/{item_definition_id}/assets"]
+	resource := spec.Paths["/api/v1/item-definitions/{item_definition_id}/assets/{id}"]
+	if collection == nil || resource == nil {
+		t.Fatal("missing asset paths")
+	}
+	for _, op := range []*huma.Operation{collection.Get, collection.Post, resource.Get, resource.Put, resource.Patch, resource.Delete} {
+		if op == nil || len(op.Security) != 1 {
+			t.Fatal("missing asset operation or security")
+		}
+		if _, ok := op.Security[0]["session"]; !ok {
+			t.Fatal("missing session security")
+		}
+	}
+	if collection.Post.Responses["201"] == nil || resource.Delete.Responses["204"] == nil {
+		t.Fatal("incorrect CRUD status codes")
+	}
+}
+
+func TestAssetNullableEnumContract(t *testing.T) {
+	for _, name := range []string{"Asset", "AssetBody", "UpdateAssetInputBody"} {
+		t.Run(name, func(t *testing.T) {
+			data, err := json.Marshal(OpenAPI().Components.Schemas.Map()[name])
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Decode only the field under test; other properties have scalar types.
+			var object struct {
+				Properties map[string]json.RawMessage `json:"properties"`
+			}
+			if err := json.Unmarshal(data, &object); err != nil {
+				t.Fatal(err)
+			}
+			var field struct {
+				Type []string `json:"type"`
+				Enum []any    `json:"enum"`
+			}
+			if err := json.Unmarshal(object.Properties["identification_source"], &field); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(field.Type, []string{"string", "null"}) ||
+				!reflect.DeepEqual(field.Enum, []any{"ITEM_DEF", "IMPACT_RATING", "THREAT_DERIVED", "CATALOGUE", nil}) {
+				t.Fatalf("invalid nullable enum contract: %+v", field)
+			}
+		})
 	}
 }

@@ -9,11 +9,25 @@ import (
 	"testing"
 
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-type statusFunc func(context.Context) (string, error)
+type statusReaderFunc func(context.Context) (string, error)
 
-func (f statusFunc) GetServiceStatus(ctx context.Context) (string, error) { return f(ctx) }
+func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) { return f(ctx) }
+
+type healthQueries struct {
+	statusReaderFunc
+	handlers.AssetStore
+	// Satisfy the router database interface; health tests do not call these embedded stores.
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
+}
+
+func statusFunc(f func(context.Context) (string, error)) healthQueries {
+	return healthQueries{statusReaderFunc: f}
+}
 
 func TestLiveness(t *testing.T) {
 	h := httpapi.New(statusFunc(func(context.Context) (string, error) {
