@@ -40,7 +40,7 @@ verify that the entity's owning item belongs to the requested project; the curre
 | `/projects/:projectId/settings` | Project settings, General | Project Settings (1) | manage |
 | `/projects/:projectId/settings/members` | Project settings, Members | Project Settings (2) | manage |
 | `/projects/:projectId` | Project workspace (header, element tree, empty content) | Add Items / Layout | read |
-| `/projects/:projectId/items/:itemId` | Item: Definition (React Flow diagram) | Items / Item Definition | read, edit needs write |
+| `/projects/:projectId/items/:itemId` | Item: Definition (form, supporting files, React Flow diagram) | Items / Item Definition | read, edit needs write |
 | `…/items/:itemId/assets` | Item: Assets table | Items / Item Assets | read |
 | `…/items/:itemId/risks` | Item: Risks | Summary / Item Summary | read |
 | `…/items/:itemId/review` | Item: Review | | read |
@@ -58,9 +58,10 @@ verify that the entity's owning item belongs to the requested project; the curre
 Auth values: public means no login, user means logged in, and read, write and manage are the project access levels (as in the old THIARA
 tool). Route guards come with the IAM decision (#46).
 
-Implemented with content: the item definition diagram (headlamp example) and the item assets table with the "Add asset" dialog. Everything
-else renders a placeholder. The data is hard-coded in `frontend/src/features/workspace/exampleProject.ts`, project id `headlamp`. The tab
-list per element type is in `frontend/src/features/workspace/entities.ts`.
+Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
+Everything else renders a placeholder. Items come from the item API in `frontend/src/features/items/`, an in-memory mock seeded with the
+headlamp example (`frontend/src/features/workspace/exampleProject.ts`, project id `headlamp`) until the item routes (#83) are wired to the
+generated client (#118). The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 ## Decisions
 
