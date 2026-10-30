@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -169,6 +169,40 @@ describe('Main Page project management', () => {
       within(favorites).queryByText('Battery Security'),
     ).not.toBeInTheDocument()
   })
+
+  it.each(['Escape', 'Cancel', 'Close'])(
+    'returns focus to the same Actions button after %s',
+    async (dismissal) => {
+      const user = userEvent.setup()
+      renderAt('/projects')
+
+      const opener = screen.getByRole('button', {
+        name: 'Actions for Battery Security',
+      })
+      opener.focus()
+      await user.keyboard('{Enter}')
+      await user.keyboard('{End}{Enter}')
+
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Delete Project?',
+      })
+      if (dismissal === 'Escape') {
+        await user.keyboard('{Escape}')
+      } else {
+        await user.click(within(dialog).getByRole('button', { name: dismissal }))
+      }
+
+      await waitFor(() => expect(opener).toHaveFocus())
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(opener).toBeInTheDocument()
+
+      // Continue keyboard navigation from the restored position.
+      await user.keyboard('{Enter}')
+      expect(await screen.findByRole('menuitem', { name: 'Delete Project' }))
+        .toBeInTheDocument()
+      await user.keyboard('{Escape}')
+    },
+  )
 
   it('archives and restores a project while preserving its favorite status', async () => {
     const user = userEvent.setup()
