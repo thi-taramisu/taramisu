@@ -16,6 +16,7 @@ make -C deploy migrate       # Apply backend migrations
 make -C deploy pgadmin       # Optional database UI on localhost:5050
 make -C deploy migrate-diff name=my_change
 make -C deploy down          # Stop the whole stack, preserving data and secrets
+make -C deploy check-networks # Check the network segmentation of the running stack
 ```
 
 The same commands remain available through `make -C backend`. Backend `run`, `test`, `sqlc`, `openapi`, `lint`, and `fmt`
@@ -41,12 +42,12 @@ A provisioning failure stops startup and writes a private `iam/.blueprint.log`, 
 
 Use `make up` for initial startup and configuration changes. A raw `docker compose up` does not generate secrets
 or apply the custom blueprints.
-For inspection and service-specific commands, always supply the environment file and root Compose file:
+For inspection and service-specific commands, always supply the environment file, the root Compose file and the dev override:
 
 ```sh
-docker compose --env-file iam/.env -f deploy/compose.yaml ps
-docker compose --env-file iam/.env -f deploy/compose.yaml logs api authentik-server authentik-worker
-docker compose --env-file iam/.env -f deploy/compose.yaml stop api
+docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml ps
+docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml logs api authentik-server authentik-worker
+docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml stop api
 ```
 
 Current local addresses:
@@ -67,9 +68,21 @@ Port 8080 remains available for backend diagnostics and Swagger.
 
 ## Networks and data
 
-The frontend, proxy, and API share the default application network. Backend database, migrations, and pgAdmin use `backend`.
-Authentik server, worker, and database use `iam`. Only the API and Authentik server join `auth`, where the server has
-alias `authentik.localhost`. Compose owns every network; no externally created network is required.
+The networks follow the network segmentation of the architecture overview (#87). Compose owns every network and prefixes it
+with the project name (for example `taramisu_proxy`); no externally created network is required.
+
+| Network | `internal` | Members | Purpose |
+| --- | --- | --- | --- |
+| `edge` | no | proxy | published ports and internet access |
+| `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests; API reaches Authentik as `authentik.localhost` |
+| `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
+| `iam-db` | yes | Authentik server, worker, and database | IAM database |
+| `dev` | no | db, pgAdmin, API, Authentik server | only from `compose.dev.yaml`, so these services can publish ports locally |
+
+Two containers can only reach each other if they share a network. The proxy can reach the frontend, the API, docs and Authentik, but no
+database; the API cannot reach the Authentik database. Internal networks have no internet access, and containers that are only in
+internal networks cannot publish ports. `compose.dev.yaml` therefore adds the `dev` network together with the local ports
+(db 5432, pgAdmin 5050, API 8080, Authentik 9000). `dev.sh` and the Makefile always load it; without it only the proxy publishes a port.
 
 For the default project name `taramisu`, volume names preserve the former Authentik branch's data:
 
@@ -94,12 +107,15 @@ Use a separate checkout, secrets file, and free host ports as well when running 
 ```sh
 make -C deploy test
 make -C backend test
+make -C deploy check-networks   # needs the running stack
 ```
 
 The deployment tests need Python 3 and the Compose CLI, but no running Docker daemon.
 They validate the real merged model, networks, volumes, and paths, while stubbing container operations and HTTP requests.
 They cover startup ordering, first-run secrets, missing secrets with existing data, repeat starts, Makefile commands, and failure handling.
 A live check should also start a fresh stack, verify readiness/login redirects, and restart it to check persistence.
+`check-networks` starts a throwaway busybox container in one network at a time and tries to open TCP connections: allowed paths must be
+reachable, forbidden paths (for example proxy → database, API → Authentik database, internet from internal networks) must not be.
 
 ## Database password mismatch
 
@@ -114,7 +130,7 @@ removes all stack data volumes; the next `make up` initializes them with the cur
 ## Documentation service
 
 `compose.docs.yaml` builds from the repository root and publishes only
-`docs/external/`. Nginx forwards `/docs/` over the Compose-managed `taramisu-proxy`
+`docs/external/`. Nginx forwards `/docs/` over the internal `proxy`
 network. Docs has no host port binding; port 8080 belongs to the backend.
 
 `DOCS_SITE_URL` defaults to `http://localhost`. Set it to the public origin
@@ -129,8 +145,7 @@ docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -t
 docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -s reload
 ```
 
-The reload refreshes the docs container address. On first setup, run the
-`make -C deploy up` so the proxy joins the docs network.
+The reload refreshes the docs container address.
 
 ## Standalone author preview
 

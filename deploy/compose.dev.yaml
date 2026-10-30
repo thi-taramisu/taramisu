@@ -1,0 +1,27 @@
+# Local development only: publishes the ports that the segmented stack keeps closed.
+# Containers only in internal networks cannot publish ports, so these services also join "dev".
+# dev.sh and the Makefile always load this file; without it only the proxy publishes a port.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks: [dev]
+
+  pgadmin:
+    ports:
+      - "127.0.0.1:5050:80"
+    networks: [dev]
+
+  api:
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [dev]
+
+  # The browser follows the OIDC login to http://authentik.localhost:9000.
+  authentik-server:
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks: [dev]
+
+networks:
+  dev:
