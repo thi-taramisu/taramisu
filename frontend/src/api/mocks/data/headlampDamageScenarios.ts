@@ -1,4 +1,4 @@
-import type { DamageScenario, ImpactRating } from '../../models/damageScenario'
+import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../../models/damageScenario'
 
 // Example damage scenario of the headlamp system, seed data of the mock item API until the backend
 // has damage scenario endpoints.
@@ -12,6 +12,11 @@ export const headlampDamageScenarios: DamageScenario[] = [
     functionality_adverse_relation: 'Loss of the low beam function while the vehicle is driven in the dark.',
     road_user_harm_description: 'The driver no longer sees the road; collision with other road users or obstacles.',
   },
+]
+
+export const headlampDamageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[] = [
+  { damage_scenario_id: 'ds-01', asset_id: 'a-01', property: 'I' },
+  { damage_scenario_id: 'ds-01', asset_id: 'a-01', property: 'A' },
 ]
 
 export const headlampImpactRatings: ImpactRating[] = [

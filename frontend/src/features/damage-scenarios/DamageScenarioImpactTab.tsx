@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { useId, useState, type FormEvent } from 'react'
+import { Pencil } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -57,6 +57,20 @@ function toValues(ratings: ImpactRating[]): FormValues {
   ) as FormValues
 }
 
+type FormErrors = Partial<Record<ImpactCategory, string>>
+
+/** A category can only be omitted with a rationale and in favour of a rated category [PM-15-07]. */
+function omissionErrors(values: FormValues): FormErrors {
+  const rated = CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
+  const errors: FormErrors = {}
+  for (const { value, label } of CATEGORIES) {
+    if (values[value].rating !== 'OMITTED') continue
+    if (!rated) errors[value] = `Rate another category before omitting ${label}.`
+    else if (!values[value].rationale.trim()) errors[value] = `A rationale is required to omit ${label}.`
+  }
+  return errors
+}
+
 /** Rating as a badge with the impact colour tokens; the rating is in the text, not only in the colour. */
 function ImpactBadge({ rating }: { rating: ImpactRatingValue | null }) {
   const classes = rating ? RATING_CLASSES[rating] : 'border-rating-unknown-border bg-rating-unknown text-rating-unknown-foreground'
@@ -89,6 +103,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   const [values, setValues] = useState(() => toValues(ratings))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
   const [saved, setSaved] = useState(values)
+  const [errors, setErrors] = useState<FormErrors>({})
   const update = useUpdateImpactRatings(projectId, damageScenarioId)
   const dirty = CATEGORIES.some(({ value }) =>
     (Object.keys(values[value]) as (keyof CategoryValues)[]).some((key) => values[value][key] !== saved[value][key]),
@@ -97,10 +112,15 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   function change(category: ImpactCategory, patch: Partial<CategoryValues>) {
     setValues((prev) => ({ ...prev, [category]: { ...prev[category], ...patch } }))
     update.reset()
+    // A change in one category can resolve the error of another, e.g. rating it in favour of an omission.
+    setErrors({})
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const nextErrors = omissionErrors(values)
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length) return
     update.mutate(
       CATEGORIES.map(({ value }) => ({
         impact_category: value,
@@ -119,11 +139,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid max-w-3xl gap-4">
-      <p className="text-sm text-muted-foreground">
-        Rate the impact of the damage scenario per category. Omit a category only with a rationale, e.g. a higher rating in another
-        category.
-      </p>
+    <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
       <Table>
         <TableHeader>
           <TableRow>
@@ -142,6 +158,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
             key={category.value}
             category={category}
             values={values[category.value]}
+            error={errors[category.value]}
             onChange={(patch) => change(category.value, patch)}
           />
         ))}
@@ -166,13 +183,17 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
 interface ImpactCategoryRowsProps {
   category: (typeof CATEGORIES)[number]
   values: CategoryValues
+  error?: string
   onChange: (patch: Partial<CategoryValues>) => void
 }
 
 /** One impact category: a row with the rating options, and a row with the rationale while it is opened. */
-function ImpactCategoryRows({ category, values, onChange }: ImpactCategoryRowsProps) {
+function ImpactCategoryRows({ category, values, error, onChange }: ImpactCategoryRowsProps) {
+  const id = useId()
   const [open, setOpen] = useState(false)
   const { rating, rationale } = values
+  // The rationale stays open while it shows an error.
+  const expanded = open || Boolean(error)
 
   function selectRating(value: ImpactRatingValue) {
     onChange({ rating: value })
@@ -181,15 +202,16 @@ function ImpactCategoryRows({ category, values, onChange }: ImpactCategoryRowsPr
   }
 
   return (
-    <Collapsible asChild open={open} onOpenChange={setOpen}>
+    <Collapsible asChild open={expanded} onOpenChange={setOpen}>
       <TableBody>
         <TableRow>
           <TableHead scope="row" className="text-foreground">
             {category.label}
           </TableHead>
           {RATINGS.map((option) => (
-            <TableCell key={option.value} className="text-center">
-              <Label className="justify-center">
+            <TableCell key={option.value} className="p-0 text-center">
+              {/* The label fills the cell, so the whole cell selects the rating. */}
+              <Label className="cursor-pointer justify-center p-2">
                 <input
                   type="radio"
                   name={`impact-${category.value}`}
@@ -208,21 +230,34 @@ function ImpactCategoryRows({ category, values, onChange }: ImpactCategoryRowsPr
           </TableCell>
           <TableCell>
             <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-xs" aria-label={`${open ? 'Collapse' : 'Expand'} ${category.label} rationale`}>
-                <ChevronRight aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`${rationale ? 'Edit' : 'Add'} ${category.label} rationale`}
+                className={rationale ? '' : 'text-muted-foreground'}
+              >
+                <Pencil aria-hidden="true" />
               </Button>
             </CollapsibleTrigger>
           </TableCell>
         </TableRow>
         <CollapsibleContent asChild>
           <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={RATINGS.length + 3}>
+            <TableCell colSpan={RATINGS.length + 3} className="space-y-2 whitespace-normal">
               <Textarea
                 aria-label={`${category.label} rationale`}
                 value={rationale}
                 placeholder={rating === 'OMITTED' ? 'Why the category is omitted (PM-15-07)' : 'Justification, e.g. ISO 26262-3 or Annex F reference'}
                 onChange={(event) => onChange({ rationale: event.target.value })}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
               />
+              {error && (
+                <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
             </TableCell>
           </TableRow>
         </CollapsibleContent>

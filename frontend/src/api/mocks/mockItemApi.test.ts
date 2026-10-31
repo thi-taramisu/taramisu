@@ -66,6 +66,42 @@ describe('createMockItemApi', () => {
     expect((await api.content.children(project, 'i-01')).at(-1)).toMatchObject({ type: 'assets', id: asset.id, code: 'A-05' })
   })
 
+  it('creates a damage scenario with the next code below each linked asset', async () => {
+    const api = createMockItemApi()
+
+    const created = await api.damageScenarios.create(project, {
+      item_definition_id: 'i-01',
+      title: ' Key leaked ',
+      asset_properties: [
+        { asset_id: 'a-04', property: 'C' },
+        { asset_id: 'a-04', property: 'I' },
+      ],
+    })
+
+    expect(created).toMatchObject({ code: 'DS-02', title: 'Key leaked', item_definition_id: 'i-01', road_user_harm_description: null })
+    expect((await api.content.children(project, 'i-01')).find((node) => node.id === 'a-04')?.children).toEqual([
+      { type: 'damage-scenarios', id: created.id, code: 'DS-02', name: 'Key leaked' },
+    ])
+    expect((await api.content.assets(project, 'i-01')).find((asset) => asset.id === 'a-04')?.damageScenarios).toBe(1)
+  })
+
+  it('rejects a damage scenario linked to a property its asset does not have with 422', async () => {
+    const api = createMockItemApi()
+
+    await expect(
+      api.damageScenarios.create(project, { item_definition_id: 'i-01', title: 'X', asset_properties: [{ asset_id: 'a-02', property: 'C' }] }),
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('rejects a damage scenario linking the same asset property twice with 422', async () => {
+    const api = createMockItemApi()
+    const link = { asset_id: 'a-04', property: 'C' } as const
+
+    await expect(api.damageScenarios.create(project, { item_definition_id: 'i-01', title: 'X', asset_properties: [link, link] })).rejects.toMatchObject({
+      status: 422,
+    })
+  })
+
   it('updates a damage scenario and renames it in the tree', async () => {
     const api = createMockItemApi()
 

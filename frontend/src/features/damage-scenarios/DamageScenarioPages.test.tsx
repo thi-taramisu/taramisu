@@ -9,6 +9,94 @@ const page = `${project}/damage-scenarios/ds-01`
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
 const categoryRow = (name: string) => screen.getByRole('rowheader', { name }).closest('tr')!
 
+const location = () => screen.getByTestId('location')
+
+async function openNewDamageScenarioDialog(user: ReturnType<typeof renderApp>['user']) {
+  await user.click(await within(tree()).findByRole('button', { name: 'New' }))
+  await user.click(screen.getByRole('menuitem', { name: 'Damage Scenario' }))
+  return screen.getByRole('dialog', { name: 'New Damage Scenario' })
+}
+
+describe('create damage scenario', () => {
+  it('starts with the item and asset of the current page and creates the damage scenario below the asset', async () => {
+    const { user, api } = renderApp(`${project}/assets/a-04`)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
+    expect(within(dialog).getByRole('button', { name: 'A-04 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: 'A-04 Integrity' }))
+    await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+
+    expect(await screen.findByRole('heading', { name: 'DS-02 Diagnostic key leaked' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
+    expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
+    expect(within(tree()).getByRole('link', { name: /DS-02 Diagnostic key leaked/ })).toHaveAttribute('aria-current', 'page')
+    expect((await api.content.assets('headlamp', 'i-01')).find((asset) => asset.id === 'a-04')).toMatchObject({ damageScenarios: 1 })
+  })
+
+  it('links further assets with the properties they have', async () => {
+    const { user } = renderApp(project)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add Asset' }))
+    await user.click(screen.getByRole('menuitem', { name: /A-03 Camera image data/ }))
+
+    const properties = within(dialog).getByRole('group', { name: 'A-03 properties' })
+    expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['I', 'A'])
+    expect(within(properties).queryByRole('button', { name: 'A-03 Confidentiality' })).not.toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Remove A-03 Camera image data' }))
+    expect(within(dialog).queryByRole('group', { name: 'A-03 properties' })).not.toBeInTheDocument()
+  })
+
+  it('requires a name, a linked asset and a property per asset', async () => {
+    const { user, api } = renderApp(`${project}/assets/a-02`)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(within(dialog).getByLabelText(/Name/)).toHaveAccessibleDescription('Name is required.')
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'A-02 Integrity' }))
+    expect(within(dialog).getByRole('button', { name: 'A-02 Integrity' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Select at least one property of A-02.')
+
+    await user.click(within(dialog).getByRole('button', { name: 'Remove A-02 Body control ECU firmware' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Link at least one asset.')
+    expect((await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-02')!.children).toBeUndefined()
+  })
+
+  it('keeps the dialog open with "Create & add another"', async () => {
+    const { user } = renderApp(`${project}/assets/a-02`)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & add another' }))
+
+    expect(await within(dialog).findByRole('status')).toHaveTextContent('Manipulated firmware created.')
+    expect(within(dialog).getByLabelText(/Name/)).toHaveValue('')
+    expect(within(dialog).getByRole('button', { name: 'A-02 Integrity' })).toHaveAttribute('aria-pressed', 'true')
+    expect(location()).toHaveTextContent(`${project}/assets/a-02`)
+  })
+
+  it('shows an error and keeps the dialog open when creating fails', async () => {
+    const api = createMockItemApi()
+    api.damageScenarios.create = () => Promise.reject(new Error('network'))
+    const { user } = renderApp(`${project}/assets/a-02`, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be created')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
 describe('damage scenario page', () => {
   it('shows the type label, code and title in the header', async () => {
     renderApp(page)
@@ -96,13 +184,13 @@ describe('damage scenario impact', () => {
   it('hides the rationale until it is opened', async () => {
     const { user } = renderApp(`${page}/impact`)
 
-    const toggle = await screen.findByRole('button', { name: 'Expand Safety rationale' })
+    const toggle = await screen.findByRole('button', { name: 'Edit Safety rationale' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: 'Add Financial rationale' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
     await user.click(toggle)
 
-    expect(toggle).toHaveAccessibleName('Collapse Safety rationale')
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('textbox', { name: 'Safety rationale' })).toHaveValue('Severity S3 from the HARA of the headlamp system.')
   })
@@ -120,7 +208,7 @@ describe('damage scenario impact', () => {
 
     await user.click(await screen.findByRole('radio', { name: 'Financial Major' }))
     expect(within(categoryRow('Financial')).getByText('Major', { selector: 'span:not(.sr-only)' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Expand Financial rationale' }))
+    await user.click(screen.getByRole('button', { name: 'Add Financial rationale' }))
     await user.type(screen.getByRole('textbox', { name: 'Financial rationale' }), 'Recall of the vehicle series')
     await user.click(screen.getByRole('radio', { name: 'Operational Omitted' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -136,6 +224,39 @@ describe('damage scenario impact', () => {
     expect(ratings.find((r) => r.impact_category === 'OPERATIONAL')).toMatchObject({ rating_value: 'OMITTED', is_omitted_by_pm_15_07: true })
     // Not editable for now, but saving keeps the stored flag.
     expect(ratings.find((r) => r.impact_category === 'SAFETY')).toMatchObject({ rating_value: 'SEVERE', reused_from_functional_safety: true })
+  })
+
+  it('requires a rationale to omit a category', async () => {
+    const { user, api } = renderApp(`${page}/impact`)
+
+    await user.click(await screen.findByRole('radio', { name: 'Financial Omitted' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    const rationale = screen.getByRole('textbox', { name: 'Financial rationale' })
+    expect(rationale).toHaveAccessibleDescription('A rationale is required to omit Financial.')
+    expect(await api.damageScenarios.impactRatings('headlamp', 'ds-01')).toHaveLength(3)
+
+    await user.type(rationale, 'Covered by the safety rating')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  })
+
+  it('omits a category only in favour of a rated one', async () => {
+    const api = createMockItemApi()
+    await api.damageScenarios.updateImpactRatings('headlamp', 'ds-01', [
+      { impact_category: 'SAFETY', rating_value: null, is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+      { impact_category: 'OPERATIONAL', rating_value: null, is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+    ])
+    const { user } = renderApp(`${page}/impact`, api)
+
+    await user.click(await screen.findByRole('radio', { name: 'Financial Omitted' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getAllByRole('alert').map((alert) => alert.textContent)).toEqual([
+      'Rate another category before omitting Financial.',
+      'Rate another category before omitting Privacy.',
+    ])
   })
 
   it('shows an error and keeps the ratings when saving fails', async () => {

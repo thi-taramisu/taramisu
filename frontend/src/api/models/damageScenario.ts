@@ -1,3 +1,5 @@
+import type { CiaProperty } from './asset'
+
 // Damage scenarios follow `DAMAGE_SCENARIO` and `IMPACT_RATING` of the data model. A damage scenario
 // belongs to one item; several assets can lead to it. Not in the backend spec yet.
 
@@ -9,6 +11,17 @@ export interface DamageScenario {
   title: string
   functionality_adverse_relation: string | null
   road_user_harm_description: string | null
+}
+
+/** Asset property whose compromise leads to a damage scenario (`DAMAGE_SCENARIO_ASSET_PROPERTY`). */
+export interface DamageScenarioAssetProperty {
+  asset_id: string
+  property: CiaProperty
+}
+
+/** POST body: title, owning item and the asset properties leading to the damage scenario. */
+export type DamageScenarioBody = Pick<DamageScenario, 'item_definition_id' | 'title'> & {
+  asset_properties: DamageScenarioAssetProperty[]
 }
 
 /** PATCH body: only the given fields change. */

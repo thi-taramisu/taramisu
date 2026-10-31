@@ -1,12 +1,12 @@
 import { ApiError } from '../errors'
 import type { ItemAsset } from '../models/asset'
-import type { DamageScenario, ImpactRating, ImpactRatingBody } from '../models/damageScenario'
+import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating, ImpactRatingBody } from '../models/damageScenario'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
 import type { RiskGroup } from '../models/risk'
 import type { TreeNode } from '../models/tree'
 import type { ItemApi } from '../services/items'
 import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
-import { headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
+import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 
 // MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
 // once the item routes (#83) are in `backend/openapi.json`.
@@ -17,6 +17,7 @@ interface StoredItem {
   assets: ItemAsset[]
   risks: RiskGroup[]
   damageScenarios: DamageScenario[]
+  damageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[]
   impactRatings: ImpactRating[]
 }
 
@@ -28,6 +29,7 @@ function seed(): Map<string, StoredItem> {
     assets: headlampAssets,
     risks: headlampRisks,
     damageScenarios: headlampDamageScenarios,
+    damageScenarioLinks: headlampDamageScenarioLinks,
     impactRatings: headlampImpactRatings,
   })
   return new Map([[headlampItem.id, entry]])
@@ -122,7 +124,7 @@ export function createMockItemApi(): ItemApi {
             tara_project_id: projectId,
             created_at: new Date().toISOString(),
           }
-          db.set(item.id, { item, children: [], assets: [], risks: [], damageScenarios: [], impactRatings: [] })
+          db.set(item.id, { item, children: [], assets: [], risks: [], damageScenarios: [], damageScenarioLinks: [], impactRatings: [] })
           return item
         }),
       update: (projectId, itemId, body) =>
@@ -155,6 +157,37 @@ export function createMockItemApi(): ItemApi {
       risks: (projectId, itemId) => run(() => find(projectId, itemId).risks),
     },
     damageScenarios: {
+      create: (projectId, body) =>
+        run(() => {
+          const entry = find(projectId, body.item_definition_id)
+          for (const { asset_id, property } of body.asset_properties) {
+            if (!entry.assets.some((asset) => asset.id === asset_id && asset.properties.includes(property))) {
+              throw new ApiError(422, `Asset ${asset_id} of the item has no property ${property}.`)
+            }
+          }
+          // Same rule as the UNIQUE constraint of `damage_scenario_asset_property` in backend/db/schema.sql.
+          const pairs = new Set(body.asset_properties.map(({ asset_id, property }) => `${asset_id}:${property}`))
+          if (pairs.size !== body.asset_properties.length) throw new ApiError(422, 'Each asset property can only be linked once.')
+          const codes = [...db.values()].flatMap((e) => e.damageScenarios.map((ds) => Number(ds.code.slice(3))))
+          const scenario: DamageScenario = {
+            id: crypto.randomUUID(),
+            item_definition_id: entry.item.id,
+            code: `DS-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`,
+            title: validateTitle(body.title)!,
+            functionality_adverse_relation: null,
+            road_user_harm_description: null,
+          }
+          entry.damageScenarios.push(scenario)
+          entry.damageScenarioLinks.push(...body.asset_properties.map((link) => ({ ...link, damage_scenario_id: scenario.id })))
+          // Below each linked asset in the tree, as a shared element can have several parents.
+          for (const assetId of new Set(body.asset_properties.map((link) => link.asset_id))) {
+            const asset = entry.assets.find((a) => a.id === assetId)!
+            asset.damageScenarios += 1
+            const node = entry.children.find((child) => child.type === 'assets' && child.id === assetId)
+            if (node) node.children = [...(node.children ?? []), { type: 'damage-scenarios', id: scenario.id, code: scenario.code, name: scenario.title }]
+          }
+          return scenario
+        }),
       get: (projectId, damageScenarioId) => run(() => findDamageScenario(projectId, damageScenarioId).scenario),
       update: (projectId, damageScenarioId, body) =>
         run(() => {

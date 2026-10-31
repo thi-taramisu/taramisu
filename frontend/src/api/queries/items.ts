@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { NewAsset } from '../models/asset'
-import type { ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
+import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { TreeNode } from '../models/tree'
 
@@ -119,6 +119,12 @@ export function useImpactRatings(projectId: string, damageScenarioId: string) {
     queryKey: keys.impactRatings(projectId, damageScenarioId),
     queryFn: () => api.damageScenarios.impactRatings(projectId, damageScenarioId),
   })
+}
+
+export function useCreateDamageScenario(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: DamageScenarioBody) => api.damageScenarios.create(projectId, body), onSuccess: invalidate })
 }
 
 export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
