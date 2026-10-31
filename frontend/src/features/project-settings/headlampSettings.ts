@@ -24,11 +24,17 @@ export interface Member {
 export interface ProjectDetails {
   name: string
   description: string
+  /** URL of the project image, null if the project has none. */
+  image: string | null
 }
+
+/** Image types the project image upload accepts. */
+export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 
 export const headlampDetails: ProjectDetails = {
   name: exampleProject.name,
   description: 'TARA of the headlamp system, the example project of the course.',
+  image: null,
 }
 
 export const headlampMembers: Member[] = [
