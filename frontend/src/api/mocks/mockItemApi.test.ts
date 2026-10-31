@@ -66,6 +66,61 @@ describe('createMockItemApi', () => {
     expect((await api.content.children(project, 'i-01')).at(-1)).toMatchObject({ type: 'assets', id: asset.id, code: 'A-05' })
   })
 
+  it('updates a damage scenario and renames it in the tree', async () => {
+    const api = createMockItemApi()
+
+    const updated = await api.damageScenarios.update(project, 'ds-01', { title: ' Low beam fails ' })
+
+    expect(updated).toMatchObject({ code: 'DS-01', title: 'Low beam fails', item_definition_id: 'i-01' })
+    expect((await api.content.children(project, 'i-01'))[0].children?.[0]).toMatchObject({ id: 'ds-01', name: 'Low beam fails' })
+    await expect(api.damageScenarios.update(project, 'ds-01', { title: ' ' })).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('returns 404 for unknown damage scenarios and those of deleted items', async () => {
+    const api = createMockItemApi()
+
+    await expect(api.damageScenarios.get(project, 'nope')).rejects.toMatchObject({ status: 404 })
+    await expect(api.damageScenarios.get('other', 'ds-01')).rejects.toMatchObject({ status: 404 })
+    await api.items.delete(project, 'i-01')
+    await expect(api.damageScenarios.impactRatings(project, 'ds-01')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('replaces the impact rating per category and keeps the others', async () => {
+    const api = createMockItemApi()
+    const [safety] = await api.damageScenarios.impactRatings(project, 'ds-01')
+
+    const ratings = await api.damageScenarios.updateImpactRatings(project, 'ds-01', [
+      { impact_category: 'SAFETY', rating_value: 'MAJOR', is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+      { impact_category: 'FINANCIAL', rating_value: 'NEGLIGIBLE', is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+    ])
+
+    expect(ratings.map((r) => [r.impact_category, r.rating_value])).toEqual([
+      ['SAFETY', 'MAJOR'],
+      ['OPERATIONAL', 'MODERATE'],
+      ['PRIVACY', 'OMITTED'],
+      ['FINANCIAL', 'NEGLIGIBLE'],
+    ])
+    expect(ratings[0].id).toBe(safety.id)
+  })
+
+  it.each([
+    ['an inconsistent omission flag', { impact_category: 'PRIVACY', rating_value: 'OMITTED', is_omitted_by_pm_15_07: false, reused_from_functional_safety: false }],
+    ['reuse from functional safety outside safety', { impact_category: 'FINANCIAL', rating_value: 'MAJOR', is_omitted_by_pm_15_07: false, reused_from_functional_safety: true }],
+  ] as const)('rejects impact ratings with %s with 422', async (_, rating) => {
+    const api = createMockItemApi()
+
+    await expect(
+      api.damageScenarios.updateImpactRatings(project, 'ds-01', [{ ...rating, omission_or_rating_rationale: null }]),
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('rejects two impact ratings of the same category with 422', async () => {
+    const api = createMockItemApi()
+    const rating = { impact_category: 'SAFETY', rating_value: null, is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false } as const
+
+    await expect(api.damageScenarios.updateImpactRatings(project, 'ds-01', [rating, rating])).rejects.toMatchObject({ status: 422 })
+  })
+
   it('keeps separate state per instance and hands out copies', async () => {
     const first = createMockItemApi()
     const second = createMockItemApi()

@@ -38,8 +38,9 @@ describe('routing', () => {
       ENTITY_TYPES[type].tabs.filter((t) => t.path).map((t) => [type, t.path, t.label] as const),
     ),
   )('routes %s tab "%s"', async (type, path, label) => {
-    // Item pages load the item from the API, so they need an existing one.
-    renderAt(`${project}/${type}/${type === 'items' ? 'i-01' : 'x-01'}/${path}`)
+    // Item and damage scenario pages load the element from the API, so they need an existing one.
+    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01' }
+    renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
 
     const tabs = await screen.findByRole('navigation', { name: `${ENTITY_TYPES[type].label} tabs` })
     expect(within(tabs).getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute('aria-current', 'page')

@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { ApiClient } from './client'
+import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
 
 /**
@@ -10,6 +11,7 @@ export interface Api {
   client: ApiClient
   items: ItemService
   content: ItemContentService
+  damageScenarios: DamageScenarioService
 }
 
 const ApiContext = createContext<Api | null>(null)
