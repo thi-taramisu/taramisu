@@ -14,6 +14,7 @@ import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
 import { Placeholder } from './features/workspace/Placeholder'
 import { WorkspaceLayout } from './features/workspace/WorkspaceLayout'
+import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { ColorSchemesPage } from './pages/ColorSchemesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ProjectListPage } from './pages/ProjectListPage'
@@ -39,6 +40,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/projects" replace />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/design-sheet.html" element={<Navigate to="/design-system/colors" replace />} />
       <Route path="/design-system/colors" element={<ColorSchemesPage />} />
       <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />

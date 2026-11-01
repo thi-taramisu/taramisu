@@ -6,6 +6,7 @@ import App from '../App'
 import { ApiProvider } from '../api/ApiProvider'
 import { createApiClient } from '../api/client'
 import { createMockItemApi } from '../api/mocks/mockItemApi'
+import { AuthProvider } from '../auth/AuthContext'
 
 // eslint-disable-next-line react/only-export-components
 function LocationDisplay() {
@@ -19,12 +20,14 @@ export function renderApp(path: string, api = createMockItemApi()) {
   const user = userEvent.setup()
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={{ client: createApiClient({ baseUrl: 'http://api.test' }), ...api }}>
-        <MemoryRouter initialEntries={[path]}>
-          <App />
-          <LocationDisplay />
-        </MemoryRouter>
-      </ApiProvider>
+      <AuthProvider>
+        <ApiProvider api={{ client: createApiClient({ baseUrl: 'http://api.test' }), ...api }}>
+          <MemoryRouter initialEntries={[path]}>
+            <App />
+            <LocationDisplay />
+          </MemoryRouter>
+        </ApiProvider>
+      </AuthProvider>
     </QueryClientProvider>,
   )
   return { api, user }
