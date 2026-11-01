@@ -9,6 +9,10 @@ include:
 
 networks:
   backend:
+    internal: true
   iam:
-  auth:
-  taramisu-proxy:
+    internal: true
+  proxy:
+    internal: true
+  edge:
+    internal: false
