@@ -4,6 +4,7 @@ x-authentik-environment: &authentik-environment
   AUTHENTIK_POSTGRESQL__USER: authentik
   AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:?Set PG_PASS in iam/.env; see iam/.env.example}
   AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Set AUTHENTIK_SECRET_KEY in iam/.env; see iam/.env.example}
+  AUTHENTIK_WEB__PATH: /auth/
 
 x-authentik: &authentik
   image: ghcr.io/goauthentik/server:2026.8.3
@@ -44,6 +45,7 @@ services:
     command: server
     networks:
       iam:
+      taramisu-proxy:
       auth:
         aliases: [authentik.localhost]
     ports:
@@ -56,7 +58,6 @@ services:
       <<: *authentik-environment
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
       OIDC_REDIRECT_URI: ${APP_URL:-http://localhost}/auth/callback
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in iam/.env; see iam/.env.example}
       DEV_PASSWORD: ${DEV_PASSWORD:?Set DEV_PASSWORD in iam/.env; see iam/.env.example}
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Set AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env; see iam/.env.example}
     volumes:

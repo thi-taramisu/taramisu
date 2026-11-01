@@ -53,16 +53,16 @@ Current local addresses:
 
 - Frontend: <http://localhost>
 - Documentation: <http://localhost/docs/>
-- API through the proxy: <http://localhost/api/v1/me> (requires login)
+- API through the proxy: <http://localhost/api/v1/me> (requires `Authorization: Bearer <JWT>`)
 - API and Swagger: <http://localhost:8080/docs>
-- Login: <http://localhost/auth/login>
-- Authentik: <http://authentik.localhost:9000>
+- Authentik (via proxy): <http://localhost/auth/if/admin/>
 
-`APP_URL` defaults to `http://localhost` and defines the callback and logout origin.
-The issuer remains `http://authentik.localhost:9000/application/o/taramisu/`, reachable from the browser and API container.
-The proxy preserves `/api/v1/` and forwards `/auth/` to the backend. Frontend and authentication share the same origin.
-For an existing checkout, change only `APP_URL=http://localhost` in `iam/.env` and run `make -C deploy up`;
-this updates the backend origin and Authentik callback without replacing secrets or data.
+`APP_URL` defaults to `http://localhost` and defines the public origin and OIDC callback (`${APP_URL}/auth/callback`).
+Authentik runs under `AUTHENTIK_WEB__PATH=/auth/` behind NGINX (`location /auth/`), so the public OIDC issuer is
+`${APP_URL}/auth/application/o/taramisu/`, while the Go API fetches JWKS keys internally via
+`http://authentik-server:9000/auth/application/o/taramisu/jwks/`.
+The NGINX proxy load-balances `/api/v1/` across backend replicas (`least_conn` + runtime DNS resolution) and routes `/auth/callback` to the
+frontend SPA.
 Port 8080 remains available for backend diagnostics and Swagger.
 
 ## Networks and data
