@@ -13,6 +13,7 @@ make -C deploy init          # Generate missing secrets and validate configurati
 make -C deploy up            # Provision Authentik, start the API, then frontend, docs, and proxy
 make -C deploy db            # Start only the backend database
 make -C deploy migrate       # Apply backend migrations
+make -C deploy seed          # Load dummy data (backend/db/seed/seed.sql); never runs automatically
 make -C deploy pgadmin       # Optional database UI on localhost:5050
 make -C deploy migrate-diff name=my_change
 make -C deploy down          # Stop the whole stack, preserving data and secrets
