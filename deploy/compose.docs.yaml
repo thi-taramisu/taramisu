@@ -1,5 +1,6 @@
 services:
   docs:
+    image: ghcr.io/thi-taramisu/taramisu-docs:${DOCS_IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: docs/docusaurus/Dockerfile
