@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import { exampleProject } from '../features/workspace/exampleProject'
+import { ProjectHeader } from '../features/workspace/ProjectHeader'
 import { NotFoundPage } from './NotFoundPage'
 
 const SECTIONS = [
@@ -13,28 +14,31 @@ export function ProjectSettingsPage() {
   if (projectId !== exampleProject.id) return <NotFoundPage />
 
   return (
-    <div className="flex h-screen">
-      <nav aria-label="Settings" className="w-56 shrink-0 space-y-1 border-r p-3">
-        <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
-          ← Back
-        </Link>
-        {SECTIONS.map((s) => (
-          <NavLink
-            key={s.path}
-            to={s.path}
-            end
-            className={({ isActive }) =>
-              `block rounded-md px-2 py-1 text-sm hover:bg-muted ${isActive ? 'bg-muted font-medium' : ''}`
-            }
-          >
-            {s.label}
-          </NavLink>
-        ))}
-      </nav>
-      <main className="flex-1 space-y-4 p-6">
-        <h1 className="text-xl font-semibold">Settings: {exampleProject.name}</h1>
-        <Outlet />
-      </main>
+    <div className="flex h-screen flex-col">
+      <ProjectHeader projectId={projectId} />
+      <div className="flex min-h-0 flex-1">
+        <nav aria-label="Settings" className="w-56 shrink-0 space-y-1 border-r p-3">
+          <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
+            ← Back
+          </Link>
+          <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">Settings</h2>
+          {SECTIONS.map((s) => (
+            <NavLink
+              key={s.path}
+              to={s.path}
+              end
+              className={({ isActive }) =>
+                `block rounded-md px-2 py-1 text-sm hover:bg-muted ${isActive ? 'bg-muted font-medium' : ''}`
+              }
+            >
+              {s.label}
+            </NavLink>
+          ))}
+        </nav>
+        <main className="min-w-0 flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
