@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
@@ -35,6 +35,29 @@ describe('create damage scenario', () => {
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
     expect(within(tree()).getByRole('link', { name: /DS-02 Diagnostic key leaked/ })).toHaveAttribute('aria-current', 'page')
     expect((await api.content.assets('headlamp', 'i-01')).find((asset) => asset.id === 'a-04')).toMatchObject({ damageScenarios: 1 })
+  })
+
+  it('takes the item and asset of the page when the tree loads after opening', async () => {
+    const api = createMockItemApi()
+    const list = api.items.list
+    let loadTree!: () => void
+    // Only the first request waits, the refetch after creating answers at once.
+    api.items.list = (projectId) => {
+      api.items.list = list
+      return new Promise((resolve) => {
+        loadTree = () => resolve(list(projectId))
+      })
+    }
+    const { user } = renderApp(`${project}/assets/a-04`, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    act(() => loadTree())
+
+    expect(await within(dialog).findByRole('button', { name: 'A-04 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
+    await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(await screen.findByRole('heading', { name: 'DS-02 Diagnostic key leaked' })).toBeInTheDocument()
   })
 
   it('links further assets with the properties they have', async () => {

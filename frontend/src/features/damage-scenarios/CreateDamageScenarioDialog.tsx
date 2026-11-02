@@ -24,7 +24,7 @@ interface AssetLink {
 }
 
 /** Item and asset of the page the dialog is opened on, used as the defaults. */
-function useContextDefaults(items: TreeNode[]) {
+function useContextDefaults(items: TreeNode[]): { itemId: string; links: AssetLink[] } {
   const { pathname } = useLocation()
   const match = matchPath('/projects/:projectId/:type/:entityId/*', pathname)
   const type = match?.params.type as EntityType | undefined
@@ -48,8 +48,11 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
-  const [itemId, setItemId] = useState(defaults.itemId)
-  const [links, setLinks] = useState<AssetLink[]>(defaults.links)
+  // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
+  const [chosenItemId, setChosenItemId] = useState<string>()
+  const [chosenLinks, setChosenLinks] = useState<AssetLink[]>()
+  const itemId = chosenItemId ?? defaults.itemId
+  const links = chosenLinks ?? defaults.links
   const [linkError, setLinkError] = useState<string>()
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
@@ -59,8 +62,9 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     return asset ? [{ asset, properties: link.properties ?? asset.properties }] : []
   })
 
-  function changeLinks(next: AssetLink[]) {
-    setLinks(next)
+  /** Undefined goes back to the default links. */
+  function changeLinks(next: AssetLink[] | undefined) {
+    setChosenLinks(next)
     setLinkError(undefined)
   }
 
@@ -93,8 +97,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       errorMessage="The damage scenario could not be created. Please try again."
       onCreate={create}
       onReset={() => {
-        setItemId(defaults.itemId)
-        changeLinks(defaults.links)
+        setChosenItemId(undefined)
+        changeLinks(undefined)
       }}
     >
       <div className="grid gap-2">
@@ -103,7 +107,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
           id={`${id}-item`}
           value={itemId}
           onChange={(event) => {
-            setItemId(event.target.value)
+            setChosenItemId(event.target.value)
             // Assets belong to one item, so its links do not carry over.
             changeLinks([])
           }}
