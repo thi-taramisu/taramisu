@@ -117,6 +117,40 @@ A live check should also start a fresh stack, verify readiness/login redirects, 
 `check-networks` starts a throwaway busybox container in one network at a time and tries to open TCP connections: allowed paths must be
 reachable, forbidden paths (for example proxy → database, API → Authentik database, internet from internal networks) must not be.
 
+## Server (VM) setup and updates
+
+`taramisu-ctl.sh` sets up and updates the stack on a Debian VM (ARM64 or x86_64). Unlike `dev.sh` it uses only
+`compose.yaml` (no dev ports) and pulls the API, frontend and docs images from GHCR instead of building them.
+Run it as root from a clone of the repository:
+
+```sh
+git clone https://github.com/thi-taramisu/taramisu.git && cd taramisu
+sudo deploy/taramisu-ctl.sh --bootstrap        # blank VM: install Docker, generate secrets, start the stack
+sudo deploy/taramisu-ctl.sh                    # update: pull latest images, migrate, recreate changed containers
+sudo deploy/taramisu-ctl.sh --set api=v0.3.0   # pin one service (api, frontend, docs); repeatable
+sudo deploy/taramisu-ctl.sh --set api=latest   # remove the pin, back to the newest image
+sudo deploy/taramisu-ctl.sh --prune            # also remove images no container uses any more
+```
+
+- `--bootstrap` installs Docker Engine and the Compose plugin from Docker's apt repository if missing,
+  generates `iam/.env` with the same code as `dev.sh` and adds `PROXY_BIND=0.0.0.0`, so the proxy accepts connections from outside.
+  Locally the proxy stays on `127.0.0.1`.
+- Tags come from the publish workflow: `latest` (newest `main`), `sha-a1b2c3d` (one commit), `v0.3.0` (release).
+  Pinned tags are stored in `deploy/.image-tags` (not in Git), so later runs keep them. Pinning an older tag is a rollback;
+  database migrations are not rolled back.
+- Every run waits for the health checks (up to 10 minutes for Authentik, whose first start migrates its database),
+  checks `/api/health/ready` through the proxy and ends with a table of services, image tags and digests.
+- The images are public, so no GHCR login is needed. The docs image contains its site URL from the repository variable `DOCS_SITE_URL`.
+- Not covered yet: HTTPS, and Authentik settings for a public host name (`OIDC_ISSUER`, see #103).
+
+`deploy/test-bootstrap.sh` runs the bootstrap in a throwaway privileged `debian:trixie` container (Docker in Docker),
+so it can be tried without a VM. The first run takes about 10–15 minutes because every image is downloaded.
+
+```sh
+deploy/test-bootstrap.sh                 # run taramisu-ctl.sh --bootstrap in a fresh "VM"
+deploy/test-bootstrap.sh sh              # open a shell in the fresh "VM" instead
+```
+
 ## Database password mismatch
 
 `POSTGRES_PASSWORD` initializes a new database; changing `PG_PASS` in `iam/.env` does not update a password stored in an existing volume.

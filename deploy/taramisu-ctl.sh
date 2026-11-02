@@ -80,6 +80,11 @@ ensure_env() {
         log 'Generating iam/.env with random secrets'
     fi
     ./dev.sh --init > /dev/null
+    # On the server the proxy must accept connections from outside, locally it stays on 127.0.0.1.
+    if ! grep -q '^PROXY_BIND=' ../iam/.env; then
+        echo 'PROXY_BIND=0.0.0.0' >> ../iam/.env
+        log 'Proxy will listen on all interfaces (PROXY_BIND=0.0.0.0 in iam/.env)'
+    fi
     empty=$(grep -E '^[A-Z_]+=$' ../iam/.env | cut -d= -f1 | tr '\n' ' ')
     [ -z "$empty" ] || die "empty variables in iam/.env: $empty"
     log "iam/.env ok ($(stat -c %a ../iam/.env))"
@@ -148,7 +153,7 @@ wait_healthy() {
 
 # Same order as dev.sh: Authentik first, because the API needs its OIDC provider.
 start_stack() {
-    log 'Starting Authentik (first start migrates its database, this can take several minutes)'
+    log 'Starting Authentik (several minutes on the first start, which migrates its database)'
     compose up -d --no-build authentik-db authentik-server authentik-worker
     wait_healthy 600 authentik-db authentik-server authentik-worker
     log 'Applying Authentik blueprints'
@@ -170,7 +175,28 @@ start_stack() {
     log 'Running migrations and starting the API, frontend, docs and proxy'
     compose up -d --no-build --wait --wait-timeout 300 --remove-orphans
     # Pick up new container addresses after recreated containers.
-    compose exec -T proxy nginx -s reload
+    compose exec -T proxy nginx -s reload 2> /dev/null
+    if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused --retry-delay 1 \
+        --retry-max-time 30 http://localhost/api/health/ready > /dev/null; then
+        die 'API not ready through the proxy; see: docker compose -f deploy/compose.yaml logs api proxy'
+    fi
+}
+
+# Running services with tag and image digest, so an update or rollback can be checked.
+show_status() {
+    log 'Running services'
+    {
+        printf 'SERVICE\tSTATUS\tIMAGE\tDIGEST\n'
+        for id in $(compose ps -q); do
+            docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}	{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}	{{.Config.Image}}	{{.Image}}' "$id"
+        done | while IFS="$(printf '\t')" read -r service status image image_id; do
+            digest=$(docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' "$image_id")
+            digest=${digest#*@sha256:}
+            printf '%s\t%s\t%s\t%.12s\n' "$service" "$status" "$image" "${digest:--}"
+        done | sort
+    } | awk -F '\t' '
+        { for (i = 1; i <= NF; i++) { cell[NR, i] = $i; if (length($i) > width[i]) width[i] = length($i) } }
+        END { for (r = 1; r <= NR; r++) { for (i = 1; i <= 4; i++) printf "%-*s  ", width[i], cell[r, i]; print "" } }'
 }
 
 bootstrap=false
@@ -217,3 +243,4 @@ if $prune; then
     # -a: also tagged images that no container uses any more, e.g. an old pinned version.
     docker image prune -af > /dev/null
 fi
+show_status
