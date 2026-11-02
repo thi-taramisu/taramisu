@@ -3,13 +3,16 @@ import { ImageIcon, Upload } from 'lucide-react'
 import { AspectRatio } from '@/components/ui/aspect-ratio'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { IMAGE_TYPES } from './headlampSettings'
+import { IMAGE_ERROR_MESSAGES, IMAGE_TYPES, type ImageError, validateImage } from '@/lib/imageUpload'
 
 /** File input for the project image with a local preview; the file is not uploaded yet. */
 export function ProjectImageInput({ defaultValue }: { defaultValue: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState(defaultValue)
-  const [invalidType, setInvalidType] = useState(false)
+  const [removed, setRemoved] = useState(false)
+  const [error, setError] = useState<ImageError | null>(null)
+  // Without a chosen file, the preview shows the saved image unless it was removed.
+  const fallback = removed ? null : defaultValue
 
   // Object URLs keep the file in memory until they are revoked.
   useEffect(() => {
@@ -19,20 +22,21 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    // `accept` only filters the file picker, other files can still be chosen.
-    if (file && !IMAGE_TYPES.includes(file.type)) {
+    const fileError = file ? validateImage(file) : null
+    setError(fileError)
+    // Invalid files are cleared, so the preview always matches what the form submits.
+    if (!file || fileError) {
       event.target.value = ''
-      setInvalidType(true)
-      setPreview(defaultValue)
+      setPreview(fallback)
       return
     }
-    setInvalidType(false)
-    setPreview(file ? URL.createObjectURL(file) : defaultValue)
+    setPreview(URL.createObjectURL(file))
   }
 
   function remove() {
     if (inputRef.current) inputRef.current.value = ''
-    setInvalidType(false)
+    setError(null)
+    setRemoved(true)
     setPreview(null)
   }
 
@@ -56,9 +60,13 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
         type="file"
         accept={IMAGE_TYPES.join(',')}
         onChange={handleChange}
+        aria-invalid={error !== null}
+        aria-describedby={error ? 'project-image-error' : undefined}
         tabIndex={-1}
         className="sr-only"
       />
+      {/* An empty file input also means "unchanged", so removing the saved image needs its own field. */}
+      {removed && !preview && <input type="hidden" name="removeImage" value="true" />}
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
           <Upload aria-hidden="true" />
@@ -68,9 +76,9 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
           Remove
         </Button>
       </div>
-      {invalidType && (
-        <p role="alert" className="text-sm text-destructive">
-          Only PNG, JPEG and WebP images are supported.
+      {error && (
+        <p id="project-image-error" role="alert" className="text-sm text-destructive">
+          {IMAGE_ERROR_MESSAGES[error]}
         </p>
       )}
     </div>

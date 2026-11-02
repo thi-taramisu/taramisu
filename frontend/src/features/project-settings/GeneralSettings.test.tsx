@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
+import { MAX_IMAGE_SIZE } from '@/lib/imageUpload'
 
 function renderGeneral() {
   render(
@@ -76,6 +77,27 @@ describe('GeneralSettings', () => {
     expect(image).toHaveValue('')
 
     await user.upload(image, new File(['image'], 'headlamp.webp', { type: 'image/webp' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByAltText('Preview')).toBeInTheDocument()
+  })
+
+  it('rejects images larger than the size limit', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:image')
+    const user = userEvent.setup()
+    renderGeneral()
+
+    const image = screen.getByLabelText('Image')
+    const large = new File(['image'], 'large.png', { type: 'image/png' })
+    Object.defineProperty(large, 'size', { value: MAX_IMAGE_SIZE + 1 })
+    await user.upload(image, large)
+    expect(screen.getByRole('alert')).toHaveTextContent('Images can be at most 5 MB.')
+    expect(image).toBeInvalid()
+    expect(screen.queryByAltText('Preview')).not.toBeInTheDocument()
+    expect(image).toHaveValue('')
+
+    const small = new File(['image'], 'small.png', { type: 'image/png' })
+    Object.defineProperty(small, 'size', { value: MAX_IMAGE_SIZE })
+    await user.upload(image, small)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByAltText('Preview')).toBeInTheDocument()
   })
