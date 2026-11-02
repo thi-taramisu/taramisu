@@ -75,6 +75,22 @@ describe('create damage scenario', () => {
     expect(within(dialog).queryByRole('group', { name: 'A-03 properties' })).not.toBeInTheDocument()
   })
 
+  it('drops the linked assets when another item is chosen', async () => {
+    const api = createMockItemApi()
+    await api.items.create('headlamp', { name: 'Rear lights', scope_type: 'ITEM' })
+    const { user } = renderApp(`${project}/assets/a-04`, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+    expect(within(dialog).getByRole('group', { name: 'A-04 properties' })).toBeInTheDocument()
+
+    await user.selectOptions(within(dialog).getByLabelText('Item'), 'Rear lights')
+    expect(within(dialog).queryByRole('group', { name: 'A-04 properties' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Add Asset' })).toBeDisabled()
+
+    // Assets belong to one item, so going back does not bring the link back either.
+    await user.selectOptions(within(dialog).getByLabelText('Item'), 'Headlamp system')
+    expect(within(dialog).queryByRole('group', { name: 'A-04 properties' })).not.toBeInTheDocument()
+  })
+
   it('requires a name, a linked asset and a property per asset', async () => {
     const { user, api } = renderApp(`${project}/assets/a-02`)
     const dialog = await openNewDamageScenarioDialog(user)
@@ -135,6 +151,22 @@ describe('damage scenario page', () => {
     expect(await screen.findByRole('heading', { name: 'Damage scenario not found' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute('href', project)
     expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the damage scenario page when a refetch of the loaded damage scenario fails', async () => {
+    const api = createMockItemApi()
+    const { user } = renderApp(page, api)
+
+    const harm = await screen.findByLabelText('Harm To Road User')
+    await user.type(harm, ' Glare.')
+    // The save invalidates the damage scenario; its refetch fails, but the loaded data is still valid.
+    api.damageScenarios.get = () => Promise.reject(new Error('network'))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not be refreshed')
+    expect(screen.getByRole('heading', { name: 'DS-01 Headlamp turns off while driving at night' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
   it('keeps the relations tab as a placeholder', async () => {
