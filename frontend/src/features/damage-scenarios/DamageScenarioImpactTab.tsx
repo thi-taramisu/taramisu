@@ -1,11 +1,10 @@
 import { useId, useState, type FormEvent } from 'react'
-import { Pencil } from 'lucide-react'
+import { ChevronDown, Eraser, MessageSquareText } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/models/damageScenario'
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
 
@@ -16,13 +15,20 @@ const CATEGORIES: { value: ImpactCategory; label: string }[] = [
   { value: 'PRIVACY', label: 'Privacy' },
 ]
 
-const RATINGS: { value: ImpactRatingValue; label: string }[] = [
+interface RatingOption {
+  value: ImpactRatingValue
+  label: string
+}
+
+const SCALE: RatingOption[] = [
   { value: 'SEVERE', label: 'Severe' },
   { value: 'MAJOR', label: 'Major' },
   { value: 'MODERATE', label: 'Moderate' },
   { value: 'NEGLIGIBLE', label: 'Negligible' },
-  { value: 'OMITTED', label: 'Omitted' },
 ]
+
+// Not a level of the scale, so it is shown apart from it.
+const OMITTED: RatingOption = { value: 'OMITTED', label: 'Omitted' }
 
 const RATING_CLASSES: Record<ImpactRatingValue, string> = {
   SEVERE: 'border-impact-severe-border bg-impact-severe text-impact-severe-foreground',
@@ -65,23 +71,13 @@ function omissionErrors(values: FormValues): FormErrors {
   const errors: FormErrors = {}
   for (const { value, label } of CATEGORIES) {
     if (values[value].rating !== 'OMITTED') continue
-    if (!rated) errors[value] = `Rate another category before omitting ${label}.`
+    if (!rated) errors[value] = `${label} can only be omitted if another category is rated.`
     else if (!values[value].rationale.trim()) errors[value] = `A rationale is required to omit ${label}.`
   }
   return errors
 }
 
-/** Rating as a badge with the impact colour tokens; the rating is in the text, not only in the colour. */
-function ImpactBadge({ rating }: { rating: ImpactRatingValue | null }) {
-  const classes = rating ? RATING_CLASSES[rating] : 'border-rating-unknown-border bg-rating-unknown text-rating-unknown-foreground'
-  return (
-    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-xs font-medium whitespace-nowrap ${classes}`}>
-      {RATINGS.find((r) => r.value === rating)?.label ?? 'Not rated'}
-    </span>
-  )
-}
-
-/** Impact tab of a damage scenario ("DS Impact" wireframe, as a table): one rating per impact category S / F / O / P. */
+/** Impact tab of a damage scenario: one rating per impact category S / F / O / P. */
 export function DamageScenarioImpactTab() {
   const { projectId = '', entityId = '' } = useParams()
   const { data: ratings, isError } = useImpactRatings(projectId, entityId)
@@ -138,23 +134,12 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
     )
   }
 
+  // Container, so the rows lay out by the width of the form, not of the window.
   return (
-    <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Category</TableHead>
-            {RATINGS.map((option) => (
-              <TableHead key={option.value} className="text-center">
-                {option.label}
-              </TableHead>
-            ))}
-            <TableHead>Rating</TableHead>
-            <TableHead>Rationale</TableHead>
-          </TableRow>
-        </TableHeader>
+    <form onSubmit={handleSubmit} noValidate className="@container grid max-w-3xl gap-4">
+      <div className="divide-y justify-self-start rounded-lg border px-4">
         {CATEGORIES.map((category) => (
-          <ImpactCategoryRows
+          <ImpactCategoryRow
             key={category.value}
             category={category}
             values={values[category.value]}
@@ -162,7 +147,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
             onChange={(patch) => change(category.value, patch)}
           />
         ))}
-      </Table>
+      </div>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={!dirty || update.isPending}>
           Save
@@ -180,20 +165,46 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   )
 }
 
-interface ImpactCategoryRowsProps {
+interface RatingSegmentProps {
+  name: string
+  option: RatingOption
+  checked: boolean
+  onSelect: () => void
+  className?: string
+}
+
+/** Radio styled as a segment; its width depends on the space only, so selecting or clearing a rating moves nothing. */
+function RatingSegment({ name, option, checked, onSelect, className }: RatingSegmentProps) {
+  return (
+    <label
+      className={cn(
+        'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
+        'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
+        checked ? `z-10 font-medium ${RATING_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+        className,
+      )}
+    >
+      <input type="radio" name={name} value={option.value} checked={checked} onChange={onSelect} className="sr-only" />
+      <span className="truncate px-1">{option.label}</span>
+    </label>
+  )
+}
+
+interface ImpactCategoryRowProps {
   category: (typeof CATEGORIES)[number]
   values: CategoryValues
   error?: string
   onChange: (patch: Partial<CategoryValues>) => void
 }
 
-/** One impact category: a row with the rating options, and a row with the rationale while it is opened. */
-function ImpactCategoryRows({ category, values, error, onChange }: ImpactCategoryRowsProps) {
+/** One impact category: the rating, and below it the rationale, collapsed to a preview until opened. */
+function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategoryRowProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const { rating, rationale } = values
   // The rationale stays open while it shows an error.
   const expanded = open || Boolean(error)
+  const name = `impact-${category.value}`
 
   function selectRating(value: ImpactRatingValue) {
     onChange({ rating: value })
@@ -201,67 +212,79 @@ function ImpactCategoryRows({ category, values, error, onChange }: ImpactCategor
     if (value === 'OMITTED') setOpen(true)
   }
 
+  function clear() {
+    onChange({ rating: null, rationale: '' })
+    setOpen(false)
+  }
+
   return (
-    <Collapsible asChild open={expanded} onOpenChange={setOpen}>
-      <TableBody>
-        <TableRow>
-          <TableHead scope="row" className="text-foreground">
-            {category.label}
-          </TableHead>
-          {RATINGS.map((option) => (
-            <TableCell key={option.value} className="p-0 text-center">
-              {/* The label fills the cell, so the whole cell selects the rating. */}
-              <Label className="cursor-pointer justify-center p-2">
-                <input
-                  type="radio"
-                  name={`impact-${category.value}`}
-                  value={option.value}
-                  checked={rating === option.value}
-                  onChange={() => selectRating(option.value)}
-                />
-                <span className="sr-only">
-                  {category.label} {option.label}
-                </span>
-              </Label>
-            </TableCell>
+    <div className="grid items-center gap-x-4 gap-y-1 py-3 @xl:grid-cols-[7rem_1fr]">
+      <span id={`${id}-label`} className="text-sm font-medium">
+        {category.label}
+      </span>
+      <div className="flex items-center gap-3">
+        {/* Five equal tracks of at most 6rem, so the segments only depend on the available space. */}
+        <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid min-w-0 flex-1 grid-cols-[repeat(5,minmax(0,6rem))]">
+          {SCALE.map((option, index) => (
+            <RatingSegment
+              key={option.value}
+              name={name}
+              option={option}
+              checked={rating === option.value}
+              onSelect={() => selectRating(option.value)}
+              className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === SCALE.length - 1 && 'rounded-r-md')}
+            />
           ))}
-          <TableCell>
-            <ImpactBadge rating={rating} />
-          </TableCell>
-          <TableCell>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`${rationale ? 'Edit' : 'Add'} ${category.label} rationale`}
-                className={rationale ? '' : 'text-muted-foreground'}
-              >
-                <Pencil aria-hidden="true" />
-              </Button>
-            </CollapsibleTrigger>
-          </TableCell>
-        </TableRow>
-        <CollapsibleContent asChild>
-          <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={RATINGS.length + 3} className="space-y-2 whitespace-normal">
-              <Textarea
-                aria-label={`${category.label} rationale`}
-                value={rationale}
-                placeholder={rating === 'OMITTED' ? 'Why the category is omitted (PM-15-07)' : 'Justification, e.g. ISO 26262-3 or Annex F reference'}
-                onChange={(event) => onChange({ rationale: event.target.value })}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? `${id}-error` : undefined}
-              />
-              {error && (
-                <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-            </TableCell>
-          </TableRow>
+          <RatingSegment
+            name={name}
+            option={OMITTED}
+            checked={rating === OMITTED.value}
+            onSelect={() => selectRating(OMITTED.value)}
+            className="ml-3 rounded-md"
+          />
+        </div>
+        {/* Always shown and only disabled, so it keeps its place in the row. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          disabled={!rating && !rationale}
+          aria-label={`Clear ${category.label}`}
+          title="Clear rating and rationale"
+          onClick={clear}
+        >
+          <Eraser aria-hidden="true" />
+        </Button>
+      </div>
+      {/* Contained, so a long rationale wraps instead of widening the box, which only fits the ratings. */}
+      <Collapsible open={expanded} onOpenChange={setOpen} className="grid gap-2 contain-inline-size @xl:col-start-2">
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            {/* The negative margin lines the icon up with the rating segments above. */}
+            <Button type="button" variant="ghost" size="sm" className="-ml-1.5">
+              <MessageSquareText aria-hidden="true" data-icon="inline-start" />
+              <span className="sr-only">{category.label}</span> Rationale
+              <ChevronDown aria-hidden="true" data-icon="inline-end" className={cn('transition-transform', expanded && 'rotate-180')} />
+            </Button>
+          </CollapsibleTrigger>
+          {!expanded && rationale && <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{rationale}</p>}
+        </div>
+        <CollapsibleContent className="grid gap-2">
+          <Textarea
+            aria-label={`${category.label} rationale`}
+            value={rationale}
+            onChange={(event) => onChange({ rationale: event.target.value })}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? `${id}-error` : undefined}
+          />
+          {error && (
+            <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
         </CollapsibleContent>
-      </TableBody>
-    </Collapsible>
+      </Collapsible>
+    </div>
   )
 }

@@ -7,7 +7,8 @@ const project = '/projects/headlamp'
 const page = `${project}/damage-scenarios/ds-01`
 
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
-const categoryRow = (name: string) => screen.getByRole('rowheader', { name }).closest('tr')!
+const category = (name: string) => within(screen.getByRole('radiogroup', { name }))
+const radio = (name: string, rating: string) => category(name).getByRole('radio', { name: rating })
 
 const location = () => screen.getByTestId('location')
 
@@ -168,26 +169,43 @@ describe('damage scenario definition', () => {
 })
 
 describe('damage scenario impact', () => {
-  it('shows the stored rating per category, with the rating as text', async () => {
+  it('shows the stored rating per category', async () => {
     renderApp(`${page}/impact`)
 
-    const safety = within((await screen.findByRole('rowheader', { name: 'Safety' })).closest('tr')!)
-    expect(safety.getByRole('radio', { name: 'Safety Severe' })).toBeChecked()
-    expect(safety.getByText('Severe', { selector: 'span' })).toBeInTheDocument()
-    expect(within(categoryRow('Operational')).getByRole('radio', { name: 'Operational Moderate' })).toBeChecked()
-    expect(within(categoryRow('Privacy')).getByRole('radio', { name: 'Privacy Omitted' })).toBeChecked()
-    expect(within(categoryRow('Privacy')).getByText('Omitted', { selector: 'span:not(.sr-only)' })).toBeInTheDocument()
-    expect(within(categoryRow('Financial')).getByText('Not rated')).toBeInTheDocument()
-    expect(within(categoryRow('Financial')).queryByRole('radio', { checked: true })).not.toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: 'Severe', checked: true })).toBe(radio('Safety', 'Severe'))
+    expect(radio('Operational', 'Moderate')).toBeChecked()
+    expect(radio('Privacy', 'Omitted')).toBeChecked()
+    expect(category('Financial').queryByRole('radio', { checked: true })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear Financial' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear Safety' })).toBeEnabled()
+  })
+
+  it('clears the rating and the rationale of a category', async () => {
+    const { user, api } = renderApp(`${page}/impact`)
+
+    await user.click(await screen.findByRole('button', { name: 'Clear Operational' }))
+    expect(category('Operational').queryByRole('radio', { checked: true })).not.toBeInTheDocument()
+    expect(screen.queryByText('The vehicle cannot be driven at night until repaired.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear Operational' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    const ratings = await api.damageScenarios.impactRatings('headlamp', 'ds-01')
+    expect(ratings.find((r) => r.impact_category === 'OPERATIONAL')).toMatchObject({
+      rating_value: null,
+      is_omitted_by_pm_15_07: false,
+      omission_or_rating_rationale: null,
+    })
   })
 
   it('hides the rationale until it is opened', async () => {
     const { user } = renderApp(`${page}/impact`)
 
-    const toggle = await screen.findByRole('button', { name: 'Edit Safety rationale' })
+    const toggle = await screen.findByRole('button', { name: 'Safety Rationale' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: 'Add Financial rationale' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Financial Rationale' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByText('Severity S3 from the HARA of the headlamp system.')).toBeInTheDocument()
 
     await user.click(toggle)
 
@@ -198,19 +216,21 @@ describe('damage scenario impact', () => {
   it('opens the rationale when a category is omitted', async () => {
     const { user } = renderApp(`${page}/impact`)
 
-    await user.click(await screen.findByRole('radio', { name: 'Financial Omitted' }))
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Omitted'))
 
-    expect(screen.getByRole('textbox', { name: 'Financial rationale' })).toHaveAttribute('placeholder', expect.stringContaining('omitted'))
+    expect(screen.getByRole('textbox', { name: 'Financial rationale' })).toBeVisible()
   })
 
   it('rates and omits categories and saves them', async () => {
     const { user, api } = renderApp(`${page}/impact`)
 
-    await user.click(await screen.findByRole('radio', { name: 'Financial Major' }))
-    expect(within(categoryRow('Financial')).getByText('Major', { selector: 'span:not(.sr-only)' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Add Financial rationale' }))
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Major'))
+    expect(radio('Financial', 'Major')).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Financial Rationale' }))
     await user.type(screen.getByRole('textbox', { name: 'Financial rationale' }), 'Recall of the vehicle series')
-    await user.click(screen.getByRole('radio', { name: 'Operational Omitted' }))
+    await user.click(radio('Operational', 'Omitted'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
@@ -229,7 +249,8 @@ describe('damage scenario impact', () => {
   it('requires a rationale to omit a category', async () => {
     const { user, api } = renderApp(`${page}/impact`)
 
-    await user.click(await screen.findByRole('radio', { name: 'Financial Omitted' }))
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Omitted'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     const rationale = screen.getByRole('textbox', { name: 'Financial rationale' })
@@ -250,12 +271,13 @@ describe('damage scenario impact', () => {
     ])
     const { user } = renderApp(`${page}/impact`, api)
 
-    await user.click(await screen.findByRole('radio', { name: 'Financial Omitted' }))
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Omitted'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(screen.getAllByRole('alert').map((alert) => alert.textContent)).toEqual([
-      'Rate another category before omitting Financial.',
-      'Rate another category before omitting Privacy.',
+      'Financial can only be omitted if another category is rated.',
+      'Privacy can only be omitted if another category is rated.',
     ])
   })
 
@@ -264,11 +286,12 @@ describe('damage scenario impact', () => {
     api.damageScenarios.updateImpactRatings = () => Promise.reject(new Error('network'))
     const { user } = renderApp(`${page}/impact`, api)
 
-    await user.click(await screen.findByRole('radio', { name: 'Financial Negligible' }))
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Negligible'))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
-    expect(screen.getByRole('radio', { name: 'Financial Negligible' })).toBeChecked()
+    expect(radio('Financial', 'Negligible')).toBeChecked()
   })
 
   it('shows an error when the impact ratings cannot be loaded', async () => {
