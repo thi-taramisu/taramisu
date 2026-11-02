@@ -1,12 +1,19 @@
 #!/bin/sh
 # Sets up and updates taramisu on a Debian VM (#110). Run as root.
 #
-#   sudo deploy/taramisu-ctl.sh --bootstrap   # blank VM: install Docker, then set up the stack
+#   sudo deploy/taramisu-ctl.sh --bootstrap           # blank VM: install Docker, then set up the stack
+#   sudo deploy/taramisu-ctl.sh                       # update: pull images, migrate, recreate changed containers
+#   sudo deploy/taramisu-ctl.sh --set api=v0.3.0      # pin a tag (api, frontend, docs); repeatable
+#   sudo deploy/taramisu-ctl.sh --set api=latest      # remove the pin again
+#   sudo deploy/taramisu-ctl.sh --prune               # also remove unused old images after the update
+#
+# Pinned tags are kept in deploy/.image-tags (not in Git), so later runs keep them.
 set -eu
 cd "$(dirname "$0")"
 
 usage() {
-    echo 'Usage: sudo deploy/taramisu-ctl.sh --bootstrap' >&2
+    echo 'Usage: sudo deploy/taramisu-ctl.sh [--bootstrap] [--set SERVICE=TAG]... [--prune]' >&2
+    echo '       SERVICE is api, frontend or docs; TAG e.g. latest, v0.3.0, sha-a1b2c3d' >&2
     exit 2
 }
 
@@ -78,6 +85,36 @@ ensure_env() {
     log "iam/.env ok ($(stat -c %a ../iam/.env))"
 }
 
+tags_file=.image-tags
+
+# --set api=v0.3.0 -> API_IMAGE_TAG=v0.3.0 in .image-tags; "latest" removes the pin.
+set_tag() {
+    service=${1%%=*}
+    tag=${1#*=}
+    case "$service" in
+        api | frontend | docs) ;;
+        *) die "unknown service '$service' in --set (api, frontend or docs)" ;;
+    esac
+    printf '%s' "$tag" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$' || die "invalid tag '$tag'"
+    var=$(printf '%s_IMAGE_TAG' "$service" | tr '[:lower:]' '[:upper:]')
+    touch "$tags_file"
+    grep -v "^$var=" "$tags_file" > "$tags_file.new" || true
+    if [ "$tag" != latest ]; then
+        echo "$var=$tag" >> "$tags_file.new"
+    fi
+    mv "$tags_file.new" "$tags_file"
+    log "$service: ${tag}"
+}
+
+load_tags() {
+    if [ -s "$tags_file" ]; then
+        log "Pinned tags: $(tr '\n' ' ' < "$tags_file")"
+        set -a
+        . "./$tags_file"
+        set +a
+    fi
+}
+
 # Server stack: compose.yaml only (no dev ports), images from GHCR instead of local builds.
 compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
 
@@ -136,16 +173,47 @@ start_stack() {
     compose exec -T proxy nginx -s reload
 }
 
-bootstrap() {
-    ensure_docker
-    ensure_env
-    pull_images
-    start_stack
-}
+bootstrap=false
+prune=false
+sets=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --bootstrap) bootstrap=true ;;
+        --prune) prune=true ;;
+        --set)
+            [ "$#" -ge 2 ] || usage
+            sets="$sets $2"
+            shift
+            ;;
+        --set=*) sets="$sets ${1#--set=}" ;;
+        -h | --help) usage ;;
+        *) usage ;;
+    esac
+    shift
+done
 
 [ "$(id -u)" -eq 0 ] || die 'run as root: sudo deploy/taramisu-ctl.sh ...'
 export DEBIAN_FRONTEND=noninteractive
-case "${1:-}" in
-    --bootstrap) bootstrap ;;
-    *) usage ;;
-esac
+
+if $bootstrap; then
+    ensure_docker
+    ensure_env
+else
+    command -v docker > /dev/null 2>&1 || die 'Docker is not installed; run with --bootstrap first'
+    [ -e ../iam/.env ] || die 'iam/.env is missing; run with --bootstrap first'
+    start_docker
+fi
+for item in $sets; do
+    case "$item" in
+        *=*) set_tag "$item" ;;
+        *) die "--set expects SERVICE=TAG, got '$item'" ;;
+    esac
+done
+load_tags
+pull_images
+start_stack
+if $prune; then
+    log 'Removing unused images'
+    # -a: also tagged images that no container uses any more, e.g. an old pinned version.
+    docker image prune -af > /dev/null
+fi
