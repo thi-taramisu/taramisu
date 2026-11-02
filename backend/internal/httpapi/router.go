@@ -15,6 +15,9 @@ import (
 type Queries interface {
 	handlers.StatusReader
 	handlers.TaraProjectStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
 }
 
 func New(queries Queries, manager *auth.Manager) http.Handler {
@@ -52,6 +55,9 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	huma.Get(api, "/health/ready", h.Ready)
 	registerAuth(api, manager)
 	handlers.NewTaraProject(queries).Register(api)
+	handlers.NewAttackPath(queries).Register(api)
+	handlers.NewAttackFeasibilityRating(queries).Register(api)
+	handlers.NewThreatAttackPathLink(queries).Register(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user", Method: http.MethodGet, Path: "/api/v1/me",
 		Summary: "Get the current user", Security: []map[string][]string{{"session": {}}},

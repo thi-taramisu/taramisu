@@ -14,12 +14,16 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
 const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
 	statusReaderFunc
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
 	project db.TaraProject
 	found   bool
 }
