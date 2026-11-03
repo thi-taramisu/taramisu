@@ -326,6 +326,24 @@ describe('damage scenario impact', () => {
     expect(ratings.find((r) => r.impact_category === 'SAFETY')).toMatchObject({ rating_value: 'SEVERE', reused_from_functional_safety: true })
   })
 
+  it('saves the rationale trimmed and a blank one as none', async () => {
+    const { user, api } = renderApp(`${page}/impact`)
+
+    await screen.findByRole('radiogroup', { name: 'Financial' })
+    await user.click(radio('Financial', 'Major'))
+    await user.click(screen.getByRole('button', { name: 'Financial Rationale' }))
+    await user.type(screen.getByRole('textbox', { name: 'Financial rationale' }), '  Recall of the vehicle series  ')
+    await user.click(screen.getByRole('button', { name: 'Operational Rationale' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Operational rationale' }))
+    await user.type(screen.getByRole('textbox', { name: 'Operational rationale' }), '   ')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    const ratings = await api.damageScenarios.impactRatings('headlamp', 'ds-01')
+    expect(ratings.find((r) => r.impact_category === 'FINANCIAL')?.omission_or_rating_rationale).toBe('Recall of the vehicle series')
+    expect(ratings.find((r) => r.impact_category === 'OPERATIONAL')?.omission_or_rating_rationale).toBeNull()
+  })
+
   it('requires a rationale to omit a category', async () => {
     const { user, api } = renderApp(`${page}/impact`)
 

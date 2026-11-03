@@ -122,7 +122,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
         impact_category: value,
         rating_value: values[value].rating,
         is_omitted_by_pm_15_07: values[value].rating === 'OMITTED',
-        omission_or_rating_rationale: values[value].rationale || null,
+        omission_or_rating_rationale: values[value].rationale.trim() || null,
         reused_from_functional_safety: value === 'SAFETY' && values[value].reusedFromFunctionalSafety,
       })),
       {
