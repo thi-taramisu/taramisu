@@ -8,18 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
-	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
 // propertyFixture holds a test API, database transaction, and IDs from two separate item definitions.
 // The second item provides records used to verify that references cannot cross item boundaries.
 type propertyFixture struct {
 	tx                                              pgx.Tx
-	api                                             humatest.TestAPI
+	api                                             *routeAPI
 	item, otherItem, asset, secondAsset, otherAsset string
 	property, otherProperty                         string
 	damage, secondDamage, otherDamage               string
@@ -83,13 +81,8 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 	}{{&f.threat, f.item}, {&f.secondThreat, f.item}, {&f.otherThreat, f.otherItem}} {
 		*row.dest = insertID("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'threat') RETURNING id", row.item)
 	}
-	_, f.api = humatest.New(t)
-	// Use the same transaction for fixture setup and handler queries so all changes roll back together.
-	queries := db.New(tx)
-	handlers.NewAssets(queries).Register(f.api)
-	handlers.NewAssetCybersecurityProperties(queries).Register(f.api)
-	handlers.NewDamageScenarioAssetProperties(queries).Register(f.api)
-	handlers.NewThreatScenarioAssetProperties(queries).Register(f.api)
+	// Fixture setup and handler queries share the transaction and roll back together.
+	f.api = newRouteAPI(t, db.New(tx))
 	return f
 }
 

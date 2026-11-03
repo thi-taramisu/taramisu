@@ -130,6 +130,14 @@ CI verifies that migrations and generated Go models are in sync with `db/schema.
 
 ## Tests and coverage
 
+Following the backend architecture in [PR #159](https://github.com/thi-taramisu/taramisu/pull/159),
+asset, cybersecurity property, and scenario-link route tests send HTTP requests through `httpapi.New`.
+Unit tests inject fake stores; integration tests use `db.New(tx)` with a rolled-back transaction.
+Both obtain a real session manager and cookie via `authtest.Login(t)`, which completes login against
+a local fake OIDC provider. Requests without a session are checked separately for `401` responses.
+The shared request helper in `internal/httpapi/handlers/routes_test.go` adds the session cookie;
+tests must not register resource handlers directly on a bare test API.
+
 Run unit tests with `make test`. Without `TEST_DATABASE_URL`, `TestPostgresReadiness` skips;
 with it set, the test connects to PostgreSQL and checks `/health/ready` against the migrated database.
 

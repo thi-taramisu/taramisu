@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -62,8 +61,7 @@ func TestAssetValidation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.method+tc.path+tc.body, func(t *testing.T) {
 			s := &assetStore{}
-			_, api := humatest.New(t)
-			handlers.NewAssets(s).Register(api)
+			api := newRouteAPI(t, assetQueries{assetStore: s})
 			r := api.Do(tc.method, tc.path, strings.NewReader(tc.body))
 			if r.Code != 422 || s.calls != 0 {
 				t.Fatalf("got %d, calls %d: %s", r.Code, s.calls, r.Body)
@@ -85,8 +83,7 @@ func TestAssetErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &assetStore{err: tc.err}
-			_, api := humatest.New(t)
-			handlers.NewAssets(s).Register(api)
+			api := newRouteAPI(t, assetQueries{assetStore: s})
 			r := api.Do(tc.method, tc.path, strings.NewReader(assetJSON))
 			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
 				t.Fatalf("got %d, want %d: %s", r.Code, tc.want, r.Body)

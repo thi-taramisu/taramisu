@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
@@ -42,8 +41,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	_, api := humatest.New(t)
-	handlers.NewAssets(db.New(tx)).Register(api)
+	api := newRouteAPI(t, db.New(tx))
 	collection := "/api/v1/item-definitions/" + item + "/assets"
 	otherCollection := "/api/v1/item-definitions/" + otherItem + "/assets"
 	created := api.Post(collection, map[string]any{"name": "ECU", "description": "original", "identification_source": "ITEM_DEF"})

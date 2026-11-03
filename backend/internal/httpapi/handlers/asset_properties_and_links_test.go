@@ -6,13 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
-	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
 // propertyErrorStore is a fake database shared by property and link handler tests.
@@ -133,19 +130,18 @@ func (s *propertyErrorStore) DeleteThreatScenarioAssetProperty(context.Context, 
 // propertyRouteCase describes one resource so the same assertions can exercise all three APIs.
 type propertyRouteCase struct {
 	name, collection, member, body string
-	register                       func(huma.API)
 }
 
-// propertyRouteCases builds valid example requests and registration functions for properties and both link types.
-func propertyRouteCases(s *propertyErrorStore) []propertyRouteCase {
+// propertyRouteCases builds valid example requests and paths for properties and both link types.
+func propertyRouteCases() []propertyRouteCase {
 	root := "/api/v1/item-definitions/" + itemID
 	propertyCollection := root + "/assets/" + assetID + "/cybersecurity-properties"
 	return []propertyRouteCase{
-		{"property", propertyCollection, propertyCollection + "/" + assetID, `{"property_type":"INTEGRITY"}`, handlers.NewAssetCybersecurityProperties(s).Register},
+		{"property", propertyCollection, propertyCollection + "/" + assetID, `{"property_type":"INTEGRITY"}`},
 		{"damage", root + "/damage-scenario-asset-properties", root + "/damage-scenario-asset-properties/" + assetID,
-			`{"damage_scenario_id":"` + assetID + `","asset_cybersecurity_property_id":"` + assetID + `"}`, handlers.NewDamageScenarioAssetProperties(s).Register},
+			`{"damage_scenario_id":"` + assetID + `","asset_cybersecurity_property_id":"` + assetID + `"}`},
 		{"threat", root + "/threat-scenario-asset-properties", root + "/threat-scenario-asset-properties/" + assetID,
-			`{"threat_scenario_id":"` + assetID + `","asset_cybersecurity_property_id":"` + assetID + `"}`, handlers.NewThreatScenarioAssetProperties(s).Register},
+			`{"threat_scenario_id":"` + assetID + `","asset_cybersecurity_property_id":"` + assetID + `"}`},
 	}
 }
 
@@ -165,10 +161,9 @@ func TestAssetCybersecurityPropertyErrors(t *testing.T) {
 	} {
 		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "LIST"} {
 			s := &propertyErrorStore{err: dbError.err}
-			for _, route := range propertyRouteCases(s) {
+			for _, route := range propertyRouteCases() {
 				t.Run(dbError.name+"/"+method+"/"+route.name, func(t *testing.T) {
-					_, api := humatest.New(t)
-					route.register(api)
+					api := newRouteAPI(t, propertyQueries{propertyErrorStore: s})
 					path, actualMethod := route.member, method
 					if method == "POST" || method == "LIST" {
 						path = route.collection
@@ -191,7 +186,7 @@ func TestAssetCybersecurityPropertyErrors(t *testing.T) {
 // Invalid requests must be rejected before any database method is called.
 func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 	s := &propertyErrorStore{}
-	for _, route := range propertyRouteCases(s) {
+	for _, route := range propertyRouteCases() {
 		cases := []struct{ method, path, body string }{
 			{"POST", route.collection, "{}"},
 			{"POST", route.collection, "null"},
@@ -227,8 +222,7 @@ func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 		}
 		for _, tc := range cases {
 			t.Run(route.name+"/"+tc.method+tc.path+tc.body, func(t *testing.T) {
-				_, api := humatest.New(t)
-				route.register(api)
+				api := newRouteAPI(t, propertyQueries{propertyErrorStore: s})
 				s.calls = 0
 				response := api.Do(tc.method, tc.path, strings.NewReader(tc.body))
 				want := 422
