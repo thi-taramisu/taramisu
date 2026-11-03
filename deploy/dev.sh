@@ -56,9 +56,11 @@ if ! compose exec -T authentik-worker ak apply_blueprint \
     /blueprints/system/providers-oauth2.yaml \
     /blueprints/default/flow-password-change.yaml \
     /blueprints/default/flow-default-authentication-flow.yaml \
+    /blueprints/default/flow-default-user-settings-flow.yaml \
     /blueprints/default/flow-default-provider-authorization-implicit-consent.yaml \
     /blueprints/default/flow-default-provider-invalidation.yaml \
     /blueprints/custom/taramisu.yaml \
+    /blueprints/custom/enrollment.yaml \
     /blueprints/custom/branding.yaml > ../iam/.blueprint.log 2>&1; then
     echo 'Authentik provisioning failed. Details: iam/.blueprint.log (private; may contain secrets).' >&2
     exit 1
