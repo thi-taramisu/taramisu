@@ -5,7 +5,7 @@
 #
 #   deploy/test-bootstrap.sh                 # run taramisu-ctl.sh --bootstrap
 #   deploy/test-bootstrap.sh sh              # open a shell in the fresh "VM" instead
-#   deploy/test-bootstrap.sh <command ...>   # run any other command in /opt/taramisu
+#   deploy/test-bootstrap.sh <command ...>   # run any other command in the repository copy (/opt)
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -19,9 +19,10 @@ if [ -t 0 ] && [ -t 1 ]; then
 fi
 
 # /var/lib/docker gets its own anonymous volume: the inner Docker cannot put overlays on the container's overlay.
-container=$(docker create -i $tty --rm --privileged -v /var/lib/docker -w /opt/taramisu "$image" "$@")
+container=$(docker create -i $tty --rm --privileged -v /var/lib/docker -w /opt "$image" "$@")
 trap 'docker rm -f "$container" > /dev/null 2>&1 || true' EXIT INT TERM
+# The repository goes straight to /opt; plain tar options only, so bsdtar (macOS) works as well.
 git ls-files -z --cached --others --exclude-standard \
-    | tar --null -T - --transform 's,^,taramisu/,' -cf - \
+    | tar --null -T - -cf - \
     | docker cp - "$container":/opt
 docker start -a -i "$container"
