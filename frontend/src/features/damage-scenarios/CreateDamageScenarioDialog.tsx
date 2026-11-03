@@ -69,6 +69,11 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   }
 
   async function create(name: string) {
+    // The links only count once the assets are there, so "Link at least one asset" would be wrong.
+    if (!assets) {
+      setLinkError('The assets are still loading.')
+      return undefined
+    }
     if (linked.length === 0) {
       setLinkError('Link at least one asset.')
       return undefined

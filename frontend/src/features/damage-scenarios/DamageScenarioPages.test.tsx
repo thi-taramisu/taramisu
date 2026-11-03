@@ -110,6 +110,31 @@ describe('create damage scenario', () => {
     expect((await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-02')!.children).toBeUndefined()
   })
 
+  it('does not create before the assets of the item are loaded', async () => {
+    const api = createMockItemApi()
+    const assets = api.content.assets
+    let loadAssets!: () => void
+    // Only the first request for the item waits, the refetch after creating answers at once.
+    api.content.assets = (projectId, itemId) => {
+      if (itemId !== 'i-01') return assets(projectId, itemId)
+      api.content.assets = assets
+      return new Promise((resolve) => {
+        loadAssets = () => resolve(assets(projectId, itemId))
+      })
+    }
+    const { user } = renderApp(`${project}/assets/a-02`, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('The assets are still loading.')
+
+    act(() => loadAssets())
+    await within(dialog).findByRole('button', { name: 'A-02 Integrity' })
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(await screen.findByRole('heading', { name: 'DS-02 Manipulated firmware' })).toBeInTheDocument()
+  })
+
   it('keeps the dialog open with "Create & add another"', async () => {
     const { user } = renderApp(`${project}/assets/a-02`)
     const dialog = await openNewDamageScenarioDialog(user)
