@@ -262,7 +262,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
             {/* The negative margin lines the icon up with the rating segments above. */}
-            <Button type="button" variant="ghost" size="sm" className="-ml-1.5">
+            <Button type="button" variant="ghost" size="sm" className="relative -ml-1.5">
               <MessageSquareText aria-hidden="true" data-icon="inline-start" />
               <span className="sr-only">{category.label}</span> Rationale
               <ChevronDown aria-hidden="true" data-icon="inline-end" className={cn('transition-transform', expanded && 'rotate-180')} />
