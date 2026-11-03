@@ -76,6 +76,9 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 	if a.Name != nil {
 		p.Name = *a.Name
 	}
+	if a.SetDescription {
+		p.Description = a.Description
+	}
 	return p, nil
 }
 
@@ -87,7 +90,7 @@ func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, e
 }
 
 func TestTaraProjectRoutes(t *testing.T) {
-	base := "/api/tara-projects"
+	base := "/api/v1/projects"
 	manager, session := authtest.Login(t)
 	for _, tc := range []struct {
 		name   string
@@ -127,12 +130,43 @@ func TestTaraProjectRoutes(t *testing.T) {
 
 func TestTaraProjectListBody(t *testing.T) {
 	manager, session := authtest.Login(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/tara-projects", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects", http.NoBody)
 	req.AddCookie(session)
 	rr := httptest.NewRecorder()
 	httpapi.New(newFakeProjects(false), manager).ServeHTTP(rr, req)
 	var got []any
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil || got == nil || len(got) != 0 {
 		t.Fatalf("body = %s, want []", rr.Body.String())
+	}
+}
+
+func TestTaraProjectPatchDescription(t *testing.T) {
+	manager, session := authtest.Login(t)
+	for _, tc := range []struct {
+		name string
+		body string
+		want any
+	}{
+		{"omitted keeps description", `{"name":"c"}`, "desc"},
+		{"null clears description", `{"description":null}`, nil},
+		{"value replaces description", `{"description":"new"}`, "new"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/"+projectID, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(session)
+			rr := httptest.NewRecorder()
+			httpapi.New(newFakeProjects(true), manager).ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d: %s", rr.Code, rr.Body.String())
+			}
+			var got map[string]any
+			if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+			if got["description"] != tc.want {
+				t.Fatalf("description = %v, want %v: %s", got["description"], tc.want, rr.Body.String())
+			}
+		})
 	}
 }

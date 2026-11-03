@@ -13,7 +13,7 @@ UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING *;
 -- name: UpdateTaraProject :one
 UPDATE tara_project
 SET name = COALESCE(sqlc.narg('name'), name),
-    description = COALESCE(sqlc.narg('description'), description)
+    description = CASE WHEN sqlc.arg('set_description')::boolean THEN sqlc.narg('description')::text ELSE description END
 WHERE id = @id
 RETURNING *;
 

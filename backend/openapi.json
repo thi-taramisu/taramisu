@@ -162,7 +162,10 @@
         "additionalProperties": false,
         "properties": {
           "description": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "name": {
             "minLength": 1,
@@ -207,7 +210,40 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/tara-projects": {
+    "/api/v1/me": {
+      "get": {
+        "operationId": "current-user",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Get the current user"
+      }
+    },
+    "/api/v1/projects": {
       "get": {
         "operationId": "list-tara-projects",
         "responses": {
@@ -293,7 +329,7 @@
         ]
       }
     },
-    "/api/tara-projects/{id}": {
+    "/api/v1/projects/{id}": {
       "delete": {
         "operationId": "delete-tara-project",
         "parameters": [
@@ -486,39 +522,6 @@
         "tags": [
           "Tara Project"
         ]
-      }
-    },
-    "/api/v1/me": {
-      "get": {
-        "operationId": "current-user",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorModel"
-                }
-              }
-            },
-            "description": "Error"
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "summary": "Get the current user"
       }
     },
     "/auth/callback": {

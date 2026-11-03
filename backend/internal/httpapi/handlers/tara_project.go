@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -30,7 +32,7 @@ func NewTaraProject(store TaraProjectStore) *TaraProject {
 }
 
 func (h *TaraProject) Register(api huma.API) {
-	const collection = "/api/tara-projects"
+	const collection = "/api/v1/projects"
 	const member = collection + "/{id}"
 	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
 		Name: "Tara Project", Description: "Create, read, replace, update and delete TARA projects.",
@@ -85,11 +87,28 @@ type ReplaceTaraProjectInput struct {
 	}
 }
 
+// Optional distinguishes an omitted PATCH field from an explicit JSON null.
+type Optional[T any] struct {
+	Set   bool
+	Value *T
+}
+
+func (o *Optional[T]) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	return json.Unmarshal(data, &o.Value)
+}
+
+func (o Optional[T]) Schema(r huma.Registry) *huma.Schema {
+	s := *r.Schema(reflect.TypeFor[T](), true, "")
+	s.Nullable = true
+	return &s
+}
+
 type UpdateTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        *string `json:"name,omitempty" minLength:"1"`
-		Description *string `json:"description,omitempty"`
+		Name        *string          `json:"name,omitempty" minLength:"1"`
+		Description Optional[string] `json:"description,omitempty"`
 	}
 }
 
@@ -150,9 +169,10 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 		return nil, err
 	}
 	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:          id,
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
+		ID:             id,
+		Name:           in.Body.Name,
+		SetDescription: in.Body.Description.Set,
+		Description:    in.Body.Description.Value,
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
