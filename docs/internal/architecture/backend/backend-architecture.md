@@ -15,6 +15,9 @@ Store interface
    |
    +----> Real Store
    |         |
+   |         +----> Integration tests
+   |         |      (PostgreSQL, rolled-back transaction)
+   |         |
    |         v
    |      Generated DB code
    |         |
@@ -64,3 +67,11 @@ together. Handlers are not registered on a bare `humatest` API, because that ski
   `httpapi.New` and add the cookie to each request. `authtest` is a temporary fake of the login flow and may change, so tests should only
   use `authtest.Login` and not build their own.
 - **Unauthenticated requests** - Tests that expect `401` send the request without the cookie.
+
+### Two test types per resource
+
+- **Unit test** - Wide matrix (status codes, validation, error mapping) with a fake store. No database, always runs.
+- **Integration test** - One lifecycle (create, get, update, replace, delete) through `httpapi.New` against `db.New(tx)`. It runs inside a
+  transaction that is rolled back and skips without `TEST_DATABASE_URL`.
+
+Both go through the same entry point. Only the store differs. Run the integration tests with the stack's database, see the backend README.
