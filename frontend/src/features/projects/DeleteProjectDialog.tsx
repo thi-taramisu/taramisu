@@ -12,19 +12,28 @@ type DeleteProjectDialogProps = {
   projectName: string | null
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
+  returnFocusTo?: HTMLButtonElement | null
 }
 
 export function DeleteProjectDialog({
   projectName,
   onOpenChange,
   onConfirm,
+  returnFocusTo,
 }: DeleteProjectDialogProps) {
   return (
     <Dialog
       open={projectName !== null}
       onOpenChange={onOpenChange}
     >
-      <DialogContent>
+      <DialogContent
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo?.isConnected) {
+            event.preventDefault()
+            returnFocusTo.focus()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Delete Project?</DialogTitle>
           <DialogDescription>
