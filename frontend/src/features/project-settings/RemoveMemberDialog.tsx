@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { Member } from './headlampSettings'
+import type { Member } from '../../api/models/project'
 
 interface RemoveMemberDialogProps {
   /** Member to confirm, null keeps the dialog closed. */

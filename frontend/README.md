@@ -13,7 +13,7 @@ npm run preview    # preview the production build on http://localhost:4173
 npm run lint -- --deny-warnings
 npm run typecheck  # app, tooling and E2E TypeScript
 npm run test:coverage # unit/integration tests, 70% minimum
-npm run generate:api  # regenerate src/api/schema.d.ts from openapi/openapi.yaml
+npm run generate:api  # regenerate src/api/schema.d.ts from ../backend/openapi.json
 npm test           # run tests once
 npm run test:watch # tests in watch mode
 npm run test:e2e   # Playwright against the production preview
@@ -25,13 +25,13 @@ See the [testing workflow](../docs/internal/dev-workflow/frontend-testing.md) fo
 
 ```text
 src/
-  api/                         # typed API client (openapi-fetch), generated schema.d.ts
+  api/                         # everything the app reads from the backend, real and mocked (see "API client")
   components/ui/               # shadcn/ui components (added via the shadcn CLI, owned by us)
   lib/                         # shared helpers
   pages/                       # route-level components
-  features/api-status/         # example: typed GET /health via openapi-react-query
+  features/api-status/         # example: typed GET /health/live on the real backend
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
-  features/items/              # item pages: item API (interface + in-memory mock), query hooks, create/delete dialogs, tabs
+  features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
@@ -53,8 +53,38 @@ on leave; reduced-motion preferences disable the animation.
 
 ## API client
 
-The client is typed against the OpenAPI spec in `openapi/openapi.yaml`, which is only a stub for now. The reasoning behind the setup is in
-[ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). The base URL comes from `VITE_API_BASE_URL` and defaults to `/api/v1`.
+The client is typed against the backend's spec `backend/openapi.json`; the reasoning behind the setup is in
+[ADR 0001](../docs/internal/adr/0001-frontend-api-client.md). After an API change, regenerate both files and commit them:
+
+```bash
+cd backend && make openapi            # backend/openapi.json
+cd ../frontend && npm run generate:api  # src/api/schema.d.ts
+```
+
+CI regenerates `schema.d.ts` and fails if it differs from the committed file, also when only `backend/openapi.json` changed.
+
+The paths in the spec are complete (`/api/v1/me`, `/health/live`, `/auth/login`): the backend mounts them that way and `proxy/nginx.conf`
+forwards the full URI. So the base URL is only the origin: same origin by default, `VITE_API_BASE_URL` for a backend elsewhere. For
+`npm run dev`, Vite forwards `/api`, `/auth` and `/health` to `VITE_API_PROXY_TARGET` (default `http://localhost:8080`).
+
+`src/api/` keeps real and mocked data apart:
+
+```text
+src/api/
+  client.ts, schema.d.ts   # REAL: openapi-fetch client, types generated from backend/openapi.json
+  queries/backend.ts       # REAL: hooks on the client (health, current user)
+  errors.ts                # ApiError, which every service rejects with
+  models/                  # domain types of the views; hand-written until their routes are in the spec
+  services/                # service interfaces the views use (e.g. ItemService)
+  queries/items.ts         # TanStack Query hooks on the services
+  ApiProvider.tsx          # provides the client and the service implementations
+  mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
+```
+
+`src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
+`ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
+model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
+that has no service yet (project list, project settings, example project).
 
 ## UI components
 

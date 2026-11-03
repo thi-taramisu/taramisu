@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ItemDefinitionDiagram } from '../item-definition/ItemDefinitionDiagram'
-import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from './itemApi'
-import { useItem, useUpdateItem } from './queries'
+import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../../api/models/item'
+import { useItem, useUpdateItem } from '../../api/queries/items'
 
 // The React Flow diagram only exists for the headlamp example so far.
 const EXAMPLE_DIAGRAM_ITEM = 'i-01'

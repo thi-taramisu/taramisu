@@ -15,8 +15,9 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
-import { mockProjects, type Project } from '@/features/projects/mockProjects'
-import { exampleProject } from '../features/workspace/exampleProject'
+import { exampleProject } from '@/api/mocks/data/headlamp'
+import { mockProjects } from '@/api/mocks/data/projects'
+import type { Project } from '@/api/models/project'
 
 type MainView = 'projects' | 'archive'
 

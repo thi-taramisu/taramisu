@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { ENTITY_TYPES, type EntityType } from './features/workspace/entities'
+import type { EntityType } from './api/models/tree'
+import { ENTITY_TYPES } from './features/workspace/entities'
 import { renderApp as renderAt } from './test/renderApp'
 
 const project = '/projects/headlamp'
