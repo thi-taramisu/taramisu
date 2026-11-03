@@ -1,5 +1,6 @@
 """Live flow regressions; run through ak shell (see README)."""
 
+import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -9,7 +10,7 @@ from requests import Session
 
 from authentik.core.models import User
 
-BASE = "http://authentik-server:9000"
+BASE = f"http://authentik-server:9000{os.environ.get('AUTHENTIK_WEB__PATH', '').rstrip('/')}"
 
 
 class EnrollmentTest(unittest.TestCase):
