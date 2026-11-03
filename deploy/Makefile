@@ -1,7 +1,7 @@
-COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
+COMPOSE = docker compose --env-file ../iam/.env $(if $(wildcard ../storage/.env),--env-file ../storage/.env) -f compose.yaml
 
 .DEFAULT_GOAL := up
-.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate test
+.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate test test-storage
 init:
 	./dev.sh --init
 up:
@@ -23,3 +23,5 @@ migrate-validate: init
 	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
 test:
 	sh dev_test.sh
+test-storage:
+	python3 ../storage/integration_test.py

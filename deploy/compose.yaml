@@ -1,6 +1,7 @@
 name: taramisu
 
 include:
+  - ./compose.storage.yaml
   - ./compose.backend.yaml
   - ./compose.iam.yaml
   - ./compose.frontend.yaml

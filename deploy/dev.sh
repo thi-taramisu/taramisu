@@ -38,7 +38,34 @@ if [ ! -e ../iam/.env ]; then
     echo 'Generated local secrets in iam/.env (ignored by Git).'
 fi
 
-compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
+missing_storage_keys=""
+for key in S3_ROOT_ACCESS_KEY S3_ROOT_SECRET_KEY S3_ACCESS_KEY S3_SECRET_KEY; do
+    if [ ! -f ../storage/.env ] || ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?$key[[:space:]]*=" ../storage/.env; then
+        missing_storage_keys="$missing_storage_keys $key"
+    fi
+done
+if [ -n "$missing_storage_keys" ]; then
+    docker info > /dev/null 2>&1 || { echo 'Docker must be running to check for existing storage data.' >&2; exit 1; }
+    if docker volume inspect "${COMPOSE_PROJECT_NAME:-taramisu}-storage_data" > /dev/null 2>&1; then
+        echo 'Existing storage data found with missing credentials. Restore storage/.env.' >&2
+        exit 1
+    fi
+    env_tmp=$(mktemp ../storage/.env.XXXXXX)
+    trap 'rm -f "$env_tmp"' EXIT HUP INT TERM
+    if [ -f ../storage/.env ]; then cat ../storage/.env > "$env_tmp"; fi
+    printf '\n' >> "$env_tmp"
+    for key in $missing_storage_keys; do
+        value=$(openssl rand -hex 32)
+        printf '%s=%s\n' "$key" "$value" >> "$env_tmp"
+    done
+    if ! grep -q '^S3_BUCKET=' "$env_tmp"; then printf 'S3_BUCKET=taramisu-uploads\n' >> "$env_tmp"; fi
+    mv "$env_tmp" ../storage/.env
+    trap - EXIT HUP INT TERM
+    echo 'Added missing credentials to storage/.env.'
+fi
+chmod 600 ../storage/.env
+
+compose() { docker compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml "$@"; }
 chmod 600 ../iam/.env
 compose config --quiet
 if [ "${1:-}" = --init ]; then
@@ -48,7 +75,7 @@ if ! compose up -d --wait --wait-timeout 60 authentik-db; then
     echo 'Authentik database readiness failed. Check database logs and PG_PASS in iam/.env; an existing volume keeps its original database password.' >&2
     exit 1
 fi
-compose up -d --wait --wait-timeout 240 authentik-server authentik-worker
+compose up -d --wait --wait-timeout 480 authentik-server authentik-worker
 # Blueprint output may contain secrets.
 : > ../iam/.blueprint.log
 chmod 600 ../iam/.blueprint.log
