@@ -3,6 +3,7 @@ export type Project = {
   id: string
   name: string
   description: string
+  image?: string
   favorite: boolean
   archived: boolean
   owner: string
