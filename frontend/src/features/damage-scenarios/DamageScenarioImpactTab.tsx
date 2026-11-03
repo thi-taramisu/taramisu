@@ -258,7 +258,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
         </Button>
       </div>
       {/* Contained, so a long rationale wraps instead of widening the box, which only fits the ratings. */}
-      <Collapsible open={expanded} onOpenChange={setOpen} className="grid gap-2 contain-inline-size @xl:col-start-2">
+      <Collapsible open={expanded} onOpenChange={setOpen} className="grid grid-cols-1 gap-2 contain-inline-size @xl:col-start-2">
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
             {/* The negative margin lines the icon up with the rating segments above. */}
