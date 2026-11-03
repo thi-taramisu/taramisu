@@ -24,11 +24,14 @@ export interface Member {
 export interface ProjectDetails {
   name: string
   description: string
+  /** URL of the project image, null if the project has none. */
+  image: string | null
 }
 
 export const headlampDetails: ProjectDetails = {
   name: exampleProject.name,
   description: 'TARA of the headlamp system, the example project of the course.',
+  image: null,
 }
 
 export const headlampMembers: Member[] = [
