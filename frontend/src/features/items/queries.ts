@@ -9,6 +9,7 @@ const keys = {
   project: (projectId: string) => ['projects', projectId] as const,
   tree: (projectId: string) => ['projects', projectId, 'tree'] as const,
   item: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId] as const,
+  children: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'children'] as const,
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
 }
@@ -31,6 +32,16 @@ export function useProjectTree(projectId: string, { enabled = true } = {}) {
         })),
       )
     },
+  })
+}
+
+/** The elements below one item. Unlike the tree, a failed request is an error and not an empty list. */
+export function useItemChildren(projectId: string, itemId: string, { enabled = true } = {}) {
+  const api = useItemApi()
+  return useQuery({
+    enabled,
+    queryKey: keys.children(projectId, itemId),
+    queryFn: () => api.content.children(projectId, itemId),
   })
 }
 
