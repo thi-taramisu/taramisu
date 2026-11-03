@@ -6,8 +6,19 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { sentryEnabled } from './sentry.ts'
+import { type Api, ApiProvider } from './api/ApiProvider'
+import { createApiClient } from './api/client'
+import { retryUnlessNotFound } from './api/errors'
+import { createMockItemApi } from './api/mocks/mockItemApi'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryUnlessNotFound } } })
+
+const api: Api = {
+  // Real: the generated client against the backend.
+  client: createApiClient(),
+  // Mocked until the item routes (#83) are in `backend/openapi.json`.
+  ...createMockItemApi(),
+}
 
 createRoot(document.getElementById('root')!, sentryEnabled ? {
   onUncaughtError: Sentry.reactErrorHandler(),
@@ -16,9 +27,11 @@ createRoot(document.getElementById('root')!, sentryEnabled ? {
 } : undefined).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <ApiProvider api={api}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ApiProvider>
     </QueryClientProvider>
   </StrictMode>,
 )
