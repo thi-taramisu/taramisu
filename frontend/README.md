@@ -30,17 +30,19 @@ src/
   lib/                         # shared helpers
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health via openapi-react-query
-  features/workspace/          # project workspace: layout with element tree, element pages with tabs, example data
+  features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
+  features/items/              # item pages: item API (interface + in-memory mock), query hooks, create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
+  test/renderApp.tsx           # renders the app with a fresh mock item API and query cache
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
-`/projects/headlamp/items/i-01` for the item definition diagram. The route concept is in
-[`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
+`/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
+The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
 entity independently expandable, highlights the active entity on its subpages, and preserves URL query parameters (including graph view).

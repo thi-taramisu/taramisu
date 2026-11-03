@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { Asset, CiaProperty } from './headlampAssets'
+import type { CiaProperty, NewAsset } from '../items/itemApi'
 
 const PROPERTIES: { value: CiaProperty; label: string }[] = [
   { value: 'C', label: 'Confidentiality' },
@@ -19,31 +20,49 @@ const PROPERTIES: { value: CiaProperty; label: string }[] = [
   { value: 'A', label: 'Availability' },
 ]
 
-/** Example of a shadcn/ui dialog with a small form. */
-export function AddAssetDialog({ onAdd }: { onAdd: (asset: Omit<Asset, 'id'>) => void }) {
+/** Dialog to add an asset to the current item. */
+export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<unknown> }) {
   const [open, setOpen] = useState(false)
+  const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle')
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
-    onAdd({
-      name: String(form.get('name')),
-      component: String(form.get('component')),
-      properties: PROPERTIES.map((p) => p.value).filter((value) => form.has(value)),
-    })
-    setOpen(false)
+    setState('saving')
+    try {
+      await onAdd({
+        name: String(form.get('name')),
+        component: String(form.get('component')),
+        properties: PROPERTIES.map((p) => p.value).filter((value) => form.has(value)),
+      })
+      setState('idle')
+      setOpen(false)
+    } catch {
+      // Stay open so the input is not lost.
+      setState('error')
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (state === 'saving') return
+        setState('idle')
+        setOpen(next)
+      }}
+    >
       <DialogTrigger asChild>
-        <Button>Add asset</Button>
+        <Button>
+          <Plus aria-hidden="true" />
+          Add Asset
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>Add asset</DialogTitle>
-            <DialogDescription>Assets are not saved yet, this is only an example.</DialogDescription>
+            <DialogTitle>Add Asset</DialogTitle>
+            <DialogDescription>Saved in the mock data until the asset API exists.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="asset-name">Name</Label>
@@ -62,8 +81,15 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: Omit<Asset, 'id'>) =>
               </Label>
             ))}
           </fieldset>
+          {state === 'error' && (
+            <p role="alert" className="text-sm text-destructive">
+              The asset could not be added. Please try again.
+            </p>
+          )}
           <DialogFooter>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={state === 'saving'}>
+              Save
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

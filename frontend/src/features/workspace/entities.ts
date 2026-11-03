@@ -8,7 +8,8 @@ export type EntityType = 'items' | 'assets' | 'damage-scenarios' | 'threat-scena
 export interface TreeNode {
   type: EntityType
   id: string
-  code: string
+  /** Display ID such as A-01; items have none (interactive wireframe). */
+  code?: string
   name: string
   children?: TreeNode[]
 }
@@ -29,6 +30,11 @@ export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[]
   'damage-scenarios': { label: 'Damage scenario', tabs: tabs('Definition', 'Impact', 'Relations') },
   'threat-scenarios': { label: 'Threat scenario', tabs: tabs('Definition', 'Risks', 'Treatment', 'Relations') },
   'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
+}
+
+/** Code and name as shown in the tree and headers, e.g. "A-01 Firmware". */
+export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
+  return code ? `${code} ${name}` : name
 }
 
 export function entityPath(projectId: string, type: EntityType, id: string) {
