@@ -20,3 +20,7 @@ class DOMMatrixReadOnlyMock {
   }
 }
 globalThis.DOMMatrixReadOnly = DOMMatrixReadOnlyMock as unknown as typeof DOMMatrixReadOnly
+
+// Object URLs for file previews, which jsdom does not implement. Tests spy on these for return values.
+URL.createObjectURL = () => ''
+URL.revokeObjectURL = () => {}

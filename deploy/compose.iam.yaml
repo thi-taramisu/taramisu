@@ -1,0 +1,71 @@
+x-authentik-environment: &authentik-environment
+  AUTHENTIK_POSTGRESQL__HOST: authentik-db
+  AUTHENTIK_POSTGRESQL__NAME: authentik
+  AUTHENTIK_POSTGRESQL__USER: authentik
+  AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:?Set PG_PASS in iam/.env; see iam/.env.example}
+  AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Set AUTHENTIK_SECRET_KEY in iam/.env; see iam/.env.example}
+
+x-authentik: &authentik
+  image: ghcr.io/goauthentik/server:2026.8.3
+  environment: *authentik-environment
+  depends_on:
+    authentik-db:
+      condition: service_healthy
+  volumes:
+    - authentik_data:/data
+    - ../iam/branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
+  shm_size: 512mb
+  healthcheck:
+    test: [CMD, ak, healthcheck]
+    interval: 5s
+    timeout: 5s
+    start_period: 120s
+    retries: 12
+
+services:
+  authentik-db:
+    networks: [iam]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${PG_PASS:?Set PG_PASS in iam/.env; see iam/.env.example}
+    volumes:
+      - authentik_database:/var/lib/postgresql/data
+    healthcheck:
+      # A socket/localhost readiness probe can pass even when PG_PASS is wrong.
+      test:
+        - CMD-SHELL
+        - 'PGPASSWORD="$${POSTGRES_PASSWORD}" psql -h authentik-db -U authentik -d authentik -w -tAc "SELECT 1" > /dev/null'
+      interval: 5s
+      retries: 20
+  authentik-server:
+    <<: *authentik
+    command: server
+    networks:
+      iam:
+      auth:
+        aliases: [authentik.localhost]
+    ports:
+      - '127.0.0.1:9000:9000'
+  authentik-worker:
+    <<: *authentik
+    command: worker
+    networks: [iam]
+    environment:
+      <<: *authentik-environment
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
+      OIDC_REDIRECT_URI: ${APP_URL:-http://localhost}/auth/callback
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET in iam/.env; see iam/.env.example}
+      DEV_PASSWORD: ${DEV_PASSWORD:?Set DEV_PASSWORD in iam/.env; see iam/.env.example}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Set AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env; see iam/.env.example}
+    volumes:
+      - authentik_data:/data
+      - ../iam/branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
+      - ../iam/blueprints:/blueprints/custom:ro
+
+volumes:
+  authentik_database:
+    name: ${COMPOSE_PROJECT_NAME}-iam_authentik_database
+  authentik_data:
+    name: ${COMPOSE_PROJECT_NAME}-iam_authentik_data
