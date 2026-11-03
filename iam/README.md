@@ -29,3 +29,12 @@ password only takes effect on a fresh database.
 Provisioning failures are saved to ignored `iam/.blueprint.log`, which may contain secrets.
 
 Only the Authentik server and backend API share the `auth` network. The Authentik database and worker use the separate `iam` network.
+
+## Registration and approval
+
+Use **Sign up** on the login screen to register. Accounts remain inactive until an
+administrator enables **Active** under **Directory → Users** in Authentik.
+Approved users can sign in at <http://localhost/auth/login>.
+
+See the [internal registration flow guide](../docs/internal/architecture/iam/registration-flow.md)
+for validation, approval, and tests.
