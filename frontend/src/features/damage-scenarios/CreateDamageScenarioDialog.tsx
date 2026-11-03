@@ -38,13 +38,14 @@ interface CreateDamageScenarioDialogProps {
   projectName: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  returnFocusTo?: HTMLButtonElement | null
 }
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
  * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
  */
-export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange }: CreateDamageScenarioDialogProps) {
+export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo }: CreateDamageScenarioDialogProps) {
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
@@ -97,6 +98,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       description={`in project ${projectName} · description and impact follow on the damage scenario page`}
       open={open}
       onOpenChange={onOpenChange}
+      returnFocusTo={returnFocusTo}
       namePlaceholder="e.g. Loss of cell balancing"
       hint="Will appear in the tree below each linked asset."
       errorMessage="The damage scenario could not be created. Please try again."

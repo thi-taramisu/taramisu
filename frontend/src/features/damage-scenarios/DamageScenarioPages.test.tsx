@@ -148,6 +148,16 @@ describe('create damage scenario', () => {
     expect(location()).toHaveTextContent(`${project}/assets/a-02`)
   })
 
+  it('returns focus to the New button after Cancel', async () => {
+    const { user } = renderApp(`${project}/assets/a-02`)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(tree()).getByRole('button', { name: 'New' })).toHaveFocus()
+  })
+
   it('shows an error and keeps the dialog open when creating fails', async () => {
     const api = createMockItemApi()
     api.damageScenarios.create = () => Promise.reject(new Error('network'))

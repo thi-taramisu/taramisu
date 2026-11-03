@@ -269,6 +269,16 @@ describe('review findings', () => {
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
+  it('returns focus to the New button after Cancel', async () => {
+    const { user } = renderApp(project)
+    const dialog = await openNewItemDialog(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(tree()).getByRole('button', { name: 'New' })).toHaveFocus()
+  })
+
   it('keeps the page usable after the dialog opened from the menu is closed', async () => {
     const { user } = renderApp(project)
     const dialog = await openNewItemDialog(user)

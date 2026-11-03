@@ -16,6 +16,8 @@ interface CreateElementDialogProps {
   description: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Gets the focus back on close; opened from a menu, the dialog would otherwise drop it after Cancel. */
+  returnFocusTo?: HTMLButtonElement | null
   namePlaceholder: string
   nameMaxLength?: number
   /** Where the new element shows up, e.g. in the tree. */
@@ -39,6 +41,7 @@ export function CreateElementDialog({
   description,
   open,
   onOpenChange,
+  returnFocusTo,
   namePlaceholder,
   nameMaxLength,
   hint,
@@ -109,7 +112,15 @@ export function CreateElementDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent
+        className="sm:max-w-xl"
+        onCloseAutoFocus={(event) => {
+          if (returnFocusTo?.isConnected) {
+            event.preventDefault()
+            returnFocusTo.focus()
+          }
+        }}
+      >
         <form ref={formRef} onSubmit={handleSubmit} noValidate className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>

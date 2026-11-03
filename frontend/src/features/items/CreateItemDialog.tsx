@@ -18,10 +18,11 @@ interface CreateItemDialogProps {
   projectName: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  returnFocusTo?: HTMLButtonElement | null
 }
 
 /** "+ New → Item" from the interactive wireframe. */
-export function CreateItemDialog({ projectId, projectName, open, onOpenChange }: CreateItemDialogProps) {
+export function CreateItemDialog({ projectId, projectName, open, onOpenChange, returnFocusTo }: CreateItemDialogProps) {
   const id = useId()
   const createItem = useCreateItem(projectId)
 
@@ -41,6 +42,7 @@ export function CreateItemDialog({ projectId, projectName, open, onOpenChange }:
       description={`in project ${projectName} · details follow in the item definition`}
       open={open}
       onOpenChange={onOpenChange}
+      returnFocusTo={returnFocusTo}
       namePlaceholder="e.g. Charging Control Unit"
       nameMaxLength={ITEM_NAME_MAX_LENGTH}
       hint="Will appear in the tree as a new item."

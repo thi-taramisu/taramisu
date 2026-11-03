@@ -12,12 +12,14 @@ const OTHER_TYPES = ['Asset', 'Threat Scenario', 'Attack Path']
 export function NewElementMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
+  // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
+  const [newButton, setNewButton] = useState<HTMLButtonElement | null>(null)
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm">
+          <Button ref={setNewButton} size="sm">
             <Plus aria-hidden="true" />
             New
           </Button>
@@ -35,13 +37,20 @@ export function NewElementMenu({ projectId, projectName }: { projectId: string; 
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <CreateItemDialog projectId={projectId} projectName={projectName} open={itemDialogOpen} onOpenChange={setItemDialogOpen} />
+      <CreateItemDialog
+        projectId={projectId}
+        projectName={projectName}
+        open={itemDialogOpen}
+        onOpenChange={setItemDialogOpen}
+        returnFocusTo={newButton}
+      />
       <CreateDamageScenarioDialog
         key={damageScenarioDialog.key}
         projectId={projectId}
         projectName={projectName}
         open={damageScenarioDialog.open}
         onOpenChange={(open) => setDamageScenarioDialog((prev) => ({ ...prev, open }))}
+        returnFocusTo={newButton}
       />
     </>
   )
