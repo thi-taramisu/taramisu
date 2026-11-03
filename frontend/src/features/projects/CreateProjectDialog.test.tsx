@@ -6,12 +6,13 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { CreateProjectDialog } from './CreateProjectDialog'
 
 function TestPage({
-  onCreateProject = vi.fn<(name: string) => void>(),
+  onCreateProject = vi.fn<(name: string, image?: File) => void>(),
 }: {
-  onCreateProject?: (name: string) => void
+  onCreateProject?: (name: string, image?: File) => void
 }) {
   const [open, setOpen] = useState(false)
   const [opener, setOpener] = useState<HTMLButtonElement | null>(null)
@@ -44,8 +45,32 @@ function openDialog() {
 }
 
 describe('CreateProjectDialog', () => {
+  it('submits the selected image, independently of the dialog preview URL', async () => {
+    const user = userEvent.setup()
+    const onCreateProject = vi.fn<(name: string, image?: File) => void>()
+    render(<TestPage onCreateProject={onCreateProject} />)
+    openDialog()
+    const file = new File(['image'], 'project.png', { type: 'image/png' })
+    await user.type(screen.getByLabelText('Project name'), 'Image project')
+    await user.upload(screen.getByLabelText('Image'), file)
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    expect(onCreateProject).toHaveBeenCalledExactlyOnceWith('Image project', file)
+  })
+
+  it('clears rejected images before creating a project', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    const onCreateProject = vi.fn<(name: string, image?: File) => void>()
+    render(<TestPage onCreateProject={onCreateProject} />)
+    openDialog()
+    await user.type(screen.getByLabelText('Project name'), 'Without image')
+    await user.upload(screen.getByLabelText('Image'), new File(['notes'], 'notes.txt', { type: 'text/plain' }))
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    expect(onCreateProject).toHaveBeenCalledExactlyOnceWith('Without image')
+  })
+
   it('submits the project form with a valid name', () => {
-    const onCreateProject = vi.fn<(name: string) => void>()
+    const onCreateProject = vi.fn<(name: string, image?: File) => void>()
 
     render(<TestPage onCreateProject={onCreateProject} />)
     openDialog()
@@ -69,7 +94,7 @@ describe('CreateProjectDialog', () => {
   })
 
   it('rejects whitespace-only project names', () => {
-    const onCreateProject = vi.fn<(name: string) => void>()
+    const onCreateProject = vi.fn<(name: string, image?: File) => void>()
 
     render(<TestPage onCreateProject={onCreateProject} />)
     openDialog()
