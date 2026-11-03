@@ -81,8 +81,8 @@ und Verantwortlichem notieren.
 ## Konkrete Vorbereitungsthemen
 
 Die PR-Listen in der Meeting-Vorlage wurden am **3. November 2026** mit GitHub
-abgeglichen: [Sprint Results](onsite-2026-11-03.md#sprint-results) enthalten 20 offene
-PRs, darunter drei Entwürfe, sowie 10 geschlossene PRs (9 gemergt, einer ohne Merge geschlossen).
+abgeglichen: [Sprint Results](onsite-2026-11-03.md#sprint-results) enthalten 17 offene
+PRs, darunter vier Entwürfe, sowie 15 geschlossene PRs (14 gemergt, einer ohne Merge geschlossen).
 Die Kategorien heißen wie am 27. Oktober **Completed:** und **Open:**;
 beide Listen sind aufsteigend nach PR-Nummer sortiert.
 **Open:** enthält alle aktuell offenen PRs. **Completed:** führt seit dem 27. Oktober
