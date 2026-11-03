@@ -27,13 +27,14 @@ describe('sidebar tree', () => {
 })
 
 describe('create item', () => {
-  it('offers only Item in the "+ New" menu for now', async () => {
+  it('offers only Item and Damage Scenario in the "+ New" menu for now', async () => {
     const { user } = renderApp(project)
 
     await user.click(await within(tree()).findByRole('button', { name: 'New' }))
 
     expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Damage Scenario', 'Threat Scenario', 'Attack Path']) {
+    expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
+    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
       expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
     }
   })
@@ -266,6 +267,16 @@ describe('review findings', () => {
 
     expect(screen.getByRole('dialog', { name: 'New Item' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+  })
+
+  it('returns focus to the New button after Cancel', async () => {
+    const { user } = renderApp(project)
+    const dialog = await openNewItemDialog(user)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(tree()).getByRole('button', { name: 'New' })).toHaveFocus()
   })
 
   it('keeps the page usable after the dialog opened from the menu is closed', async () => {

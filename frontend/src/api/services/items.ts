@@ -2,6 +2,7 @@ import type { ItemAsset, NewAsset } from '../models/asset'
 import type { ItemDefinition, ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { RiskGroup } from '../models/risk'
 import type { TreeNode } from '../models/tree'
+import type { DamageScenarioService } from './damageScenarios'
 
 // Services of the item views. Only the mock in `../mocks/mockItemApi.ts` implements them so far; the
 // real implementation wraps the openapi-fetch client once the routes are in `backend/openapi.json`.
@@ -30,4 +31,5 @@ export interface ItemContentService {
 export interface ItemApi {
   items: ItemService
   content: ItemContentService
+  damageScenarios: DamageScenarioService
 }

@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
+import { DamageScenarioDefinitionTab } from './features/damage-scenarios/DamageScenarioDefinitionTab'
+import { DamageScenarioImpactTab } from './features/damage-scenarios/DamageScenarioImpactTab'
+import { DamageScenarioPage } from './features/damage-scenarios/DamageScenarioPage'
 import { ItemDefinitionTab } from './features/items/ItemDefinitionTab'
 import { ItemPage } from './features/items/ItemPage'
 import { ItemRisksTab } from './features/items/ItemRisksTab'
@@ -16,11 +19,19 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { ProjectListPage } from './pages/ProjectListPage'
 import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 
+// Element types with their own page (data from the API), everything else uses the generic page.
+const PAGES: Partial<Record<EntityType, ReactNode>> = {
+  items: <ItemPage />,
+  'damage-scenarios': <DamageScenarioPage />,
+}
+
 // Tabs that already have content, everything else renders a placeholder.
 const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/': <ItemDefinitionTab />,
   'items/assets': <ItemAssetsTab />,
   'items/risks': <ItemRisksTab />,
+  'damage-scenarios/': <DamageScenarioDefinitionTab />,
+  'damage-scenarios/impact': <DamageScenarioImpactTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md
@@ -39,11 +50,7 @@ export default function App() {
       <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
         <Route index element={<Placeholder title="Select an element in the tree" />} />
         {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
-          <Route
-            key={type}
-            path={`${type}/:entityId`}
-            element={type === 'items' ? <ItemPage /> : <EntityPage type={type} />}
-          >
+          <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
             {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
               const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
               return path ? (

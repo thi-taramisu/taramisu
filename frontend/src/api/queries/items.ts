@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { NewAsset } from '../models/asset'
+import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { TreeNode } from '../models/tree'
 
@@ -13,6 +14,8 @@ const keys = {
   children: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'children'] as const,
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
+  damageScenario: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id] as const,
+  impactRatings: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'impact'] as const,
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
@@ -100,4 +103,44 @@ export function useAddAsset(projectId: string, itemId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({ mutationFn: (asset: NewAsset) => api.content.addAsset(projectId, itemId, asset), onSuccess: invalidate })
+}
+
+export function useDamageScenario(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.damageScenario(projectId, damageScenarioId),
+    queryFn: () => api.damageScenarios.get(projectId, damageScenarioId),
+  })
+}
+
+export function useImpactRatings(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.impactRatings(projectId, damageScenarioId),
+    queryFn: () => api.damageScenarios.impactRatings(projectId, damageScenarioId),
+  })
+}
+
+export function useCreateDamageScenario(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: DamageScenarioBody) => api.damageScenarios.create(projectId, body), onSuccess: invalidate })
+}
+
+export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: (body: PatchDamageScenarioBody) => api.damageScenarios.update(projectId, damageScenarioId, body),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateImpactRatings(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: (body: ImpactRatingBody[]) => api.damageScenarios.updateImpactRatings(projectId, damageScenarioId, body),
+    onSuccess: invalidate,
+  })
 }
