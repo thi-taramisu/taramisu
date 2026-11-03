@@ -14,6 +14,8 @@ export type Project = {
 export interface ProjectDetails {
   name: string
   description: string
+  /** URL of the project image, null if the project has none. */
+  image: string | null
 }
 
 export type ProjectRole = 'OWNER' | 'EDITOR' | 'REVIEWER' | 'VIEWER'

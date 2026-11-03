@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { headlampDetails } from '../../api/mocks/data/projectSettings'
+import { ProjectImageInput } from './ProjectImageInput'
 
 function handleSubmit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault()
@@ -22,6 +23,7 @@ export function GeneralSettings() {
         <Label htmlFor="project-description">Description</Label>
         <Textarea id="project-description" name="description" defaultValue={headlampDetails.description} className="min-h-32" />
       </div>
+      <ProjectImageInput defaultValue={headlampDetails.image} />
       <div className="flex justify-end">
         <Button type="submit">Save</Button>
       </div>

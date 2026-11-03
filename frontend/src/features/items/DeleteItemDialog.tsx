@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import type { ItemDefinition } from '../../api/models/item'
 import type { TreeNode } from '../../api/models/tree'
-import { useDeleteItem, useProjectTree } from '../../api/queries/items'
+import { useDeleteItem, useItemChildren } from '../../api/queries/items'
 
 function countBelow(nodes: readonly TreeNode[] = []): number {
   return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)
@@ -30,12 +30,12 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const projectId = item.tara_project_id
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const { data: tree } = useProjectTree(projectId)
-  // The warning must name what is deleted, so the action waits for the counts.
-  const countsLoaded = Boolean(tree)
+  // The warning must name what is deleted, so the action waits for the counts. They are loaded
+  // separately because the tree shows a failed request as an item with nothing below it.
+  const children = useItemChildren(projectId, item.id, { enabled: open })
   const deleteItem = useDeleteItem(projectId, item.id)
 
-  const below = tree?.find((node) => node.id === item.id)?.children ?? []
+  const below = children.data ?? []
   const assets = below.filter((node) => node.type === 'assets').length
   const others = countBelow(below) - assets
 
@@ -68,6 +68,16 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
             This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {children.isError && (
+          <div className="flex items-center justify-between gap-2">
+            <p role="alert" className="text-sm text-destructive">
+              The elements below this item could not be loaded.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void children.refetch()}>
+              Retry
+            </Button>
+          </div>
+        )}
         {deleteItem.isError && (
           <p role="alert" className="text-sm text-destructive">
             The item could not be deleted. Please try again.
@@ -77,7 +87,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            disabled={!countsLoaded || deleteItem.isPending}
+            disabled={!children.isSuccess || deleteItem.isPending}
             onClick={(event) => {
               // Keep the dialog open until the request finished.
               event.preventDefault()

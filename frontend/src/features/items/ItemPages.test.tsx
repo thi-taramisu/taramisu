@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
@@ -105,6 +105,37 @@ describe('delete item', () => {
     expect(await screen.findByText('No project elements yet.')).toBeInTheDocument()
     expect(location()).toHaveTextContent(new RegExp(`^${project}$`))
     expect(await api.items.list('headlamp')).toEqual([])
+  })
+
+  it('keeps Delete disabled until the elements below the item could be loaded', async () => {
+    const api = createMockItemApi()
+    const children = api.content.children
+    let failing = true
+    api.content.children = (projectId, itemId) =>
+      failing ? Promise.reject(new Error('network')) : children(projectId, itemId)
+    const { user } = renderApp(`${project}/items/i-01`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    const dialog = screen.getByRole('alertdialog')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be loaded')
+    expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeDisabled()
+
+    failing = false
+    await user.click(within(dialog).getByRole('button', { name: 'Retry' }))
+    expect(await within(dialog).findByText(/4 assets and 4 elements below them/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled()
+  })
+
+  it('deletes an item with nothing below it without a warning', async () => {
+    const api = createMockItemApi()
+    const extra = await api.items.create('headlamp', { name: 'Extra item', scope_type: 'ITEM' })
+    const { user } = renderApp(`${project}/items/${extra.id}`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete "Extra item"?' })
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled())
+    expect(dialog).not.toHaveTextContent('This also deletes')
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

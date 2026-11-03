@@ -6,6 +6,7 @@ import { exampleProject } from './headlamp'
 export const headlampDetails: ProjectDetails = {
   name: exampleProject.name,
   description: 'TARA of the headlamp system, the example project of the course.',
+  image: null,
 }
 
 export const headlampMembers: Member[] = [
