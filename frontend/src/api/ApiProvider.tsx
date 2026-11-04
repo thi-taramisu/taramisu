@@ -26,24 +26,29 @@ export function ApiProvider({
   children: ReactNode
 }) {
   const { accessToken, signOut } = useAuth()
+  const defaultMocks = useMemo(() => createMockItemApi(), [])
 
-  const value = useMemo<Api>(() => {
-    const client =
+  const client = useMemo(
+    () =>
       api?.client ??
       createApiClient({
         getToken: () => accessToken,
         onUnauthorized: () => {
           void signOut({ localOnly: true })
         },
-      })
-    const defaultMocks = createMockItemApi()
-    return {
+      }),
+    [accessToken, api?.client, signOut],
+  )
+
+  const value = useMemo<Api>(
+    () => ({
       client,
       items: api?.items ?? defaultMocks.items,
       content: api?.content ?? defaultMocks.content,
       damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
-    }
-  }, [accessToken, api, signOut])
+    }),
+    [api?.content, api?.damageScenarios, api?.items, client, defaultMocks],
+  )
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>
 }

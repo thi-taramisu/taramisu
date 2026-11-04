@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -16,7 +16,7 @@ import {
   refreshAccessToken,
   type OidcConfig,
 } from './oidc'
-import { useAuth } from './useAuth'
+import { useAuth, type AuthContextValue } from './useAuth'
 
 function StatusProbe() {
   const { status } = useAuth()
@@ -262,5 +262,179 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       expect(navigateExternal).toHaveBeenCalledOnce()
     })
     expect(navigateExternal.mock.calls[0]?.[0]).toContain(testOidcConfig.authorizeEndpoint)
+  })
+
+  it('ignores in-flight refresh responses after sign-out and keeps session cleared', async () => {
+    vi.useFakeTimers()
+    const jwt = makeFakeJwt({ sub: 'user-refresh-test', name: 'Refresh Test', email: 'test@local' })
+    const initialTokens = {
+      accessToken: jwt,
+      refreshToken: 'rt-pending',
+      idToken: null,
+      expiresAt: Date.now() + 65_000,
+    }
+
+    let resolveRefresh: (value: Response) => void = () => {}
+    const refreshPromise = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve
+    })
+
+    const customFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/token/')) {
+        return refreshPromise
+      }
+      return fetch(input, init)
+    })
+
+    let authContext: AuthContextValue | null = null
+    function AuthConsumer() {
+      authContext = useAuth()
+      return <div>Status: {authContext.status}</div>
+    }
+
+    render(
+      <AuthProvider
+        config={testOidcConfig}
+        initialTokens={initialTokens}
+        fetchImpl={customFetch as unknown as typeof fetch}
+      >
+        <AuthConsumer />
+      </AuthProvider>,
+    )
+
+    expect(authContext!.status).toBe('authenticated')
+
+    // Advance clock to trigger refresh request
+    await act(async () => {
+      vi.advanceTimersByTime(6_000)
+    })
+
+    // Sign out while refresh request is in flight
+    await act(async () => {
+      await authContext!.signOut({ localOnly: true })
+    })
+
+    expect(authContext!.status).toBe('unauthenticated')
+    expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
+
+    // Now resolve the in-flight refresh response
+    await act(async () => {
+      resolveRefresh(
+        new Response(
+          JSON.stringify({
+            access_token: makeFakeJwt({ sub: 'user-refreshed' }),
+            refresh_token: 'rt-next',
+            expires_in: 600,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+    })
+
+    // Auth state must remain unauthenticated and storage must remain empty
+    expect(authContext!.status).toBe('unauthenticated')
+    expect(authContext!.accessToken).toBeNull()
+    expect(authContext!.user).toBeNull()
+    expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
+
+    vi.useRealTimers()
+  })
+
+  it('immediately clears local session and completes sign-out even if revocation is rejected or stalls', async () => {
+    vi.useFakeTimers()
+    const jwt = makeFakeJwt({ sub: 'user-revocation-test', name: 'Revocation Test', email: 'test@local' })
+    const initialTokens = {
+      accessToken: jwt,
+      refreshToken: 'rt-revoke',
+      idToken: 'id-token-abc',
+      expiresAt: Date.now() + 600_000,
+    }
+
+    const navigateExternal = vi.fn()
+
+    // 1. Rejected revocation request
+    let authContext: AuthContextValue | null = null
+    function AuthConsumer() {
+      authContext = useAuth()
+      return <div>Status: {authContext.status}</div>
+    }
+
+    const failingFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/revoke/')) {
+        return Promise.reject(new Error('Network offline'))
+      }
+      return fetch(input, init)
+    })
+
+    const { unmount } = render(
+      <AuthProvider
+        config={testOidcConfig}
+        initialTokens={initialTokens}
+        fetchImpl={failingFetch as unknown as typeof fetch}
+        onNavigateExternal={navigateExternal}
+      >
+        <AuthConsumer />
+      </AuthProvider>,
+    )
+
+    expect(authContext!.status).toBe('authenticated')
+
+    await act(async () => {
+      await authContext!.signOut()
+    })
+
+    expect(authContext!.status).toBe('unauthenticated')
+    expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
+    expect(navigateExternal).toHaveBeenCalledWith(
+      expect.stringContaining(testOidcConfig.endSessionEndpoint),
+    )
+
+    unmount()
+    navigateExternal.mockClear()
+
+    // 2. Never-resolving revocation request
+    const hangingFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/revoke/')) {
+        return new Promise<Response>(() => {})
+      }
+      return fetch(input, init)
+    })
+
+    render(
+      <AuthProvider
+        config={testOidcConfig}
+        initialTokens={initialTokens}
+        fetchImpl={hangingFetch as unknown as typeof fetch}
+        onNavigateExternal={navigateExternal}
+      >
+        <AuthConsumer />
+      </AuthProvider>,
+    )
+
+    expect(authContext!.status).toBe('authenticated')
+
+    let signOutPromise: Promise<void>
+    act(() => {
+      signOutPromise = authContext!.signOut()
+    })
+
+    // Local authentication must be cleared immediately, even while revocation is still pending
+    expect(authContext!.status).toBe('unauthenticated')
+    expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
+
+    // Fast-forward beyond the revocation timeout
+    await act(async () => {
+      vi.advanceTimersByTime(2500)
+      await signOutPromise!
+    })
+
+    expect(navigateExternal).toHaveBeenCalledWith(
+      expect.stringContaining(testOidcConfig.endSessionEndpoint),
+    )
+
+    vi.useRealTimers()
   })
 })

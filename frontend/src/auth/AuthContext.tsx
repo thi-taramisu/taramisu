@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createApiClient } from '@/api/client'
 import {
   buildAuthorizationUrl,
@@ -61,6 +61,7 @@ export function AuthProvider({
   onNavigateExternal = defaultNavigateExternal,
 }: AuthProviderProps) {
   const oidcConfig = useMemo(() => config ?? getOidcConfig(), [config])
+  const sessionGenerationRef = useRef(0)
   const initialSession = useMemo<StoredSession | null>(() => {
     if (initialTokens !== undefined) {
       return initialTokens ? { tokens: initialTokens } : null
@@ -74,13 +75,24 @@ export function AuthProvider({
 
   const signOut = useCallback(
     async (options?: SignOutOptions) => {
+      sessionGenerationRef.current += 1
       const currentTokens = tokens
-      if (currentTokens?.refreshToken) {
-        await revokeToken(currentTokens.refreshToken, oidcConfig, fetchImpl)
-      }
+
       clearStoredSession()
       setTokens(null)
       setUser(null)
+
+      if (currentTokens?.refreshToken) {
+        try {
+          await Promise.race([
+            revokeToken(currentTokens.refreshToken, oidcConfig, fetchImpl),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+          ])
+        } catch {
+          // Best-effort remote revocation: network errors or timeouts must not prevent sign-out or redirect.
+        }
+      }
+
       if (!options?.localOnly) {
         const url = buildEndSessionUrl(
           oidcConfig,
@@ -105,11 +117,16 @@ export function AuthProvider({
 
   const completeCallback = useCallback(
     async (searchParams: URLSearchParams): Promise<string> => {
+      sessionGenerationRef.current += 1
+      const generation = sessionGenerationRef.current
       const { tokens: exchanged, returnTo } = await exchangeAuthorizationCode(
         searchParams,
         oidcConfig,
         fetchImpl,
       )
+      if (sessionGenerationRef.current !== generation) {
+        return returnTo
+      }
       setTokens(exchanged)
       const initialUser = deriveUserFromTokens(exchanged)
       saveStoredSession(exchanged)
@@ -125,7 +142,7 @@ export function AuthProvider({
 
       try {
         const { data } = await callbackClient.GET('/api/v1/me')
-        if (data) {
+        if (data && sessionGenerationRef.current === generation) {
           saveStoredSession(exchanged, data.id)
           setUser({
             id: data.id,
@@ -146,24 +163,37 @@ export function AuthProvider({
   useEffect(() => {
     if (!tokens?.refreshToken) return undefined
 
+    const currentGeneration = sessionGenerationRef.current
     const refreshLeadMs = 60_000
     const delayMs = Math.max(0, tokens.expiresAt - Date.now() - refreshLeadMs)
+    let cancelled = false
 
     const timer = window.setTimeout(async () => {
       try {
         const next = await refreshAccessToken(tokens.refreshToken!, oidcConfig, fetchImpl)
+        if (cancelled || sessionGenerationRef.current !== currentGeneration) {
+          return
+        }
         setTokens(next)
         setUser((prev) => {
+          if (cancelled || sessionGenerationRef.current !== currentGeneration) {
+            return null
+          }
           const derived = deriveUserFromTokens(next, prev?.id)
           saveStoredSession(next, prev?.id)
           return derived ?? prev
         })
       } catch {
-        void signOut({ localOnly: true })
+        if (!cancelled && sessionGenerationRef.current === currentGeneration) {
+          void signOut({ localOnly: true })
+        }
       }
     }, delayMs)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [fetchImpl, oidcConfig, signOut, tokens])
 
   const value = useMemo<AuthContextValue>(
