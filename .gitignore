@@ -1,2 +1,4 @@
 tmp/
 .DS_Store
+backend/coverage.out
+__pycache__/

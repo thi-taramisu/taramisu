@@ -1,0 +1,69 @@
+/* UI palette only. Risk and impact colours are shared in ../tara.css. */
+
+[data-color-scheme="ocean"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
+  --destructive: #b91c1c;
+  --border: #cbd5e1;
+  --input: #94a3b8;
+  --ring: #2563eb;
+  --chart-1: #1d4ed8;
+  --chart-2: #0369a1;
+  --chart-3: #0e7490;
+  --chart-4: #4338ca;
+  --chart-5: #475569;
+  --sidebar: #f1f5f9;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #1d4ed8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #1e3a8a;
+  --sidebar-border: #cbd5e1;
+  --sidebar-ring: #2563eb;
+}
+
+[data-color-scheme="ocean"].dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
+  --primary: #93c5fd;
+  --primary-foreground: #172554;
+  --secondary: #334155;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #cbd5e1;
+  --accent: #1e3a8a;
+  --accent-foreground: #dbeafe;
+  --destructive: #f87171;
+  --border: #475569;
+  --input: #64748b;
+  --ring: #60a5fa;
+  --chart-1: #93c5fd;
+  --chart-2: #7dd3fc;
+  --chart-3: #67e8f9;
+  --chart-4: #a5b4fc;
+  --chart-5: #cbd5e1;
+  --sidebar: #111c32;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #93c5fd;
+  --sidebar-primary-foreground: #172554;
+  --sidebar-accent: #1e3a8a;
+  --sidebar-accent-foreground: #dbeafe;
+  --sidebar-border: #475569;
+  --sidebar-ring: #60a5fa;
+}

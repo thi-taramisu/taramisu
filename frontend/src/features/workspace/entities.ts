@@ -1,0 +1,42 @@
+import type { EntityType, TreeNode } from '../../api/models/tree'
+
+// Element types of the TARA hierarchy with their URL segment and tabs, as in the Concept 2 wireframes.
+// The URLs are flat per type (not nested), because the relations are many-to-many: one threat
+// scenario can belong to several damage scenarios, so it has no single parent path.
+
+export interface EntityTab {
+  /** Path segment below the entity URL, '' is the index tab. */
+  path: string
+  label: string
+}
+
+function tabs(...labels: string[]): EntityTab[] {
+  return labels.map((label, i) => ({ path: i === 0 ? '' : label.toLowerCase(), label }))
+}
+
+export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[] }> = {
+  items: { label: 'Item', tabs: tabs('Definition', 'Assets', 'Risks', 'Review') },
+  assets: { label: 'Asset', tabs: tabs('Definition', 'Risks', 'Relations') },
+  'damage-scenarios': { label: 'Damage scenario', tabs: tabs('Definition', 'Impact', 'Relations') },
+  'threat-scenarios': { label: 'Threat scenario', tabs: tabs('Definition', 'Risks', 'Treatment', 'Relations') },
+  'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
+}
+
+/** Code and name as shown in the tree and headers, e.g. "A-01 Firmware". */
+export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
+  return code ? `${code} ${name}` : name
+}
+
+export function entityPath(projectId: string, type: EntityType, id: string) {
+  return `/projects/${projectId}/${type}/${id}`
+}
+
+/** First occurrence of the entity in the tree, depth-first. */
+export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeNode | undefined {
+  for (const node of nodes) {
+    if (node.type === type && node.id === id) return node
+    const found = node.children && findNode(type, id, node.children)
+    if (found) return found
+  }
+  return undefined
+}

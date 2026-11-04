@@ -1,8 +1,8 @@
 # ADR 0001: Frontend API client
 
-- Status: Proposed, still needs to be agreed on in the team
+- Status: Accepted, agreed with the frontend team
 - Issue: #31
-- Related: #6 (wireframes / API contract), #46 (IAM evaluation), #32 (UI library)
+- Related: #6 (wireframes / API contract), #46 (IAM evaluation), #32 (UI library, [ADR 0002](0002-frontend-ui-library.md))
 
 ## Context
 
@@ -39,7 +39,7 @@ What we want from the client:
 
 ## Decision
 
-I suggest we go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and
+We go with option 2. `openapi-typescript` generates `src/api/schema.d.ts` from the spec, `openapi-fetch` does the HTTP calls, and
 components use `openapi-react-query` (on top of TanStack Query) for caching and loading states.
 
 `createApiClient()` in `src/api/client.ts` wraps `createClient<paths>` and adds a middleware with two hooks:
@@ -49,9 +49,10 @@ components use `openapi-react-query` (on top of TanStack Query) for caching and 
 
 The tests mock the API with MSW, so no backend is needed to run them.
 
-For now `frontend/openapi/openapi.yaml` is just a stub with a single endpoint (`GET /health`). Since #62 the backend publishes its spec as
-`backend/openapi.json`. Its health endpoints are `/health/live` and `/health/ready`, so the stub doesn't match it yet. Once we switch over,
-regenerate with `npm run generate:api`.
+The types are generated from the backend's spec `backend/openapi.json` (#56, switched over in #118) with `npm run generate:api`. Its paths
+are complete (`/api/v1/me`, `/health/live`, `/auth/login`), because the backend mounts them that way and the proxy forwards the full URI, so
+the client's base URL is only the origin. Views that need routes the spec doesn't have yet use service interfaces with mock implementations
+in `src/api/mocks/`; `src/main.tsx` decides between real and mock (see `frontend/README.md`).
 
 ## Consequences
 
@@ -59,9 +60,10 @@ regenerate with `npm run generate:api`.
   changes in the diff.
 - New runtime dependencies: `openapi-fetch`, `@tanstack/react-query`, `openapi-react-query`. New dev dependencies: `openapi-typescript`, `msw`.
 - One thing to keep an eye on: the latest `openapi-typescript` (7.13.0) declares `typescript ^5` as its peer dependency, but we're on
-  TypeScript 6. We only use it as a CLI at build time and generation works fine, so I overrode the peer range for just that package
+  TypeScript 6. We only use it as a CLI at build time and generation works fine, so we override the peer range for just that package
   (`overrides` in `package.json`). We should remove the override once there's a release that supports TS 6.
-- We still need to agree with the backend team on where the spec lives and whether `schema.d.ts` stays committed or gets generated in CI.
+- The spec lives in `backend/openapi.json` and `schema.d.ts` stays committed. CI regenerates it and fails if the committed file differs,
+  also when only `backend/openapi.json` changed (#118).
 - If the spec turns out not to work well with `openapi-typescript`, we can switch to option 3. The call sites would look pretty similar.
 - Picking a server-state library is part of this decision. If the team would rather not use TanStack Query yet, `openapi-fetch` works fine
   without it.

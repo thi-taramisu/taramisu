@@ -1,7 +1,11 @@
-html,
-body,
-#root {
-  margin: 0;
-  height: 100%;
-  font-family: system-ui, sans-serif;
-}
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@import "./styles/tailwind.css";
+@import "./styles/themes/neutral.css";
+@import "./styles/themes/ocean.css";
+@import "./styles/themes/iris.css";
+@import "./styles/tara.css";
+@import "./styles/base.css";

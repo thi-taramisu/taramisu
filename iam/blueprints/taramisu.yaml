@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+version: 1
+metadata:
+  name: Taramisu local development
+  labels:
+    blueprints.goauthentik.io/instantiate: "false"
+entries:
+  - model: authentik_providers_oauth2.oauth2provider
+    id: taramisu-provider
+    identifiers:
+      name: Taramisu
+    attrs:
+      client_type: confidential
+      client_id: !Env OIDC_CLIENT_ID
+      client_secret: !Env OIDC_CLIENT_SECRET
+      grant_types:
+        - authorization_code
+      issuer_mode: per_provider
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+      redirect_uris:
+        - matching_mode: strict
+          url: !Env OIDC_REDIRECT_URI
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+  - model: authentik_core.application
+    identifiers:
+      slug: taramisu
+    attrs:
+      name: Taramisu
+      provider: !KeyOf taramisu-provider
+  - model: authentik_core.user
+    identifiers:
+      username: dev
+    attrs:
+      name: Development user
+      email: dev@taramisu.localhost
+      is_active: true
+      password: !Env DEV_PASSWORD
