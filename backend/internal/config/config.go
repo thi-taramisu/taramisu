@@ -8,19 +8,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const defaultHTTPAddr = ":8080"
 
 // Config contains the runtime configuration for the API.
 type Config struct {
-	HTTPAddr       string
-	DatabaseURL    string
-	OIDCIssuer     string
-	OIDCClientID   string
-	OIDCJWKSURL    string
-	AuthentikURL   string
-	AuthentikToken string
+	HTTPAddr                  string
+	DatabaseURL               string
+	OIDCIssuer                string
+	OIDCClientID              string
+	OIDCJWKSURL               string
+	AuthentikURL              string
+	AuthentikToken            string
+	IAMUserCacheTTL           time.Duration
+	AuthentikMetadataCacheTTL time.Duration
 }
 
 // Load reads and validates the runtime configuration from the environment.
@@ -58,21 +61,43 @@ func Load() (Config, error) {
 		}
 	}
 
-	authentikURL := os.Getenv("AUTHENTIK_URL")
+	authentikURL := os.Getenv("AUTHENTIK_API_URL")
 	if authentikURL != "" {
 		if err := validateHTTPURL(authentikURL); err != nil {
-			return Config{}, fmt.Errorf("invalid AUTHENTIK_URL: %w", err)
+			return Config{}, fmt.Errorf("invalid AUTHENTIK_API_URL: %w", err)
 		}
 	}
 
+	authentikToken := os.Getenv("AUTHENTIK_API_TOKEN")
+
+	iamUserCacheTTL := 10 * time.Minute
+	if raw := os.Getenv("IAM_USER_CACHE_TTL"); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed <= 0 {
+			return Config{}, fmt.Errorf("invalid IAM_USER_CACHE_TTL: must be a positive duration: %q", raw)
+		}
+		iamUserCacheTTL = parsed
+	}
+
+	authentikMetadataCacheTTL := 5 * time.Minute
+	if raw := os.Getenv("AUTHENTIK_METADATA_CACHE_TTL"); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed <= 0 {
+			return Config{}, fmt.Errorf("invalid AUTHENTIK_METADATA_CACHE_TTL: must be a positive duration: %q", raw)
+		}
+		authentikMetadataCacheTTL = parsed
+	}
+
 	return Config{
-		HTTPAddr:       httpAddr,
-		DatabaseURL:    databaseURL,
-		OIDCIssuer:     oidcIssuer,
-		OIDCClientID:   os.Getenv("OIDC_CLIENT_ID"),
-		OIDCJWKSURL:    oidcJWKSURL,
-		AuthentikURL:   authentikURL,
-		AuthentikToken: os.Getenv("AUTHENTIK_TOKEN"),
+		HTTPAddr:                  httpAddr,
+		DatabaseURL:               databaseURL,
+		OIDCIssuer:                oidcIssuer,
+		OIDCClientID:              os.Getenv("OIDC_CLIENT_ID"),
+		OIDCJWKSURL:               oidcJWKSURL,
+		AuthentikURL:              authentikURL,
+		AuthentikToken:            authentikToken,
+		IAMUserCacheTTL:           iamUserCacheTTL,
+		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
 	}, nil
 }
 

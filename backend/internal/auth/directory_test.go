@@ -184,3 +184,24 @@ func TestTTLCacheEviction(t *testing.T) {
 		t.Fatalf("expected unexpired 'c' to remain, got %v %v", v, ok)
 	}
 }
+
+func TestTTLCacheUpdateDoesNotEvict(t *testing.T) {
+	c := newTTLCache[string, int](5*time.Minute, 2)
+	now := time.Now()
+	c.now = func() time.Time { return now }
+
+	c.set("a", 1)
+	now = now.Add(time.Minute)
+	c.set("b", 2)
+
+	// Updating existing key "b" in a full cache (2/2) must not evict "a".
+	now = now.Add(time.Minute)
+	c.set("b", 20)
+
+	if v, ok := c.get("a"); !ok || v != 1 {
+		t.Fatalf("expected 'a' to remain in cache with value 1, got %v (found: %v)", v, ok)
+	}
+	if v, ok := c.get("b"); !ok || v != 20 {
+		t.Fatalf("expected 'b' to return updated value 20, got %v (found: %v)", v, ok)
+	}
+}

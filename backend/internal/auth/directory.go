@@ -52,10 +52,10 @@ func NewDirectoryResolver(cfg DirectoryConfig) (*DirectoryResolver, error) {
 	trimmed := strings.TrimRight(cfg.BaseURL, "/")
 	parsed, err := url.Parse(trimmed)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
-		return nil, errors.New("AUTHENTIK_URL must be a valid http(s) URL without credentials or query parameters")
+		return nil, errors.New("AUTHENTIK_API_URL must be a valid http(s) URL without credentials or query parameters")
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
-		return nil, errors.New("AUTHENTIK_TOKEN is required")
+		return nil, errors.New("AUTHENTIK_API_TOKEN is required")
 	}
 	client := cfg.HTTPClient
 	if client == nil {

@@ -65,7 +65,7 @@ func (c *ttlCache[K, V]) set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if len(c.entries) >= c.maxSize {
+	if _, exists := c.entries[key]; !exists && len(c.entries) >= c.maxSize {
 		c.evictLocked(now)
 	}
 	c.entries[key] = cacheEntry[V]{

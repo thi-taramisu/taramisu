@@ -3,6 +3,9 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 )
 
 func clearOIDCEnv(t *testing.T) {
@@ -10,8 +13,10 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("OIDC_ISSUER", "")
 	t.Setenv("OIDC_CLIENT_ID", "")
 	t.Setenv("OIDC_JWKS_URL", "")
-	t.Setenv("AUTHENTIK_URL", "")
-	t.Setenv("AUTHENTIK_TOKEN", "")
+	t.Setenv("AUTHENTIK_API_URL", "")
+	t.Setenv("AUTHENTIK_API_TOKEN", "")
+	t.Setenv("IAM_USER_CACHE_TTL", "")
+	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -34,8 +39,8 @@ func TestLoadValidEnvironment(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgresql://user@db.example.com:5432/taramisu?sslmode=disable")
 	t.Setenv("OIDC_ISSUER", "http://localhost/auth/application/o/taramisu/")
 	t.Setenv("OIDC_CLIENT_ID", "taramisu")
-	t.Setenv("AUTHENTIK_URL", "http://authentik-server:9000/auth")
-	t.Setenv("AUTHENTIK_TOKEN", "service-token")
+	t.Setenv("AUTHENTIK_API_URL", "http://authentik-server:9000/auth")
+	t.Setenv("AUTHENTIK_API_TOKEN", "service-token")
 
 	cfg, err := Load()
 	if err != nil {
@@ -62,6 +67,51 @@ func TestLoadValidEnvironment(t *testing.T) {
 	if cfg.AuthentikToken != "service-token" {
 		t.Errorf("AuthentikToken = %q", cfg.AuthentikToken)
 	}
+	if cfg.IAMUserCacheTTL != 10*time.Minute {
+		t.Errorf("IAMUserCacheTTL = %v, want 10m", cfg.IAMUserCacheTTL)
+	}
+	if cfg.AuthentikMetadataCacheTTL != 5*time.Minute {
+		t.Errorf("AuthentikMetadataCacheTTL = %v, want 5m", cfg.AuthentikMetadataCacheTTL)
+	}
+}
+
+func TestLoadDocumentedIAMEnvironmentAndCustomTTLs(t *testing.T) {
+	clearOIDCEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://user@localhost:5432/taramisu")
+	t.Setenv("AUTHENTIK_API_URL", "http://authentik-server:9000/auth")
+	t.Setenv("AUTHENTIK_API_TOKEN", "api-token-xyz")
+	t.Setenv("IAM_USER_CACHE_TTL", "15m")
+	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "30s")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.AuthentikURL != "http://authentik-server:9000/auth" {
+		t.Errorf("AuthentikURL = %q, want http://authentik-server:9000/auth", cfg.AuthentikURL)
+	}
+	if cfg.AuthentikToken != "api-token-xyz" {
+		t.Errorf("AuthentikToken = %q, want api-token-xyz", cfg.AuthentikToken)
+	}
+	if cfg.IAMUserCacheTTL != 15*time.Minute {
+		t.Errorf("IAMUserCacheTTL = %v, want 15m", cfg.IAMUserCacheTTL)
+	}
+	if cfg.AuthentikMetadataCacheTTL != 30*time.Second {
+		t.Errorf("AuthentikMetadataCacheTTL = %v, want 30s", cfg.AuthentikMetadataCacheTTL)
+	}
+
+	// Verify that DirectoryResolver can be configured through the returned config
+	resolver, err := auth.NewDirectoryResolver(auth.DirectoryConfig{
+		BaseURL: cfg.AuthentikURL,
+		Token:   cfg.AuthentikToken,
+		TTL:     cfg.AuthentikMetadataCacheTTL,
+	})
+	if err != nil {
+		t.Fatalf("NewDirectoryResolver() error = %v", err)
+	}
+	if resolver == nil {
+		t.Fatal("expected resolver to be initialized")
+	}
 }
 
 func TestLoadExplicitJWKSURL(t *testing.T) {
@@ -81,13 +131,15 @@ func TestLoadExplicitJWKSURL(t *testing.T) {
 
 func TestLoadFailures(t *testing.T) {
 	tests := []struct {
-		name         string
-		httpAddr     string
-		databaseURL  string
-		oidcIssuer   string
-		oidcJWKSURL  string
-		authentikURL string
-		wantError    string
+		name                      string
+		httpAddr                  string
+		databaseURL               string
+		oidcIssuer                string
+		oidcJWKSURL               string
+		authentikAPIURL           string
+		iamUserCacheTTL           string
+		authentikMetadataCacheTTL string
+		wantError                 string
 	}{
 		{
 			name:      "missing database URL",
@@ -151,10 +203,40 @@ func TestLoadFailures(t *testing.T) {
 			wantError:   "invalid OIDC_JWKS_URL",
 		},
 		{
-			name:         "invalid Authentik URL",
-			databaseURL:  "postgres://user@localhost/taramisu",
-			authentikURL: "http://user@localhost/auth",
-			wantError:    "invalid AUTHENTIK_URL",
+			name:            "invalid Authentik API URL",
+			databaseURL:     "postgres://user@localhost/taramisu",
+			authentikAPIURL: "http://user@localhost/auth",
+			wantError:       "invalid AUTHENTIK_API_URL",
+		},
+		{
+			name:            "unparseable IAM user cache TTL",
+			databaseURL:     "postgres://user@localhost/taramisu",
+			iamUserCacheTTL: "not-a-duration",
+			wantError:       "invalid IAM_USER_CACHE_TTL",
+		},
+		{
+			name:            "negative IAM user cache TTL",
+			databaseURL:     "postgres://user@localhost/taramisu",
+			iamUserCacheTTL: "-1m",
+			wantError:       "invalid IAM_USER_CACHE_TTL",
+		},
+		{
+			name:            "zero IAM user cache TTL",
+			databaseURL:     "postgres://user@localhost/taramisu",
+			iamUserCacheTTL: "0s",
+			wantError:       "invalid IAM_USER_CACHE_TTL",
+		},
+		{
+			name:                      "unparseable Authentik metadata cache TTL",
+			databaseURL:               "postgres://user@localhost/taramisu",
+			authentikMetadataCacheTTL: "invalid",
+			wantError:                 "invalid AUTHENTIK_METADATA_CACHE_TTL",
+		},
+		{
+			name:                      "negative Authentik metadata cache TTL",
+			databaseURL:               "postgres://user@localhost/taramisu",
+			authentikMetadataCacheTTL: "-30s",
+			wantError:                 "invalid AUTHENTIK_METADATA_CACHE_TTL",
 		},
 	}
 
@@ -165,7 +247,9 @@ func TestLoadFailures(t *testing.T) {
 			t.Setenv("DATABASE_URL", tt.databaseURL)
 			t.Setenv("OIDC_ISSUER", tt.oidcIssuer)
 			t.Setenv("OIDC_JWKS_URL", tt.oidcJWKSURL)
-			t.Setenv("AUTHENTIK_URL", tt.authentikURL)
+			t.Setenv("AUTHENTIK_API_URL", tt.authentikAPIURL)
+			t.Setenv("IAM_USER_CACHE_TTL", tt.iamUserCacheTTL)
+			t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", tt.authentikMetadataCacheTTL)
 
 			_, err := Load()
 			if err == nil {
