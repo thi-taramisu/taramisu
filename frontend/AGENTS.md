@@ -22,4 +22,4 @@ The Frontend team maintains this file. Shared instructions are in [../AGENTS.md]
 ## Verification
 
 Use the README's lint, typecheck, coverage, and build commands and the testing guidelines for focused regression tests.
-Obtain the current user's approval before running Playwright. Keep E2E routes aligned with application behavior.
+Keep E2E routes aligned with application behavior.

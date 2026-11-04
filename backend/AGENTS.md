@@ -14,7 +14,7 @@ Shared instructions are in [../AGENTS.md](../AGENTS.md).
 - Follow the existing Chi/Huma handlers and pgx/sqlc patterns.
 - Keep schema/query changes, Atlas migrations, and regenerated sqlc output consistent using the README's database workflow.
 - For API changes, follow the README's OpenAPI workflow and the [frontend API workflow](../frontend/README.md#api-client)
-  to update both committed contracts. There is no separate frontend spec to maintain.
+  to update the OpenAPI spec and generated TypeScript types.
 - Use the authentication and project authorization behavior implemented on the target branch.
 
 ## Verification
