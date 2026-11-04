@@ -1,39 +1,23 @@
 # Documentation instructions
 
-## Scope and ownership
+The Documentation team maintains this file; other teams document and review their own areas.
+Shared instructions are in [../AGENTS.md](../AGENTS.md).
 
-The Documentation team maintains these instructions; other teams document their own work and review content in their area.
-Shared rules are in [../AGENTS.md](../AGENTS.md). Read [README.md](README.md) for the content split.
+## References
 
-## Conventions and generated files
+- [README.md](README.md): audiences, publication boundaries, and local preview.
+- [Docusaurus README](docusaurus/README.md): tooling, build commands, and deployment settings.
+- [Linting guide](internal/dev-workflow/linting.md): shared Markdown rules and commands.
 
-- Put user/customer guidance in `external/` and team-facing meetings, decisions, and development guides in `internal/`.
-- Docusaurus publishes only `external/`. Do not add internal documents as a content source.
-- Write concise English Markdown with working relative links. Use the shared root Markdown configuration.
-- Keep historical meeting notes distinct from current implementation status; use follow-up issues and PRs for later changes.
-- Describe draft decisions and prototypes as such. Do not turn an interpretation of a standard into a verified requirement without a source.
-- Never publish secrets, private access details, customer data, or restricted standard text. This repository is public.
-- Keep Docusaurus output (`docusaurus/build/`, `.docusaurus/`) and dependencies out of commits.
-- For documents relevant to the whole team, allow at least 24 hours for PR review or obtain everyone's approval before merging,
-  as recorded in the 2026-10-06 meeting.
+## Editing rules
 
-## Setup and verification
+- Follow the README's content split. Only `external/` is published; internal content must not become a Docusaurus source.
+- Write concise English Markdown and check relative links and referenced assets; Markdown lint does not validate their existence.
+- Keep meeting records distinct from current implementation status. Mark proposals, prototypes, and unverified interpretations as such.
+- For documents relevant to the whole team, follow the
+  [agreed review window](internal/meetings/onsite-2026-10-06.md#4-documentation-strategy): at least 24 hours or everyone's approval.
 
-From the repository root, run `npx markdownlint-cli2` for Markdown changes.
-Check relative links and referenced assets; Markdown lint does not validate their existence.
-For changes to published content or Docusaurus tooling, use Node.js 24 and run from `docs/docusaurus/`:
+## Verification
 
-```sh
-npm ci
-npm run typecheck
-npm run build
-```
-
-The production build checks configured documentation links and anchors. `npm start` provides a local preview on port 3001.
-Internal Markdown-only changes do not require a Docusaurus build.
-The documentation site is a separate npm project; keep its dependency installation and configuration separate from `frontend/`.
-
-## Team maintenance
-
-Keep setup commands aligned with `docusaurus/package.json` and the documentation workflow.
-Add narrower instructions only when a documentation area needs additional conventions.
+Run Markdown lint for Markdown changes. Use the Docusaurus README's typecheck and build commands when published content or
+site tooling changes; internal Markdown-only changes do not need a site build.

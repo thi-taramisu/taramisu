@@ -1,33 +1,28 @@
 # GitHub Actions instructions
 
-## Scope and ownership
+The CI/CD team maintains this file and coordinates component checks with the responsible team.
+Shared instructions are in [../../AGENTS.md](../../AGENTS.md).
 
-The CI/CD team maintains these instructions and coordinates component checks with the responsible team.
-Shared rules are in [../../AGENTS.md](../../AGENTS.md).
-Read the workflow being changed, its callers, and the corresponding package scripts or Makefile first.
+## References
 
-## Conventions
+- Read the workflow being changed, its callers, and the corresponding package scripts or Makefile.
+- Use [linting guidance](../../docs/internal/dev-workflow/linting.md),
+  [image publishing](../../docs/internal/dev-workflow/docker-publishing.md), and
+  [Discord notifications](../../docs/internal/dev-workflow/discord-notifications.md) for those workflows.
 
-- Extend the central `lint.yml` and `build.yml` jobs when appropriate; avoid adding duplicate component pipelines.
-  Backend consolidation is tracked by PRs #74 and #122; inspect the actual branch before changing those workflows.
-- Keep PR triggers compatible with stacked PRs. Apply path filters to component jobs and keep aggregate result jobs running.
-- Include workflow/configuration changes in the relevant path filters. Check shared inputs such as API contracts as well.
-- Keep aggregate result checks failing on dependency failures, cancellation, or failed change detection; allow intentional component skips.
-- Declare the least permissions each job needs. Avoid persisted checkout credentials in validation jobs.
-- Follow existing concurrency, timeout, lockfile installation, toolchain version, summary, and artifact conventions.
-- Do not put untrusted PR titles, bodies, or branch names directly into shell expressions. Pass them through data/environment variables.
-- Never expose secrets in output or run untrusted PR code with privileged credentials.
+## Editing rules
 
-## Verification and review
+- Extend `lint.yml` and `build.yml` for component validation rather than duplicating their pipelines.
+- Preserve stacked-PR support and include workflow changes and shared inputs, such as API contracts, in affected path filters.
+- Keep aggregate result checks running and failing on failed change detection, dependency failures, or cancellation;
+  allow intentional component skips.
+- Use least-privilege permissions and avoid persisted checkout credentials in validation jobs.
+- Pass untrusted PR metadata through data/environment variables instead of interpolating it into shell scripts.
+  Do not expose secrets or execute untrusted PR code with privileged credentials.
+- Preserve relevant concurrency, timeout, lockfile, toolchain, summary, and artifact conventions.
+- Coordinate status-check names with maintainers; workflow changes do not configure branch protection.
 
-- Inspect the effective triggers, paths, job dependencies, and permissions, including the `push`, PR, and manual-run cases in use.
-- Check frontend-only, backend-only, docs-only, workflow-only, failure, and skipped-job behavior for changes to central gates.
-- Run the affected component commands locally where practical and report differences from the GitHub runner environment.
-- For Markdown changes, run `npx markdownlint-cli2` from the repository root.
-- Report which behavior was checked locally and which still requires an actual Actions run; do not claim an unrun workflow passed.
-- Coordinate required status check names with repository maintainers. Changing a workflow does not configure branch protection.
+## Verification
 
-## Team maintenance
-
-Update these instructions when workflow consolidation or shared validation commands change.
-Keep component-specific test policy in the component's instructions rather than duplicating it here.
+Check effective triggers, path filters, permissions, dependencies, failures, and skips for affected PR, push, and manual-run cases.
+Run relevant component checks where practical and distinguish local verification from behavior requiring an actual Actions run.

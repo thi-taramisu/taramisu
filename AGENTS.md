@@ -1,45 +1,34 @@
 # Repository instructions
 
-## Scope and ownership
+These instructions apply across the repository; also read the scoped `AGENTS.md` for the area you change.
+Contributors maintain this file, and each team maintains its scoped instructions through reviewed PRs.
 
-These shared instructions apply to the whole repository. Read the `AGENTS.md` in the area you change as well.
-Contributors maintain this file; each team maintains its own instructions through a reviewed PR.
-Update instructions when commands or conventions change. Keep shared rules here instead of copying them into every folder.
+## Start here
 
-## Working conventions
+Setup, commands, and architecture belong in the existing documentation. Link to that documentation instead of copying it here.
 
-- Read the existing code, relevant issue, and project documentation before editing. Prefer small changes and existing dependencies.
-- Work on assigned tickets. Keep PRs focused and explain the problem, resulting behavior, verification, and dependencies.
-- Match branch names to the work area, following existing names such as `docs/92-team-agent-instructions` or `feature/30-frontend-routes`.
-- Follow the current user's approval requirements for commits, pushes, deployments, and browser tests.
-- Review against the PR's actual target branch. Check existing discussions before adding feedback.
-- Record technical decisions in the PR, including summaries of decisions made in meetings or Discord.
-- Treat draft architecture documents and unmerged PRs as proposals, not as implemented behavior.
-- Keep credentials, private access details, customer data, and restricted standards out of this public repository.
-
-## Areas and verification
-
-| Area | Local instructions | Verification |
+| Area | Instructions | Setup and reference |
 | --- | --- | --- |
-| Backend | [backend/AGENTS.md](backend/AGENTS.md) | `make test`, `make lint`; regenerate affected SQL/OpenAPI outputs |
-| Frontend | [frontend/AGENTS.md](frontend/AGENTS.md) | Lint, typecheck, coverage, and production build |
-| GitHub Actions | [.github/workflows/AGENTS.md](.github/workflows/AGENTS.md) | Check triggers, paths, permissions, and failure handling |
-| Documentation | [docs/AGENTS.md](docs/AGENTS.md) | Markdown lint; Docusaurus checks when published content/tooling changes |
+| Backend | [backend/AGENTS.md](backend/AGENTS.md) | [Backend README](backend/README.md) |
+| Frontend | [frontend/AGENTS.md](frontend/AGENTS.md) | [Frontend README](frontend/README.md) |
+| GitHub Actions | [.github/workflows/AGENTS.md](.github/workflows/AGENTS.md) | [Repository workflow](docs/internal/dev-workflow/github-setup.md) |
+| Documentation | [docs/AGENTS.md](docs/AGENTS.md) | [Documentation README](docs/README.md) |
+| Deployment and IAM | Maintained by the responsible teams | [Deployment README](deploy/README.md), [IAM README](iam/README.md) |
 
-Run commands from the relevant project directory unless documented otherwise.
-From the repository root, `npx markdownlint-cli2` uses the shared Markdown rules.
-Run checks appropriate to the change; report failures, skipped integration tests, and checks that were not run.
-Add focused tests for realistic behavior changes. Do not weaken checks or add assertions solely to raise coverage.
-Do not hand-edit generated code or commit build output, installed dependencies, or test reports.
+## Working rules
 
-## Other teams
+- Read the assigned issue, relevant code, and existing documentation before editing. Prefer small changes and existing dependencies.
+- Follow the [repository workflow](docs/internal/dev-workflow/github-setup.md) and [PR template](.github/pull_request_template.md).
+- Review against the PR's actual target branch and read existing discussions before adding feedback.
+- Record technical decisions in the PR, including decisions made in meetings or Discord.
+- Check the implementation on the branch being changed; unmerged PRs and draft designs are proposals.
+- Follow the current user's approval requirements for commits, pushes, deployments, and browser tests.
 
-Containerization, IAM/Security, and LLM owners should add scoped instructions alongside their code or configuration as those areas land.
-Coordinate ownership for shared folders; do not create empty service folders solely to hold instructions.
-Security conventions also apply across the backend, frontend, workflows, and deployment configuration.
+## Verification and maintenance
 
-## References
+Use the relevant README and CI workflow for verification commands. Run checks appropriate to the change and report failures or skips.
+Test realistic behavior; do not weaken checks or add assertions solely to raise coverage. Regenerate derived files from their sources.
+Keep build output, dependencies, and reports out of commits; follow the [public-repository data rules](docs/README.md).
 
-- [Repository workflow](docs/internal/dev-workflow/github-setup.md)
-- [Meeting decisions](docs/internal/meetings/)
-- [Documentation structure](docs/README.md)
+Update instructions alongside changes that affect them. Add narrower instructions only for rules missing from shared guidance;
+do not create empty service folders or copy READMEs into `AGENTS.md`.

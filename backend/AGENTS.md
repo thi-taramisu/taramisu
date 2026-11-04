@@ -1,40 +1,24 @@
 # Backend instructions
 
-## Scope and ownership
+The Backend team maintains this file and coordinates authentication and authorization changes with IAM/Security.
+Shared instructions are in [../AGENTS.md](../AGENTS.md).
 
-The Backend team maintains these instructions, together with IAM/Security for authentication and authorization changes.
-Shared rules are in [../AGENTS.md](../AGENTS.md).
-This folder contains the Go API, PostgreSQL schema, Atlas migrations, sqlc queries, and generated OpenAPI contract.
+## References
 
-## Conventions and generated files
+- [README.md](README.md): setup, database migrations, sqlc, OpenAPI, tests, and coverage.
+- [Deployment README](../deploy/README.md): shared stack startup and configuration.
+- [Makefile](Makefile) and [go.mod](go.mod): available targets and Go toolchain.
 
-- Follow the existing Chi/Huma handlers and pgx/sqlc patterns. Read [README.md](README.md) before changing startup or database behavior.
-- Keep SQL sources in `db/queries/` and the desired schema in `db/schema.sql`.
-- Regenerate `internal/db/` using `make sqlc`; do not edit sqlc output by hand.
-- Include an Atlas migration for schema changes. Use `make migrate-diff name=descriptive_name` and inspect the generated migration.
-- Treat `internal/httpapi/` as the API source of truth. Refresh `openapi.json` with `make openapi` when the contract changes.
-- Coordinate API changes with frontend consumers; the frontend currently generates types from its separate stub.
-- Follow the existing authentication and project authorization patterns on the branch being changed; do not assume draft designs exist.
+## Editing rules
 
-## Setup and verification
+- Follow the existing Chi/Huma handlers and pgx/sqlc patterns.
+- Keep schema/query changes, Atlas migrations, and regenerated sqlc output consistent using the README's database workflow.
+- For API changes, follow the README's OpenAPI workflow and the [frontend API workflow](../frontend/README.md#api-client)
+  to update both committed contracts. There is no separate frontend spec to maintain.
+- Use the authentication and project authorization behavior implemented on the target branch.
 
-Use the Go version declared in `go.mod`. Copy `.env.example` to `.env` for local development; never commit the populated file.
-Run these commands from `backend/`:
+## Verification
 
-```sh
-make db migrate       # start and migrate the local development database
-make run              # start the API
-make test             # go test -race ./...
-make lint             # golangci-lint run ./...
-go build ./cmd/...    # compile the API and OpenAPI exporter
-make openapi          # regenerate the committed API contract
-```
-
-`make test` skips PostgreSQL integration tests unless `TEST_DATABASE_URL` points to a migrated test database.
-Report that skip explicitly. Keep test data isolated from development or shared databases.
-Use `make down` for a normal stop; `make reset` removes local database volumes.
-
-## Team maintenance
-
-Keep setup, migration, API, and verification guidance aligned with the Makefile and CI.
-Add service-specific instructions when new backend areas need conventions that do not belong here.
+Use the README's checks for the affected area. Report when PostgreSQL integration tests were skipped because `TEST_DATABASE_URL`
+was not configured; keep test data isolated from shared databases.
+Check the deployment guide before changing stack lifecycle commands or secrets handling.
