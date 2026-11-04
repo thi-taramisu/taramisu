@@ -25,7 +25,7 @@ sequenceDiagram
     AS-->>SPA: 302 Redirect back to /auth/callback?code=...&state=...
     SPA->>P: POST /auth/application/o/token/ (code + code_verifier)
     P->>AS: Forward (/auth/*)
-    AS-->>SPA: Access token (JWT: sub=user_uuid, name, email) + refresh token
+    AS-->>SPA: Access token (JWT: sub=hashed_user_id, name, email) + refresh token
     Note over SPA: Tokens kept in memory, short-lived access token (10 min), refreshed via refresh token
 ```
 

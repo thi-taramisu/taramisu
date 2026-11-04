@@ -254,4 +254,43 @@ assert isolated['services']['authentik-worker']['environment']['OIDC_REDIRECT_UR
 assert all(v['name'].startswith('isolated-check-') for v in isolated['volumes'].values())
 assert all(n['name'].startswith('isolated-check_') for n in isolated['networks'].values())
 PY
+
+# Verify NGINX starts without Authentik present and recovers dynamically when Authentik starts.
+if [ -n "$REAL_DOCKER" ] && "$REAL_DOCKER" info >/dev/null 2>&1; then
+    TEST_NET="taramisu-test-proxy-$$-net"
+    "$REAL_DOCKER" network create "$TEST_NET" >/dev/null
+    cleanup_proxy_test() {
+        "$REAL_DOCKER" rm -f "proxy-$$" "frontend-$$" "docs-$$" "authentik-$$" >/dev/null 2>&1 || true
+        "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1 || true
+        rm -rf "$scratch"
+    }
+    trap cleanup_proxy_test EXIT HUP INT TERM
+
+    "$REAL_DOCKER" run -d --name "frontend-$$" --network "$TEST_NET" --network-alias frontend nginx:1.28-alpine >/dev/null
+    "$REAL_DOCKER" run -d --name "docs-$$" --network "$TEST_NET" --network-alias docs nginx:1.28-alpine >/dev/null
+    "$REAL_DOCKER" run -d --name "proxy-$$" --network "$TEST_NET" -v "$scratch/proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.28-alpine >/dev/null
+
+    sleep 2
+    test "$("$REAL_DOCKER" inspect -f '{{.State.Running}}' "proxy-$$")" = "true"
+    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/" | grep -q '<title>Welcome to nginx!</title>'
+    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine sh -c "wget -O - 'http://proxy-$$/auth/' 2>&1 | grep -q '502 Bad Gateway'"
+
+    "$REAL_DOCKER" run -d --name "authentik-$$" --network "$TEST_NET" --network-alias authentik-server nginx:1.28-alpine sh -c "cat > /etc/nginx/conf.d/default.conf << 'EOF'
+server {
+  listen 9000;
+  location /auth/ {
+    return 200 'authentik-ok';
+  }
+}
+EOF
+nginx -g 'daemon off;'
+" >/dev/null
+
+    sleep 11
+    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/auth/" | grep -q 'authentik-ok'
+
+    "$REAL_DOCKER" rm -f "proxy-$$" "frontend-$$" "docs-$$" "authentik-$$" >/dev/null 2>&1
+    "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
+fi
+
 echo 'PASS: unified Compose model, isolated networks/volumes, startup order, commands, secrets, and failures.'

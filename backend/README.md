@@ -64,7 +64,7 @@ in `../iam/.env` and run `make up`.
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)
 and sends `Authorization: Bearer <JWT>` on every `/api/v1/*` request.
 The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs (`RS256`, `iss`, `aud`, `exp`, and required `sub`, `name`,
-`email` claims) against Authentik's JWKS keys (`OIDC_JWKS_URL`, cached in memory per replica) and resolves `sub` (`user_uuid`) to the local
+`email` claims) against Authentik's JWKS keys (`OIDC_JWKS_URL`, cached in memory per replica) and resolves `sub` (`hashed_user_id`) to the local
 `iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
 `GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
 

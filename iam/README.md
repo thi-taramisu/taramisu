@@ -22,7 +22,7 @@ Keep `.env` with the database volumes; `make -C deploy down` preserves both.
 - Application: <http://localhost>, user `dev`, password `DEV_PASSWORD`.
 
 Authentik runs under `/auth/` behind the NGINX reverse proxy (`AUTHENTIK_WEB__PATH=/auth/`).
-The `Taramisu` OAuth2 provider is configured as a public client (`Authorization Code + PKCE`) issuing JWT access tokens with `sub=user_uuid`,
+The `Taramisu` OAuth2 provider is configured as a public client (`Authorization Code + PKCE`) issuing JWT access tokens with `sub=hashed_user_id`,
 `name`, and `email` claims. The Go backend validates incoming `Bearer` JWTs statelessly against Authentik's JWKS endpoint over the internal
 Docker network without holding any session state or client secret.
 
