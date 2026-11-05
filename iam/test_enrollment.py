@@ -235,6 +235,26 @@ class EnrollmentTest(unittest.TestCase):
         self.assertIn("access_token", tokens)
 
 
+        # 5. Unapproved localhost redirect URIs must be rejected by strict matching.
+        _, challenge3 = make_pkce()
+        resp_bad_redirect = client.get(
+            f"{BASE}/application/o/authorize/",
+            params={
+                "client_id": "taramisu",
+                "response_type": "code",
+                "redirect_uri": "http://localhost:4444/eval/route",
+                "code_challenge": challenge3,
+                "code_challenge_method": "S256",
+            },
+            allow_redirects=False,
+        )
+        bad_redirect_loc = resp_bad_redirect.headers.get("Location", "")
+        self.assertFalse(
+            resp_bad_redirect.status_code == 302 and bad_redirect_loc.startswith("http://localhost:4444/"),
+            f"Expected unapproved localhost redirect_uri to be rejected, got redirect to {bad_redirect_loc}",
+        )
+
+
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(EnrollmentTest)
 if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
     raise SystemExit(1)

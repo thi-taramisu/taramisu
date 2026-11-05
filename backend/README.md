@@ -18,7 +18,7 @@ Go HTTP API for Taramisu.
 
 ## Commands
 
-Run from `backend/`. The full stack uses ports 80, 5432, 8080 and 9000; optional pgAdmin uses 5050.
+Run from `backend/`. The full stack uses ports 80, 5432, and 9000; optional pgAdmin uses 5050.
 
 ```bash
 make up
@@ -46,13 +46,10 @@ These commands initialize the configuration automatically if needed.
 `make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at <http://localhost:5050> (no login),
 connected to the backend database. It remains opt-in through the `tools` profile.
 
-To run the API on the host, copy `.env.example` to `.env` and copy the OIDC settings from `../iam/.env`.
-Set `APP_URL=http://localhost:8080` in both files, then run `make up` to update the Authentik callback.
-Stop the API container with
-`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, then run `make run`.
+To run the API directly on the host, copy `.env.example` to `.env`, stop the API container with
+`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, and run `make run`.
 `make run` and `make test` load the backend `.env`; bare `make` runs tests.
-Use port 8080 directly in this mode. To return to the full Compose stack, restore `APP_URL=http://localhost`
-in `../iam/.env` and run `make up`.
+The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to the full Compose stack, run `make up`.
 
 `make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
 
@@ -71,7 +68,7 @@ The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs
 ## Checks
 
 ```sh
-curl -f http://localhost:8080/health/ready
+curl -f http://localhost/health/ready
 make -C ../deploy test
 make test
 TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make test
@@ -177,9 +174,10 @@ Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Post
 
 ## OpenAPI contract
 
-With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at
-[http://localhost:8080/openapi.json](http://localhost:8080/openapi.json), UI at [/docs](http://localhost:8080/docs).
-Example: `curl -fsS "http://localhost:8080/openapi.json" -o openapi.json`.
+With the Compose stack running: OpenAPI 3.1 at [http://localhost/openapi.json](http://localhost/openapi.json), Swagger UI at
+[/api/docs](http://localhost/api/docs) (or `http://localhost:8080/openapi.json` and `http://localhost:8080/docs` when running standalone
+on the host via `make run`, default `HTTP_ADDR=:8080`).
+Example: `curl -fsS "http://localhost/openapi.json" -o openapi.json`.
 
 For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or
 `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).

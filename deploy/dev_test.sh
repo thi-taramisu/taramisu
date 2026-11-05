@@ -230,6 +230,10 @@ assert Path(services['frontend']['build']['context']).resolve() == root / 'front
 assert Path(services['docs']['build']['context']).resolve() == root
 assert 'docs' in services['proxy']['depends_on']
 assert not services['docs'].get('ports')
+assert not api.get('ports')
+blueprint_text = (root / 'iam/blueprints/taramisu.yaml').read_text()
+assert 'matching_mode: regex' not in blueprint_text
+assert 'url: http://localhost:5173/auth/callback' in blueprint_text
 for service, target, source in [
     ('migrate', '/app', root / 'backend'),
     ('authentik-worker', '/blueprints/custom', root / 'iam/blueprints'),

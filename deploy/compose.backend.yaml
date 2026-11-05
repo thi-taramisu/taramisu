@@ -71,8 +71,6 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-${APP_URL:-http://localhost}/auth/application/o/taramisu/}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://authentik-server:9000/auth/application/o/taramisu/jwks/}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
-    ports:
-      - "127.0.0.1:8080-8089:8080"
     depends_on:
       migrate:
         condition: service_completed_successfully
