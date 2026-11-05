@@ -16,10 +16,10 @@ export default defineConfig({
   // /auth/callback is bypassed and served by index.html so the SPA handles the OIDC PKCE redirect.
   server: {
     proxy: {
-      '/api': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
-      '/health': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
+      '/api': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
+      '/health': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
       '/auth': {
-        target: process.env.VITE_AUTH_PROXY_TARGET ?? process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
+        target: process.env.VITE_AUTH_PROXY_TARGET ?? process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
         bypass(req) {
           if (req.url === '/auth/callback' || req.url?.startsWith('/auth/callback?')) {
             return '/index.html'
