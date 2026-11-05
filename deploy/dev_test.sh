@@ -290,8 +290,16 @@ EOF
 nginx -g 'daemon off;'
 " >/dev/null
 
-    sleep 11
-    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/auth/" | grep -q 'authentik-ok'
+    # Poll until NGINX re-resolves the upstream after its resolver TTL and forwards to authentik-server.
+    recovered=0
+    for _ in $(seq 1 15); do
+        if "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/auth/" 2>/dev/null | grep -q 'authentik-ok'; then
+            recovered=1
+            break
+        fi
+        sleep 1
+    done
+    test "$recovered" = 1
 
     "$REAL_DOCKER" rm -f "proxy-$$" "frontend-$$" "docs-$$" "authentik-$$" >/dev/null 2>&1
     "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
