@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -16,7 +16,7 @@ import {
   refreshAccessToken,
   type OidcConfig,
 } from './oidc'
-import { useAuth, type AuthContextValue } from './useAuth'
+import { useAuth } from './useAuth'
 
 function StatusProbe() {
   const { status } = useAuth()
@@ -274,12 +274,12 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       expiresAt: Date.now() + 65_000,
     }
 
-    let resolveRefresh: (value: Response) => void = () => {}
+    let resolveRefresh!: (value: Response) => void
     const refreshPromise = new Promise<Response>((resolve) => {
       resolveRefresh = resolve
     })
 
-    const customFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const customFetch = vi.fn<typeof fetch>((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.includes('/token/')) {
         return refreshPromise
@@ -287,23 +287,19 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       return fetch(input, init)
     })
 
-    let authContext: AuthContextValue | null = null
-    function AuthConsumer() {
-      authContext = useAuth()
-      return <div>Status: {authContext.status}</div>
-    }
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => (
+        <AuthProvider
+          config={testOidcConfig}
+          initialTokens={initialTokens}
+          fetchImpl={customFetch}
+        >
+          {children}
+        </AuthProvider>
+      ),
+    })
 
-    render(
-      <AuthProvider
-        config={testOidcConfig}
-        initialTokens={initialTokens}
-        fetchImpl={customFetch as unknown as typeof fetch}
-      >
-        <AuthConsumer />
-      </AuthProvider>,
-    )
-
-    expect(authContext!.status).toBe('authenticated')
+    expect(result.current.status).toBe('authenticated')
 
     // Advance clock to trigger refresh request
     await act(async () => {
@@ -312,10 +308,10 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
 
     // Sign out while refresh request is in flight
     await act(async () => {
-      await authContext!.signOut({ localOnly: true })
+      await result.current.signOut({ localOnly: true })
     })
 
-    expect(authContext!.status).toBe('unauthenticated')
+    expect(result.current.status).toBe('unauthenticated')
     expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
 
     // Now resolve the in-flight refresh response
@@ -333,9 +329,9 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
     })
 
     // Auth state must remain unauthenticated and storage must remain empty
-    expect(authContext!.status).toBe('unauthenticated')
-    expect(authContext!.accessToken).toBeNull()
-    expect(authContext!.user).toBeNull()
+    expect(result.current.status).toBe('unauthenticated')
+    expect(result.current.accessToken).toBeNull()
+    expect(result.current.user).toBeNull()
     expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
 
     vi.useRealTimers()
@@ -351,16 +347,10 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       expiresAt: Date.now() + 600_000,
     }
 
-    const navigateExternal = vi.fn()
+    const navigateExternal = vi.fn<(url: string) => void>()
 
     // 1. Rejected revocation request
-    let authContext: AuthContextValue | null = null
-    function AuthConsumer() {
-      authContext = useAuth()
-      return <div>Status: {authContext.status}</div>
-    }
-
-    const failingFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const failingFetch = vi.fn<typeof fetch>((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.includes('/revoke/')) {
         return Promise.reject(new Error('Network offline'))
@@ -368,24 +358,26 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       return fetch(input, init)
     })
 
-    const { unmount } = render(
-      <AuthProvider
-        config={testOidcConfig}
-        initialTokens={initialTokens}
-        fetchImpl={failingFetch as unknown as typeof fetch}
-        onNavigateExternal={navigateExternal}
-      >
-        <AuthConsumer />
-      </AuthProvider>,
-    )
-
-    expect(authContext!.status).toBe('authenticated')
-
-    await act(async () => {
-      await authContext!.signOut()
+    const { result: rejectedResult, unmount } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => (
+        <AuthProvider
+          config={testOidcConfig}
+          initialTokens={initialTokens}
+          fetchImpl={failingFetch}
+          onNavigateExternal={navigateExternal}
+        >
+          {children}
+        </AuthProvider>
+      ),
     })
 
-    expect(authContext!.status).toBe('unauthenticated')
+    expect(rejectedResult.current.status).toBe('authenticated')
+
+    await act(async () => {
+      await rejectedResult.current.signOut()
+    })
+
+    expect(rejectedResult.current.status).toBe('unauthenticated')
     expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
     expect(navigateExternal).toHaveBeenCalledWith(
       expect.stringContaining(testOidcConfig.endSessionEndpoint),
@@ -395,7 +387,7 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
     navigateExternal.mockClear()
 
     // 2. Never-resolving revocation request
-    const hangingFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const hangingFetch = vi.fn<typeof fetch>((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.includes('/revoke/')) {
         return new Promise<Response>(() => {})
@@ -403,26 +395,28 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       return fetch(input, init)
     })
 
-    render(
-      <AuthProvider
-        config={testOidcConfig}
-        initialTokens={initialTokens}
-        fetchImpl={hangingFetch as unknown as typeof fetch}
-        onNavigateExternal={navigateExternal}
-      >
-        <AuthConsumer />
-      </AuthProvider>,
-    )
+    const { result: hangingResult } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => (
+        <AuthProvider
+          config={testOidcConfig}
+          initialTokens={initialTokens}
+          fetchImpl={hangingFetch}
+          onNavigateExternal={navigateExternal}
+        >
+          {children}
+        </AuthProvider>
+      ),
+    })
 
-    expect(authContext!.status).toBe('authenticated')
+    expect(hangingResult.current.status).toBe('authenticated')
 
     let signOutPromise: Promise<void>
     act(() => {
-      signOutPromise = authContext!.signOut()
+      signOutPromise = hangingResult.current.signOut()
     })
 
     // Local authentication must be cleared immediately, even while revocation is still pending
-    expect(authContext!.status).toBe('unauthenticated')
+    expect(hangingResult.current.status).toBe('unauthenticated')
     expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
 
     // Fast-forward beyond the revocation timeout
