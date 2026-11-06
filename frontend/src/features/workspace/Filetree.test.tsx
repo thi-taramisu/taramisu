@@ -36,13 +36,27 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Filetree', () => {
   it('shows element names without their IDs in labels, tooltips and toggles', () => {
-    renderTree()
+    const allTypes: TreeNode[] = [{
+      type: 'items', id: 'i-10', code: 'I-10', name: 'Gateway', children: [{
+        type: 'assets', id: 'a-12', code: 'A-12', name: 'CAN bus', children: [{
+          type: 'damage-scenarios', id: 'ds-11', code: 'DS-11', name: 'Bus flooding', children: [{
+            type: 'threat-scenarios', id: 'ts-14', code: 'TS-14', name: 'Spoofed frames', children: [
+              { type: 'attack-paths', id: 'ap-15', code: 'AP-15', name: 'Compromised ECU' },
+            ],
+          }],
+        }],
+      }],
+    }]
+    renderTree(project, allTypes)
 
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
-    expect(within(tree).queryByText(/\b(I|A|DS)-0\d\b/)).not.toBeInTheDocument()
-    expect(within(tree).getByRole('link', { name: 'Headlamp' })).toHaveTextContent(/^Headlamp$/)
-    expect(within(tree).getByRole('link', { name: 'Firmware' })).toHaveAttribute('title', 'Asset: Firmware')
-    expect(within(tree).getByRole('button', { name: 'Collapse Long asset name' })).toBeInTheDocument()
+    const anyCode = /\b[A-Z]{1,2}-\d+\b/
+    const links = within(tree).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual(['Gateway', 'CAN bus', 'Bus flooding', 'Spoofed frames', 'Compromised ECU'])
+    for (const link of links) expect(link.title).not.toMatch(anyCode)
+    for (const button of within(tree).getAllByRole('button')) expect(button).not.toHaveAccessibleName(anyCode)
+    expect(within(tree).getByRole('link', { name: 'CAN bus' })).toHaveAttribute('title', 'Asset: CAN bus')
+    expect(within(tree).getByRole('button', { name: 'Collapse Spoofed frames' })).toBeInTheDocument()
   })
 
   it('uses the supplied project and keeps the active entity on its tabs and in graph view', async () => {
@@ -72,7 +86,7 @@ describe('Filetree', () => {
     const rootToggle = screen.getByRole('button', { name: 'Expand Headlamp' })
     expect(rootToggle).toHaveAttribute('aria-expanded', 'false')
     expect(content).not.toBeVisible()
-    expect(screen.queryByRole('link', { name: /A-01/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Long asset name' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Headlamp' })).not.toHaveAttribute('aria-current')
 
     await user.keyboard('{Enter}')
@@ -80,8 +94,8 @@ describe('Filetree', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse Headlamp' }))
     await user.click(screen.getByRole('button', { name: 'Expand Headlamp' }))
     expect(screen.getByRole('button', { name: 'Expand Long asset name' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: /DS-01/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /A-02/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Loss of light' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Firmware/ })).not.toBeInTheDocument()
   })
 
   it('moves between visible entries with arrows, Home and End', async () => {
