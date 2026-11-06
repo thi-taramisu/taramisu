@@ -4,7 +4,7 @@ import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { EntityType, TreeNode } from '../../api/models/tree'
-import { entityPath, entityTitle } from './entities'
+import { entityPath } from './entities'
 import { FiletreeLink } from './FiletreeLink'
 
 const icons = {
@@ -52,7 +52,7 @@ function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: Br
                 variant="ghost"
                 size="icon-xs"
                 className="size-6 rounded-md"
-                aria-label={`${expanded ? 'Collapse' : 'Expand'} ${entityTitle(node)}`}
+                aria-label={`${expanded ? 'Collapse' : 'Expand'} ${node.name}`}
                 onKeyDown={onKeyDown}
               >
                 <ChevronRight aria-hidden="true" className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`} />

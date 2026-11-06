@@ -31,7 +31,7 @@ describe('ItemAssetsTab', () => {
     expect(within(row).getByText('Power switch actuator')).toBeInTheDocument()
     expect(within(row).getByLabelText('Properties I')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets (5)' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'A-05 LED driver config' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'LED driver config' })).toBeInTheDocument()
     expect(await api.content.assets('headlamp', 'i-01')).toHaveLength(5)
   })
 })
