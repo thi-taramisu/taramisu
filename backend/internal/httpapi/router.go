@@ -12,8 +12,8 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-func New(queries handlers.StatusReader, manager *auth.Manager) http.Handler {
-	mux, _ := newAPI(queries, manager)
+func New(queries handlers.StatusReader, manager *auth.Manager, attachments ...*Attachments) http.Handler {
+	mux, _ := newAPI(queries, manager, attachments...)
 	return mux
 }
 
@@ -22,7 +22,7 @@ func OpenAPI() *huma.OpenAPI {
 	return api.OpenAPI()
 }
 
-func newAPI(queries handlers.StatusReader, manager *auth.Manager) (*chi.Mux, huma.API) {
+func newAPI(queries handlers.StatusReader, manager *auth.Manager, attachments ...*Attachments) (*chi.Mux, huma.API) {
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
 	mux.Use(func(next http.Handler) http.Handler {
@@ -52,5 +52,10 @@ func newAPI(queries handlers.StatusReader, manager *auth.Manager) (*chi.Mux, hum
 	}, func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	var files *Attachments
+	if len(attachments) > 0 {
+		files = attachments[0]
+	}
+	registerAttachments(api, files)
 	return mux, api
 }
