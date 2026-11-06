@@ -1,9 +1,13 @@
 services:
   frontend:
-    build: ../frontend
+    build:
+      context: ../frontend
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-production}
+        VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
    # This has a declarative function rather than really exposing the port.
    # Just to make it easier to find the frontend port through which frontend
-   # and nginx communicate  
+   # and nginx communicate
     expose:
       - 80
-  
