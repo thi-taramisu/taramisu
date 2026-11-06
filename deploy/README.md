@@ -110,11 +110,15 @@ make -C deploy test-stack
 Requires a running stack (`make -C deploy up`); the runner does not start one.
 It obtains an access token through the OIDC PKCE flow against Authentik via NGINX (`/auth/`), checks its claims,
 and temporarily scales `api` to 2 replicas.
-It verifies direct token acceptance and rejection on each replica's container IP and load distribution through NGINX.
+It verifies direct token acceptance and rejection on each replica's container IP
+and that sequential requests through NGINX reach both replicas.
 Under continuous load, it verifies that no request fails while a replica is stopped (`docker stop`, SIGTERM)
-or crashes (`docker kill`, SIGKILL).
-It also verifies cold-cache token acceptance by a restarted replica.
-It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130).
+or killed (`docker kill`, SIGKILL).
+It also restarts a replica on a new IP and verifies cold-cache token acceptance and that NGINX re-resolves it.
+It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130; 2 if the restore fails);
+further signals are ignored while it restores.
+`python3 deploy/stack_test.py --self-check`, run by `make -C deploy test`, checks offline that `proxy/nginx.conf`
+still matches the timings and log format the runner parses.
 Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
 
 Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:

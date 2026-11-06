@@ -4,20 +4,22 @@ Validates:
 1. OIDC Authorization Code + PKCE flow against Authentik via NGINX.
 2. Bearer JWT claims (alg, iss, aud, sub, name, email, validity).
 3. Direct acceptance of the exact same JWT by each scaled replica (via container IP).
-4. Direct and proxied rejection of missing or tampered tokens (401).
-5. Load distribution across both replicas.
+4. Direct and proxied rejection of missing or tampered tokens (401) on every replica.
+5. Distribution of sequential requests across both replicas.
 6. No failed requests while a replica is stopped (SIGTERM) or killed (SIGKILL) under load,
    with the proxy_next_upstream retry recorded in the NGINX access log.
 7. Removal of the dead replica from the upstream pool by the NGINX runtime resolver.
-8. Cold-cache token acceptance and NGINX re-integration of a restarted replica.
+8. Cold-cache token acceptance by a restarted replica and NGINX re-resolution of its new address.
 
 Timing assumptions (resolver valid=, fail_timeout=) are read from proxy/nginx.conf.
+`python3 stack_test.py --self-check` checks offline that the config still matches what this runner parses.
 """
 
 from __future__ import annotations
 
 import base64
 from datetime import datetime, timedelta, timezone
+import functools
 import hashlib
 from http.cookiejar import CookieJar
 import json
@@ -41,16 +43,31 @@ REPO_ROOT = SCRIPT_DIR.parent
 ENV_FILE = REPO_ROOT / "iam" / ".env"
 COMPOSE_FILE = SCRIPT_DIR / "compose.yaml"
 PROXY_CONF = REPO_ROOT / "proxy" / "nginx.conf"
+HELPER_IMAGE = "nginx:1.28-alpine"
 
 # Unique identifier for this test run so proxy access logs can be correlated
 # strictly to test requests, preventing cross-contamination from other clients.
 RUN_ID = uuid.uuid4().hex[:8]
-# Only read proxy logs written during this run; the margin absorbs host/Docker VM clock skew.
-LOG_SINCE = (datetime.now(timezone.utc) - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+# Labels helper containers started by this run so cleanup can find them.
+RUN_LABEL = f"stack-test.run={RUN_ID}"
+
+# Upper bounds for single docker invocations, so a hanging daemon fails the run instead of blocking it.
+DOCKER_TIMEOUT = 60
+COMPOSE_TIMEOUT = 180
+
+# Matches proxy/nginx.conf 'log_format upstream_logging':
+#   $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent
+#   "$http_referer" "$http_user_agent" "$http_x_forwarded_for"
+#   upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time
+LOG_PATTERN = re.compile(
+    r'"(?P<method>[A-Z]+)\s+(?P<uri>\S+)[^"]*"\s+(?P<http_status>\d+)\s+\d+\s+'
+    r'"[^"]*"\s+"(?P<user_agent>[^"]*)"\s+"[^"]*"\s+'
+    r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>[^\r\n]+)'
+)
 
 
 class ComposeError(RuntimeError):
-    """Raised when a docker compose command exits with non-zero status."""
+    """Raised when a docker or docker compose command exits with non-zero status."""
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -79,22 +96,26 @@ def read_proxy_timings(path: Path = PROXY_CONF) -> tuple[float, float]:
     return float(fail_timeout.group(1)), float(resolver_valid.group(1))
 
 
-def run_compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    cmd = [
-        "docker",
-        "compose",
-        "--env-file",
-        str(ENV_FILE),
-        "-f",
-        str(COMPOSE_FILE),
-        *args,
-    ]
+def read_log_format(path: Path = PROXY_CONF) -> str:
+    """Returns the concatenated 'log_format upstream_logging' template from the proxy config."""
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r"\blog_format\s+upstream_logging\s+((?:'[^']*'\s*)+);", text)
+    if not match:
+        raise RuntimeError(f"{path} must define 'log_format upstream_logging'")
+    return "".join(re.findall(r"'([^']*)'", match.group(1)))
+
+
+def _run(cmd: list[str], check: bool, timeout: float, new_session: bool, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     proc = subprocess.run(
         cmd,
         cwd=str(SCRIPT_DIR),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
+        timeout=timeout,
+        # A new session keeps terminal Ctrl-C away from commands that must not be interrupted halfway.
+        start_new_session=new_session,
     )
     if check and proc.returncode != 0:
         raise ComposeError(
@@ -105,9 +126,31 @@ def run_compose(*args: str, check: bool = True) -> subprocess.CompletedProcess[s
     return proc
 
 
-def scale_api(count: int) -> None:
+def run_compose(*args: str, check: bool = True, new_session: bool = False) -> subprocess.CompletedProcess[str]:
+    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), "-f", str(COMPOSE_FILE), *args]
+    return _run(cmd, check, COMPOSE_TIMEOUT, new_session)
+
+
+def run_docker(
+    *args: str,
+    check: bool = True,
+    new_session: bool = False,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    return _run(["docker", *args], check, DOCKER_TIMEOUT, new_session, env)
+
+
+def scale_api(count: int, new_session: bool = False) -> None:
     """Scales the api service without touching its dependencies or recreating running replicas."""
-    run_compose("up", "-d", "--wait", "--no-deps", "--no-recreate", f"--scale=api={count}", "api")
+    run_compose("up", "-d", "--wait", "--no-deps", "--no-recreate", f"--scale=api={count}", "api", new_session=new_session)
+
+
+def docker_now() -> datetime:
+    """Returns the Docker daemon's clock, which stamps container logs (it can drift from the host's)."""
+    raw = run_docker("info", "--format", "{{.SystemTime}}").stdout.strip()
+    # Go prints up to nine fractional digits and 'Z'; datetime.fromisoformat needs exactly six and an offset.
+    raw = re.sub(r"\.(\d+)", lambda m: "." + (m.group(1) + "000000")[:6], raw).replace("Z", "+00:00")
+    return datetime.fromisoformat(raw)
 
 
 def b64url_decode(s: str) -> bytes:
@@ -217,10 +260,11 @@ def oidc_pkce_login(
         urllib.request.HTTPCookieProcessor(jar),
         NoRedirect(),
     )
-    auth_resp = no_redir_opener.open(urllib.request.Request(auth_url), timeout=20)
-    loc = auth_resp.headers.get("Location")
+    with no_redir_opener.open(urllib.request.Request(auth_url), timeout=20) as auth_resp:
+        loc = auth_resp.headers.get("Location")
+        auth_status = auth_resp.status
     if not loc:
-        raise RuntimeError(f"Expected redirect Location header from authorize endpoint, got status {auth_resp.status}")
+        raise RuntimeError(f"Expected redirect Location header from authorize endpoint, got status {auth_status}")
 
     parsed = urllib.parse.urlparse(loc)
     qs = urllib.parse.parse_qs(parsed.query)
@@ -254,74 +298,46 @@ def oidc_pkce_login(
     return token_res["access_token"]
 
 
+def compose_ids(service: str) -> list[str]:
+    return run_compose("ps", "-q", service).stdout.split()
+
+
+@functools.cache
 def get_shared_network() -> str:
-    """Finds the network name shared between proxy and api containers."""
-    res_proxy = run_compose("ps", "-q", "proxy", check=False)
-    proxy_cids = [cid.strip() for cid in res_proxy.stdout.splitlines() if cid.strip()]
-    res_api = run_compose("ps", "-q", "api", check=False)
-    api_cids = [cid.strip() for cid in res_api.stdout.splitlines() if cid.strip()]
-
-    if proxy_cids and api_cids:
-        p_inspect = subprocess.run(["docker", "inspect", proxy_cids[0]], capture_output=True, text=True, check=False)
-        a_inspect = subprocess.run(["docker", "inspect", api_cids[0]], capture_output=True, text=True, check=False)
-        if p_inspect.returncode == 0 and a_inspect.returncode == 0:
-            p_nets = set(json.loads(p_inspect.stdout)[0].get("NetworkSettings", {}).get("Networks", {}).keys())
-            a_nets = set(json.loads(a_inspect.stdout)[0].get("NetworkSettings", {}).get("Networks", {}).keys())
-            common = p_nets & a_nets
-            if common:
-                return next(iter(common))
-
-    project = os.environ.get("COMPOSE_PROJECT_NAME", "taramisu")
-    return f"{project}_default"
+    """Returns the one network that NGINX uses to reach the api replicas."""
+    proxy_ids, api_ids = compose_ids("proxy"), compose_ids("api")
+    if not proxy_ids or not api_ids:
+        raise RuntimeError("proxy and api must be running to determine their shared network")
+    proxy_info, api_info = json.loads(run_docker("inspect", proxy_ids[0], api_ids[0]).stdout)
+    common = sorted(
+        set(proxy_info["NetworkSettings"]["Networks"]) & set(api_info["NetworkSettings"]["Networks"])
+    )
+    if len(common) != 1:
+        raise RuntimeError(f"Expected exactly one network shared by proxy and api, found {common}")
+    return common[0]
 
 
 def get_api_replicas() -> list[dict[str, str]]:
-    """Returns running api container metadata (id, name, ip, network)."""
-    res = run_compose("ps", "-q", "api")
-    cids = [cid.strip() for cid in res.stdout.splitlines() if cid.strip()]
+    """Returns running api replicas (id, name, ip, network) with their address on the proxy network."""
+    cids = compose_ids("api")
+    if not cids:
+        return []
+    network = get_shared_network()
     replicas: list[dict[str, str]] = []
-    shared_net = get_shared_network()
-
-    for cid in cids:
-        inspect_proc = subprocess.run(
-            ["docker", "inspect", cid],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        info = json.loads(inspect_proc.stdout)[0]
-        name = info.get("Name", "").lstrip("/")
-        networks = info.get("NetworkSettings", {}).get("Networks", {})
-
-        selected_ip = ""
-        selected_net = ""
-        if shared_net in networks and networks[shared_net].get("IPAddress"):
-            selected_net = shared_net
-            selected_ip = networks[shared_net]["IPAddress"]
-        else:
-            for net_name, net_cfg in networks.items():
-                ip = net_cfg.get("IPAddress", "")
-                if ip:
-                    selected_ip = ip
-                    selected_net = net_name
-                    break
-
-        if selected_ip and selected_net:
-            replicas.append({
-                "id": cid,
-                "name": name,
-                "ip": selected_ip,
-                "network": selected_net,
-            })
+    for info in json.loads(run_docker("inspect", *cids).stdout):
+        # A replica that is shutting down may already have left the network; NGINX cannot reach it either.
+        ip = info["NetworkSettings"]["Networks"].get(network, {}).get("IPAddress", "")
+        if ip:
+            replicas.append({"id": info["Id"], "name": info["Name"].lstrip("/"), "ip": ip, "network": network})
     return replicas
 
 
 def wait_for_api_replicas(expected_count: int, timeout: float = 30.0) -> list[dict[str, str]]:
-    """Polls until the expected count of api replicas are running and have IP addresses."""
+    """Polls until the expected count of api replicas are running and attached to the proxy network."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         replicas = get_api_replicas()
-        if len(replicas) == expected_count and all(r["ip"] for r in replicas):
+        if len(replicas) == expected_count:
             return replicas
         time.sleep(1)
     raise TimeoutError(f"Timed out waiting for {expected_count} api replicas; current: {get_api_replicas()}")
@@ -335,16 +351,12 @@ def query_replica_direct(
 ) -> tuple[int, dict | str]:
     """Queries an api replica directly via its container IP using a temporary container on the network.
 
-    The bearer token (if present) is passed via the subprocess environment and forwarded
-    into docker using '-e AUTH_TOKEN' without exposing the raw secret value in the process table argv.
+    The bearer token reaches the helper container through the environment ('-e AUTH_TOKEN'), which keeps
+    it out of the docker CLI's argv. It is still visible in 'docker inspect' (Config.Env) and, once the
+    helper's shell expands it, in wget's argv, which a Linux host can see in its process list.
+    The development token is short-lived, so this is acceptable for a local and CI test.
     """
-    cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "--network",
-        network,
-    ]
+    cmd = ["run", "--rm", "--label", RUN_LABEL, "--network", network]
     env_vars = os.environ.copy()
     if token:
         cmd.extend(["-e", "AUTH_TOKEN"])
@@ -352,14 +364,9 @@ def query_replica_direct(
         wget_cmd = f'wget -S -O - --header "Authorization: $AUTH_TOKEN" http://{ip}:8080{path} 2>&1'
     else:
         wget_cmd = f'wget -S -O - http://{ip}:8080{path} 2>&1'
+    cmd.extend([HELPER_IMAGE, "sh", "-c", wget_cmd])
 
-    cmd.extend([
-        "nginx:1.28-alpine",
-        "sh",
-        "-c",
-        wget_cmd,
-    ])
-    proc = subprocess.run(cmd, env=env_vars, capture_output=True, text=True, check=False)
+    proc = run_docker(*cmd, check=False, env=env_vars)
     output = proc.stdout + proc.stderr
     status_match = re.search(r"HTTP/\d\.\d\s+(\d{3})", output)
     status_code = int(status_match.group(1)) if status_match else 0
@@ -423,19 +430,21 @@ def query_proxy(
 
 
 class LoadGenerator(threading.Thread):
-    """Sends tagged proxied requests back to back until stopped and records every response."""
+    """Sends tagged proxied requests every few milliseconds until stopped and records every response."""
 
-    def __init__(self, base_url: str, token: str, phase: str) -> None:
+    def __init__(self, base_url: str, token: str, phase: str, interval: float = 0.01) -> None:
         super().__init__(daemon=True)
         self.base_url = base_url
         self.token = token
         self.phase = phase
+        self.interval = interval
         self.results: list[tuple[int, dict | str]] = []
         self._halt = threading.Event()
 
     def run(self) -> None:
         while not self._halt.is_set():
             self.results.append(query_proxy(self.base_url, self.token, phase=self.phase))
+            self._halt.wait(self.interval)
 
     def stop(self) -> None:
         self._halt.set()
@@ -447,28 +456,15 @@ def upstream_ips(entry: dict[str, str]) -> list[str]:
     return [part.strip().split(":")[0] for part in entry["upstream_addr"].split(",")]
 
 
-def get_proxy_upstream_entries(phase: str | None = None) -> list[dict[str, str]]:
-    """Extracts upstream request entries from proxy access logs matching this test runner's RUN_ID.
-
-    If phase is specified, returns only entries strictly tagged for that phase.
-    """
-    res = run_compose("logs", f"--since={LOG_SINCE}", "--no-color", "proxy", check=False)
-    lines = res.stdout.splitlines()
+def parse_upstream_entries(lines: list[str], phase: str | None = None) -> list[dict[str, str]]:
+    """Extracts access-log entries tagged with this run's RUN_ID (and phase, if given)."""
     entries: list[dict[str, str]] = []
-    # Log format: $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent
-    #             "$http_referer" "$http_user_agent" "$http_x_forwarded_for"
-    #             upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time
-    pattern = re.compile(
-        r'"(?P<method>[A-Z]+)\s+(?P<uri>\S+)[^"]*"\s+(?P<http_status>\d+)\s+\d+\s+'
-        r'"[^"]*"\s+"(?P<user_agent>[^"]*)"\s+"[^"]*"\s+'
-        r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>[^\r\n]+)'
-    )
     parsed_any = False
     target_prefix = f"stack-test/{RUN_ID}/"
     expected_ua = f"stack-test/{RUN_ID}/{phase}" if phase else None
 
     for line in lines:
-        m = pattern.search(line)
+        m = LOG_PATTERN.search(line)
         if m:
             parsed_any = True
             d = m.groupdict()
@@ -482,10 +478,30 @@ def get_proxy_upstream_entries(phase: str | None = None) -> list[dict[str, str]]
     if not parsed_any and any("upstream:" in l for l in lines):
         raise RuntimeError(
             "Proxy access log entries contain 'upstream:' markers but could not be parsed by the test regex. "
-            "Verify that proxy/nginx.conf defines 'log_format upstream_logging' including $http_x_forwarded_for "
-            "and that the NGINX proxy container has reloaded its configuration."
+            "Run 'python3 deploy/stack_test.py --self-check' and verify that the NGINX proxy container has "
+            "reloaded its configuration."
         )
     return entries
+
+
+def get_proxy_upstream_entries(phase: str | None = None) -> list[dict[str, str]]:
+    """Returns this run's proxy access-log entries, optionally only those tagged for phase."""
+    res = run_compose("logs", f"--since={STACK.log_since}", "--no-color", "proxy")
+    return parse_upstream_entries(res.stdout.splitlines(), phase)
+
+
+def wait_for_proxy_entries(phase: str, expected: int, timeout: float = 10.0) -> list[dict[str, str]]:
+    """Polls the asynchronous Docker log pipeline until every request sent for phase has been logged."""
+    deadline = time.monotonic() + timeout
+    while True:
+        entries = get_proxy_upstream_entries(phase=phase)
+        if len(entries) >= expected:
+            return entries
+        if time.monotonic() > deadline:
+            raise AssertionError(
+                f"Only {len(entries)} of {expected} requests for phase '{phase}' appeared in the proxy access log"
+            )
+        time.sleep(0.5)
 
 
 def wait_for_nginx_to_resolve_both_replicas(
@@ -511,81 +527,167 @@ def wait_for_nginx_to_resolve_both_replicas(
     )
 
 
-def cleanup_stack(initial_count: int) -> bool:
-    """Restores the api service to its initial replica count. Returns True on success."""
+def occupy_address(network: str, ip: str, limit: int = 12) -> str:
+    """Starts placeholder containers on network until one holds ip, removes the others, and returns its ID.
+
+    New containers get the lowest free address, so filling the free addresses below ip reaches it.
+    """
+    placeholders: list[str] = []
     try:
-        scale_api(initial_count)
+        for _ in range(limit):
+            cid = run_docker(
+                "run", "-d", "--rm", "--label", RUN_LABEL, "--network", network, HELPER_IMAGE, "sleep", "300"
+            ).stdout.strip()
+            info = json.loads(run_docker("inspect", cid).stdout)[0]
+            if info["NetworkSettings"]["Networks"][network]["IPAddress"] == ip:
+                return cid
+            placeholders.append(cid)
+        raise RuntimeError(f"No placeholder on {network} received {ip} within {limit} attempts")
+    finally:
+        if placeholders:
+            run_docker("rm", "-f", *placeholders, check=False)
+
+
+def remove_helper_containers() -> None:
+    """Removes helper and placeholder containers this run started."""
+    ids = run_docker("ps", "-aq", "--filter", f"label={RUN_LABEL}", check=False, new_session=True).stdout.split()
+    if ids:
+        run_docker("rm", "-f", *ids, check=False, new_session=True)
+
+
+def proxy_ready(base_url: str, attempts: int, delay: float) -> bool:
+    """Polls /health/ready through NGINX until it returns 200."""
+    for _ in range(attempts):
+        try:
+            with urllib.request.urlopen(f"{base_url}/health/ready", timeout=3) as resp:
+                if resp.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(delay)
+    return False
+
+
+def cleanup_stack(initial_count: int) -> bool:
+    """Restores the api service to its initial replica count and waits until NGINX serves it again."""
+    try:
+        remove_helper_containers()
+        scale_api(initial_count, new_session=True)
+        # Until the resolver TTL expires, NGINX may still route to a replica that was just removed.
+        if not proxy_ready(STACK.base_url, attempts=10, delay=1):
+            print("Warning: api is not ready through NGINX after restoring the replica count", file=sys.stderr)
+            return False
         return True
-    except Exception as e:
-        print(f"Warning: stack cleanup failed: {e}", file=sys.stderr)
+    except BaseException as e:  # main() ignores signals here, but no failure may skip the warning.
+        print(f"Warning: stack cleanup failed: {e!r}", file=sys.stderr)
         return False
 
 
+def self_check() -> int:
+    """Checks offline that proxy/nginx.conf still matches the timings and log format this runner parses."""
+    fail_timeout, resolver_valid = read_proxy_timings()
+    values = {
+        "remote_addr": "172.18.0.1",
+        "remote_user": "-",
+        "time_local": "06/Nov/2026:10:00:00 +0000",
+        "request": "GET /api/v1/me HTTP/1.1",
+        "status": "200",
+        "body_bytes_sent": "42",
+        "http_referer": "-",
+        "http_user_agent": f"stack-test/{RUN_ID}/self_check",
+        "http_x_forwarded_for": "-",
+        "upstream_addr": "10.0.0.2:8080, 10.0.0.3:8080",
+        "upstream_status": "502, 200",
+        "upstream_response_time": "0.001, 0.002",
+    }
+    try:
+        line = re.sub(r"\$(\w+)", lambda m: values[m.group(1)], read_log_format())
+    except KeyError as e:
+        raise RuntimeError(f"log_format upstream_logging uses ${e.args[0]}; update LOG_PATTERN and self_check()") from None
+    expected = {
+        "method": "GET",
+        "uri": "/api/v1/me",
+        "http_status": "200",
+        "user_agent": values["http_user_agent"],
+        "upstream_addr": values["upstream_addr"],
+        "upstream_status": values["upstream_status"],
+        "upstream_response_time": values["upstream_response_time"],
+    }
+    entries = parse_upstream_entries([f"proxy-1  | {line}"], phase="self_check")
+    if entries != [expected]:
+        print(f"LOG_PATTERN does not match log_format upstream_logging:\n{line}\nparsed: {entries}", file=sys.stderr)
+        return 1
+    print(f"stack_test self-check OK (fail_timeout={fail_timeout:g}s, resolver valid={resolver_valid:g}s)")
+    return 0
+
+
+class StackSession:
+    """Login and stack state shared by all test classes, filled once by setUpModule()."""
+
+    def __init__(self) -> None:
+        self.base_url = "http://localhost"
+        self.client_id = "taramisu"
+        self.token = ""
+        self.header: dict[str, Any] = {}
+        self.payload: dict[str, Any] = {}
+        self.user_id = ""
+        self.initial_replica_count = 1
+        self.log_since = ""
+        # True once tests may change the replica count; main() restores the stack only then.
+        self.restore_needed = False
+
+
+STACK = StackSession()
+
+
+def setUpModule() -> None:
+    if not ENV_FILE.is_file():
+        raise RuntimeError(f"Missing environment file: {ENV_FILE}. Run deploy/dev.sh first.")
+
+    env = read_env(ENV_FILE)
+    dev_password = env.get("DEV_PASSWORD")
+    if not dev_password:
+        raise RuntimeError(f"DEV_PASSWORD not set in {ENV_FILE}. Run deploy/dev.sh first to provision Authentik.")
+
+    # Configuration resolution: Shell environment takes precedence, followed by iam/.env,
+    # matching Docker Compose variable interpolation semantics.
+    STACK.base_url = (os.environ.get("APP_URL") or env.get("APP_URL") or "http://localhost").rstrip("/")
+    STACK.client_id = os.environ.get("OIDC_CLIENT_ID") or env.get("OIDC_CLIENT_ID") or "taramisu"
+
+    if not proxy_ready(STACK.base_url, attempts=15, delay=2):
+        raise RuntimeError(f"Stack is not ready at {STACK.base_url}/health/ready. Start it with deploy/dev.sh first.")
+
+    # Container logs are stamped by the daemon's clock; a small margin covers log lines written while it is read.
+    STACK.log_since = (docker_now() - timedelta(seconds=5)).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    STACK.token = oidc_pkce_login(STACK.base_url, STACK.client_id, "dev", dev_password, f"{STACK.base_url}/auth/callback")
+    STACK.header, STACK.payload = decode_jwt(STACK.token)
+
+    status, body = query_proxy(STACK.base_url, STACK.token, phase="setup")
+    if status != 200 or not isinstance(body, dict) or not body.get("id"):
+        raise RuntimeError(f"Failed to resolve initial iam_user via /api/v1/me: status={status}, body={body}")
+    STACK.user_id = str(body["id"])
+
+    STACK.initial_replica_count = len(get_api_replicas()) or 1
+    STACK.restore_needed = True
+
+
+class TokenClaimsTest(unittest.TestCase):
+    def test_token_claims(self) -> None:
+        """Verifies JWT signature algorithm and payload claims match the OIDC provider configuration."""
+        self.assertEqual(STACK.header.get("alg"), "RS256")
+        self.assertEqual(STACK.payload.get("iss"), f"{STACK.base_url}/auth/application/o/{STACK.client_id}/")
+        self.assertEqual(STACK.payload.get("aud"), STACK.client_id)
+        self.assertEqual(STACK.payload.get("name"), "Development user")
+        self.assertEqual(STACK.payload.get("email"), "dev@taramisu.localhost")
+        self.assertTrue(STACK.payload.get("sub"), "Missing sub claim in JWT")
+
+        validity = STACK.payload.get("exp", 0) - STACK.payload.get("iat", 0)
+        self.assertEqual(validity, 600, f"Expected token validity to be 600s (10 min), got {validity}s")
+
+
 class MultiReplicaFailoverTest(unittest.TestCase):
-    env: dict[str, str] = {}
-    base_url: str = "http://localhost"
-    client_id: str = "taramisu"
-    redirect_uri: str = "http://localhost/auth/callback"
-    token: str = ""
-    header: dict[str, Any] = {}
-    payload: dict[str, Any] = {}
-    initial_user_id: str = ""
-    initial_replica_count: int = 1
-    # Set once the runner starts changing the stack; main() only restores it when this is True.
-    scaled: bool = False
     replicas: list[dict[str, str]] = []
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        if not ENV_FILE.is_file():
-            raise RuntimeError(f"Missing environment file: {ENV_FILE}. Run deploy/dev.sh first.")
-
-        cls.env = read_env(ENV_FILE)
-        dev_password = cls.env.get("DEV_PASSWORD")
-        if not dev_password:
-            raise RuntimeError(
-                f"DEV_PASSWORD not set in {ENV_FILE}. Run deploy/dev.sh first to provision Authentik."
-            )
-
-        # Configuration resolution: Shell environment takes precedence, followed by iam/.env,
-        # matching Docker Compose variable interpolation semantics.
-        cls.base_url = (os.environ.get("APP_URL") or cls.env.get("APP_URL") or "http://localhost").rstrip("/")
-        cls.client_id = os.environ.get("OIDC_CLIENT_ID") or cls.env.get("OIDC_CLIENT_ID") or "taramisu"
-        cls.redirect_uri = f"{cls.base_url}/auth/callback"
-
-        # Check stack readiness before scaling
-        ready_url = f"{cls.base_url}/health/ready"
-        ready = False
-        for _ in range(15):
-            try:
-                with urllib.request.urlopen(ready_url, timeout=3) as resp:
-                    if resp.status == 200:
-                        ready = True
-                        break
-            except Exception:
-                time.sleep(2)
-
-        if not ready:
-            raise RuntimeError(f"Stack is not ready at {ready_url}. Start it with deploy/dev.sh first.")
-
-        # Obtain OIDC PKCE JWT token
-        cls.token = oidc_pkce_login(
-            cls.base_url,
-            cls.client_id,
-            "dev",
-            dev_password,
-            cls.redirect_uri,
-        )
-        cls.header, cls.payload = decode_jwt(cls.token)
-
-        # Resolve initial user ID immediately via proxy
-        status, body = query_proxy(cls.base_url, cls.token, phase="setup")
-        if status != 200 or not isinstance(body, dict) or not body.get("id"):
-            raise RuntimeError(f"Failed to resolve initial iam_user via /api/v1/me: status={status}, body={body}")
-        cls.initial_user_id = str(body["id"])
-
-        cls.initial_replica_count = len(get_api_replicas()) or 1
-        cls.scaled = True
 
     def setUp(self) -> None:
         # Every test starts from two ready replicas that NGINX balances across, regardless of
@@ -597,8 +699,8 @@ class MultiReplicaFailoverTest(unittest.TestCase):
         for r in replicas:
             wait_for_replica_ready(r["network"], r["ip"])
         wait_for_nginx_to_resolve_both_replicas(
-            self.base_url,
-            self.token,
+            STACK.base_url,
+            STACK.token,
             {r["ip"] for r in replicas},
             phase=f"setup_{self._testMethodName}",
         )
@@ -607,19 +709,18 @@ class MultiReplicaFailoverTest(unittest.TestCase):
     def assert_me(self, status: int, body: dict | str, context: str) -> None:
         self.assertEqual(status, 200, f"{context} failed with status {status}: {body}")
         self.assertIsInstance(body, dict, f"{context} returned a non-JSON body: {body}")
-        self.assertEqual(body.get("id"), self.initial_user_id, f"{context} resolved a different iam_user")
+        self.assertEqual(body.get("id"), STACK.user_id, f"{context} resolved a different iam_user")
 
     def assert_failover(self, docker_command: str, phase: str) -> None:
         """Takes one replica down with docker_command under continuous load and verifies the failover."""
         fail_timeout, resolver_valid = read_proxy_timings()
         victim, survivor = self.replicas
 
-        load = LoadGenerator(self.base_url, self.token, phase)
+        load = LoadGenerator(STACK.base_url, STACK.token, phase)
         load.start()
         try:
             time.sleep(0.5)
-            proc = subprocess.run(["docker", docker_command, victim["id"]], capture_output=True, text=True, check=False)
-            self.assertEqual(proc.returncode, 0, f"docker {docker_command} {victim['name']} failed: {proc.stderr}")
+            run_docker(docker_command, victim["id"])
             stopped_at = time.monotonic()
             # Keep the load running past the resolver TTL so the replica is hit both before and after
             # Docker DNS drops its address.
@@ -630,11 +731,12 @@ class MultiReplicaFailoverTest(unittest.TestCase):
 
         # 1. Every request issued during the outage succeeded.
         self.assertTrue(load.results, "Load generator sent no requests")
-        failed = [(s, b) for s, b in load.results if s != 200 or not isinstance(b, dict) or b.get("id") != self.initial_user_id]
+        failed = [(s, b) for s, b in load.results if s != 200 or not isinstance(b, dict) or b.get("id") != STACK.user_id]
         self.assertEqual(failed, [], f"{len(failed)} of {len(load.results)} requests failed during failover")
 
         # 2. NGINX retried the dead replica on the survivor (proxy_next_upstream).
-        retries = [e for e in get_proxy_upstream_entries(phase=phase) if len(upstream_ips(e)) > 1]
+        entries = wait_for_proxy_entries(phase, len(load.results))
+        retries = [e for e in entries if len(upstream_ips(e)) > 1]
         self.assertTrue(retries, f"No proxy_next_upstream retry recorded after docker {docker_command}")
         for entry in retries:
             ips = upstream_ips(entry)
@@ -651,100 +753,92 @@ class MultiReplicaFailoverTest(unittest.TestCase):
         time.sleep(max(0.0, deadline - time.monotonic()))
         pruned_phase = f"{phase}_pruned"
         for i in range(20):
-            status, body = query_proxy(self.base_url, self.token, phase=pruned_phase)
+            status, body = query_proxy(STACK.base_url, STACK.token, phase=pruned_phase)
             self.assert_me(status, body, f"Post-pruning request {i}")
-        entries = get_proxy_upstream_entries(phase=pruned_phase)
-        self.assertTrue(entries, f"Expected log entries for {pruned_phase}")
-        for entry in entries:
+        for entry in wait_for_proxy_entries(pruned_phase, 20):
             self.assertEqual(upstream_ips(entry), [survivor["ip"]], f"Dead replica still in upstream pool: {entry}")
             self.assertEqual(entry["upstream_status"], "200")
 
-    def test_01_token_claims(self) -> None:
-        """Verifies JWT signature algorithm and payload claims match the OIDC provider configuration."""
-        self.assertEqual(self.header.get("alg"), "RS256")
-        expected_issuer = f"{self.base_url}/auth/application/o/{self.client_id}/"
-        self.assertEqual(self.payload.get("iss"), expected_issuer)
-        self.assertEqual(self.payload.get("aud"), self.client_id)
-        self.assertEqual(self.payload.get("name"), "Development user")
-        self.assertEqual(self.payload.get("email"), "dev@taramisu.localhost")
-        self.assertTrue(self.payload.get("sub"), "Missing sub claim in JWT")
-
-        exp = self.payload.get("exp", 0)
-        iat = self.payload.get("iat", 0)
-        self.assertEqual(
-            exp - iat,
-            600,
-            f"Expected token validity to be 600s (10 min), got {exp - iat}s",
-        )
-
-    def test_02_each_replica_accepts_token_directly(self) -> None:
+    def test_01_each_replica_accepts_token_directly(self) -> None:
         """Verifies each replica directly validates the JWT via its container IP and resolves identical iam_user."""
         for r in self.replicas:
-            status, body = query_replica_direct(r["network"], r["ip"], self.token)
+            status, body = query_replica_direct(r["network"], r["ip"], STACK.token)
             self.assert_me(status, body, f"Replica {r['name']} ({r['ip']})")
-            self.assertEqual(body.get("subject"), self.payload.get("sub"))
+            self.assertEqual(body.get("subject"), STACK.payload.get("sub"))
             self.assertEqual(body.get("email"), "dev@taramisu.localhost")
 
-    def test_03_rejects_missing_or_tampered_token(self) -> None:
-        """Verifies the backend enforces token authentication both via proxy and directly."""
-        tampered = self.token[:-2] + ("b" if self.token[-2] != "b" else "c") + self.token[-1]
+    def test_02_rejects_missing_or_tampered_token(self) -> None:
+        """Verifies token authentication is enforced via NGINX and directly on every replica.
 
-        # 1. Via NGINX proxy
-        status_no_token, _ = query_proxy(self.base_url, None, phase="auth_check")
+        Only the signature is tampered with here; issuer, audience, and expiry enforcement are covered by
+        backend/internal/auth unit tests, because forging those claims needs the provider's signing key.
+        """
+        tampered = STACK.token[:-2] + ("b" if STACK.token[-2] != "b" else "c") + STACK.token[-1]
+
+        status_no_token, _ = query_proxy(STACK.base_url, None, phase="auth_check")
         self.assertEqual(status_no_token, 401, "Expected 401 Unauthorized for missing token via proxy")
-
-        status_tampered, _ = query_proxy(self.base_url, tampered, phase="auth_check")
+        status_tampered, _ = query_proxy(STACK.base_url, tampered, phase="auth_check")
         self.assertEqual(status_tampered, 401, "Expected 401 Unauthorized for tampered token via proxy")
 
-        # 2. Directly against replica container
-        target = self.replicas[0]
-        direct_no_token, _ = query_replica_direct(target["network"], target["ip"], None)
-        self.assertEqual(direct_no_token, 401, "Expected 401 Unauthorized directly for missing token")
+        for r in self.replicas:
+            direct_no_token, _ = query_replica_direct(r["network"], r["ip"], None)
+            self.assertEqual(direct_no_token, 401, f"Expected 401 for missing token on {r['name']}")
+            direct_tampered, _ = query_replica_direct(r["network"], r["ip"], tampered)
+            self.assertEqual(direct_tampered, 401, f"Expected 401 for tampered token on {r['name']}")
 
-        direct_tampered, _ = query_replica_direct(target["network"], target["ip"], tampered)
-        self.assertEqual(direct_tampered, 401, "Expected 401 Unauthorized directly for tampered token")
+    def test_03_sequential_requests_reach_both_replicas(self) -> None:
+        """Verifies sequential requests through NGINX reach both replicas.
 
-    def test_04_load_distribution(self) -> None:
-        """Verifies NGINX distributes sequential requests across both replicas."""
+        Without concurrent connections, least_conn picks replicas like round robin, so this checks that NGINX
+        balances at all, not that it prefers the replica with fewer active connections.
+        """
         for i in range(20):
-            status, body = query_proxy(self.base_url, self.token, phase="distribution")
+            status, body = query_proxy(STACK.base_url, STACK.token, phase="distribution")
             self.assert_me(status, body, f"Request {i}")
 
-        replica_ips = {r["ip"] for r in self.replicas}
-        observed = {ip for e in get_proxy_upstream_entries(phase="distribution") for ip in upstream_ips(e)}
-        self.assertEqual(observed, replica_ips, "Expected requests to be distributed across both replicas")
+        observed = {ip for e in wait_for_proxy_entries("distribution", 20) for ip in upstream_ips(e)}
+        self.assertEqual(observed, {r["ip"] for r in self.replicas}, "Expected requests on both replicas")
 
-    def test_05_graceful_stop_failover(self) -> None:
-        """Verifies no failed requests, an NGINX retry, and resolver pruning when a replica stops (SIGTERM)."""
-        self.assert_failover("stop", "graceful_stop")
+    def test_04_sigterm_stop_failover(self) -> None:
+        """Verifies no failed requests, an NGINX retry, and resolver pruning when a replica is stopped (SIGTERM)."""
+        self.assert_failover("stop", "sigterm_stop")
 
-    def test_06_crash_failover(self) -> None:
-        """Verifies no failed requests, an NGINX retry, and resolver pruning when a replica crashes (SIGKILL)."""
-        self.assert_failover("kill", "crash")
+    def test_05_sigkill_crash_failover(self) -> None:
+        """Verifies no failed requests, an NGINX retry, and resolver pruning when a replica is killed (SIGKILL)."""
+        self.assert_failover("kill", "sigkill_crash")
 
-    def test_07_restarted_replica_cold_cache_and_reintegration(self) -> None:
-        """Verifies a restarted replica accepts tokens with a cold cache and NGINX balances to it again."""
+    def test_06_restarted_replica_with_new_ip(self) -> None:
+        """Verifies a restarted replica on a new IP accepts tokens with a cold cache and NGINX re-resolves it."""
         restarted = self.replicas[0]
-        proc = subprocess.run(["docker", "stop", restarted["id"]], capture_output=True, text=True, check=False)
-        self.assertEqual(proc.returncode, 0, f"docker stop {restarted['name']} failed: {proc.stderr}")
+        run_docker("stop", restarted["id"])
+
+        # A restarted container gets its old IP back while that IP is free, so a stale NGINX upstream entry
+        # would go unnoticed. A placeholder holding the freed address forces a new one.
+        holder = occupy_address(restarted["network"], restarted["ip"])
+        self.addCleanup(run_docker, "rm", "-f", holder, check=False)
 
         scale_api(2)
-        fresh_replicas = wait_for_api_replicas(2)
-        self.assertIn(restarted["id"], {r["id"] for r in fresh_replicas}, "Stopped replica was not restarted")
-        for r in fresh_replicas:
-            wait_for_replica_ready(r["network"], r["ip"])
+        fresh_replicas = {r["id"]: r for r in wait_for_api_replicas(2)}
+        self.assertIn(restarted["id"], fresh_replicas, "Stopped replica was not restarted")
+        new_ip = fresh_replicas[restarted["id"]]["ip"]
+        self.assertNotEqual(new_ip, restarted["ip"], "Restarted replica kept its address; re-resolution is not exercised")
 
+        for r in fresh_replicas.values():
+            wait_for_replica_ready(r["network"], r["ip"])
         # The restarted process starts with empty JWKS and IAM caches.
-        for r in fresh_replicas:
-            status, body = query_replica_direct(r["network"], r["ip"], self.token)
+        for r in fresh_replicas.values():
+            status, body = query_replica_direct(r["network"], r["ip"], STACK.token)
             self.assert_me(status, body, f"Replica {r['name']} ({r['ip']})")
 
         wait_for_nginx_to_resolve_both_replicas(
-            self.base_url, self.token, {r["ip"] for r in fresh_replicas}, phase="reintegration"
+            STACK.base_url, STACK.token, {r["ip"] for r in fresh_replicas.values()}, phase="reintegration"
         )
 
 
 def main() -> int:
+    if sys.argv[1:] == ["--self-check"]:
+        return self_check()
+
     interrupted = False
 
     def _sig_handler(sig: int, _frame: Any) -> None:
@@ -755,7 +849,11 @@ def main() -> int:
     old_sigint = signal.signal(signal.SIGINT, _sig_handler)
     old_sigterm = signal.signal(signal.SIGTERM, _sig_handler)
 
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(MultiReplicaFailoverTest)
+    loader = unittest.defaultTestLoader
+    suite = unittest.TestSuite([
+        loader.loadTestsFromTestCase(TokenClaimsTest),
+        loader.loadTestsFromTestCase(MultiReplicaFailoverTest),
+    ])
     runner = unittest.TextTestRunner(verbosity=2)
     res: unittest.TestResult | None = None
     cleanup_ok = True
@@ -763,18 +861,25 @@ def main() -> int:
         res = runner.run(suite)
     except KeyboardInterrupt:
         interrupted = True
-        print("\n[stack_test] Interrupted by signal. Restoring stack...", file=sys.stderr)
     finally:
-        signal.signal(signal.SIGINT, old_sigint)
-        signal.signal(signal.SIGTERM, old_sigterm)
-        if MultiReplicaFailoverTest.scaled:
-            cleanup_ok = cleanup_stack(MultiReplicaFailoverTest.initial_replica_count)
+        # A second Ctrl-C or SIGTERM must not abort the restore halfway, e.g. after compose removed the extra
+        # replica but before it restarted the stopped one, which would leave no api replica running.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        try:
+            if STACK.restore_needed:
+                if interrupted:
+                    print("\n[stack_test] Interrupted. Restoring the stack; further signals are ignored.", file=sys.stderr)
+                cleanup_ok = cleanup_stack(STACK.initial_replica_count)
+        finally:
+            signal.signal(signal.SIGINT, old_sigint)
+            signal.signal(signal.SIGTERM, old_sigterm)
 
-    if interrupted:
-        return 130
     if not cleanup_ok:
         print("[stack_test] FATAL: Stack cleanup failed to restore replica count!", file=sys.stderr)
         return 2
+    if interrupted:
+        return 130
     return 0 if (res and res.wasSuccessful()) else 1
 
 

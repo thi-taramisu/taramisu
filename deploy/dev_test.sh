@@ -305,7 +305,7 @@ nginx -g 'daemon off;'
     "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
 fi
 
-python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' stack_test.py
+python3 -I stack_test.py --self-check >/dev/null
 make -n test-stack >/dev/null
 
 echo 'PASS: unified Compose model, isolated networks/volumes, startup order, commands, secrets, and failures.'
