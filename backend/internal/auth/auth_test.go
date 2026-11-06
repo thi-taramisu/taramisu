@@ -377,3 +377,48 @@ func TestExpiredCredentials(t *testing.T) {
 		t.Fatalf("expired login: %d", w.Code)
 	}
 }
+
+func TestRequireWriteOrigin(t *testing.T) {
+	m := &Manager{origin: "http://localhost:8080", sessions: map[string]session{
+		"test": {User: User{ID: localUserID}, Expires: time.Now().Add(time.Hour)},
+	}}
+	for _, method := range []struct {
+		name   string
+		writes bool
+	}{
+		{http.MethodGet, false}, {http.MethodHead, false}, {http.MethodOptions, false},
+		{http.MethodPost, true}, {http.MethodPut, true}, {http.MethodPatch, true}, {http.MethodDelete, true},
+	} {
+		for _, origin := range []string{"", "null", "https://untrusted.example", "http://localhost:8081", "http://localhost:8080.attacker.example", m.origin} {
+			for _, authenticated := range []bool{false, true} {
+				called := false
+				h := m.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					called = true
+					if UserFromContext(r.Context()).ID != localUserID {
+						t.Error("authenticated user missing from handler context")
+					}
+					w.WriteHeader(http.StatusNoContent)
+				}))
+				r := httptest.NewRequest(method.name, "/api/v1/resource", http.NoBody)
+				if authenticated {
+					r.AddCookie(&http.Cookie{Name: sessionCookie, Value: "test", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+				}
+				r.Header.Set("Origin", origin)
+				w := httptest.NewRecorder()
+				h.ServeHTTP(w, r)
+				want := http.StatusNoContent
+				if !authenticated {
+					want = http.StatusUnauthorized
+				} else if method.writes && origin != m.origin {
+					want = http.StatusForbidden
+				}
+				if w.Code != want || called != (want == http.StatusNoContent) {
+					t.Fatalf("%s origin %q authenticated=%v: status=%d handler called=%v; want status=%d", method.name, origin, authenticated, w.Code, called, want)
+				}
+				if w.Header().Get("Cache-Control") != "no-store" {
+					t.Fatal("authentication response can be cached")
+				}
+			}
+		}
+	}
+}

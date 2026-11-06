@@ -228,6 +228,10 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 			fail(w, 401, "authentication required")
 			return
 		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && r.Header.Get("Origin") != m.origin {
+			fail(w, http.StatusForbidden, "invalid origin")
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, user)))
 	})
 }
