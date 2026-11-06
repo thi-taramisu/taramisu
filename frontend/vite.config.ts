@@ -13,10 +13,20 @@ export default defineConfig({
   },
   // Same routing as proxy/nginx.conf for `npm run dev` without Compose: the backend serves these paths
   // itself, so they are forwarded without a rewrite. /health is only proxied here, for local checks.
+  // /auth/callback is bypassed and served by index.html so the SPA handles the OIDC PKCE redirect.
   server: {
-    proxy: Object.fromEntries(
-      ['/api', '/auth', '/health'].map((prefix) => [prefix, process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080']),
-    ),
+    proxy: {
+      '/api': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
+      '/health': process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
+      '/auth': {
+        target: process.env.VITE_AUTH_PROXY_TARGET ?? process.env.VITE_API_PROXY_TARGET ?? 'http://localhost',
+        bypass(req) {
+          if (req.url === '/auth/callback' || req.url?.startsWith('/auth/callback?')) {
+            return '/index.html'
+          }
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',
