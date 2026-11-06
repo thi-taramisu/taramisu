@@ -21,6 +21,21 @@ erDiagram
     %% ==========================================
     %% 2. PROJECT & PREREQUISITES (15.1, 15.3.1)
     %% ==========================================
+    TARA_PROJECT ||--o{ ATTACHMENT : "owns"
+    IAM_USER ||--o{ ATTACHMENT : "uploads"
+    ATTACHMENT {
+        uuid id PK
+        uuid project_id FK
+        text file_name
+        text content_type
+        bigint size_bytes
+        text sha256
+        uuid s3_object_key UK
+        boolean delete_pending
+        uuid uploaded_by FK
+        timestamptz created_at
+    }
+
     TARA_PROJECT ||--o{ ITEM_DEFINITION : "contains (0..N)"
     ITEM_DEFINITION ||--o{ ASSET : "contains (15.3.1)"
     ITEM_DEFINITION ||--o{ DAMAGE_SCENARIO : "defines context for (15.3.1)"
@@ -328,3 +343,9 @@ erDiagram
 | **`ATTACK_FEASIBILITY_RATING`** | **15.7** (`[RQ-15-10]`, `[RC-15-11a]`, `[RC-15-12]`, `[WP-15-06]`) | $1:1$ table to `ATTACK_PATH`. Evaluates the 5 numerical Attack Potential core factors (`ap_elapsed_time`, `ap_specialist_expertise`, `ap_knowledge_of_item`, `ap_window_of_opportunity`, `ap_equipment`), `ap_total_score`, and resulting `feasibility_rating`. |
 | **`RISK_VALUE`** | **15.8** (`[RQ-15-15]`, `[RQ-15-16]`, **15.8.2 NOTE 1**, `[WP-15-07]`) | Stores the granular risk score (`1` to `5`) for each combination of `THREAT_SCENARIO` and associated `IMPACT_RATING` (S, F, O, P). |
 | **`RISK_TREATMENT_DECISION`** | **15.9** (`[RQ-15-17]`, **15.9.2 NOTE**, `[WP-15-08]`) | Stores the treatment decision (`AVOIDING \| REDUCING \| SHARING \| RETAINING`), rationale, and Cybersecurity Claim flag (`is_cybersecurity_claim`) for a `THREAT_SCENARIO`. |
+
+Attachments belong to a project and inherit its direct and group roles. Metadata lives in PostgreSQL; bytes live in
+private S3-compatible storage (SeaweedFS), keyed by a random UUID. Project and uploader deletion is restricted while
+attachments exist, so metadata cannot be cascaded away leaving storage objects behind.
+The `delete_pending` flag records deletion intent durably; list queries exclude pending attachments, and a separate
+query retrieves them for cleanup.
