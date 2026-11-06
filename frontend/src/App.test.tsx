@@ -57,7 +57,7 @@ describe('routing', () => {
   it('shows the graph view with ?view=graph and keeps it in the tree links', async () => {
     renderAt(`${project}/damage-scenarios/ds-01?view=graph`)
 
-    expect(await screen.findByRole('heading', { name: 'DS-01 Headlamp turns off while driving at night' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })).toBeInTheDocument()
     expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
