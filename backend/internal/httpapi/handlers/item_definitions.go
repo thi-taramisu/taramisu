@@ -295,7 +295,7 @@ func (h *ItemDefinitions) Register(api huma.API) {
 	operation := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
 			DefaultStatus: status, Tags: []string{"Item definitions"},
-			Security: []map[string][]string{{"session": {}}}, Errors: []int{401, 404, 409, 422, 500, 503}}
+			Security: []map[string][]string{{"bearer": {}}}, Errors: []int{401, 404, 409, 422, 500, 503}}
 	}
 	huma.Register(api, operation("list-item-definitions", http.MethodGet, collection, "List item definitions", 200), h.List)
 	huma.Register(api, operation("create-item-definition", http.MethodPost, collection, "Create an item definition", 201), h.Create)

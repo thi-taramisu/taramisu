@@ -44,10 +44,10 @@ func TestItemDefinitionPostgresCRUD(t *testing.T) {
 		}
 	}
 	queries := db.New(tx)
-	handler, cookie := authenticatedAPI(t, queries, newItemStore())
+	handler, token := authenticatedAPI(t, queries, newItemStore())
 	call := func(method, path, body string, want int) *handlers.ItemDefinition {
 		t.Helper()
-		w := request(handler, method, path, body, cookie)
+		w := request(handler, method, path, body, token)
 		if w.Code != want {
 			t.Fatalf("%s %s: %d %s", method, path, w.Code, w.Body.String())
 		}
@@ -82,12 +82,12 @@ func TestItemDefinitionPostgresCRUD(t *testing.T) {
 	if item.Name != "Replaced" || item.ScopeType != db.ScopeTypeCOMPONENT || item.ItemDefinitionWP0901 != nil || item.CybersecuritySpecsWP1001 != nil || item.ArchitecturalDesign != nil || !item.CreatedAt.Equal(originalCreatedAt) {
 		t.Fatalf("replacement did not clear omitted fields or preserve metadata: %+v", item)
 	}
-	w := request(handler, http.MethodGet, collection+"?limit=1&offset=0", "", cookie)
+	w := request(handler, http.MethodGet, collection+"?limit=1&offset=0", "", token)
 	var items []handlers.ItemDefinition
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &items) != nil || len(items) != 1 || items[0].ID != item.ID {
 		t.Fatalf("list: %d %s", w.Code, w.Body.String())
 	}
-	w = request(handler, http.MethodGet, collection+"?limit=1&offset=1", "", cookie)
+	w = request(handler, http.MethodGet, collection+"?limit=1&offset=1", "", token)
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &items) != nil || len(items) != 0 {
 		t.Fatalf("pagination: %d %s", w.Code, w.Body.String())
 	}

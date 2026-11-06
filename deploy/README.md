@@ -1,6 +1,6 @@
 # Local development stack
 
-The `taramisu` Compose project includes the backend, Authentik, frontend, and proxy.
+The `taramisu` Compose project includes the backend, Authentik, frontend, proxy, and documentation.
 `compose.yaml` is the entry point; the included files describe each component.
 Use Docker Compose v2.23.1+ (includes and inline pgAdmin configs), make, OpenSSL, and curl.
 
@@ -10,7 +10,7 @@ Run from the repository root:
 
 ```sh
 make -C deploy init          # Generate missing secrets and validate configuration; no containers
-make -C deploy up            # Provision Authentik, start the API, then frontend and proxy
+make -C deploy up            # Provision Authentik, start the API, then frontend, docs, and proxy
 make -C deploy db            # Start only the backend database
 make -C deploy migrate       # Apply backend migrations
 make -C deploy pgadmin       # Optional database UI on localhost:5050
@@ -52,17 +52,18 @@ docker compose --env-file iam/.env -f deploy/compose.yaml stop api
 Current local addresses:
 
 - Frontend: <http://localhost>
-- API through the proxy: <http://localhost/api/v1/me> (requires login)
-- API and Swagger: <http://localhost:8080/docs>
-- Login: <http://localhost/auth/login>
-- Authentik: <http://authentik.localhost:9000>
+- Documentation: <http://localhost/docs/>
+- API through the proxy: <http://localhost/api/v1/me> (requires `Authorization: Bearer <JWT>`)
+- API Swagger UI: <http://localhost/api/docs> (OpenAPI spec: <http://localhost/openapi.json>)
+- Authentik (via proxy): <http://localhost/auth/if/admin/>
 
-`APP_URL` defaults to `http://localhost` and defines the callback and logout origin.
-The issuer remains `http://authentik.localhost:9000/application/o/taramisu/`, reachable from the browser and API container.
-The proxy preserves `/api/v1/` and forwards `/auth/` to the backend. Frontend and authentication share the same origin.
-For an existing checkout, change only `APP_URL=http://localhost` in `iam/.env` and run `make -C deploy up`;
-this updates the backend origin and Authentik callback without replacing secrets or data.
-Port 8080 remains available for backend diagnostics and Swagger.
+`APP_URL` defaults to `http://localhost` and defines the public origin and OIDC callback (`${APP_URL}/auth/callback`).
+Authentik runs under `AUTHENTIK_WEB__PATH=/auth/` behind NGINX (`location /auth/`), so the public OIDC issuer is
+`${APP_URL}/auth/application/o/taramisu/`, while the Go API fetches JWKS keys internally via
+`http://authentik-server:9000/auth/application/o/taramisu/jwks/`.
+The NGINX proxy load-balances `/api/v1/` across backend replicas (`least_conn` + runtime DNS resolution), routes `/api/docs` and
+`/openapi.json` to the backend's Swagger UI and OpenAPI spec, and routes `/auth/callback` to the frontend SPA.
+The API container has no host port binding in Compose, so scaling replicas (`--scale api=N`) works without port collisions.
 
 ## Networks and data
 
@@ -109,3 +110,37 @@ A socket-based `pg_isready` check cannot detect this mismatch.
 If logs report `password authentication failed for user "authentik"`, restore the matching `iam/.env` or deliberately update the database
 role password to the configured value. Keep the other original Authentik secrets as well. For disposable local data, `make -C deploy reset`
 removes all stack data volumes; the next `make up` initializes them with the current secrets.
+
+## Documentation service
+
+`compose.docs.yaml` builds from the repository root and publishes only
+`docs/external/`. Nginx forwards `/docs/` over the Compose-managed `taramisu-proxy`
+network. Neither the docs nor the API container binds a host port; all HTTP traffic enters through the proxy on port 80.
+
+`DOCS_SITE_URL` defaults to `http://localhost`. Set it to the public origin
+(e.g. `https://tara.security.science`) when building. The container fixes
+`DOCS_BASE_URL=/docs/`. DNS and TLS require separate configuration.
+
+After changing the content or origin, rebuild and reload the proxy:
+
+```sh
+docker compose --env-file iam/.env -f deploy/compose.yaml up --build -d docs
+docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -t
+docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -s reload
+```
+
+The reload refreshes the docs container address. On first setup, run the
+`make -C deploy up` so the proxy joins the docs network.
+
+## Standalone author preview
+
+With Node.js 24 and npm, no application stack needed:
+
+```sh
+cd docs/docusaurus
+npm ci
+npm start
+```
+
+Open <http://localhost:3001> for live preview at `/`.
+See the [tooling guide](../docs/docusaurus/README.md) for other build options.

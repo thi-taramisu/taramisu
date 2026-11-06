@@ -8,3 +8,7 @@ services:
     depends_on:
       - api
       - frontend
+      - docs
+    networks:
+      - default
+      - taramisu-proxy

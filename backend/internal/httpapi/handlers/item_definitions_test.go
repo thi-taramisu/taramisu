@@ -2,22 +2,18 @@ package handlers_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
@@ -88,95 +84,21 @@ func (s *itemStore) DeleteItemDefinition(context.Context, db.DeleteItemDefinitio
 	return s.count, s.err
 }
 
-// Authenticate through the same OIDC/session flow used by the protected API.
-func authenticatedAPI(t *testing.T, store httpapi.Store, users auth.UserStore) (http.Handler, *http.Cookie) {
+// Authenticate through the same Bearer JWT middleware used by the protected API.
+func authenticatedAPI(t *testing.T, store httpapi.Store, users auth.UserStore) (http.Handler, *string) {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var issuer, nonce string
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		var value any
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			value = map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys", "id_token_signing_alg_values_supported": []string{"RS256"}}
-		case "/keys":
-			value = jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}
-		case "/token":
-			payload, err := json.Marshal(map[string]any{"iss": issuer, "sub": "crud-test-user", "aud": "taramisu", "nonce": nonce, "exp": time.Now().Add(time.Hour).Unix()})
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			signed, err := signer.Sign(payload)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			raw, err := signed.CompactSerialize()
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			value = map[string]string{"access_token": "test", "token_type": "Bearer", "id_token": raw}
-		default:
-			http.NotFound(w, r)
-			return
-		}
-		if err := json.NewEncoder(w).Encode(value); err != nil {
-			t.Error(err)
-		}
-	}))
-	t.Cleanup(provider.Close)
-	issuer = provider.URL
-	manager, err := auth.New(context.Background(), auth.Config{Issuer: issuer, ClientID: "taramisu", ClientSecret: "test-secret", AppURL: "http://localhost:8080"}, users)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := httpapi.New(store, manager)
-	login := request(handler, http.MethodGet, "/auth/login", "", nil)
-	redirect, err := url.Parse(login.Header().Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	nonce = redirect.Query().Get("nonce")
-	result := login.Result()
-	cookies := result.Cookies()
-	if err := result.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if len(cookies) == 0 {
-		t.Fatal("missing login cookie")
-	}
-	callback := request(handler, http.MethodGet, "/auth/callback?code=test&state="+url.QueryEscape(redirect.Query().Get("state")), "", cookies[0])
-	result = callback.Result()
-	t.Cleanup(func() {
-		if err := result.Body.Close(); err != nil {
-			t.Error(err)
-		}
-	})
-	for _, cookie := range result.Cookies() {
-		if cookie.Name == "taramisu_session" {
-			return handler, cookie
-		}
-	}
-	t.Fatalf("login failed: %d %s", callback.Code, callback.Body.String())
-	return nil, nil
+	fixture := authtest.NewFixture(t, users)
+	token := "Bearer " + fixture.Token(t, nil)
+	return httpapi.New(store, fixture.Manager), &token
 }
 
-func request(handler http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+func request(handler http.Handler, method, path, body string, token *string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	if body != "" {
 		r.Header.Set("Content-Type", "application/json")
 	}
-	if cookie != nil {
-		r.AddCookie(cookie)
+	if token != nil {
+		r.Header.Set("Authorization", *token)
 	}
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -185,7 +107,7 @@ func request(handler http.Handler, method, path, body string, cookie *http.Cooki
 
 func TestItemDefinitionRoutes(t *testing.T) {
 	store := newItemStore()
-	handler, cookie := authenticatedAPI(t, store, store)
+	handler, token := authenticatedAPI(t, store, store)
 	for _, tc := range []struct {
 		method, path, body string
 		code               int
@@ -202,7 +124,7 @@ func TestItemDefinitionRoutes(t *testing.T) {
 			if unauthorized.Code != 401 {
 				t.Fatalf("unauthenticated: %d", unauthorized.Code)
 			}
-			w := request(handler, tc.method, tc.path, tc.body, cookie)
+			w := request(handler, tc.method, tc.path, tc.body, token)
 			if w.Code != tc.code {
 				t.Fatalf("got %d: %s", w.Code, w.Body.String())
 			}
@@ -230,7 +152,7 @@ func TestItemDefinitionRoutes(t *testing.T) {
 
 func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	store := newItemStore()
-	handler, cookie := authenticatedAPI(t, store, store)
+	handler, token := authenticatedAPI(t, store, store)
 	for _, tc := range []struct{ method, path, body string }{
 		{"POST", collection, `{"name":"","scope_type":"ITEM"}`},
 		{"POST", collection, `{"name":"   ","scope_type":"ITEM"}`},
@@ -247,7 +169,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 		{"GET", collection + "/not-a-uuid", ""},
 		{"GET", "/api/v1/projects/invalid/item-definitions", ""},
 	} {
-		w := request(handler, tc.method, tc.path, tc.body, cookie)
+		w := request(handler, tc.method, tc.path, tc.body, token)
 		if w.Code != 422 {
 			t.Errorf("%s %s %s: got %d %s", tc.method, tc.path, tc.body, w.Code, w.Body.String())
 		}
@@ -261,7 +183,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 		if method == "POST" {
 			path = collection
 		}
-		w := request(handler, method, path, body, cookie)
+		w := request(handler, method, path, body, token)
 		if w.Code != 404 {
 			t.Errorf("inaccessible project %s: %d", method, w.Code)
 		}
@@ -284,7 +206,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 			if method == "POST" {
 				path = collection
 			}
-			w := request(handler, method, path, `{"name":"A","scope_type":"ITEM"}`, cookie)
+			w := request(handler, method, path, `{"name":"A","scope_type":"ITEM"}`, token)
 			if w.Code != tc.code || strings.Contains(w.Body.String(), "private database details") {
 				t.Errorf("%s error: %d %s", method, w.Code, w.Body.String())
 			}
@@ -292,7 +214,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	}
 	store.err = nil
 	store.count = 0
-	if w := request(handler, "DELETE", member, "", cookie); w.Code != 404 {
+	if w := request(handler, "DELETE", member, "", token); w.Code != 404 {
 		t.Fatalf("missing delete: %d", w.Code)
 	}
 }
@@ -308,21 +230,21 @@ func TestItemDefinitionOpenAPI(t *testing.T) {
 			t.Fatalf("missing path %s", path)
 		}
 		for _, method := range methods {
-			var operationSecurity int
+			var operationSecurity []map[string][]string
 			switch method {
 			case "GET":
-				operationSecurity = len(item.Get.Security)
+				operationSecurity = item.Get.Security
 			case "POST":
-				operationSecurity = len(item.Post.Security)
+				operationSecurity = item.Post.Security
 			case "PUT":
-				operationSecurity = len(item.Put.Security)
+				operationSecurity = item.Put.Security
 			case "PATCH":
-				operationSecurity = len(item.Patch.Security)
+				operationSecurity = item.Patch.Security
 			case "DELETE":
-				operationSecurity = len(item.Delete.Security)
+				operationSecurity = item.Delete.Security
 			}
-			if operationSecurity == 0 {
-				t.Errorf("missing authentication: %s %s", method, path)
+			if len(operationSecurity) != 1 || operationSecurity[0]["bearer"] == nil {
+				t.Errorf("missing Bearer JWT authentication: %s %s", method, path)
 			}
 		}
 	}
