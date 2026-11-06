@@ -1,9 +1,7 @@
 services:
   frontend:
     build: ../frontend
-   # This has a declarative function rather than really exposing the port.
-   # Just to make it easier to find the frontend port through which frontend
-   # and nginx communicate  
+    # Only documents the port; the proxy reaches the frontend through the proxy network.
     expose:
       - 80
-  
+    networks: [proxy]
