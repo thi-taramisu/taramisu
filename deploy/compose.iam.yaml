@@ -43,9 +43,8 @@ services:
     <<: *authentik
     command: server
     networks:
-      iam:
-      auth:
-        aliases: [authentik.localhost]
+      - iam
+      - proxy
     ports:
       - '127.0.0.1:9000:9000'
   authentik-worker:

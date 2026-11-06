@@ -6,4 +6,6 @@ services:
    # and nginx communicate  
     expose:
       - 80
+    networks:
+      - proxy
   
