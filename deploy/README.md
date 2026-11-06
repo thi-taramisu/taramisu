@@ -114,11 +114,13 @@ It verifies direct token acceptance and rejection on each replica's container IP
 and that sequential requests through NGINX reach both replicas.
 Under continuous load, it verifies that no request fails while a replica is stopped (`docker stop`, SIGTERM)
 or killed (`docker kill`, SIGKILL).
-It also restarts a replica on a new IP and verifies cold-cache token acceptance and that NGINX re-resolves it.
+In rolling-deploy order, it starts a replacement replica, stops an old one, and verifies that NGINX serves the new one
+and drops the old one, and that the new replica accepts the token with a cold cache.
 It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130; 2 if the restore fails);
 further signals are ignored while it restores.
 `python3 deploy/stack_test.py --self-check`, run by `make -C deploy test`, checks offline that `proxy/nginx.conf`
 still matches the timings and log format the runner parses.
+To run single tests, pass their names, e.g. `python3 deploy/stack_test.py MultiReplicaFailoverTest.test_04_sigterm_stop_failover`.
 Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
 
 Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:
