@@ -64,9 +64,9 @@ cd ../frontend && npm run generate:api  # src/api/schema.d.ts
 
 CI regenerates `schema.d.ts` and fails if it differs from the committed file, also when only `backend/openapi.json` changed.
 
-The paths in the spec are complete (`/api/v1/me`, `/health/live`, `/auth/login`): the backend mounts them that way and `proxy/nginx.conf`
+The paths in the spec are complete (`/api/v1/me`, `/health/live`): the backend mounts them that way and `proxy/nginx.conf`
 forwards the full URI. So the base URL is only the origin: same origin by default, `VITE_API_BASE_URL` for a backend elsewhere. For
-`npm run dev`, Vite forwards `/api`, `/auth` and `/health` to `VITE_API_PROXY_TARGET` (default `http://localhost:8080`).
+`npm run dev`, Vite forwards `/api`, `/auth` and `/health` to `VITE_API_PROXY_TARGET` (default `http://localhost`, the Compose proxy).
 
 `src/api/` keeps real and mocked data apart:
 

@@ -1,0 +1,9 @@
+# Use LF for all text files, independent of OS or Git settings (shell scripts and nginx config break on CRLF).
+* text=auto eol=lf
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.woff binary
+*.woff2 binary
