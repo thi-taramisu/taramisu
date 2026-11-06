@@ -101,6 +101,27 @@ They validate the real merged model, networks, volumes, and paths, while stubbin
 They cover startup ordering, first-run secrets, missing secrets with existing data, repeat starts, Makefile commands, and failure handling.
 A live check should also start a fresh stack, verify readiness/login redirects, and restart it to check persistence.
 
+### Live multi-replica and failover verification
+
+```sh
+make -C deploy test-stack
+```
+
+Requires a running stack (`make -C deploy up`); the runner does not start one.
+It obtains an access token through the OIDC PKCE flow against Authentik via NGINX (`/auth/`), checks its claims, and temporarily scales `api` to 2 replicas.
+It verifies direct token acceptance and rejection on each replica's container IP, load distribution through NGINX, and that no request fails while a replica is stopped (`docker stop`, SIGTERM) or crashes (`docker kill`, SIGKILL) under continuous load.
+It also verifies cold-cache token acceptance by a restarted replica and restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130).
+Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
+
+Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:
+- Retry: `proxy_next_upstream` resends a request whose connection is refused (logged as `502`) or times out after `proxy_connect_timeout 2s` (`504`) to the other replica; the access log records both attempts in `$upstream_addr` and `$upstream_status`.
+- Passive health check: `max_fails=1 fail_timeout=10s` marks a replica down for 10 seconds after one failed attempt.
+- Runtime re-resolution: `resolver 127.0.0.11 valid=2s` re-queries Docker's embedded DNS, which drops a stopped container's address, so NGINX removes it from the upstream pool within the TTL.
+  The test waits until `fail_timeout` and the TTL have passed and then expects no further attempts on the dead replica.
+
+> **Worktrees and multiple checkouts:** Compose uses fixed host ports and the project name `taramisu`, so every checkout and worktree talks to the same running stack.
+> Bind mounts such as the proxy's `nginx.conf` point to the checkout that last recreated the container; run `make -C deploy up` from your main checkout when you finish in a worktree.
+
 ## Database password mismatch
 
 `POSTGRES_PASSWORD` initializes a new database; changing `PG_PASS` in `iam/.env` does not update a password stored in an existing volume.
