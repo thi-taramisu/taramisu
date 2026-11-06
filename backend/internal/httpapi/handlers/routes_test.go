@@ -32,13 +32,13 @@ type propertyQueries struct {
 type routeAPI struct {
 	t       *testing.T
 	handler http.Handler
-	cookie  *http.Cookie
+	token   string
 }
 
 func newRouteAPI(t *testing.T, queries httpapi.Queries) *routeAPI {
 	t.Helper()
-	manager, cookie := authtest.Login(t)
-	return &routeAPI{t: t, handler: httpapi.New(queries, manager), cookie: cookie}
+	manager, token := authtest.NewManagerAndToken(t)
+	return &routeAPI{t: t, handler: httpapi.New(queries, manager), token: token}
 }
 
 func (a *routeAPI) Do(method, path string, bodies ...any) *httptest.ResponseRecorder {
@@ -57,8 +57,8 @@ func (a *routeAPI) Do(method, path string, bodies ...any) *httptest.ResponseReco
 	}
 	r := httptest.NewRequest(method, path, body)
 	r.Header.Set("Content-Type", "application/json")
-	if a.cookie != nil {
-		r.AddCookie(a.cookie)
+	if a.token != "" {
+		r.Header.Set("Authorization", a.token)
 	}
 	w := httptest.NewRecorder()
 	a.handler.ServeHTTP(w, r)
@@ -79,9 +79,9 @@ func (a *routeAPI) Delete(path string) *httptest.ResponseRecorder {
 	return a.Do(http.MethodDelete, path)
 }
 
-func TestResourceRoutesRequireSession(t *testing.T) {
+func TestResourceRoutesRequireBearerToken(t *testing.T) {
 	api := newRouteAPI(t, nil)
-	api.cookie = nil
+	api.token = ""
 	routes := append(propertyRouteCases(), propertyRouteCase{"asset", assetCollection, assetPath, assetJSON})
 	for _, route := range routes {
 		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "LIST"} {

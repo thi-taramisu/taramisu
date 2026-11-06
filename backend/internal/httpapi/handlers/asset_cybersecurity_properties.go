@@ -41,7 +41,7 @@ func NewAssetCybersecurityProperties(queries AssetCybersecurityPropertyStore) *A
 func (h *AssetCybersecurityProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/assets/{asset_id}/cybersecurity-properties"
 	const member = collection + "/{id}"
-	// Build operation metadata using the shared session security and error declarations.
+	// Build operation metadata using the shared Bearer JWT security and error declarations.
 	op := func(id, method, path, summary string) huma.Operation {
 		return propertyOperation(id, method, path, "Asset cybersecurity properties", summary)
 	}

@@ -33,7 +33,7 @@ func (h *Assets) Register(api huma.API) {
 	const member = collection + "/{id}"
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Assets"}, Security: []map[string][]string{{"session": {}}},
+			Tags: []string{"Assets"}, Security: []map[string][]string{{"bearer": {}}},
 			Errors: []int{401, 404, 422, 503}}
 	}
 	huma.Register(api, op("list-assets", http.MethodGet, collection, "List assets"), h.List)

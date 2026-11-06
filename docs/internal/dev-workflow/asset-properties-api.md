@@ -6,8 +6,9 @@ The issue branch is based on PR #154's `feature/84-assets-crud-api` branch; merg
 
 ## Routes
 
-All routes use the existing Authentik login and `taramisu_session` cookie.
-Use `/auth/login` to establish a session. See the [backend authentication documentation](../../../backend/README.md#authentication).
+All routes require an Authentik-issued JWT in the `Authorization: Bearer <JWT>` header.
+The frontend obtains it through OIDC Authorization Code Flow with PKCE.
+See the [backend authentication documentation](../../../backend/README.md#authentication).
 
 The prefix below is `/api/v1/item-definitions/{item_definition_id}`:
 
@@ -98,7 +99,7 @@ Errors use `application/problem+json`:
 
 | Status | Meaning |
 | --- | --- |
-| `401` | Missing or expired session |
+| `401` | Missing, invalid, or expired Bearer token |
 | `404` | Record or referenced parent not found in the URL's item definition |
 | `409` | Duplicate asset/property type or scenario/property pair |
 | `422` | Invalid UUID, enum, body, pagination, or a reference deleted during the request |

@@ -27,11 +27,11 @@ type ListPropertyLinksInput struct {
 }
 
 // propertyOperation builds shared Huma metadata for property and scenario-link routes.
-// It declares session security and errors, sets POST to 201, and describes PATCH semantics.
-// The router middleware performs the actual session check.
+// It declares Bearer JWT security and errors, sets POST to 201, and describes PATCH semantics.
+// The router middleware performs the actual Bearer JWT check.
 func propertyOperation(id, method, path, tag, summary string) huma.Operation {
 	op := huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-		Tags: []string{tag}, Security: []map[string][]string{{"session": {}}},
+		Tags: []string{tag}, Security: []map[string][]string{{"bearer": {}}},
 		Errors: []int{401, 404, 409, 422, 503}}
 	switch method {
 	case http.MethodPost:

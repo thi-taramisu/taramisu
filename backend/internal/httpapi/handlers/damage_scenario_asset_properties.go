@@ -35,11 +35,11 @@ func NewDamageScenarioAssetProperties(queries DamagePropertyLinkStore) *DamageSc
 }
 
 // Register connects collection and individual-link URLs to HTTP handlers and OpenAPI documentation.
-// The shared operation metadata declares session security and possible error responses.
+// The shared operation metadata declares Bearer JWT security and possible error responses.
 func (h *DamageScenarioAssetProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/damage-scenario-asset-properties"
 	const member = collection + "/{id}"
-	// Build route metadata using the shared session and error declarations.
+	// Build route metadata using the shared Bearer JWT and error declarations.
 	op := func(id, method, path, summary string) huma.Operation {
 		return propertyOperation(id, method, path, "Damage scenario asset properties", summary)
 	}

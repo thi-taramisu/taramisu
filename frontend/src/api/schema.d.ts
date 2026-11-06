@@ -191,57 +191,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Complete browser login */
-        get: operations["auth-callback"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Start browser login */
-        get: operations["auth-login"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** End the backend session */
-        post: operations["auth-logout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -413,9 +362,12 @@ export interface components {
             threat_scenario_id?: string;
         };
         User: {
+            /** Format: email */
+            email: string;
             /** Format: uuid */
             id: string;
             issuer: string;
+            name: string;
             subject: string;
         };
     };
@@ -2301,103 +2253,6 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
-            };
-        };
-    };
-    "auth-callback": {
-        parameters: {
-            query: {
-                state: string;
-                code: string;
-            };
-            header?: never;
-            path?: never;
-            cookie: {
-                taramisu_login: string;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Clears taramisu_login, sets taramisu_session and redirects to /api/v1/me. */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid, expired or rejected login attempt. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid identity token or claims. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Token exchange failed or identity token missing. */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description User database unavailable. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "auth-login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Sets taramisu_login and redirects to Authentik. */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    "auth-logout": {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Must match APP_URL. */
-                Origin: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Clears taramisu_session. The Authentik SSO session remains active. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Missing or invalid Origin header. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

@@ -1,16 +1,13 @@
-// Package authtest provides a temporary fake OIDC login for authenticated route tests.
+// Package authtest provides fast in-memory JWT signing and verification fixtures for route and handler tests.
 package authtest
 
 import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
@@ -18,103 +15,126 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 )
 
-type users struct{}
+const (
+	// UserID is the default internal iam_user UUID returned for authenticated test requests.
+	UserID = "018f5031-7016-750a-a08b-20c2a25b1819"
+	// Subject is the default external_iam_sub UUID used in signed test JWTs.
+	Subject = "6b5a9e1a-3b6e-4c9a-8a1e-1d2c3b4a5f6e"
+	// Name is the default display name claim in signed test JWTs.
+	Name = "Development user"
+	// Email is the default email claim in signed test JWTs.
+	Email = "dev@taramisu.localhost"
+	// ClientID is the default OIDC audience used in signed test JWTs.
+	ClientID = "taramisu"
+)
 
-func (users) UpsertIAMUser(context.Context, string) (string, error) {
-	return "018f5031-7016-750a-a08b-20c2a25b1819", nil
+type defaultUsers struct{}
+
+func (defaultUsers) UpsertIAMUser(context.Context, string) (string, error) {
+	return UserID, nil
 }
 
-// Login returns a real auth manager and session cookie after completing login
-// against a fake OIDC provider. Callers should depend only on this function.
-func Login(t *testing.T) (*auth.Manager, *http.Cookie) {
+// Fixture holds a test JWKS server, JWT signer, and configured *auth.Manager.
+type Fixture struct {
+	Manager *auth.Manager
+	Issuer  string
+	JWKSURL string
+	signer  jose.Signer
+}
+
+// NewFixture starts a local JWKS test server and returns a ready-to-use stateless JWT Fixture.
+func NewFixture(t testing.TB, users auth.UserStore) *Fixture {
 	t.Helper()
+	if users == nil {
+		users = defaultUsers{}
+	}
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, nil)
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "test-key-1"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var issuer, nonce, challenge string
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		var body any
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			body = map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys", "id_token_signing_alg_values_supported": []string{"RS256"}}
-		case "/keys":
-			body = jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}
-		case "/token":
-			if err := r.ParseForm(); err != nil {
-				t.Error(err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			hash := sha256.Sum256([]byte(r.Form.Get("code_verifier")))
-			if base64.RawURLEncoding.EncodeToString(hash[:]) != challenge || r.Form.Get("code") != "ok" || r.Form.Get("redirect_uri") != "http://localhost:8080/auth/callback" {
-				t.Error("unexpected token exchange or PKCE verifier")
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			payload, err := json.Marshal(map[string]any{"iss": issuer, "sub": "route-test-user", "aud": "taramisu", "nonce": nonce, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix()})
-			if err != nil {
-				t.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			signed, err := signer.Sign(payload)
-			if err != nil {
-				t.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			token, err := signed.CompactSerialize()
-			if err != nil {
-				t.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			body = map[string]string{"access_token": "unused", "token_type": "Bearer", "id_token": token}
-		default:
+	jwks := jose.JSONWebKeySet{
+		Keys: []jose.JSONWebKey{{
+			Key:       &key.PublicKey,
+			KeyID:     "test-key-1",
+			Algorithm: string(jose.RS256),
+			Use:       "sig",
+		}},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/application/o/taramisu/jwks/" {
 			http.NotFound(w, r)
 			return
 		}
-		if err := json.NewEncoder(w).Encode(body); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(jwks); err != nil {
 			t.Error(err)
 		}
 	}))
-	t.Cleanup(provider.Close)
-	issuer = provider.URL
-	manager, err := auth.New(context.Background(), auth.Config{Issuer: issuer, ClientID: "taramisu", ClientSecret: "test-secret", AppURL: "http://localhost:8080"}, users{})
+	t.Cleanup(server.Close)
+
+	issuer := "http://localhost/auth/application/o/taramisu/"
+	jwksURL := server.URL + "/auth/application/o/taramisu/jwks/"
+	manager, err := auth.New(context.Background(), auth.Config{
+		Issuer:   issuer,
+		ClientID: ClientID,
+		JWKSURL:  jwksURL,
+	}, users)
 	if err != nil {
 		t.Fatal(err)
 	}
-	login := httptest.NewRecorder()
-	manager.Login(login, httptest.NewRequest(http.MethodGet, "/auth/login", http.NoBody))
-	redirect, err := url.Parse(login.Header().Get("Location"))
-	if err != nil {
-		t.Fatal(err)
+	return &Fixture{
+		Manager: manager,
+		Issuer:  issuer,
+		JWKSURL: jwksURL,
+		signer:  signer,
 	}
-	q := redirect.Query()
-	nonce, challenge = q.Get("nonce"), q.Get("code_challenge")
-	if login.Code != http.StatusFound || q.Get("state") == "" || nonce == "" || challenge == "" || q.Get("code_challenge_method") != "S256" {
-		t.Fatal("login did not return state, nonce and PKCE challenge")
+}
+
+// Token signs a test JWT with the default valid claims merged with any custom overrides.
+func (f *Fixture) Token(t testing.TB, overrides map[string]any) string {
+	t.Helper()
+	now := time.Now()
+	claims := map[string]any{
+		"iss":   f.Issuer,
+		"sub":   Subject,
+		"aud":   ClientID,
+		"name":  Name,
+		"email": Email,
+		"iat":   now.Unix(),
+		"exp":   now.Add(10 * time.Minute).Unix(),
 	}
-	request := httptest.NewRequest(http.MethodGet, "/auth/callback?state="+url.QueryEscape(q.Get("state"))+"&code=ok", http.NoBody)
-	for _, cookie := range login.Result().Cookies() {
-		request.AddCookie(cookie)
-	}
-	callback := httptest.NewRecorder()
-	manager.Callback(callback, request)
-	if callback.Code != http.StatusFound {
-		t.Fatalf("login callback: %d %s", callback.Code, callback.Body)
-	}
-	for _, cookie := range callback.Result().Cookies() {
-		if cookie.Name == "taramisu_session" && cookie.Value != "" {
-			return manager, cookie
+	for k, v := range overrides {
+		if v == nil {
+			delete(claims, k)
+		} else {
+			claims[k] = v
 		}
 	}
-	t.Fatal("login did not return a session cookie")
-	return nil, nil
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jws, err := f.signer.Sign(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+// NewManagerAndToken returns a configured *auth.Manager and a valid "Bearer <JWT>" Authorization header value.
+func NewManagerAndToken(t testing.TB) (*auth.Manager, string) {
+	t.Helper()
+	f := NewFixture(t, nil)
+	return f.Manager, "Bearer " + f.Token(t, nil)
 }
