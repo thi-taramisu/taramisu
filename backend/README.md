@@ -48,8 +48,7 @@ connected to the backend database. It remains opt-in through the `tools` profile
 
 To run the API on the host, copy `.env.example` to `.env` and copy the OIDC settings from `../iam/.env`.
 Set `APP_URL=http://localhost:8080` in both files, then run `make up` to update the Authentik callback.
-Stop the API container with
-`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, then run `make run`.
+Then follow the [host storage setup](../deploy/README.md#seaweedfs-object-storage) before running Go locally.
 `make run` and `make test` load the backend `.env`; bare `make` runs tests.
 Use port 8080 directly in this mode. To return to the full Compose stack, restore `APP_URL=http://localhost`
 in `../iam/.env` and run `make up`.
@@ -186,3 +185,6 @@ For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `
 `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).
 API-changing PRs must include an updated spec; CI regenerates and fails if it is stale.
 Source of truth: `internal/httpapi/`.
+
+For host Go runs, configure S3 using [the storage setup](../deploy/README.md#seaweedfs-object-storage)
+and the values in `.env.example`.

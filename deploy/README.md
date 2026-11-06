@@ -1,6 +1,6 @@
 # Local development stack
 
-The `taramisu` Compose project includes the backend, Authentik, frontend, proxy, and documentation.
+The `taramisu` Compose project includes the backend, Authentik, SeaweedFS, frontend, proxy, and documentation.
 `compose.yaml` is the entry point; the included files describe each component.
 Use Docker Compose v2.23.1+ (includes and inline pgAdmin configs), make, OpenSSL, and curl.
 
@@ -21,7 +21,7 @@ make -C deploy down          # Stop the whole stack, preserving data and secrets
 The same commands remain available through `make -C backend`. Backend `run`, `test`, `sqlc`, `openapi`, `lint`, and `fmt`
 remain backend-specific. Both `down` commands now stop frontend and proxy as well as backend and IAM.
 
-> **Warning:** `make -C deploy reset` (or `make -C backend reset`) deletes all four stack data volumes,
+> **Warning:** `make -C deploy reset` (or `make -C backend reset`) deletes all six stack data volumes,
 > including Authentik accounts and pgAdmin settings. Use `down` for a normal stop. Reset keeps `iam/.env`.
 
 ## Configuration and startup
@@ -34,7 +34,7 @@ are used by `make run` and `make test`; they are not loaded for container comman
 
 Startup first verifies a password-authenticated query to the Authentik database, then waits for server and worker health.
 It applies the built-in and custom blueprints before starting the API.
-The API waits for backend migrations and Authentik health. The script additionally checks `/health/ready`
+The API waits for backend migrations, Authentik health, and storage bucket initialization. The script additionally checks `/health/ready`
 before starting frontend and proxy.
 It validates and reloads nginx so configuration changes and rebuilt API containers take effect on repeat starts.
 A provisioning failure stops startup and writes a private `iam/.blueprint.log`, which may contain secrets.
@@ -44,9 +44,9 @@ or apply the custom blueprints.
 For inspection and service-specific commands, always supply the environment file and root Compose file:
 
 ```sh
-docker compose --env-file iam/.env -f deploy/compose.yaml ps
-docker compose --env-file iam/.env -f deploy/compose.yaml logs api authentik-server authentik-worker
-docker compose --env-file iam/.env -f deploy/compose.yaml stop api
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml ps
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml logs api authentik-server authentik-worker
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml stop api
 ```
 
 Current local addresses:
@@ -124,9 +124,9 @@ network. Docs has no host port binding; port 8080 belongs to the backend.
 After changing the content or origin, rebuild and reload the proxy:
 
 ```sh
-docker compose --env-file iam/.env -f deploy/compose.yaml up --build -d docs
-docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -t
-docker compose --env-file iam/.env -f deploy/compose.yaml exec proxy nginx -s reload
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml up --build -d docs
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml exec proxy nginx -t
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml exec proxy nginx -s reload
 ```
 
 The reload refreshes the docs container address. On first setup, run the
@@ -144,3 +144,31 @@ npm start
 
 Open <http://localhost:3001> for live preview at `/`.
 See the [tooling guide](../docs/docusaurus/README.md) for other build options.
+
+## SeaweedFS object storage
+
+`make up` starts SeaweedFS on the private `taramisu-storage` network and creates the application bucket automatically.
+Only the API and provisioning jobs join this network; storage has no published ports or console.
+The API uses a separate bucket-scoped key and `http://storage:8333`.
+
+`make init` creates `storage/.env` for storage credentials; existing `iam/.env` values stay unchanged.
+If storage data already exists, restore missing credentials from backup instead.
+To rotate keys, stop `api` and `storage`, update the file, then run `make up`.
+
+For host Go development, complete initial setup first, then run from the repository root:
+
+```sh
+make -C deploy down
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml \
+  -f deploy/compose.storage-dev.yaml up -d --build --wait api authentik-worker
+docker compose --env-file iam/.env --env-file storage/.env -f deploy/compose.yaml stop api
+```
+
+Copy the bucket-scoped credentials and bucket name into `backend/.env`; use `S3_ENDPOINT=http://localhost:8333`, then `make -C backend run`.
+
+**Backups:** stop `api`, `storage-init`, and `storage`, then archive the entire `${COMPOSE_PROJECT_NAME}-storage_data`
+volume, including filer metadata, preserving ownership. Keep an encrypted off-host copy alongside `storage/.env` and the image version.
+Restore into an empty volume with storage stopped, start the same version, and verify object contents through S3.
+The `storage_config` volume is regenerated from `storage/.env`. `down` preserves volumes; `reset` deletes them.
+
+Run `make -C deploy test-storage` for isolated live S3, network, rotation, and restore checks (requires Linux Docker and Python 3).
