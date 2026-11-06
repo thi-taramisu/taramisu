@@ -15,11 +15,13 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
@@ -65,7 +67,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload"} {
+	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch"} {
 		t.Run(scenario, func(t *testing.T) {
 			tx, e := pool.Begin(ctx)
 			if e != nil {
@@ -83,7 +85,35 @@ func TestAttachmentsIntegration(t *testing.T) {
 			exec("INSERT INTO iam_user(id,external_iam_sub) VALUES($1,$1::uuid::text),($2,$2::uuid::text)", user, other)
 			exec("INSERT INTO project_role_assignment(tara_project_id,user_id,project_role) VALUES($1,$2,'OWNER')", project, user)
 			tracked := &trackedObjects{ObjectStore: objects}
-			h := NewAttachments(db.New(tx), tracked)
+			database := &deleteFailureDB{DBTX: tx}
+			h := NewAttachments(db.New(database), tracked)
+			if scenario == "cleanup-batch" {
+				exec(`INSERT INTO attachment(id,project_id,file_name,content_type,size_bytes,sha256,s3_object_key,uploaded_by,delete_pending)
+                      SELECT lpad(to_hex(n),32,'0')::uuid,$1,'pending','text/plain',1,repeat('a',64),gen_random_uuid(),$2,true
+                      FROM generate_series(1,105) n`, project, user)
+				if e = tx.QueryRow(ctx, "SELECT s3_object_key::text FROM attachment WHERE project_id=$1 ORDER BY id LIMIT 1", project).Scan(&tracked.failKey); e != nil {
+					t.Fatal(e)
+				}
+				if e = h.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				var count int
+				if e = tx.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE project_id=$1", project).Scan(&count); e != nil || count != 1 {
+					t.Fatalf("failed row starved later batches: %d %v", count, e)
+				}
+				if tracked.deletes != 105 {
+					t.Fatalf("expected 105 attempts, got %d", tracked.deletes)
+				}
+				tracked.failKey = ""
+				if e = h.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if e = tx.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE project_id=$1", project).Scan(&count); e != nil || count != 0 {
+					t.Fatalf("retry incomplete: %d %v", count, e)
+				}
+				return
+			}
+
 			base := "/api/v1/projects/" + project + "/attachments"
 			request := func(method, target, who string, data []byte, etag string) *httptest.ResponseRecorder {
 				t.Helper()
@@ -127,7 +157,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 			}
 			data := []byte("attachment content\n")
-			if scenario != "flow" {
+			if scenario != "flow" && !strings.HasPrefix(scenario, "delete-") {
 				if scenario == "insert-failure" {
 					tracked.afterPut = func() { _ = tx.Rollback(ctx) }
 				}
@@ -206,15 +236,101 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 			}
 			check(request("GET", strings.Replace(location, project, uuid.NewString(), 1), user, nil, ""), 404)
+			if strings.HasPrefix(scenario, "delete-") {
+				// Commit the fixture: a fresh handler must recover using persisted state.
+				if e = tx.Commit(ctx); e != nil {
+					t.Fatal(e)
+				}
+				database.DBTX = pool
+				t.Cleanup(func() {
+					for _, q := range []string{"DELETE FROM attachment WHERE project_id=$1", "DELETE FROM tara_project WHERE id=$1"} {
+						if _, e := pool.Exec(ctx, q, project); e != nil {
+							t.Error(e)
+						}
+					}
+					if _, e := pool.Exec(ctx, "DELETE FROM iam_user WHERE id=$1 OR id=$2", user, other); e != nil {
+						t.Error(e)
+					}
+				})
+				database.fail = scenario == "delete-db-failure"
+				database.failMark = scenario == "delete-marker-failure"
+				tracked.failDelete = scenario == "delete-storage-failure"
+				if scenario == "delete-marker-failure" {
+					check(request("DELETE", location, user, nil, ""), 503)
+					check(request("GET", location, user, nil, ""), 200)
+					if tracked.deletes != 0 {
+						t.Fatal("storage touched before durable deletion intent")
+					}
+					database.failMark = false
+				}
+				switch scenario {
+				case "delete-restart", "delete-replicas":
+					// Simulate a process dying after the durable marker, before S3 deletion.
+					if _, e = pool.Exec(ctx, "UPDATE attachment SET delete_pending=true WHERE id=$1", meta.ID); e != nil {
+						t.Fatal(e)
+					}
+				case "delete-marker-failure":
+					tracked.failDelete = true
+					check(request("DELETE", location, user, nil, ""), 202)
+				default:
+					check(request("DELETE", location, user, nil, ""), 202)
+				}
+				listed := request("GET", base, user, nil, "")
+				check(listed, 200)
+				if listed.Body.String() != "[]\n" {
+					t.Fatalf("pending attachment visible: %s", listed.Body.String())
+				}
+				check(request("GET", location, user, nil, ""), 404)
+				check(request("GET", location, user, nil, etag), 404)
+				// The retry loop also tolerates a still-failing dependency.
+				if scenario != "delete-restart" && scenario != "delete-replicas" {
+					if e = h.cleanupPending(ctx); e != nil {
+						t.Fatal(e)
+					}
+				}
+				database.fail = false
+				tracked.failDelete = false
+				// Fresh handler and storage client emulate application restart. Stop after
+				// the successful metadata delete, exercising startup retry and shutdown.
+				workerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				recoveredDB := &deleteFailureDB{DBTX: pool, afterDelete: cancel}
+				restarted := NewAttachments(db.New(recoveredDB), storage.New(cfg))
+				if scenario == "delete-replicas" {
+					results := make(chan error, 2)
+					for range 2 {
+						go func() { results <- NewAttachments(db.New(pool), storage.New(cfg)).cleanupPending(workerCtx) }()
+					}
+					for range 2 {
+						if e = <-results; e != nil {
+							t.Fatal(e)
+						}
+					}
+				} else {
+					restarted.RunCleanup(workerCtx)
+				}
+				var count int
+				if e = pool.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE id=$1", meta.ID).Scan(&count); e != nil || count != 0 {
+					t.Fatalf("pending deletion not recovered: %d %v", count, e)
+				}
+				if body, e := objects.Get(ctx, tracked.key); e == nil {
+					_ = body.Close()
+					t.Fatal("object not removed")
+				}
+				check(request("GET", location, user, nil, etag), 404)
+				return
+			}
 			for _, role := range []string{"VIEWER", "REVIEWER", "EDITOR", "OWNER"} {
 				exec("UPDATE project_role_assignment SET project_role=$1 WHERE tara_project_id=$2", role, project)
 				check(request("GET", location, user, nil, ""), 200)
 				check(request("GET", base, user, nil, ""), 200)
 				if role == "VIEWER" || role == "REVIEWER" {
 					check(request("POST", base, user, data, ""), 404)
+					check(request("DELETE", location, user, nil, ""), 404)
 				} else {
 					created := request("POST", base, user, data, "")
 					check(created, 201)
+					check(request("DELETE", created.Header().Get("Location"), user, nil, ""), 204)
 				}
 			}
 			exec("DELETE FROM project_role_assignment WHERE tara_project_id=$1", project)
@@ -223,14 +339,19 @@ func TestAttachmentsIntegration(t *testing.T) {
 			exec("INSERT INTO iam_user_group_member(user_id,group_id) VALUES($1,$2)", user, group)
 			exec("INSERT INTO project_role_assignment(tara_project_id,group_id,project_role) VALUES($1,$2,'EDITOR')", project, group)
 			check(request("GET", location, user, nil, ""), 200)
-			// Pending metadata must never be served, including conditional downloads.
-			exec("UPDATE attachment SET delete_pending=true WHERE id=$1", meta.ID)
+			// Storage failure keeps a durable marker and hides the attachment until retry.
+			tracked.failDelete = true
+			check(request("DELETE", location, user, nil, ""), 202)
 			check(request("GET", location, user, nil, etag), 404)
 			listed = request("GET", base, user, nil, "")
 			check(listed, 200)
 			if strings.Contains(listed.Body.String(), meta.ID) {
 				t.Fatal("pending attachment was listed")
 			}
+			tracked.failDelete = false
+			check(request("DELETE", location, user, nil, ""), 204)
+			check(request("GET", location, user, nil, ""), 404)
+			check(request("DELETE", location, user, nil, ""), 404)
 
 		})
 	}
@@ -238,11 +359,13 @@ func TestAttachmentsIntegration(t *testing.T) {
 
 type trackedObjects struct {
 	ObjectStore
-	key      string
-	deletes  int
-	failPut  bool
-	failGet  bool
-	afterPut func()
+	key        string
+	failKey    string
+	failDelete bool
+	deletes    int
+	failPut    bool
+	failGet    bool
+	afterPut   func()
 }
 
 func (s *trackedObjects) Put(ctx context.Context, key, kind string, size int64, r io.ReadSeeker) error {
@@ -258,6 +381,9 @@ func (s *trackedObjects) Put(ctx context.Context, key, kind string, size int64, 
 }
 func (s *trackedObjects) Delete(ctx context.Context, key string) error {
 	s.deletes++
+	if s.failDelete || key == s.failKey {
+		return errors.New("injected storage outage")
+	}
 	return s.ObjectStore.Delete(ctx, key)
 }
 
@@ -350,4 +476,25 @@ func TestRejectUnsupportedDeclaredAttachmentType(t *testing.T) {
 			t.Fatalf("%s: got %d", declared, w.Code)
 		}
 	}
+}
+
+// Inject deletion failures while all other SQL still uses PostgreSQL.
+type deleteFailureDB struct {
+	db.DBTX
+	fail, failMark bool
+	afterDelete    func()
+}
+
+func (d *deleteFailureDB) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	if d.fail && strings.Contains(sql, "DELETE FROM attachment") {
+		return pgconn.CommandTag{}, errors.New("injected database delete failure")
+	}
+	if d.failMark && strings.Contains(sql, "UPDATE attachment SET delete_pending") {
+		return pgconn.CommandTag{}, errors.New("injected marker failure")
+	}
+	tag, err := d.DBTX.Exec(ctx, sql, args...)
+	if err == nil && d.afterDelete != nil && strings.Contains(sql, "DELETE FROM attachment") {
+		d.afterDelete()
+	}
+	return tag, err
 }

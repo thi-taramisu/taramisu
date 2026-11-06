@@ -362,6 +362,66 @@
       }
     },
     "/api/v1/projects/{project_id}/attachments/{attachment_id}": {
+      "delete": {
+        "operationId": "delete-attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deletion accepted; attachment is hidden and cleanup will retry automatically"
+          },
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Invalid origin"
+          },
+          "404": {
+            "description": "Not found or insufficient project role"
+          },
+          "503": {
+            "description": "Database or storage unavailable"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Delete an attachment"
+      },
       "get": {
         "operationId": "download-attachment",
         "parameters": [

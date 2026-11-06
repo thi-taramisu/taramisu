@@ -67,6 +67,7 @@ func registerAttachments(api huma.API, h *Attachments) {
 		{http.MethodPost, base, "upload-attachment", "Upload one multipart file (field file), up to 10 MiB; PDF, PNG, JPEG, GIF, WebP or plain text"},
 		{http.MethodGet, base, "list-attachments", "List project attachments"},
 		{http.MethodGet, base + "/{attachment_id}", "download-attachment", "Download an attachment"},
+		{http.MethodDelete, base + "/{attachment_id}", "delete-attachment", "Delete an attachment"},
 	} {
 		op := huma.Operation{Method: route.method, Path: route.path, OperationID: route.id, Summary: route.summary, Security: []map[string][]string{{"session": {}}},
 			Parameters: []*huma.Param{{Name: "project_id", In: "path", Required: true, Schema: &huma.Schema{Type: "string", Format: "uuid"}}},
@@ -89,8 +90,11 @@ func registerAttachments(api huma.API, h *Attachments) {
 			op.Parameters = append(op.Parameters, &huma.Param{Name: "If-None-Match", In: "header", Schema: &huma.Schema{Type: "string"}})
 			op.Responses["200"] = &huma.Response{Description: "File bytes; ETag is quoted SHA-256; Cache-Control: private, no-cache", Content: map[string]*huma.MediaType{"application/octet-stream": {Schema: &huma.Schema{Type: "string", Format: "binary"}}}}
 			op.Responses["304"] = &huma.Response{Description: "Unchanged; authorization revalidated"}
+		case "delete-attachment":
+			op.Responses["204"] = &huma.Response{Description: "Deleted"}
+			op.Responses["202"] = &huma.Response{Description: "Deletion accepted; attachment is hidden and cleanup will retry automatically"}
 		}
-		if route.method == http.MethodPost {
+		if route.method == http.MethodPost || route.method == http.MethodDelete {
 			op.Parameters = append(op.Parameters, &huma.Param{Name: "Origin", In: "header", Required: true, Schema: &huma.Schema{Type: "string"}})
 			op.Responses["403"] = &huma.Response{Description: "Invalid origin"}
 		}
@@ -141,7 +145,7 @@ func (h *Attachments) serve(w http.ResponseWriter, r *http.Request, userID strin
 		attachmentError(w, 401, "authentication required")
 		return
 	}
-	allowed, err := h.queries.CanAccessAttachments(ctx, db.CanAccessAttachmentsParams{ProjectID: project, UserID: user, WriteAccess: r.Method == http.MethodPost})
+	allowed, err := h.queries.CanAccessAttachments(ctx, db.CanAccessAttachmentsParams{ProjectID: project, UserID: user, WriteAccess: r.Method == http.MethodPost || r.Method == http.MethodDelete})
 	if err != nil {
 		attachmentError(w, 503, "database unavailable")
 		return
@@ -197,6 +201,25 @@ func (h *Attachments) serve(w http.ResponseWriter, r *http.Request, userID strin
 		return
 	}
 	key := uuid.UUID(a.S3ObjectKey.Bytes).String()
+	if r.Method == http.MethodDelete {
+		// Persist intent before touching storage. Cleanup survives request/process failure.
+		affected, err := h.queries.MarkAttachmentDeleting(ctx, db.MarkAttachmentDeletingParams{ProjectID: project, ID: id})
+		if err != nil {
+			attachmentError(w, 503, "database unavailable")
+			return
+		}
+		if affected == 0 {
+			attachmentError(w, 404, "not found")
+			return
+		}
+		if err := h.finishDeletion(ctx, a); err != nil {
+			slog.Warn("attachment deletion queued for retry", "id", uuid.UUID(id.Bytes).String(), "error", err)
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if a.DeletePending {
 		attachmentError(w, 404, "not found")
 		return

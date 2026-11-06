@@ -349,3 +349,6 @@ private S3-compatible storage (SeaweedFS), keyed by a random UUID. Project and u
 attachments exist, so metadata cannot be cascaded away leaving storage objects behind.
 The `delete_pending` flag records deletion intent durably; list queries exclude pending attachments, and a separate
 query retrieves them for cleanup.
+
+The API retries pending deletions at startup and every minute. It removes the S3 object before removing its metadata;
+failed attempts remain pending and hidden from reads until a retry succeeds.

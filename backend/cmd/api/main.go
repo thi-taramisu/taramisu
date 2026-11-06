@@ -48,7 +48,12 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.New(queries, iam, httpapi.NewAttachments(queries, storage.New(cfg.S3))), ReadHeaderTimeout: 5 * time.Second}
+	files := httpapi.NewAttachments(queries, storage.New(cfg.S3))
+	cleanupCtx, stopCleanup := context.WithCancel(ctx)
+	cleanupDone := make(chan struct{})
+	go func() { defer close(cleanupDone); files.RunCleanup(cleanupCtx) }()
+	defer func() { stopCleanup(); <-cleanupDone }()
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: httpapi.New(queries, iam, files), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
