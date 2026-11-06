@@ -22,7 +22,7 @@ export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[]
   'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
 }
 
-/** Code and name as shown in the tree and headers, e.g. "A-01 Firmware". */
+/** Code and name as shown in page headers, e.g. "A-01 Firmware". The hierarchy shows the name only. */
 export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
   return code ? `${code} ${name}` : name
 }

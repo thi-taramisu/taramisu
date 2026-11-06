@@ -22,7 +22,7 @@ describe('sidebar tree', () => {
 
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
-    expect(within(tree()).getByRole('link', { name: /AP-02/ })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'Malicious device on the OBD-II connector' })).toBeInTheDocument()
   })
 })
 
@@ -195,7 +195,8 @@ describe('item page', () => {
 
     const tabs = await screen.findByRole('navigation', { name: 'Item tabs' })
     expect(await within(tabs).findByRole('link', { name: 'Assets (4)' })).toHaveAttribute('aria-current', 'page')
-    const row = (await screen.findByRole('link', { name: 'Headlamp on/off command' })).closest('tr')!
+    const table = await screen.findByRole('table')
+    const row = (await within(table).findByRole('link', { name: 'Headlamp on/off command' })).closest('tr')!
     expect(within(row).getByText('A-01')).toBeInTheDocument()
     expect(within(row).getByText('4')).toBeInTheDocument()
 
