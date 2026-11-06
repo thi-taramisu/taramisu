@@ -38,13 +38,13 @@ func TestTaraProjectPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	handler := httpapi.New(db.New(tx), manager)
 	call := func(method, path, body string, want int) handlers.TaraProjectBody {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(session)
+		req.Header.Set("Authorization", bearer)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 		if rr.Code != want {
@@ -85,7 +85,7 @@ func TestTaraProjectPostgresCRUD(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet, collection, http.NoBody)
-	req.AddCookie(session)
+	req.Header.Set("Authorization", bearer)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	var list []handlers.TaraProjectBody

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
@@ -20,8 +21,9 @@ const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
 	statusReaderFunc
-	project db.TaraProject
-	found   bool
+	project   db.TaraProject
+	found     bool
+	deleteErr error
 }
 
 func newFakeProjects(found bool) *fakeProjects {
@@ -83,6 +85,9 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 }
 
 func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, error) {
+	if f.deleteErr != nil {
+		return 0, f.deleteErr
+	}
 	if !f.found {
 		return 0, nil
 	}
@@ -91,7 +96,7 @@ func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, e
 
 func TestTaraProjectRoutes(t *testing.T) {
 	base := "/api/v1/projects"
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, tc := range []struct {
 		name   string
 		found  bool
@@ -102,6 +107,7 @@ func TestTaraProjectRoutes(t *testing.T) {
 	}{
 		{"create", true, http.MethodPost, base, `{"name":"a"}`, http.StatusCreated},
 		{"create empty name", true, http.MethodPost, base, `{"name":""}`, http.StatusUnprocessableEntity},
+		{"create whitespace name", true, http.MethodPost, base, `{"name":"   "}`, http.StatusUnprocessableEntity},
 		{"list", true, http.MethodGet, base, "", http.StatusOK},
 		{"list empty", false, http.MethodGet, base, "", http.StatusOK},
 		{"get", true, http.MethodGet, base + "/" + projectID, "", http.StatusOK},
@@ -109,7 +115,9 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"get bad id", true, http.MethodGet, base + "/nope", "", http.StatusUnprocessableEntity},
 		{"replace", true, http.MethodPut, base + "/" + projectID, `{"name":"b"}`, http.StatusOK},
 		{"replace missing", false, http.MethodPut, base + "/" + projectID, `{"name":"b"}`, http.StatusNotFound},
+		{"replace whitespace name", true, http.MethodPut, base + "/" + projectID, `{"name":" "}`, http.StatusUnprocessableEntity},
 		{"update", true, http.MethodPatch, base + "/" + projectID, `{"name":"c"}`, http.StatusOK},
+		{"update whitespace name", true, http.MethodPatch, base + "/" + projectID, `{"name":"\t"}`, http.StatusUnprocessableEntity},
 		{"update missing", false, http.MethodPatch, base + "/" + projectID, `{"name":"c"}`, http.StatusNotFound},
 		{"delete", true, http.MethodDelete, base + "/" + projectID, "", http.StatusNoContent},
 		{"delete missing", false, http.MethodDelete, base + "/" + projectID, "", http.StatusNotFound},
@@ -118,7 +126,7 @@ func TestTaraProjectRoutes(t *testing.T) {
 			h := httpapi.New(newFakeProjects(tc.found), manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.AddCookie(session)
+			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 			if rr.Code != tc.code {
@@ -128,10 +136,23 @@ func TestTaraProjectRoutes(t *testing.T) {
 	}
 }
 
+func TestTaraProjectDeleteWithItemDefinitions(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	store := newFakeProjects(true)
+	store.deleteErr = &pgconn.PgError{Code: "23503"}
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+	req.Header.Set("Authorization", bearer)
+	rr := httptest.NewRecorder()
+	httpapi.New(store, manager).ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d: %s", rr.Code, http.StatusConflict, rr.Body.String())
+	}
+}
+
 func TestTaraProjectListBody(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects", http.NoBody)
-	req.AddCookie(session)
+	req.Header.Set("Authorization", bearer)
 	rr := httptest.NewRecorder()
 	httpapi.New(newFakeProjects(false), manager).ServeHTTP(rr, req)
 	var got []any
@@ -141,7 +162,7 @@ func TestTaraProjectListBody(t *testing.T) {
 }
 
 func TestTaraProjectPatchDescription(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, tc := range []struct {
 		name string
 		body string
@@ -154,7 +175,7 @@ func TestTaraProjectPatchDescription(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/"+projectID, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.AddCookie(session)
+			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
 			httpapi.New(newFakeProjects(true), manager).ServeHTTP(rr, req)
 			if rr.Code != http.StatusOK {

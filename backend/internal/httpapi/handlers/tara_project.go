@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -39,7 +40,7 @@ func (h *TaraProject) Register(api huma.API) {
 	})
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"session": {}}}}
+			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
 	huma.Register(api, op("list-tara-projects", http.MethodGet, collection, "List TARA projects"), h.List)
 	create := op("create-tara-project", http.MethodPost, collection, "Create a TARA project")
@@ -74,7 +75,7 @@ type TaraProjectIDInput struct {
 
 type CreateTaraProjectInput struct {
 	Body struct {
-		Name        string  `json:"name" minLength:"1"`
+		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
 	}
 }
@@ -82,7 +83,7 @@ type CreateTaraProjectInput struct {
 type ReplaceTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        string  `json:"name" minLength:"1"`
+		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
 	}
 }
@@ -107,7 +108,7 @@ func (o Optional[T]) Schema(r huma.Registry) *huma.Schema {
 type UpdateTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        *string          `json:"name,omitempty" minLength:"1"`
+		Name        *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
 		Description Optional[string] `json:"description,omitempty"`
 	}
 }
@@ -206,6 +207,10 @@ func parseUUID(s string) (pgtype.UUID, error) {
 func mapTaraProjectError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("project not found")
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
+		return huma.Error409Conflict("project still contains item definitions")
 	}
 	return err
 }
