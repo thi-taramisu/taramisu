@@ -52,10 +52,10 @@ export function useSidebarWidth() {
 
   /** Sets the width, clamped to the current limits. Pass `persist: false` for intermediate drag positions. */
   const setWidth = useCallback((next: number, { persist = true } = {}) => {
-    const clamped = Math.round(clamp(next, SIDEBAR_WIDTH.min, maxSidebarWidth(window.innerWidth)))
+    const clamped = Math.round(clamp(next, SIDEBAR_WIDTH.min, max))
     setPreferred(clamped)
     if (persist) storeSidebarWidth(clamped)
-  }, [])
+  }, [max])
 
   return { width, min: SIDEBAR_WIDTH.min, max, setWidth }
 }

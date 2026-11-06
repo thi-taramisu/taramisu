@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { SIDEBAR_WIDTH_STORAGE_KEY } from './useSidebarWidth'
@@ -82,6 +82,30 @@ describe('resizable project element sidebar', () => {
 
     expect(document.body).not.toHaveClass('select-none')
     expect(storedWidth()).toBe('320')
+  })
+
+  it('does not save the window-clamped width when the handle is only clicked', () => {
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, '500')
+    renderApp(project)
+    setViewportWidth(700)
+
+    fireEvent.pointerDown(handle(), { pointerId: 1, button: 0, clientX: 340 })
+    fireEvent.pointerUp(handle(), { pointerId: 1, clientX: 340 })
+    expect(storedWidth()).toBe('500')
+
+    setViewportWidth(1200)
+    expectWidth(500)
+  })
+
+  it('restores text selection when the handle unmounts during a drag', () => {
+    renderApp(project)
+
+    fireEvent.pointerDown(handle(), { pointerId: 1, button: 0, clientX: 288 })
+    expect(document.body).toHaveClass('select-none')
+    cleanup()
+
+    expect(document.body).not.toHaveClass('select-none')
+    expect(document.body).not.toHaveClass('cursor-col-resize')
   })
 
   it('restores the saved width after a reload', () => {

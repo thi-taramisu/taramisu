@@ -1,9 +1,9 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/utils'
-import { SIDEBAR_WIDTH } from './useSidebarWidth'
 
 const KEYBOARD_STEP = 16
 const KEYBOARD_STEP_LARGE = 64
+const DRAG_BODY_CLASSES = ['cursor-col-resize', 'select-none']
 
 type SidebarResizeHandleProps = {
   /** Id of the sidebar element this handle resizes. */
@@ -12,6 +12,8 @@ type SidebarResizeHandleProps = {
   width: number
   min: number
   max: number
+  /** Width restored on double-click. */
+  defaultWidth: number
   onResize: (width: number, options?: { persist?: boolean }) => void
 }
 
@@ -21,9 +23,14 @@ type Drag = { pointerId: number; startX: number; startWidth: number; width: numb
  * Vertical separator between the sidebar and the main content. Drag it with a pointer, or focus it and use the arrow
  * keys, Home, and End. Double-click restores the default width.
  */
-export function SidebarResizeHandle({ controls, label, width, min, max, onResize }: SidebarResizeHandleProps) {
+export function SidebarResizeHandle({ controls, label, width, min, max, defaultWidth, onResize }: SidebarResizeHandleProps) {
   const drag = useRef<Drag | null>(null)
   const [dragging, setDragging] = useState(false)
+
+  // Unmounting mid-drag (e.g. navigating away while the button is held) must not leave the page unselectable.
+  useEffect(() => () => {
+    if (drag.current) document.body.classList.remove(...DRAG_BODY_CLASSES)
+  }, [])
 
   function startDrag(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return
@@ -33,7 +40,7 @@ export function SidebarResizeHandle({ controls, label, width, min, max, onResize
     // Capture keeps move and release events on the handle even when the pointer leaves it or the window.
     event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: width, width }
-    document.body.classList.add('cursor-col-resize', 'select-none')
+    document.body.classList.add(...DRAG_BODY_CLASSES)
     setDragging(true)
   }
 
@@ -48,9 +55,10 @@ export function SidebarResizeHandle({ controls, label, width, min, max, onResize
     const current = drag.current
     if (!current || current.pointerId !== event.pointerId) return
     drag.current = null
-    document.body.classList.remove('cursor-col-resize', 'select-none')
+    document.body.classList.remove(...DRAG_BODY_CLASSES)
     setDragging(false)
-    onResize(current.width)
+    // A click without movement must not save the rendered width, which a narrow window may have clamped.
+    if (current.width !== current.startWidth) onResize(current.width)
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -84,12 +92,12 @@ export function SidebarResizeHandle({ controls, label, width, min, max, onResize
       onPointerCancel={endDrag}
       onLostPointerCapture={endDrag}
       onKeyDown={handleKeyDown}
-      onDoubleClick={() => onResize(SIDEBAR_WIDTH.default)}
+      onDoubleClick={() => onResize(defaultWidth)}
       data-dragging={dragging || undefined}
-      // Zero net width: the hit area straddles the sidebar border without shifting the layout.
+      // Zero net width, and the hit area lies over the content's padding so it never covers the sidebar's scrollbar.
       className={cn(
-        'group relative z-10 -mx-1 w-2 shrink-0 cursor-col-resize touch-none outline-none',
-        'after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:transition-colors',
+        'relative z-10 -mr-2 w-2 shrink-0 cursor-col-resize touch-none outline-none',
+        'after:absolute after:inset-y-0 after:left-0 after:w-0.5 after:-translate-x-1/2 after:transition-colors',
         'hover:after:bg-ring focus-visible:after:bg-ring data-dragging:after:bg-ring',
       )}
     />
