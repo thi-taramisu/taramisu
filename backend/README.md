@@ -172,6 +172,13 @@ internal/httpapi/handlers/     HTTP handlers
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
+## Risk values and treatment decisions
+
+The risk API provides authenticated CRUD under `/api/v1/threat-scenarios/{threat_scenario_id}/risk-values`
+and `/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions`.
+It uses the existing schema and checks project roles, related records, and treatment claims.
+See the [frontend API handoff](../docs/internal/dev-workflow/risk-api.md) for methods, fields, pagination, and errors.
+
 ## OpenAPI contract
 
 With the Compose stack running: OpenAPI 3.1 at [http://localhost/openapi.json](http://localhost/openapi.json), Swagger UI at
