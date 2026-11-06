@@ -44,10 +44,10 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	h := httpapi.New(db.New(tx), manager)
 	request := func(method, path string, body any) *httptest.ResponseRecorder {
-		return assetRequest(t, h, session, method, path, body)
+		return assetRequest(t, h, bearer, method, path, body)
 	}
 	collection := "/api/v1/item-definitions/" + item + "/assets"
 	otherCollection := "/api/v1/item-definitions/" + otherItem + "/assets"

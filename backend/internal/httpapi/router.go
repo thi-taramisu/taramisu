@@ -44,17 +44,23 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	cfg.DocsRenderer = huma.DocsRendererSwaggerUI
 	cfg.CreateHooks = nil
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		"session": {Type: "apiKey", In: "cookie", Name: "taramisu_session"},
+		"bearer": {
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+		},
 	}
 	api := humachi.New(mux, cfg)
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
-	registerAuth(api, manager)
 	handlers.NewAssets(queries).Register(api)
 	huma.Register(api, huma.Operation{
-		OperationID: "current-user", Method: http.MethodGet, Path: "/api/v1/me",
-		Summary: "Get the current user", Security: []map[string][]string{{"session": {}}},
+		OperationID: "current-user",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/me",
+		Summary:     "Get the current user",
+		Security:    []map[string][]string{{"bearer": {}}},
 	}, func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})

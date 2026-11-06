@@ -47,7 +47,7 @@ func (s *assetStore) DeleteAsset(context.Context, db.DeleteAssetParams) (pgtype.
 }
 
 func TestAssetValidation(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	cases := []struct{ method, path, body string }{
 		{"GET", assetCollection + "/not-a-uuid", ""},
 		{"GET", "/api/v1/item-definitions/bad/assets", ""},
@@ -70,7 +70,7 @@ func TestAssetValidation(t *testing.T) {
 		t.Run(tc.method+tc.path+tc.body, func(t *testing.T) {
 			s := &assetStore{}
 			h := httpapi.New(s, manager)
-			r := assetRequest(t, h, session, tc.method, tc.path, strings.NewReader(tc.body))
+			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(tc.body))
 			if r.Code != 422 || s.calls != 0 {
 				t.Fatalf("got %d, calls %d: %s", r.Code, s.calls, r.Body)
 			}
@@ -79,7 +79,7 @@ func TestAssetValidation(t *testing.T) {
 }
 
 func TestAssetErrors(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, tc := range []struct {
 		name, method, path string
 		err                error
@@ -93,7 +93,7 @@ func TestAssetErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &assetStore{err: tc.err}
 			h := httpapi.New(s, manager)
-			r := assetRequest(t, h, session, tc.method, tc.path, strings.NewReader(assetJSON))
+			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(assetJSON))
 			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
 				t.Fatalf("got %d, want %d: %s", r.Code, tc.want, r.Body)
 			}
@@ -101,7 +101,7 @@ func TestAssetErrors(t *testing.T) {
 	}
 }
 
-func assetRequest(t testing.TB, h http.Handler, session *http.Cookie, method, path string, body any) *httptest.ResponseRecorder {
+func assetRequest(t testing.TB, h http.Handler, bearer string, method, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	reader, ok := body.(io.Reader)
 	if !ok && body != nil {
@@ -113,8 +113,8 @@ func assetRequest(t testing.TB, h http.Handler, session *http.Cookie, method, pa
 	}
 	req := httptest.NewRequest(method, path, reader)
 	req.Header.Set("Content-Type", "application/json")
-	if session != nil {
-		req.AddCookie(session)
+	if bearer != "" {
+		req.Header.Set("Authorization", bearer)
 	}
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
