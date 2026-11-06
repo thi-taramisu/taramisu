@@ -74,6 +74,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    # Docker's default, made explicit: the API drains for shutdownTimeout and closes its pool within
+    # poolCloseTimeout before this period ends (backend/cmd/api/main.go).
+    stop_grace_period: 10s
 
 configs:
   pgadmin_servers:

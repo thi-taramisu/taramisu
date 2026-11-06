@@ -19,9 +19,13 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 )
 
-// shutdownTimeout bounds how long SIGTERM waits for in-flight requests. Docker sends SIGKILL 10s after
-// SIGTERM, which leaves time to close the remaining connections and the database pool.
-const shutdownTimeout = 8 * time.Second
+// After SIGTERM, shutdownTimeout bounds how long in-flight requests may finish and poolCloseTimeout how long
+// the database pool may then take to close. Together they stay below stop_grace_period (10s) of the api
+// service in deploy/compose.backend.yaml, after which Docker sends SIGKILL; keep the three in sync.
+const (
+	shutdownTimeout  = 8 * time.Second
+	poolCloseTimeout = time.Second
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -43,7 +47,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer pool.Close()
+	defer closePool(pool, poolCloseTimeout)
 	queries := db.New(pool)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
@@ -59,34 +63,63 @@ func run() error {
 		return err
 	}
 	slog.Info("HTTP server listening", "address", listener.Addr().String())
-	// The deferred pool.Close runs only after serve has drained in-flight requests.
+	// The deferred closePool runs only after serve has drained in-flight requests.
 	return serve(ctx, server, listener, shutdownTimeout)
 }
 
-// serve handles requests until ctx is cancelled, then stops accepting connections and waits up to
-// timeout for in-flight requests to finish. Serve returns as soon as Shutdown starts, so returning
-// on that alone would cut off requests that are still running. Requests still running after timeout
-// get their connections closed, which cancels their contexts; that is logged, not returned, because
-// a planned stop is not a crash.
+// closePool closes the pool but gives up after timeout, so a handler that ignores its cancelled context and
+// keeps a connection cannot hold the process until SIGKILL.
+func closePool(pool interface{ Close() }, timeout time.Duration) {
+	closed := make(chan struct{})
+	go func() {
+		pool.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(timeout):
+		slog.Error("database pool did not close in time; exiting with connections still in use", "timeout", timeout)
+	}
+}
+
+// serve handles requests until ctx is cancelled or Serve fails, then stops accepting connections and waits up
+// to timeout for in-flight requests to finish. Serve returns as soon as Shutdown starts, so returning on that
+// alone would cut off requests that are still running. It returns Serve's error, or nil for a planned stop.
 func serve(ctx context.Context, server *http.Server, listener net.Listener, timeout time.Duration) error {
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
+	var failed error
 	select {
-	case err := <-serveErr:
-		return err
+	case failed = <-serveErr:
+		// Serve stopped on its own, e.g. because Accept failed; requests it already accepted still run.
 	case <-ctx.Done():
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-	defer cancel()
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		// Log before returning: the deferred pool.Close in run may still wait for these requests.
-		slog.Error("HTTP server did not drain in time; closing remaining connections", "timeout", timeout, "error", err)
-		if err := server.Close(); err != nil {
-			slog.Error("closing remaining HTTP connections failed", "error", err)
-		}
+	drain(ctx, server, timeout)
+	if failed != nil {
+		return failed
 	}
 	if err := <-serveErr; !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// drain shuts the server down gracefully. Requests still running after timeout get their connections closed,
+// which cancels their contexts; that is logged, not returned, because a planned stop is not a crash. It logs
+// right away because the deferred closePool in run may still wait for those requests.
+func drain(ctx context.Context, server *http.Server, timeout time.Duration) {
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	defer cancel()
+	err := server.Shutdown(shutdownCtx)
+	switch {
+	case err == nil:
+	case errors.Is(err, context.DeadlineExceeded):
+		slog.Error("HTTP server did not drain in time; closing remaining connections", "timeout", timeout)
+		if err := server.Close(); err != nil {
+			slog.Error("closing remaining HTTP connections failed", "error", err)
+		}
+	default:
+		// Shutdown still waited for in-flight requests; only closing the listener failed.
+		slog.Error("closing the HTTP listener failed during shutdown", "error", err)
+	}
 }
