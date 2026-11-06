@@ -132,18 +132,13 @@ def _run(
     return proc
 
 
-def run_compose(
-    *args: str,
-    check: bool = True,
-    new_session: bool = False,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
+def run_compose(*args: str, check: bool = True, new_session: bool = False) -> subprocess.CompletedProcess[str]:
     cmd = ["docker", "compose", "--env-file", str(ENV_FILE), "-f", str(COMPOSE_FILE), *args]
-    return _run(cmd, check, COMPOSE_TIMEOUT, new_session, env)
+    return _run(cmd, check, COMPOSE_TIMEOUT, new_session)
 
 
-def run_docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return _run(["docker", *args], check, DOCKER_TIMEOUT, new_session=False)
+def run_docker(*args: str, check: bool = True, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return _run(["docker", *args], check, DOCKER_TIMEOUT, False, env)
 
 
 def scale_api(count: int, new_session: bool = False) -> None:
@@ -248,10 +243,14 @@ def oidc_pkce_login(
     with opener.open(req_pw, timeout=20) as resp:
         resp.read()
 
-    # Verify session authentication
-    with opener.open(urllib.request.Request(f"{base}/auth/api/v3/core/users/me/"), timeout=20) as resp:
-        if resp.status != 200:
-            raise RuntimeError(f"Authentik user verification failed with status {resp.status}")
+    # Verify session authentication; urlopen raises for any non-2xx status.
+    try:
+        with opener.open(urllib.request.Request(f"{base}/auth/api/v3/core/users/me/"), timeout=20) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(
+            f"Authentik login as '{username}' failed (users/me returned HTTP {e.code}); check DEV_PASSWORD in iam/.env"
+        ) from e
 
     # 4. PKCE authorization code request
     verifier_bytes = os.urandom(32)
@@ -317,12 +316,21 @@ def compose_ids(service: str) -> list[str]:
 
 
 @functools.cache
+def proxy_container() -> str:
+    """Returns the proxy container ID; the runner never recreates the proxy, so it is looked up once."""
+    ids = compose_ids("proxy")
+    if len(ids) != 1:
+        raise RuntimeError(f"Expected exactly one running proxy container, found {len(ids)}")
+    return ids[0]
+
+
+@functools.cache
 def get_shared_network() -> str:
     """Returns the one network that NGINX uses to reach the api replicas."""
-    proxy_ids, api_ids = compose_ids("proxy"), compose_ids("api")
-    if not proxy_ids or not api_ids:
-        raise RuntimeError("proxy and api must be running to determine their shared network")
-    proxy_info, api_info = json.loads(run_docker("inspect", proxy_ids[0], api_ids[0]).stdout)
+    api_ids = compose_ids("api")
+    if not api_ids:
+        raise RuntimeError("api must be running to determine the network it shares with the proxy")
+    proxy_info, api_info = json.loads(run_docker("inspect", proxy_container(), api_ids[0]).stdout)
     common = sorted(
         set(proxy_info["NetworkSettings"]["Networks"]) & set(api_info["NetworkSettings"]["Networks"])
     )
@@ -348,8 +356,8 @@ def get_api_replicas() -> list[dict[str, str]]:
 
 def wait_for_api_replicas(expected_count: int, timeout: float = 30.0) -> list[dict[str, str]]:
     """Polls until the expected count of api replicas are running and attached to the proxy network."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         replicas = get_api_replicas()
         if len(replicas) == expected_count:
             return replicas
@@ -360,29 +368,30 @@ def wait_for_api_replicas(expected_count: int, timeout: float = 30.0) -> list[di
 def query_replica_direct(ip: str, token: str | None = None, path: str = "/api/v1/me") -> tuple[int, dict | str]:
     """Queries an api replica on its container IP from inside the proxy container, bypassing NGINX.
 
-    The bearer token reaches the proxy container through the environment ('-e AUTH_TOKEN'), which keeps it
-    out of the docker CLI's argv. Once the shell there expands it, it is in wget's argv, which a Linux host
+    The bearer token reaches the proxy container through the environment ('docker exec -e AUTH_TOKEN'),
+    which keeps it out of the docker CLI's argv. Once the shell there expands it, it is in wget's argv, which a Linux host
     can see in its process list; the development token is short-lived, so this is acceptable for tests.
     """
     env = os.environ.copy()
-    exec_args = ["exec", "-T"]
+    exec_args = ["exec"]
     header = ""
     if token:
         env["AUTH_TOKEN"] = f"Bearer {token}"
         exec_args += ["-e", "AUTH_TOKEN"]
         header = '--header "Authorization: $AUTH_TOKEN" '
     # BusyBox wget writes the response headers (-S) to stderr and the body to stdout.
-    proc = run_compose(*exec_args, "proxy", "sh", "-c", f"wget -S -O - {header}http://{ip}:8080{path}", check=False, env=env)
+    cmd = f"wget -S -O - {header}http://{ip}:8080{path}"
+    proc = run_docker(*exec_args, proxy_container(), "sh", "-c", cmd, check=False, env=env)
     status = re.search(r"HTTP/\d\.\d\s+(\d{3})", proc.stderr)
     return (int(status.group(1)) if status else 0), decode_body(proc.stdout.strip())
 
 
 def wait_for_replica_ready(ip: str, timeout: float = 15.0) -> None:
     """Polls a replica's /health/ready endpoint directly until ready."""
-    deadline = time.time() + timeout
+    deadline = time.monotonic() + timeout
     last_code = 0
     last_body: dict | str = ""
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         last_code, last_body = query_replica_direct(ip, path="/health/ready")
         if last_code == 200:
             return
@@ -435,11 +444,11 @@ class LoadGenerator(threading.Thread):
             self.results.append(query_proxy(self.base_url, self.token, phase=self.phase))
             self._halt.wait(self.interval)
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
+        """Stops the thread and returns whether it ended; it does not raise, so callers may use it in finally."""
         self._halt.set()
         self.join(timeout=10)
-        if self.is_alive():
-            raise AssertionError("Load generator did not stop within 10s; its results would still change")
+        return not self.is_alive()
 
 
 def upstream_ips(entry: dict[str, str]) -> list[str]:
@@ -488,7 +497,8 @@ def log_cursor() -> str:
 
 def get_proxy_upstream_entries(phase: str, since: str) -> list[dict[str, str]]:
     """Returns the proxy access-log entries tagged for phase that were written after since."""
-    res = run_compose("logs", f"--since={since}", "--no-color", "proxy")
+    # NGINX writes the access log to stdout and the error log to stderr, which docker logs keeps apart.
+    res = run_docker("logs", f"--since={since}", proxy_container())
     return parse_upstream_entries(res.stdout.splitlines(), phase)
 
 
@@ -509,9 +519,9 @@ def wait_for_proxy_entries(phase: str, expected: int, since: str, timeout: float
 def wait_for_nginx_to_serve(replica_ips: set[str], phase: str, timeout: float = 25.0) -> None:
     """Sends requests tagged with phase until each replica IP has answered one of them with 200."""
     since = log_cursor()
-    deadline = time.time() + timeout
+    deadline = time.monotonic() + timeout
     seen_ips: set[str] = set()
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         query_proxy(STACK.base_url, STACK.token, phase=phase)
         seen_ips.update(served_by(e) for e in get_proxy_upstream_entries(phase, since))
         if replica_ips <= seen_ips:
@@ -580,7 +590,7 @@ def self_check() -> int:
         "upstream_status": values["upstream_status"],
         "upstream_response_time": values["upstream_response_time"],
     }
-    entries = parse_upstream_entries([f"proxy-1  | {line}"], phase="self_check")
+    entries = parse_upstream_entries([line], phase="self_check")
     if entries != [expected]:
         print(f"LOG_PATTERN does not match log_format upstream_logging:\n{line}\nparsed: {entries}", file=sys.stderr)
         return 1
@@ -588,7 +598,7 @@ def self_check() -> int:
     # A proxy still on NGINX's default 'combined' format must be reported, not silently skipped.
     stale = f'172.18.0.1 - - [06/Nov/2026:10:00:00 +0000] "GET /api/v1/me HTTP/1.1" 200 42 "-" "{UA_PREFIX}self_check"'
     try:
-        parse_upstream_entries([f"proxy-1  | {stale}"], phase="self_check")
+        parse_upstream_entries([stale], phase="self_check")
     except RuntimeError:
         pass
     else:
@@ -628,6 +638,7 @@ def login() -> None:
 
 def ensure_fresh_token(min_validity: float = 180.0) -> None:
     """Logs in again when the 10-minute token could expire during the next test (slow machines, long runs)."""
+    # exp is wall-clock time, so this compares against time.time() rather than a monotonic clock.
     if STACK.payload.get("exp", 0) - time.time() < min_validity:
         login()
 
@@ -720,8 +731,9 @@ class MultiReplicaFailoverTest(unittest.TestCase):
             # Docker DNS drops its address.
             time.sleep(resolver_valid + 1)
         finally:
-            load.stop()
+            load_ended = load.stop()
         load_stopped_at = time.monotonic()
+        self.assertTrue(load_ended, "Load generator did not stop within 10s; its results would still change")
 
         # 1. Every request issued during the outage succeeded.
         self.assertTrue(load.results, "Load generator sent no requests")
@@ -825,21 +837,17 @@ USAGE = """usage: stack_test.py [--self-check | TEST ...]
 
 def build_suite(names: list[str]) -> unittest.TestSuite | None:
     """Returns the suite for names (all tests if empty), or None if a name does not exist."""
-    module = sys.modules[__name__]
-    loader = unittest.defaultTestLoader
+    loader = unittest.TestLoader()
     if not names:
         return unittest.TestSuite([
             loader.loadTestsFromTestCase(TokenClaimsTest),
             loader.loadTestsFromTestCase(MultiReplicaFailoverTest),
         ])
-    for name in names:
-        obj: Any = module
-        for part in name.split("."):
-            obj = getattr(obj, part, None)
-        if obj is None:
-            print(f"stack_test.py: unknown test '{name}'\n{USAGE}", file=sys.stderr)
-            return None
-    return loader.loadTestsFromNames(names, module)
+    suite = loader.loadTestsFromNames(names, sys.modules[__name__])
+    if loader.errors:
+        print(f"stack_test.py: {loader.errors[0].strip().splitlines()[-1]}\n{USAGE}", file=sys.stderr)
+        return None
+    return suite
 
 
 def main() -> int:

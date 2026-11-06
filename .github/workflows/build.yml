@@ -59,6 +59,10 @@ jobs:
               - 'deploy/**'
               - 'iam/**'
               - 'proxy/**'
+              # deploy/dev.sh also builds and waits for the frontend and docs images.
+              - 'frontend/**'
+              - 'docs/docusaurus/**'
+              - 'docs/external/**'
               - '.github/workflows/build.yml'
 
   frontend:
@@ -274,12 +278,17 @@ jobs:
     needs: changes
     if: needs.changes.outputs.stack == 'true' || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # deploy/dev.sh alone may wait up to about 11 minutes (its --wait-timeout values) after cold image builds.
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      # Fails in seconds if proxy/nginx.conf no longer matches what the runner parses, before the stack is built.
+      - name: Check proxy config against the test runner
+        run: python3 deploy/stack_test.py --self-check
 
       - name: Start stack
         run: ./deploy/dev.sh
