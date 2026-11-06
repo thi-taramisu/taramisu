@@ -61,6 +61,20 @@ services:
       db:
         condition: service_healthy
 
+  # Dummy data from backend/db/seed/seed.sql; only runs on demand (make -C deploy seed).
+  seed:
+    image: postgres:17-alpine
+    networks: [backend]
+    profiles: [seed]
+    volumes:
+      - ../backend/db/seed:/seed:ro
+    environment:
+      DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
+    command: ["sh", "-c", "psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f /seed/seed.sql"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     networks: [default, backend, auth]
     build:

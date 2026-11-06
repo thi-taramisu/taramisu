@@ -1,7 +1,7 @@
 COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml
 
 .DEFAULT_GOAL := up
-.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate test
+.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate seed test
 init:
 	./dev.sh --init
 up:
@@ -21,5 +21,7 @@ migrate-diff: init
 	$(COMPOSE) run --rm migrate migrate diff "$(name)" --env local
 migrate-validate: init
 	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
+seed: init
+	$(COMPOSE) --profile seed run --rm seed
 test:
 	sh dev_test.sh
