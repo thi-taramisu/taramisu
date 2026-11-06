@@ -177,8 +177,7 @@ describe('damage scenario page', () => {
     renderApp(page)
 
     const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })
-    const label = heading.previousElementSibling!
-    expect(label).toHaveTextContent(/^Damage scenario\s*#01$/)
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
     expect(heading.parentElement).not.toHaveTextContent('DS-01')
   })
 
@@ -191,13 +190,14 @@ describe('damage scenario page', () => {
     })
     const { user } = renderApp(page, api)
 
-    expect((await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })).previousElementSibling).toHaveTextContent('#01')
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
     await user.click(await within(tree()).findByRole('link', { name: 'Diagnostic key leaked' }))
 
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${second.id}`)
-    const heading = await screen.findByRole('heading', { name: 'Diagnostic key leaked' })
-    expect(heading.previousElementSibling).toHaveTextContent(/#02$/)
-    expect(screen.queryByText('#01')).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Diagnostic key leaked' })
+    expect(screen.getByText('Damage scenario #02')).toBeInTheDocument()
+    expect(screen.queryByText('Damage scenario #01')).not.toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown damage scenarios', async () => {

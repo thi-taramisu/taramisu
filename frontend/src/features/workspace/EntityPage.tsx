@@ -33,9 +33,8 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
     <div className="flex h-full flex-col gap-4">
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground">
-            <span className="uppercase">{label}</span>
-            {displayCode && <span className="ml-1.5 tabular-nums">{formatEntityId(displayCode)}</span>}
+          <p className="text-xs uppercase tabular-nums text-muted-foreground">
+            {displayCode ? `${label} ${formatEntityId(displayCode)}` : label}
           </p>
           <h1 className="text-xl font-semibold">{name ?? node?.name ?? entityId}</h1>
         </div>
