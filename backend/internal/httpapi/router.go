@@ -15,6 +15,7 @@ import (
 type Queries interface {
 	handlers.StatusReader
 	handlers.AssetStore
+	handlers.TaraProjectStore
 }
 
 func New(queries Queries, manager *auth.Manager) http.Handler {
@@ -55,6 +56,7 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
 	handlers.NewAssets(queries).Register(api)
+	handlers.NewTaraProject(queries).Register(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,

@@ -28,6 +28,7 @@ const assetJSON = `{"name":"ECU"}`
 // Only error paths need a stub; the PostgreSQL test exercises successful CRUD.
 type assetStore struct {
 	handlers.AssetStore
+	handlers.TaraProjectStore
 	handlers.StatusReader
 	err   error
 	calls int
