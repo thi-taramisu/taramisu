@@ -65,6 +65,13 @@ The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs
 `iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
 `GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
 
+## Asset and cybersecurity property routes
+
+Authenticated asset CRUD is available under `/api/v1/item-definitions/{item_definition_id}/assets`.
+The same item prefix exposes asset cybersecurity properties and their links to damage and threat scenarios.
+See the [frontend route handoff](../docs/internal/dev-workflow/asset-properties-api.md) for all paths,
+request bodies, PUT/PATCH behavior, pagination, and error responses.
+
 ## Checks
 
 ```sh
@@ -118,6 +125,14 @@ CI verifies that migrations and generated Go models are in sync with `db/schema.
    ```
 
 ## Tests and coverage
+
+Following the backend architecture in [PR #159](https://github.com/thi-taramisu/taramisu/pull/159),
+asset, cybersecurity property, and scenario-link route tests send HTTP requests through `httpapi.New`.
+Unit tests inject fake stores; integration tests use `db.New(tx)` with a rolled-back transaction.
+Both obtain a real JWT manager and signed token via `authtest.NewManagerAndToken(t)`, backed by
+a local JWKS server. Requests without a Bearer token are checked separately for `401` responses.
+The shared request helper in `internal/httpapi/handlers/routes_test.go` adds the Authorization header;
+tests must not register resource handlers directly on a bare test API.
 
 Run unit tests with `make test`. Without `TEST_DATABASE_URL`, `TestPostgresReadiness` skips;
 with it set, the test connects to PostgreSQL and checks `/health/ready` against the migrated database.
