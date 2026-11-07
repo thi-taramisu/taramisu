@@ -12,12 +12,13 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-type Store interface {
+type Queries interface {
 	handlers.StatusReader
+	handlers.TaraProjectStore
 	handlers.ItemDefinitionStore
 }
 
-func New(queries Store, manager *auth.Manager) http.Handler {
+func New(queries Queries, manager *auth.Manager) http.Handler {
 	mux, _ := newAPI(queries, manager)
 	return mux
 }
@@ -27,7 +28,7 @@ func OpenAPI() *huma.OpenAPI {
 	return api.OpenAPI()
 }
 
-func newAPI(queries Store, manager *auth.Manager) (*chi.Mux, huma.API) {
+func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
 	mux.Use(func(next http.Handler) http.Handler {
@@ -54,6 +55,7 @@ func newAPI(queries Store, manager *auth.Manager) (*chi.Mux, huma.API) {
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
+	handlers.NewTaraProject(queries).Register(api)
 	handlers.NewItemDefinitions(queries).Register(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user",

@@ -12,20 +12,25 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-type statusFunc func(context.Context) (string, error)
+type statusReaderFunc func(context.Context) (string, error)
 
-type healthStore struct {
-	handlers.StatusReader
+func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) { return f(ctx) }
+
+type healthQueries struct {
+	statusReaderFunc
+	handlers.TaraProjectStore
 	handlers.ItemDefinitionStore
 }
 
-func (f statusFunc) GetServiceStatus(ctx context.Context) (string, error) { return f(ctx) }
+func statusFunc(f func(context.Context) (string, error)) healthQueries {
+	return healthQueries{statusReaderFunc: f}
+}
 
 func TestLiveness(t *testing.T) {
-	h := httpapi.New(healthStore{StatusReader: statusFunc(func(context.Context) (string, error) {
+	h := httpapi.New(statusFunc(func(context.Context) (string, error) {
 		t.Fatal("liveness must not query the database")
 		return "", nil
-	})}, nil)
+	}), nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/live", http.NoBody))
 	if rr.Code != http.StatusOK {
@@ -51,9 +56,9 @@ func TestReadiness(t *testing.T) {
 		{"database reachable", nil, http.StatusOK},
 		{"", errors.New("down"), http.StatusServiceUnavailable},
 	} {
-		h := httpapi.New(healthStore{StatusReader: statusFunc(func(context.Context) (string, error) {
+		h := httpapi.New(statusFunc(func(context.Context) (string, error) {
 			return tc.message, tc.err
-		})}, nil)
+		}), nil)
 		rr := httptest.NewRecorder()
 		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/ready", http.NoBody))
 		if rr.Code != tc.code {

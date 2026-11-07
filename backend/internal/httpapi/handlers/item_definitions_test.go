@@ -26,6 +26,7 @@ const collection = "/api/v1/projects/" + projectID + "/item-definitions"
 const member = collection + "/" + itemID
 
 type itemStore struct {
+	handlers.TaraProjectStore
 	handlers.StatusReader
 	allowed bool
 	err     error
@@ -85,7 +86,7 @@ func (s *itemStore) DeleteItemDefinition(context.Context, db.DeleteItemDefinitio
 }
 
 // Authenticate through the same Bearer JWT middleware used by the protected API.
-func authenticatedAPI(t *testing.T, store httpapi.Store, users auth.UserStore) (http.Handler, *string) {
+func authenticatedAPI(t *testing.T, store httpapi.Queries, users auth.UserStore) (http.Handler, *string) {
 	t.Helper()
 	fixture := authtest.NewFixture(t, users)
 	token := "Bearer " + fixture.Token(t, nil)
