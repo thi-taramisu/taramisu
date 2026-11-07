@@ -14,6 +14,7 @@ import (
 
 type Queries interface {
 	handlers.StatusReader
+	handlers.TaraProjectStore
 	handlers.AssetStore
 	// Property and scenario-link handlers share this database implementation.
 	handlers.AssetCybersecurityPropertyStore
@@ -58,6 +59,7 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
+	handlers.NewTaraProject(queries).Register(api)
 	handlers.NewAssets(queries).Register(api)
 	// Register issue #160 property and link routes with Huma for validation, dispatch, and OpenAPI.
 	handlers.NewAssetCybersecurityProperties(queries).Register(api)

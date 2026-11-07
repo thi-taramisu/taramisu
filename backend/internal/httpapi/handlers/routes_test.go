@@ -15,6 +15,7 @@ import (
 
 // Embed unused interfaces to satisfy the router without replacing its registration.
 type assetQueries struct {
+	handlers.TaraProjectStore
 	*assetStore
 	handlers.StatusReader
 	handlers.AssetCybersecurityPropertyStore
@@ -23,6 +24,7 @@ type assetQueries struct {
 }
 
 type propertyQueries struct {
+	handlers.TaraProjectStore
 	*propertyErrorStore
 	handlers.StatusReader
 	handlers.AssetStore
