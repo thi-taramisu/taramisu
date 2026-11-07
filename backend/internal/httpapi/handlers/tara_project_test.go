@@ -15,11 +15,13 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-const projectID = "11111111-1111-1111-1111-111111111111"
+const taraProjectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
+	handlers.ItemDefinitionStore
 	statusReaderFunc
 	project   db.TaraProject
 	found     bool
@@ -28,7 +30,7 @@ type fakeProjects struct {
 
 func newFakeProjects(found bool) *fakeProjects {
 	var id pgtype.UUID
-	_ = id.Scan(projectID)
+	_ = id.Scan(taraProjectID)
 	desc := "desc"
 	return &fakeProjects{
 		found: found,
@@ -110,17 +112,17 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"create whitespace name", true, http.MethodPost, base, `{"name":"   "}`, http.StatusUnprocessableEntity},
 		{"list", true, http.MethodGet, base, "", http.StatusOK},
 		{"list empty", false, http.MethodGet, base, "", http.StatusOK},
-		{"get", true, http.MethodGet, base + "/" + projectID, "", http.StatusOK},
-		{"get missing", false, http.MethodGet, base + "/" + projectID, "", http.StatusNotFound},
+		{"get", true, http.MethodGet, base + "/" + taraProjectID, "", http.StatusOK},
+		{"get missing", false, http.MethodGet, base + "/" + taraProjectID, "", http.StatusNotFound},
 		{"get bad id", true, http.MethodGet, base + "/nope", "", http.StatusUnprocessableEntity},
-		{"replace", true, http.MethodPut, base + "/" + projectID, `{"name":"b"}`, http.StatusOK},
-		{"replace missing", false, http.MethodPut, base + "/" + projectID, `{"name":"b"}`, http.StatusNotFound},
-		{"replace whitespace name", true, http.MethodPut, base + "/" + projectID, `{"name":" "}`, http.StatusUnprocessableEntity},
-		{"update", true, http.MethodPatch, base + "/" + projectID, `{"name":"c"}`, http.StatusOK},
-		{"update whitespace name", true, http.MethodPatch, base + "/" + projectID, `{"name":"\t"}`, http.StatusUnprocessableEntity},
-		{"update missing", false, http.MethodPatch, base + "/" + projectID, `{"name":"c"}`, http.StatusNotFound},
-		{"delete", true, http.MethodDelete, base + "/" + projectID, "", http.StatusNoContent},
-		{"delete missing", false, http.MethodDelete, base + "/" + projectID, "", http.StatusNotFound},
+		{"replace", true, http.MethodPut, base + "/" + taraProjectID, `{"name":"b"}`, http.StatusOK},
+		{"replace missing", false, http.MethodPut, base + "/" + taraProjectID, `{"name":"b"}`, http.StatusNotFound},
+		{"replace whitespace name", true, http.MethodPut, base + "/" + taraProjectID, `{"name":" "}`, http.StatusUnprocessableEntity},
+		{"update", true, http.MethodPatch, base + "/" + taraProjectID, `{"name":"c"}`, http.StatusOK},
+		{"update whitespace name", true, http.MethodPatch, base + "/" + taraProjectID, `{"name":"\t"}`, http.StatusUnprocessableEntity},
+		{"update missing", false, http.MethodPatch, base + "/" + taraProjectID, `{"name":"c"}`, http.StatusNotFound},
+		{"delete", true, http.MethodDelete, base + "/" + taraProjectID, "", http.StatusNoContent},
+		{"delete missing", false, http.MethodDelete, base + "/" + taraProjectID, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := httpapi.New(newFakeProjects(tc.found), manager)
@@ -140,7 +142,7 @@ func TestTaraProjectDeleteWithItemDefinitions(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
 	store := newFakeProjects(true)
 	store.deleteErr = &pgconn.PgError{Code: "23503"}
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+taraProjectID, http.NoBody)
 	req.Header.Set("Authorization", bearer)
 	rr := httptest.NewRecorder()
 	httpapi.New(store, manager).ServeHTTP(rr, req)
@@ -173,7 +175,7 @@ func TestTaraProjectPatchDescription(t *testing.T) {
 		{"value replaces description", `{"description":"new"}`, "new"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/"+projectID, strings.NewReader(tc.body))
+			req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/"+taraProjectID, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
