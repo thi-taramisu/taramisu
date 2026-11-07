@@ -14,6 +14,7 @@ import (
 
 type Queries interface {
 	handlers.StatusReader
+	handlers.TaraProjectStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 }
@@ -55,6 +56,7 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
+	handlers.NewTaraProject(queries).Register(api)
 	handlers.NewRiskValues(queries).Register(api)
 	handlers.NewRiskTreatmentDecisions(queries).Register(api)
 	huma.Register(api, huma.Operation{
