@@ -112,19 +112,15 @@ describe('damage scenario relations', () => {
     await waitFor(() => expect(assets.getByRole('button', { name: 'A-01 Integrity' })).toBeDisabled())
   })
 
-  it('keeps the last asset link and allows removing it once another asset is linked', async () => {
-    const { user } = renderApp(page)
-    const assets = await findSection('Assets')
-    expect(assets.getByRole('button', { name: `Remove link to ${A01}` })).toBeDisabled()
-
-    await add(user, 'Assets', 'Add Asset', /A-02 Body control ECU firmware/)
-    await assets.findByRole('group', { name: 'A-02 properties' })
-    await waitFor(() => expect(assets.getByRole('button', { name: `Remove link to ${A01}` })).toBeEnabled())
+  it('removes the last asset link, keeps the page open and takes the damage scenario out of the tree', async () => {
+    const { user, api } = renderApp(page)
 
     await remove(user, 'Assets', A01)
 
-    await waitFor(() => expect(assets.queryByRole('group', { name: 'A-01 properties' })).not.toBeInTheDocument())
-    expect(await within(tree()).findByRole('link', { name: /DS-01/ })).toBeInTheDocument()
+    expect(await section('Assets').findByText('No assets linked yet.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'DS-01 Headlamp turns off while driving at night' })).toBeInTheDocument()
+    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-01/ })).not.toBeInTheDocument())
+    expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-01' })
   })
 
   it('shows an error and keeps the links when saving fails', async () => {
