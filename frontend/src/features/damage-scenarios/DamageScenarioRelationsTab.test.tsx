@@ -214,14 +214,33 @@ describe('damage scenario relations', () => {
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toBeInTheDocument()
   })
 
-  it('shows an error when the elements to link cannot be loaded', async () => {
+  it('shows an error in the add dialog when the elements to link cannot be loaded', async () => {
     const api = createMockItemApi()
     api.content.assets = () => Promise.reject(new ApiError(500, 'Server error'))
     api.content.threatScenarios = () => Promise.reject(new ApiError(500, 'Server error'))
-    renderApp(page, api)
+    const { user } = renderApp(page, api)
 
-    expect(await (await findSection('Assets')).findByRole('alert')).toHaveTextContent('The assets of this item could not be loaded.')
-    expect(await section('Threat Scenarios').findByRole('alert')).toHaveTextContent('The threat scenarios of this item could not be loaded.')
+    await user.click((await findSection('Assets')).getByRole('button', { name: 'Add Asset' }))
+    const assets = within(await screen.findByRole('dialog', { name: 'Add Asset' }))
+    expect(await assets.findByRole('alert')).toHaveTextContent('The assets of this item could not be loaded.')
+    expect(assets.queryByText('No assets left to link.')).not.toBeInTheDocument()
+    await user.click(assets.getByRole('button', { name: 'Close' }))
+
+    await user.click(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' }))
+    const threats = within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' }))
+    expect(await threats.findByRole('alert')).toHaveTextContent('The threat scenarios of this item could not be loaded.')
+  })
+
+  it('shows a loading state in the add dialog until the elements to link arrive', async () => {
+    const api = createMockItemApi()
+    api.content.threatScenarios = () => new Promise(() => undefined)
+    const { user } = renderApp(page, api)
+
+    await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: 'Add Threat Scenario' }))
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' }))
+    expect(dialog.getByText('Loading…')).toBeInTheDocument()
+    expect(dialog.queryByText('No threat scenarios left to link.')).not.toBeInTheDocument()
   })
 
   it('keeps the focus and ignores further changes while saving', async () => {

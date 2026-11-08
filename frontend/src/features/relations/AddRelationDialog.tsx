@@ -8,7 +8,8 @@ import type { EntityRef } from '../../api/models/tree'
 // Names creating already, as in the wireframe; the create dialogs follow with the element types.
 const SEARCH_LABEL = 'Search by name, ID, or type a new name'
 
-export interface RelationCandidate extends EntityRef {
+/** A linked element or one that can be linked. */
+export interface RelationEntry extends EntityRef {
   /** Shown after the name, e.g. the C / I / A properties of an asset. */
   details?: ReactNode
 }
@@ -19,14 +20,18 @@ interface AddRelationDialogProps {
   /** Plural name of the linked elements in lower case, for the empty states. */
   pluralLabel: string
   /** Elements that can still be linked. */
-  options: RelationCandidate[]
+  options: RelationEntry[]
+  /** The options are still on their way, so an empty list says nothing yet. */
+  loading?: boolean
+  /** The options could not be loaded. */
+  loadError?: string
   onAdd: (id: string) => void
   /** Keeps the dialog closed while a request runs; the focus stays on the button. */
   pending?: boolean
 }
 
 /** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
-export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, pending = false }: AddRelationDialogProps) {
+export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false }: AddRelationDialogProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -58,7 +63,13 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, p
             <h3 id={`${id}-existing`} className="font-medium">
               Link existing in this item
             </h3>
-            {matches.length === 0 ? (
+            {loadError ? (
+              <p role="alert" className="py-2 text-sm text-destructive">
+                {loadError}
+              </p>
+            ) : loading ? (
+              <output className="py-2 text-muted-foreground">Loading…</output>
+            ) : matches.length === 0 ? (
               <p className="py-2 text-muted-foreground">
                 {term ? `No ${pluralLabel} match "${search.trim()}".` : `No ${pluralLabel} left to link.`}
               </p>

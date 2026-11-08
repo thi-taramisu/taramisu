@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useState } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -13,14 +13,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import type { EntityRef, EntityType } from '../../api/models/tree'
+import type { EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, entityPath, entityTitle } from '../workspace/entities'
-import { AddRelationDialog, type RelationCandidate } from './AddRelationDialog'
-
-export interface RelationRow extends EntityRef {
-  /** Shown after the name, e.g. the C / I / A properties of the link. */
-  details?: ReactNode
-}
+import { AddRelationDialog, type RelationEntry } from './AddRelationDialog'
 
 interface RelationSectionProps {
   projectId: string
@@ -31,9 +26,11 @@ interface RelationSectionProps {
   title: string
   /** Singular name of the linked elements, e.g. "Asset". */
   elementLabel: string
-  rows: RelationRow[]
+  rows: RelationEntry[]
   /** Existing elements that can still be linked. */
-  candidates: RelationCandidate[]
+  candidates: RelationEntry[]
+  candidatesLoading?: boolean
+  candidatesError?: string
   onAdd: (id: string) => void
   onRemove: (id: string) => void
   /** Blocks further changes while a request runs. */
@@ -45,7 +42,7 @@ interface RelationSectionProps {
  * One block of a Relations tab (DS / TS Relation wireframes): the linked elements of one type with
  * "+ Add …" and remove. Knows nothing about the element it belongs to, so every Relations tab can use it.
  */
-export function RelationSection({ projectId, type, direction, title, elementLabel, rows, candidates, onAdd, onRemove, pending = false, error }: RelationSectionProps) {
+export function RelationSection({ projectId, type, direction, title, elementLabel, rows, candidates, candidatesLoading, candidatesError, onAdd, onRemove, pending = false, error }: RelationSectionProps) {
   const headingId = useId()
   const Arrow = direction === 'up' ? ArrowUp : ArrowDown
 
@@ -58,7 +55,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
         <h2 id={headingId} className="flex-1 text-sm font-medium">
           {title}
         </h2>
-        <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} pending={pending} onAdd={onAdd} />
+        <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} onAdd={onAdd} />
       </div>
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">No {title.toLowerCase()} linked yet.</p>
@@ -93,7 +90,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
 }
 
 interface RemoveRelationButtonProps {
-  row: RelationRow
+  row: RelationEntry
   typeLabel: string
   pending: boolean
   onRemove: () => void
