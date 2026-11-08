@@ -4,7 +4,7 @@
 DROP TABLE "public"."iam_user_group_member";
 
 -- PostgreSQL cannot remove or reorder enum values, so the type is recreated in rank order.
--- Existing REVIEWER assignments become VIEWER, the closest role without write access.
+-- No REVIEWER assignments exist: the system has never been deployed.
 ALTER TABLE "public"."project_role_assignment"
   DROP CONSTRAINT "project_role_assignment_tara_project_id_user_id_project_rol_key",
   DROP CONSTRAINT "project_role_assignment_tara_project_id_group_id_project_ro_key";
@@ -12,7 +12,7 @@ ALTER TYPE "public"."project_role" RENAME TO "project_role_old";
 CREATE TYPE "public"."project_role" AS ENUM ('VIEWER', 'EDITOR', 'OWNER');
 ALTER TABLE "public"."project_role_assignment"
   ALTER COLUMN "project_role" TYPE "public"."project_role"
-  USING (CASE "project_role"::text WHEN 'REVIEWER' THEN 'VIEWER' ELSE "project_role"::text END)::"public"."project_role";
+  USING "project_role"::text::"public"."project_role";
 DROP TYPE "public"."project_role_old";
 
 -- Keep only the highest role per principal before enforcing one role per principal.
