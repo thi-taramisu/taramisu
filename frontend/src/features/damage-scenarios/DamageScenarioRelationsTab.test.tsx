@@ -43,8 +43,8 @@ describe('damage scenario relations', () => {
   it('shows whether the linked elements are above or below in the hierarchy', async () => {
     renderApp(page)
 
-    expect((await findSection('Assets')).getByTitle('Above in the hierarchy')).toBeInTheDocument()
-    expect(section('Threat Scenarios').getByTitle('Below in the hierarchy')).toBeInTheDocument()
+    expect((await findSection('Assets')).getByTitle('Above in the hierarchy')).toHaveTextContent('Above in the hierarchy')
+    expect(section('Threat Scenarios').getByTitle('Below in the hierarchy')).toHaveTextContent('Below in the hierarchy')
   })
 
   it('adds further threat scenarios and shows them in the tree and tab count', async () => {
@@ -92,10 +92,12 @@ describe('damage scenario relations', () => {
     await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: `Remove link to ${TS01}` }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toBeInTheDocument()
+    await waitFor(() => expect(section('Threat Scenarios').getByRole('button', { name: `Remove link to ${TS01}` })).toHaveFocus())
 
     await remove(user, 'Threat Scenarios', TS01)
 
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
+    await waitFor(() => expect(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' })).toHaveFocus())
     expect(await screen.findByRole('link', { name: 'Relations 1' })).toBeInTheDocument()
     expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-01' }))
   })
@@ -212,6 +214,10 @@ describe('damage scenario relations', () => {
 
     expect(await screen.findByText('The relations could not be refreshed.')).toBeInTheDocument()
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toBeInTheDocument()
+    // The saved link is shown although the refetch failed, and it is not offered again.
+    expect(section('Threat Scenarios').getByRole('link', { name: 'Denial of service on the body control ECU' })).toBeInTheDocument()
+    await user.click(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' }))
+    expect(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).queryByRole('button', { name: /TS-03/ })).not.toBeInTheDocument()
   })
 
   it('shows an error in the add dialog when the elements to link cannot be loaded', async () => {

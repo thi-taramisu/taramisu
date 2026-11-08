@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -45,17 +45,21 @@ interface RelationSectionProps {
 export function RelationSection({ projectId, type, direction, title, elementLabel, rows, candidates, candidatesLoading, candidatesError, onAdd, onRemove, pending = false, error }: RelationSectionProps) {
   const headingId = useId()
   const Arrow = direction === 'up' ? ArrowUp : ArrowDown
+  const directionHint = direction === 'up' ? 'Above in the hierarchy' : 'Below in the hierarchy'
+  // Gets the focus after a removal, because the row with the remove button is gone then.
+  const [addButton, setAddButton] = useState<HTMLButtonElement | null>(null)
 
   return (
     <section aria-labelledby={headingId} className="overflow-hidden rounded-lg border">
       <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2">
-        <span title={direction === 'up' ? 'Above in the hierarchy' : 'Below in the hierarchy'}>
+        <span title={directionHint}>
           <Arrow aria-hidden="true" className="size-4" />
+          <span className="sr-only">{directionHint}</span>
         </span>
         <h2 id={headingId} className="flex-1 text-sm font-medium">
           {title}
         </h2>
-        <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} onAdd={onAdd} />
+        <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} triggerRef={setAddButton} onAdd={onAdd} />
       </div>
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">No {title.toLowerCase()} linked yet.</p>
@@ -74,6 +78,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
                 row={row}
                 typeLabel={ENTITY_TYPES[type].label}
                 pending={pending}
+                returnFocusTo={addButton}
                 onRemove={() => onRemove(row.id)}
               />
             </li>
@@ -93,12 +98,14 @@ interface RemoveRelationButtonProps {
   row: RelationEntry
   typeLabel: string
   pending: boolean
+  returnFocusTo: HTMLButtonElement | null
   onRemove: () => void
 }
 
-function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelationButtonProps) {
+function RemoveRelationButton({ row, typeLabel, pending, returnFocusTo, onRemove }: RemoveRelationButtonProps) {
   const name = entityTitle(row)
   const [open, setOpen] = useState(false)
+  const removing = useRef(false)
 
   return (
     <AlertDialog open={open} onOpenChange={(next) => setOpen(next && !pending)}>
@@ -107,6 +114,7 @@ function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelat
           type="button"
           variant="ghost"
           size="icon-sm"
+          className={pending ? 'opacity-50' : undefined}
           aria-disabled={pending}
           aria-label={`Remove link to ${name}`}
           title="Remove link"
@@ -114,14 +122,29 @@ function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelat
           <X aria-hidden="true" />
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent
+        onCloseAutoFocus={(event) => {
+          if (removing.current && returnFocusTo?.isConnected) {
+            event.preventDefault()
+            returnFocusTo.focus()
+          }
+          removing.current = false
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Remove link to "{name}"?</AlertDialogTitle>
           <AlertDialogDescription>The {typeLabel.toLowerCase()} stays in the project. Only this link is removed.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onRemove}>Remove link</AlertDialogAction>
+          <AlertDialogAction
+            onClick={() => {
+              removing.current = true
+              onRemove()
+            }}
+          >
+            Remove link
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
