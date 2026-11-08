@@ -54,17 +54,17 @@ Current local addresses:
 
 - Frontend: <http://localhost>
 - Documentation: <http://localhost/docs/>
-- API through the proxy: <http://localhost/api/v1/me> (requires login)
-- API and Swagger: <http://localhost:8080/docs>
-- Login: <http://localhost/auth/login>
-- Authentik: <http://authentik.localhost:9000>
+- API through the proxy: <http://localhost/api/v1/me> (requires `Authorization: Bearer <JWT>`)
+- API Swagger UI: <http://localhost/api/docs> (OpenAPI spec: <http://localhost/openapi.json>)
+- Authentik (via proxy): <http://localhost/auth/if/admin/>
 
-`APP_URL` defaults to `http://localhost` and defines the callback and logout origin.
-The issuer remains `http://authentik.localhost:9000/application/o/taramisu/`, reachable from the browser and API container.
-The proxy preserves `/api/v1/` and forwards `/auth/` to the backend. Frontend and authentication share the same origin.
-For an existing checkout, change only `APP_URL=http://localhost` in `iam/.env` and run `make -C deploy up`;
-this updates the backend origin and Authentik callback without replacing secrets or data.
-Port 8080 remains available for backend diagnostics and Swagger.
+`APP_URL` defaults to `http://localhost` and defines the public origin and OIDC callback (`${APP_URL}/auth/callback`).
+Authentik runs under `AUTHENTIK_WEB__PATH=/auth/` behind NGINX (`location /auth/`), so the public OIDC issuer is
+`${APP_URL}/auth/application/o/taramisu/`, while the Go API fetches JWKS keys internally via
+`http://authentik-server:9000/auth/application/o/taramisu/jwks/`.
+The NGINX proxy load-balances `/api/v1/` across backend replicas (`least_conn` + runtime DNS resolution), routes `/api/docs` and
+`/openapi.json` to the backend's Swagger UI and OpenAPI spec, and routes `/auth/callback` to the frontend SPA.
+The API container has no host port binding in Compose, so scaling replicas (`--scale api=N`) works without port collisions.
 
 ## Networks and data
 
@@ -74,15 +74,15 @@ with the project name (for example `taramisu_proxy`); no externally created netw
 | Network | `internal` | Members | Purpose |
 | --- | --- | --- | --- |
 | `edge` | no | proxy | published ports and internet access |
-| `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests; API reaches Authentik as `authentik.localhost` |
+| `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests (incl. `/auth/` to Authentik); API fetches JWKS from `authentik-server:9000` |
 | `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
 | `iam-db` | yes | Authentik server, worker, and database | IAM database |
-| `dev` | no | db, pgAdmin, API, Authentik server | only from `compose.dev.yaml`, so these services can publish ports locally |
+| `dev` | no | db, pgAdmin, Authentik server | only from `compose.dev.yaml`, so these services can publish ports locally |
 
 Two containers can only reach each other if they share a network. The proxy can reach the frontend, the API, docs and Authentik, but no
 database; the API cannot reach the Authentik database. Internal networks have no internet access, and containers that are only in
 internal networks cannot publish ports. `compose.dev.yaml` therefore adds the `dev` network together with the local ports
-(db 5432, pgAdmin 5050, API 8080, Authentik 9000). `dev.sh` and the Makefile always load it; without it only the proxy publishes a port.
+(db 5432, pgAdmin 5050, Authentik 9000). `dev.sh` and the Makefile always load it; without it only the proxy publishes a port.
 
 For the default project name `taramisu`, volume names preserve the former Authentik branch's data:
 
@@ -131,7 +131,7 @@ removes all stack data volumes; the next `make up` initializes them with the cur
 
 `compose.docs.yaml` builds from the repository root and publishes only
 `docs/external/`. Nginx forwards `/docs/` over the internal `proxy`
-network. Docs has no host port binding; port 8080 belongs to the backend.
+network. Neither the docs nor the API container binds a host port; all HTTP traffic enters through the proxy on port 80.
 
 `DOCS_SITE_URL` defaults to `http://localhost`. Set it to the public origin
 (e.g. `https://tara.security.science`) when building. The container fixes
