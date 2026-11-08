@@ -112,8 +112,25 @@ func InProject(store ProjectAccessStore, scope Scope, permission Permission) Acc
 }
 
 // WithoutProject declares that the operation belongs to no project, for example the project list.
-// Authentication still applies to every /api/ route.
+// Authentication still applies to every /api/ route. Register rejects it for paths that point into
+// a project, so it cannot be used to skip the check.
 func WithoutProject() Access { return Access{} }
+
+// projectPathParams are path parameters that identify a project or a record inside one.
+var projectPathParams = []string{"{project_id}", "{item_definition_id}", "{threat_scenario_id}"}
+
+// pointsIntoProject reports whether path addresses a project or one of its records.
+func pointsIntoProject(path string) bool {
+	if strings.HasPrefix(path, "/api/v1/projects/{") {
+		return true
+	}
+	for _, param := range projectPathParams {
+		if strings.Contains(path, param) {
+			return true
+		}
+	}
+	return false
+}
 
 // accessMetadataKey marks registered operations in huma.Operation.Metadata.
 const accessMetadataKey = "taramisu.access"
@@ -125,6 +142,9 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 		op.Metadata = map[string]any{}
 	}
 	op.Metadata[accessMetadataKey] = access
+	if !access.inProject && pointsIntoProject(op.Path) {
+		panic(fmt.Sprintf("%s %s: points into a project; declare InProject instead of WithoutProject", op.Method, op.Path))
+	}
 	if access.inProject {
 		if !strings.Contains(op.Path, "{"+access.scope.param+"}") {
 			panic(fmt.Sprintf("%s %s: path has no {%s} parameter for its access scope", op.Method, op.Path, access.scope.param))
@@ -220,7 +240,8 @@ func CheckAccessDeclared(spec *huma.OpenAPI) error {
 		}
 		for method, op := range map[string]*huma.Operation{
 			http.MethodGet: item.Get, http.MethodPost: item.Post, http.MethodPut: item.Put,
-			http.MethodPatch: item.Patch, http.MethodDelete: item.Delete,
+			http.MethodPatch: item.Patch, http.MethodDelete: item.Delete, http.MethodHead: item.Head,
+			http.MethodOptions: item.Options, http.MethodTrace: item.Trace,
 		} {
 			if op == nil {
 				continue

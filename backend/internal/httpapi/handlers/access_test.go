@@ -136,9 +136,11 @@ func TestProjectAccessIsDeclaredInOpenAPI(t *testing.T) {
 func TestCheckAccessDeclaredRejectsUndeclaredOperations(t *testing.T) {
 	_, api, _ := newAccessAPI(t, fakeAccess{})
 	huma.Get(api, "/api/v1/forgotten/{id}", echoRole)
+	huma.Head(api, "/api/v1/forgotten-head", func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
 	huma.Get(api, "/health/other", echoRole) // outside /api/, not checked
 	err := handlers.CheckAccessDeclared(api.OpenAPI())
-	if err == nil || !strings.Contains(err.Error(), "GET /api/v1/forgotten/{id}") || strings.Contains(err.Error(), "health") {
+	if err == nil || !strings.Contains(err.Error(), "GET /api/v1/forgotten/{id}") || !strings.Contains(err.Error(), "HEAD /api/v1/forgotten-head") ||
+		strings.Contains(err.Error(), "health") {
 		t.Fatalf("CheckAccessDeclared = %v, want an error naming only the forgotten operation", err)
 	}
 }
@@ -152,4 +154,28 @@ func TestRegisterRejectsScopeWithoutPathParameter(t *testing.T) {
 	}()
 	handlers.Register(api, huma.Operation{OperationID: "wrong-scope", Method: http.MethodGet, Path: "/api/v1/projects/{id}/x"},
 		handlers.InProject(fakeAccess{}, handlers.ScopeItemDefinition, handlers.PermRead), echoRole)
+}
+
+func TestRegisterRejectsWithoutProjectOnProjectPaths(t *testing.T) {
+	for _, path := range []string{
+		"/api/v1/projects/{id}/export",
+		"/api/v1/item-definitions/{item_definition_id}/assets",
+		"/api/v1/threat-scenarios/{threat_scenario_id}/risk-values",
+		"/api/v1/other/{project_id}",
+	} {
+		t.Run(path, func(t *testing.T) {
+			_, api, _ := newAccessAPI(t, fakeAccess{})
+			defer func() {
+				if recover() == nil {
+					t.Fatal("expected a panic for WithoutProject on a project path")
+				}
+			}()
+			handlers.Register(api, huma.Operation{OperationID: "skip-check", Method: http.MethodGet, Path: path},
+				handlers.WithoutProject(), echoRole)
+		})
+	}
+	// Paths outside a project stay allowed.
+	_, api, _ := newAccessAPI(t, fakeAccess{})
+	handlers.Register(api, huma.Operation{OperationID: "list", Method: http.MethodGet, Path: "/api/v1/projects"},
+		handlers.WithoutProject(), echoRole)
 }
