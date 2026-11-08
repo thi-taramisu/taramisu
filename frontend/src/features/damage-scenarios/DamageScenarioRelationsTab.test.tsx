@@ -31,10 +31,20 @@ describe('damage scenario relations', () => {
     expect(assets.getByRole('link', { name: 'Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01`)
     const properties = assets.getByRole('group', { name: 'A-01 properties' })
     expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['I', 'A'])
+    // The asset has no C, so it is shown as not available instead of being a toggle.
+    expect(within(properties).queryByRole('button', { name: 'A-01 Confidentiality' })).not.toBeInTheDocument()
+    expect(within(properties).getByText('Confidentiality: not a property of this asset')).toBeInTheDocument()
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toHaveAttribute(
       'href',
       `${project}/threat-scenarios/ts-01`,
     )
+  })
+
+  it('shows whether the linked elements are above or below in the hierarchy', async () => {
+    renderApp(page)
+
+    expect((await findSection('Assets')).getByTitle('Above in the hierarchy')).toBeInTheDocument()
+    expect(section('Threat Scenarios').getByTitle('Below in the hierarchy')).toBeInTheDocument()
   })
 
   it('adds further threat scenarios and shows them in the tree and tab count', async () => {
@@ -57,7 +67,6 @@ describe('damage scenario relations', () => {
     expect(dialog.queryByRole('button', { name: /TS-01/ })).not.toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-02/ })).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-03/ })).toBeInTheDocument()
-    expect(dialog.queryByText('Cybersecurity Properties')).not.toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeDisabled()
   })
 
@@ -106,18 +115,15 @@ describe('damage scenario relations', () => {
     await waitFor(async () => expect((await api.content.assets('headlamp', 'i-01')).find((a) => a.id === 'a-04')).toMatchObject({ damageScenarios: 1, threatScenarios: 1 }))
   })
 
-  it('links only the chosen properties and offers only assets that have one of them', async () => {
+  it('shows the properties of each asset in the add dialog and links all of them', async () => {
     const { user, api } = renderApp(page)
 
     await user.click((await findSection('Assets')).getByRole('button', { name: 'Add Asset' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Add Asset' }))
-    await user.click(dialog.getByRole('button', { name: 'New link Confidentiality' }))
-    await user.click(dialog.getByRole('button', { name: 'New link Availability' }))
-    expect(dialog.getByRole('button', { name: 'New link Integrity' })).toBeDisabled()
-    await user.click(dialog.getByRole('button', { name: /A-04 Diagnostic session key/ }))
+    await user.click(dialog.getByRole('button', { name: 'A-04 Diagnostic session key Properties C, I' }))
 
     await section('Assets').findByRole('group', { name: 'A-04 properties' })
-    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets.find((a) => a.id === 'a-04')).toMatchObject({ linkedProperties: ['I'] })
+    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets.find((a) => a.id === 'a-04')).toMatchObject({ linkedProperties: ['C', 'I'] })
   })
 
   it('filters the elements to link by name and ID and starts a new search on every opening', async () => {
@@ -151,7 +157,11 @@ describe('damage scenario relations', () => {
 
     await waitFor(() => expect(assets.getByRole('button', { name: 'A-01 Availability' })).toHaveAttribute('aria-pressed', 'false'))
     expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets[0].linkedProperties).toEqual(['I'])
-    await waitFor(() => expect(assets.getByRole('button', { name: 'A-01 Integrity' })).toBeDisabled())
+    const integrity = assets.getByRole('button', { name: 'A-01 Integrity' })
+    await waitFor(() => expect(integrity).toHaveAttribute('aria-disabled', 'true'))
+    await user.click(integrity)
+    expect(integrity).toHaveAttribute('aria-pressed', 'true')
+    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets[0].linkedProperties).toEqual(['I'])
   })
 
   it('removes the last asset link, keeps the page open and takes the damage scenario out of the tree', async () => {
