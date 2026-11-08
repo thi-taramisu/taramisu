@@ -66,8 +66,6 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
           id: asset.id,
           code: asset.code,
           name: asset.name,
-          // The tree has no place for unlinked damage scenarios yet, so it would disappear from it.
-          removeDisabled: assets.length === 1,
           details: (
             <AssetPropertyToggles
               asset={asset}
@@ -92,7 +90,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">
-        Removing a link never deletes an element. A damage scenario keeps at least one asset, and each asset link at least one property.
+        Removing a link never deletes an element. Each asset link keeps at least one property.
       </p>
     </div>
   )

@@ -65,8 +65,8 @@ Everything else renders a placeholder. Items come from the item API in `frontend
 item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 The damage scenario Relations tab (#185) links assets (with C / I / A) and threat scenarios of the owning item through the mock API. It is
-built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Threat scenarios without
-a link are not in the tree until the "Unassigned" group exists; they stay available in "+ Add Threat Scenario".
+built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
+without a link are not in the tree until the "Unassigned" group exists; threat scenarios stay available in "+ Add Threat Scenario".
 
 ## Decisions
 

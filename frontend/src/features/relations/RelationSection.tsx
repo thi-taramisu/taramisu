@@ -20,8 +20,6 @@ import { AddRelationMenu } from './AddRelationMenu'
 export interface RelationRow extends EntityRef {
   /** Shown after the name, e.g. the C / I / A properties of the link. */
   details?: ReactNode
-  /** The link has to stay, e.g. because the element would disappear from the tree. */
-  removeDisabled?: boolean
 }
 
 interface RelationSectionProps {
@@ -63,7 +61,7 @@ export function RelationSection({ projectId, type, title, addLabel, rows, candid
           {rows.map((row) => (
             <li key={row.id} className="flex items-center gap-3 px-4 py-2">
               <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{row.code}</span>
-              <Link to={entityPath(projectId, type, row.id)} title={row.name} className="min-w-0 truncate font-medium hover:underline">
+              <Link to={entityPath(projectId, type, row.id)} title={row.name} className="min-w-0 truncate text-sm hover:underline">
                 {row.name}
               </Link>
               {row.details}
@@ -106,7 +104,6 @@ function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelat
           size="icon-sm"
           className="ml-auto"
           aria-disabled={pending}
-          disabled={row.removeDisabled}
           aria-label={`Remove link to ${name}`}
           title="Remove link"
         >
