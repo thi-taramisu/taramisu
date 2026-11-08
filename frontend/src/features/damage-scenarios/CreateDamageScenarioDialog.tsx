@@ -1,21 +1,16 @@
 import { useId, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty, ItemAsset } from '../../api/models/asset'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { useCreateDamageScenario, useItemAssets, useProjectTree } from '../../api/queries/items'
+import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
+import { AddRelationMenu } from '../relations/AddRelationMenu'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
-
-const PROPERTIES: { value: CiaProperty; label: string }[] = [
-  { value: 'C', label: 'Confidentiality' },
-  { value: 'I', label: 'Integrity' },
-  { value: 'A', label: 'Availability' },
-]
 
 interface AssetLink {
   assetId: string
@@ -142,8 +137,10 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
             ))}
           </ul>
         )}
-        <AddAssetMenu
-          assets={assets?.filter((asset) => !links.some((link) => link.assetId === asset.id)) ?? []}
+        <AddRelationMenu
+          label="Add Asset"
+          className="justify-self-start border-dashed"
+          options={assets?.filter((asset) => !links.some((link) => link.assetId === asset.id)) ?? []}
           onAdd={(asset) => changeLinks([...links, { assetId: asset.id }])}
         />
         {linkError && (
@@ -170,50 +167,10 @@ function AssetLinkChip({ asset, properties, onChange, onRemove }: AssetLinkChipP
       <span>
         <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
       </span>
-      <fieldset className="flex gap-1">
-        <legend className="sr-only">{asset.code} properties</legend>
-        {PROPERTIES.filter((p) => asset.properties.includes(p.value)).map((p) => {
-          const pressed = properties.includes(p.value)
-          return (
-            <Button
-              key={p.value}
-              type="button"
-              variant={pressed ? 'default' : 'outline'}
-              size="icon-xs"
-              className={`font-mono ${pressed ? '' : 'text-muted-foreground'}`}
-              aria-pressed={pressed}
-              aria-label={`${asset.code} ${p.label}`}
-              title={p.label}
-              onClick={() => onChange(pressed ? properties.filter((v) => v !== p.value) : [...properties, p.value])}
-            >
-              {p.value}
-            </Button>
-          )
-        })}
-      </fieldset>
+      <AssetPropertyToggles asset={asset} selected={properties} onChange={onChange} />
       <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${asset.code} ${asset.name}`} onClick={onRemove}>
         <X aria-hidden="true" />
       </Button>
     </li>
-  )
-}
-
-function AddAssetMenu({ assets, onAdd }: { assets: ItemAsset[]; onAdd: (asset: ItemAsset) => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="justify-self-start border-dashed" disabled={assets.length === 0}>
-          <Plus aria-hidden="true" />
-          Add Asset
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {assets.map((asset) => (
-          <DropdownMenuItem key={asset.id} onSelect={() => onAdd(asset)}>
-            <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
