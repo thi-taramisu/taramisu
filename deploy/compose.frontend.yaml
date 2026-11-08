@@ -1,9 +1,9 @@
 services:
   frontend:
+    # Server: pulled from GHCR (taramisu-ctl.sh). Local: built from source (dev.sh uses --build).
+    image: ghcr.io/thi-taramisu/taramisu-frontend:${TARAMISU_VERSION:-latest}
     build: ../frontend
-   # This has a declarative function rather than really exposing the port.
-   # Just to make it easier to find the frontend port through which frontend
-   # and nginx communicate  
+    # Only documents the port; the proxy reaches the frontend through the proxy network.
     expose:
       - 80
-  
+    networks: [proxy]
