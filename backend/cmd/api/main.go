@@ -38,11 +38,10 @@ func run() error {
 	}
 	defer pool.Close()
 	queries := db.New(pool)
-	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	iam, err := auth.New(authCtx, auth.Config{
-		Issuer: os.Getenv("OIDC_ISSUER"), ClientID: os.Getenv("OIDC_CLIENT_ID"),
-		ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"), AppURL: os.Getenv("APP_URL"),
+	iam, err := auth.New(ctx, auth.Config{
+		Issuer:   cfg.OIDCIssuer,
+		ClientID: cfg.OIDCClientID,
+		JWKSURL:  cfg.OIDCJWKSURL,
 	}, queries)
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)

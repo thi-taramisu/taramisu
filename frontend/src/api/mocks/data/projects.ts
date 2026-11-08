@@ -1,13 +1,6 @@
-﻿
-export type Project = {
-  id: string
-  name: string
-  description: string
-  favorite: boolean
-  archived: boolean
-  owner: string
-  updatedAt: string
-}
+import type { Project } from '../../models/project'
+
+// MOCK DATA: the project list, until the project CRUD routes (#81) exist.
 
 export const mockProjects: Project[] = [
   {
