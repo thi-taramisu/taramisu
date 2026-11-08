@@ -161,14 +161,7 @@ start_stack() {
     blueprint_log=../iam/.blueprint.log
     : > "$blueprint_log"
     chmod 600 "$blueprint_log"
-    if ! compose exec -T authentik-worker ak apply_blueprint \
-        /blueprints/system/providers-oauth2.yaml \
-        /blueprints/default/flow-password-change.yaml \
-        /blueprints/default/flow-default-authentication-flow.yaml \
-        /blueprints/default/flow-default-provider-authorization-implicit-consent.yaml \
-        /blueprints/default/flow-default-provider-invalidation.yaml \
-        /blueprints/custom/taramisu.yaml \
-        /blueprints/custom/branding.yaml > "$blueprint_log" 2>&1; then
+    if ! compose exec -T authentik-worker ak apply_blueprint $(grep -v '^#' authentik-blueprints.txt) > "$blueprint_log" 2>&1; then
         die 'Authentik provisioning failed. Details: iam/.blueprint.log (private; may contain secrets)'
     fi
     rm "$blueprint_log"
@@ -177,7 +170,7 @@ start_stack() {
     # Pick up new container addresses after recreated containers.
     compose exec -T proxy nginx -s reload 2> /dev/null
     if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused --retry-delay 1 \
-        --retry-max-time 30 http://localhost/api/health/ready > /dev/null; then
+        --retry-max-time 30 http://localhost/health/ready > /dev/null; then
         die 'API not ready through the proxy; see: docker compose -f deploy/compose.yaml logs api proxy'
     fi
 }

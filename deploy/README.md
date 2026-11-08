@@ -139,7 +139,7 @@ sudo deploy/taramisu-ctl.sh --prune            # also remove images no container
   Pinned tags are stored in `deploy/.image-tags` (not in Git), so later runs keep them. Pinning an older tag is a rollback;
   database migrations are not rolled back.
 - Every run waits for the health checks (up to 10 minutes for Authentik, whose first start migrates its database),
-  checks `/api/health/ready` through the proxy and ends with a table of services, image tags and digests.
+  checks `/health/ready` through the proxy and ends with a table of services, image tags and digests.
 - The images are public, so no GHCR login is needed. The docs image contains its site URL from the repository variable `DOCS_SITE_URL`.
 - Not covered yet: HTTPS, and Authentik settings for a public host name (`OIDC_ISSUER`, see #103).
 

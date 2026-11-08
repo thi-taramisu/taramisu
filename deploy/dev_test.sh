@@ -11,7 +11,7 @@ cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
 cp ../backend/Makefile "$scratch/backend/"
 cp ../proxy/nginx.conf "$scratch/proxy/"
-cp dev.sh compose*.yaml Makefile "$scratch/deploy/"
+cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
 #!/bin/sh
