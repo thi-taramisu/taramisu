@@ -1,12 +1,19 @@
 import { ApiError } from '../errors'
-import type { ItemAsset } from '../models/asset'
-import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating, ImpactRatingBody } from '../models/damageScenario'
+import type { CiaProperty, ItemAsset } from '../models/asset'
+import type { DamageScenario, DamageScenarioAssetProperty, DamageScenarioRelations, ImpactRating, ImpactRatingBody } from '../models/damageScenario'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
 import type { RiskGroup } from '../models/risk'
-import type { TreeNode } from '../models/tree'
+import type { ThreatDamageLink, ThreatScenario } from '../models/threatScenario'
+import type { EntityRef, TreeNode } from '../models/tree'
 import type { ItemApi } from '../services/items'
-import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
-import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
+import { exampleProject, headlampAssets, headlampItem, headlampRisks, headlampThreatAttackPaths } from './data/headlamp'
+import {
+  headlampDamageScenarioLinks,
+  headlampDamageScenarios,
+  headlampImpactRatings,
+  headlampThreatDamageLinks,
+  headlampThreatScenarios,
+} from './data/headlampDamageScenarios'
 
 // MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
 // once the item routes (#83) are in `backend/openapi.json`.
@@ -19,6 +26,10 @@ interface StoredItem {
   damageScenarios: DamageScenario[]
   damageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[]
   impactRatings: ImpactRating[]
+  threatScenarios: ThreatScenario[]
+  threatDamageLinks: ThreatDamageLink[]
+  /** Attack paths below a threat scenario in the tree, kept while it has no link. */
+  threatAttackPaths: Record<string, TreeNode[]>
 }
 
 function seed(): Map<string, StoredItem> {
@@ -31,6 +42,9 @@ function seed(): Map<string, StoredItem> {
     damageScenarios: headlampDamageScenarios,
     damageScenarioLinks: headlampDamageScenarioLinks,
     impactRatings: headlampImpactRatings,
+    threatScenarios: headlampThreatScenarios,
+    threatDamageLinks: headlampThreatDamageLinks,
+    threatAttackPaths: headlampThreatAttackPaths,
   })
   return new Map([[headlampItem.id, entry]])
 }
@@ -65,11 +79,66 @@ function validateImpactRatings(body: ImpactRatingBody[]) {
   }
 }
 
+// Same rules as the foreign key and UNIQUE constraint of `damage_scenario_asset_property`, and [RQ-15-02].
+function validateAssetProperties(asset: ItemAsset, properties: CiaProperty[]) {
+  if (properties.length === 0) throw new ApiError(422, 'A link needs at least one property.')
+  if (new Set(properties).size !== properties.length) throw new ApiError(422, 'Each asset property can only be linked once.')
+  const missing = properties.find((property) => !asset.properties.includes(property))
+  if (missing) throw new ApiError(422, `Asset ${asset.id} has no property ${missing}.`)
+}
+
+function threatScenarioRef({ id, code, title }: ThreatScenario): EntityRef {
+  return { id, code, name: title }
+}
+
 /** Renames every occurrence of an element in the tree; shared elements appear below several parents. */
 function renameNodes(nodes: TreeNode[], node: Pick<TreeNode, 'type' | 'id' | 'name'>) {
   for (const child of nodes) {
     if (child.type === node.type && child.id === node.id) child.name = node.name
     if (child.children) renameNodes(child.children, node)
+  }
+}
+
+function linkedThreatScenarios(entry: StoredItem, damageScenarioId: string) {
+  return entry.threatScenarios.filter((threat) =>
+    entry.threatDamageLinks.some((link) => link.threat_scenario_id === threat.id && link.damage_scenario_id === damageScenarioId),
+  )
+}
+
+function damageScenarioNode(entry: StoredItem, scenario: DamageScenario): TreeNode {
+  const threats: TreeNode[] = linkedThreatScenarios(entry, scenario.id).map((threat) => ({
+    type: 'threat-scenarios',
+    id: threat.id,
+    code: threat.code,
+    name: threat.title,
+    children: entry.threatAttackPaths[threat.id],
+  }))
+  return { type: 'damage-scenarios', id: scenario.id, code: scenario.code, name: scenario.title, children: threats.length ? threats : undefined }
+}
+
+/** Derives the tree below the assets and their counters from the links, after a link changed. */
+function syncLinks(entry: StoredItem) {
+  for (const asset of entry.assets) {
+    const scenarioIds = new Set(entry.damageScenarioLinks.filter((link) => link.asset_id === asset.id).map((link) => link.damage_scenario_id))
+    const threatIds = new Set(entry.threatDamageLinks.filter((link) => scenarioIds.has(link.damage_scenario_id)).map((link) => link.threat_scenario_id))
+    asset.damageScenarios = scenarioIds.size
+    asset.threatScenarios = threatIds.size
+    const node = entry.children.find((child) => child.type === 'assets' && child.id === asset.id)
+    if (!node) continue
+    const others = node.children?.filter((child) => child.type !== 'damage-scenarios') ?? []
+    const children = [...others, ...entry.damageScenarios.filter((ds) => scenarioIds.has(ds.id)).map((ds) => damageScenarioNode(entry, ds))]
+    node.children = children.length ? children : undefined
+  }
+}
+
+function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenarioRelations {
+  const links = entry.damageScenarioLinks.filter((link) => link.damage_scenario_id === damageScenarioId)
+  return {
+    assets: entry.assets.flatMap(({ id, code, name, properties }) => {
+      const linkedProperties = links.filter((link) => link.asset_id === id).map((link) => link.property)
+      return linkedProperties.length ? [{ id, code, name, properties, linkedProperties }] : []
+    }),
+    threatScenarios: linkedThreatScenarios(entry, damageScenarioId).map(threatScenarioRef),
   }
 }
 
@@ -124,7 +193,18 @@ export function createMockItemApi(): ItemApi {
             tara_project_id: projectId,
             created_at: new Date().toISOString(),
           }
-          db.set(item.id, { item, children: [], assets: [], risks: [], damageScenarios: [], damageScenarioLinks: [], impactRatings: [] })
+          db.set(item.id, {
+            item,
+            children: [],
+            assets: [],
+            risks: [],
+            damageScenarios: [],
+            damageScenarioLinks: [],
+            impactRatings: [],
+            threatScenarios: [],
+            threatDamageLinks: [],
+            threatAttackPaths: {},
+          })
           return item
         }),
       update: (projectId, itemId, body) =>
@@ -155,6 +235,7 @@ export function createMockItemApi(): ItemApi {
           return asset
         }),
       risks: (projectId, itemId) => run(() => find(projectId, itemId).risks),
+      threatScenarios: (projectId, itemId) => run(() => find(projectId, itemId).threatScenarios.map(threatScenarioRef)),
     },
     damageScenarios: {
       create: (projectId, body) =>
@@ -214,6 +295,53 @@ export function createMockItemApi(): ItemApi {
             else entry.impactRatings.push({ ...rating, id: crypto.randomUUID(), damage_scenario_id: scenario.id })
           }
           return entry.impactRatings.filter((r) => r.damage_scenario_id === scenario.id)
+        }),
+      relations: (projectId, damageScenarioId) =>
+        run(() => {
+          const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
+          return relationsOf(entry, scenario.id)
+        }),
+      linkAsset: (projectId, damageScenarioId, assetId, properties) =>
+        run(() => {
+          const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
+          const asset = entry.assets.find((a) => a.id === assetId)
+          // Scenarios and assets belong to one item, so assets of other items are not found.
+          if (!asset) throw new ApiError(404, 'Asset not found.')
+          validateAssetProperties(asset, properties)
+          entry.damageScenarioLinks = entry.damageScenarioLinks.filter((link) => link.damage_scenario_id !== scenario.id || link.asset_id !== asset.id)
+          entry.damageScenarioLinks.push(...properties.map((property) => ({ damage_scenario_id: scenario.id, asset_id: asset.id, property })))
+          syncLinks(entry)
+          return relationsOf(entry, scenario.id)
+        }),
+      unlinkAsset: (projectId, damageScenarioId, assetId) =>
+        run(() => {
+          const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
+          const isLink = (link: StoredItem['damageScenarioLinks'][number]) => link.damage_scenario_id === scenario.id && link.asset_id === assetId
+          if (!entry.damageScenarioLinks.some(isLink)) throw new ApiError(404, 'Link not found.')
+          entry.damageScenarioLinks = entry.damageScenarioLinks.filter((link) => !isLink(link))
+          syncLinks(entry)
+          return relationsOf(entry, scenario.id)
+        }),
+      linkThreatScenario: (projectId, damageScenarioId, threatScenarioId) =>
+        run(() => {
+          const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
+          if (!entry.threatScenarios.some((threat) => threat.id === threatScenarioId)) throw new ApiError(404, 'Threat scenario not found.')
+          // Same rule as the UNIQUE constraint of `threat_damage_link`.
+          if (entry.threatDamageLinks.some((link) => link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === scenario.id)) {
+            throw new ApiError(409, 'The threat scenario is already linked.')
+          }
+          entry.threatDamageLinks.push({ threat_scenario_id: threatScenarioId, damage_scenario_id: scenario.id })
+          syncLinks(entry)
+          return relationsOf(entry, scenario.id)
+        }),
+      unlinkThreatScenario: (projectId, damageScenarioId, threatScenarioId) =>
+        run(() => {
+          const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
+          const isLink = (link: ThreatDamageLink) => link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === scenario.id
+          if (!entry.threatDamageLinks.some(isLink)) throw new ApiError(404, 'Link not found.')
+          entry.threatDamageLinks = entry.threatDamageLinks.filter((link) => !isLink(link))
+          syncLinks(entry)
+          return relationsOf(entry, scenario.id)
         }),
     },
   }
