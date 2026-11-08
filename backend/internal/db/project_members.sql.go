@@ -56,7 +56,7 @@ WHERE a.tara_project_id = $1 AND a.id = $2
       SELECT 1 FROM project_role_assignment o
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id
+RETURNING a.id, a.project_role
 `
 
 type DeleteProjectMemberParams struct {
@@ -64,12 +64,17 @@ type DeleteProjectMemberParams struct {
 	ID        pgtype.UUID
 }
 
+type DeleteProjectMemberRow struct {
+	ID          pgtype.UUID
+	ProjectRole ProjectRole
+}
+
 // Remove an assignment unless it is the last user Owner (same rule as UpdateProjectMemberRole).
-func (q *Queries) DeleteProjectMember(ctx context.Context, arg DeleteProjectMemberParams) (pgtype.UUID, error) {
+func (q *Queries) DeleteProjectMember(ctx context.Context, arg DeleteProjectMemberParams) (DeleteProjectMemberRow, error) {
 	row := q.db.QueryRow(ctx, deleteProjectMember, arg.ProjectID, arg.ID)
-	var id pgtype.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i DeleteProjectMemberRow
+	err := row.Scan(&i.ID, &i.ProjectRole)
+	return i, err
 }
 
 const getProjectMember = `-- name: GetProjectMember :one
@@ -172,12 +177,13 @@ func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.U
 const updateProjectMemberRole = `-- name: UpdateProjectMemberRole :one
 UPDATE project_role_assignment a
 SET project_role = $1
-WHERE a.tara_project_id = $2 AND a.id = $3
+FROM project_role_assignment previous
+WHERE previous.id = a.id AND a.tara_project_id = $2 AND a.id = $3
   AND ($1::project_role = 'OWNER' OR a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
       SELECT 1 FROM project_role_assignment o
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id
+RETURNING a.id, previous.project_role AS previous_role
 `
 
 type UpdateProjectMemberRoleParams struct {
@@ -186,14 +192,20 @@ type UpdateProjectMemberRoleParams struct {
 	ID        pgtype.UUID
 }
 
+type UpdateProjectMemberRoleRow struct {
+	ID           pgtype.UUID
+	PreviousRole ProjectRole
+}
+
 // Change a role unless that would remove the last user Owner. Group Owners do not count,
 // because their membership can change in Authentik. Returns no row if the assignment does not
 // exist or is protected; the handler tells both cases apart with GetProjectMember.
-func (q *Queries) UpdateProjectMemberRole(ctx context.Context, arg UpdateProjectMemberRoleParams) (pgtype.UUID, error) {
+// previous_role is the role before the change (the joined row is read before the update), for the audit log.
+func (q *Queries) UpdateProjectMemberRole(ctx context.Context, arg UpdateProjectMemberRoleParams) (UpdateProjectMemberRoleRow, error) {
 	row := q.db.QueryRow(ctx, updateProjectMemberRole, arg.Role, arg.ProjectID, arg.ID)
-	var id pgtype.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i UpdateProjectMemberRoleRow
+	err := row.Scan(&i.ID, &i.PreviousRole)
+	return i, err
 }
 
 const upsertIAMGroup = `-- name: UpsertIAMGroup :one

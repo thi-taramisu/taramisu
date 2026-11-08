@@ -334,4 +334,8 @@ nginx -g 'daemon off;'
     "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
 fi
 
-echo 'PASS: unified Compose model, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'
+# The project role specification accepts that group and account changes take up to 10 minutes,
+# the access token lifetime (docs/internal/architecture/iam/project-roles.md). Update both together.
+grep -q '^ *access_token_validity: minutes=10$' ../iam/blueprints/taramisu.yaml
+
+echo 'PASS: unified Compose model, access token lifetime, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'

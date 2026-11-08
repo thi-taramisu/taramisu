@@ -14,6 +14,7 @@ import (
 
 type Queries interface {
 	handlers.StatusReader
+	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
 }
@@ -71,16 +72,20 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
-	handlers.NewTaraProject(queries).Register(api)
-	handlers.NewProjectMembers(queries, o.directory).Register(api)
-	huma.Register(api, huma.Operation{
+	handlers.NewTaraProject(queries, queries).Register(api)
+	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)
+	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/me",
 		Summary:     "Get the current user",
 		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
+	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	// Fail closed: an /api/ operation without an access declaration must not be served.
+	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
+		panic(err)
+	}
 	return mux, api
 }

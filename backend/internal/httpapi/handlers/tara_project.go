@@ -16,7 +16,6 @@ import (
 )
 
 type TaraProjectStore interface {
-	ProjectAccessStore
 	CreateTaraProject(context.Context, db.CreateTaraProjectParams) (db.CreateTaraProjectRow, error)
 	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
@@ -26,11 +25,12 @@ type TaraProjectStore interface {
 }
 
 type TaraProject struct {
-	store TaraProjectStore
+	store  TaraProjectStore
+	access ProjectAccessStore
 }
 
-func NewTaraProject(store TaraProjectStore) *TaraProject {
-	return &TaraProject{store: store}
+func NewTaraProject(store TaraProjectStore, access ProjectAccessStore) *TaraProject {
+	return &TaraProject{store: store, access: access}
 }
 
 func (h *TaraProject) Register(api huma.API) {
@@ -43,16 +43,17 @@ func (h *TaraProject) Register(api huma.API) {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
 			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
-	huma.Register(api, op("list-tara-projects", http.MethodGet, collection, "List TARA projects"), h.List)
+	project := func(permission Permission) Access { return InProject(h.access, ScopeProject("id"), permission) }
+	Register(api, op("list-tara-projects", http.MethodGet, collection, "List TARA projects"), WithoutProject(), h.List)
 	create := op("create-tara-project", http.MethodPost, collection, "Create a TARA project")
 	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	huma.Register(api, op("get-tara-project", http.MethodGet, member, "Get a TARA project"), h.Get)
-	huma.Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), h.Replace)
-	huma.Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), h.Update)
+	Register(api, create, WithoutProject(), h.Create)
+	Register(api, op("get-tara-project", http.MethodGet, member, "Get a TARA project"), project(PermRead), h.Get)
+	Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), project(PermManage), h.Replace)
+	Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), project(PermManage), h.Update)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	Register(api, del, project(PermManage), h.Delete)
 }
 
 type TaraProjectBody struct {
@@ -152,51 +153,29 @@ func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOu
 	return out, nil
 }
 
-func (h *TaraProject) Get(ctx context.Context, in *TaraProjectIDInput) (*TaraProjectOutput, error) {
-	id, role, err := h.authorize(ctx, in.ID, PermRead)
-	if err != nil {
-		return nil, err
-	}
-	p, err := h.store.GetTaraProject(ctx, id)
+func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	p, err := h.store.GetTaraProject(ctx, projectIDFromContext(ctx))
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, role), nil
-}
-
-// authorize parses the project ID from the URL and checks the caller's permission in that project.
-func (h *TaraProject) authorize(ctx context.Context, rawID string, permission Permission) (pgtype.UUID, db.ProjectRole, error) {
-	id, err := parseUUID(rawID)
-	if err != nil {
-		return id, "", err
-	}
-	role, err := requireProject(ctx, h.store, id, permission)
-	return id, role, err
+	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
-	id, role, err := h.authorize(ctx, in.ID, PermManage)
-	if err != nil {
-		return nil, err
-	}
 	p, err := h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{
-		ID:          id,
+		ID:          projectIDFromContext(ctx),
 		Name:        in.Body.Name,
 		Description: in.Body.Description,
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, role), nil
+	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
-	id, role, err := h.authorize(ctx, in.ID, PermManage)
-	if err != nil {
-		return nil, err
-	}
 	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:             id,
+		ID:             projectIDFromContext(ctx),
 		Name:           in.Body.Name,
 		SetDescription: in.Body.Description.Set,
 		Description:    in.Body.Description.Value,
@@ -204,14 +183,11 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, role), nil
+	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
-func (h *TaraProject) Delete(ctx context.Context, in *TaraProjectIDInput) (*struct{}, error) {
-	id, _, err := h.authorize(ctx, in.ID, PermManage)
-	if err != nil {
-		return nil, err
-	}
+func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
+	id := projectIDFromContext(ctx)
 	n, err := h.store.DeleteTaraProject(ctx, id)
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -219,6 +195,7 @@ func (h *TaraProject) Delete(ctx context.Context, in *TaraProjectIDInput) (*stru
 	if n == 0 {
 		return nil, huma.Error404NotFound("project not found")
 	}
+	audit(ctx, "project.deleted", "project", id.String())
 	return nil, nil
 }
 

@@ -27,27 +27,27 @@ type Directory interface {
 
 // ProjectMemberStore is implemented by the sqlc-generated queries.
 type ProjectMemberStore interface {
-	ProjectAccessStore
 	UpsertIAMUser(context.Context, string) (string, error)
 	UpsertIAMGroup(context.Context, string) (pgtype.UUID, error)
 	ListProjectMembers(context.Context, pgtype.UUID) ([]db.ListProjectMembersRow, error)
 	GetProjectMember(context.Context, db.GetProjectMemberParams) (db.GetProjectMemberRow, error)
 	CreateUserMember(context.Context, db.CreateUserMemberParams) (pgtype.UUID, error)
 	CreateGroupMember(context.Context, db.CreateGroupMemberParams) (pgtype.UUID, error)
-	UpdateProjectMemberRole(context.Context, db.UpdateProjectMemberRoleParams) (pgtype.UUID, error)
-	DeleteProjectMember(context.Context, db.DeleteProjectMemberParams) (pgtype.UUID, error)
+	UpdateProjectMemberRole(context.Context, db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error)
+	DeleteProjectMember(context.Context, db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error)
 }
 
 // ProjectMembers manages project role assignments for users and Authentik groups.
 type ProjectMembers struct {
 	store     ProjectMemberStore
+	access    ProjectAccessStore
 	directory Directory
 }
 
 // NewProjectMembers creates the handler. directory may be nil; member names are then omitted and
 // adding members or listing groups returns 503.
-func NewProjectMembers(store ProjectMemberStore, directory Directory) *ProjectMembers {
-	return &ProjectMembers{store: store, directory: directory}
+func NewProjectMembers(store ProjectMemberStore, access ProjectAccessStore, directory Directory) *ProjectMembers {
+	return &ProjectMembers{store: store, access: access, directory: directory}
 }
 
 func (h *ProjectMembers) Register(api huma.API) {
@@ -60,24 +60,26 @@ func (h *ProjectMembers) Register(api huma.API) {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary, Description: description,
 			Tags: []string{"Project members"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
-	huma.Register(api, op("list-project-members", http.MethodGet, collection, "List project members",
-		"Any project role. Names and email addresses are omitted when Authentik is unavailable."), h.List)
+	project := func(permission Permission) Access { return InProject(h.access, ScopeProject("id"), permission) }
+	Register(api, op("list-project-members", http.MethodGet, collection, "List project members",
+		"Any project role. Names and email addresses are omitted when Authentik is unavailable."), project(PermRead), h.List)
 	create := op("add-project-member", http.MethodPost, collection, "Add a project member",
 		"Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group.")
 	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	huma.Register(api, op("update-project-member", http.MethodPatch, member, "Change a member's role",
-		"Owner only. Returns 409 if this would remove the last user Owner."), h.Update)
+	Register(api, create, project(PermManage), h.Create)
+	Register(api, op("update-project-member", http.MethodPatch, member, "Change a member's role",
+		"Owner only. Returns 409 if this would remove the last user Owner."), project(PermManage), h.Update)
 	del := op("remove-project-member", http.MethodDelete, member, "Remove a project member",
 		"Owners can remove anyone; every member can remove their own user assignment (leave). Returns 409 for the last user Owner.")
 	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
-	huma.Register(api, huma.Operation{
+	// Read is enough to reach the handler; it lets non-Owners remove only their own assignment.
+	Register(api, del, project(PermRead), h.Delete)
+	Register(api, huma.Operation{
 		OperationID: "list-assignable-groups", Method: http.MethodGet, Path: "/api/v1/groups",
 		Summary:     "List Authentik groups that can get a project role",
 		Description: "Groups with the taramisu_assignable attribute. Returns 503 when Authentik is not configured or unavailable.",
 		Tags:        []string{"Project members"}, Security: []map[string][]string{{"bearer": {}}},
-	}, h.ListGroups)
+	}, WithoutProject(), h.ListGroups)
 }
 
 // ProjectMember is one role assignment, either for a user or for an Authentik group.
@@ -137,12 +139,8 @@ type AssignableGroupListOutput struct {
 	Body []AssignableGroup
 }
 
-func (h *ProjectMembers) List(ctx context.Context, in *TaraProjectIDInput) (*ProjectMemberListOutput, error) {
-	projectID, err := h.authorize(ctx, in.ID, PermRead)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := h.store.ListProjectMembers(ctx, projectID)
+func (h *ProjectMembers) List(ctx context.Context, _ *TaraProjectIDInput) (*ProjectMemberListOutput, error) {
+	rows, err := h.store.ListProjectMembers(ctx, projectIDFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +153,7 @@ func (h *ProjectMembers) List(ctx context.Context, in *TaraProjectIDInput) (*Pro
 }
 
 func (h *ProjectMembers) Create(ctx context.Context, in *CreateProjectMemberInput) (*CreateProjectMemberOutput, error) {
-	projectID, err := h.authorize(ctx, in.ID, PermManage)
-	if err != nil {
-		return nil, err
-	}
+	projectID := projectIDFromContext(ctx)
 	body := in.Body
 	if (body.Email == nil) == (body.GroupID == nil) {
 		return nil, huma.Error422UnprocessableEntity("send either email or group_id")
@@ -167,6 +162,7 @@ func (h *ProjectMembers) Create(ctx context.Context, in *CreateProjectMemberInpu
 		return nil, huma.Error503ServiceUnavailable("the Authentik directory is not configured")
 	}
 	var memberID pgtype.UUID
+	var err error
 	if body.Email != nil {
 		memberID, err = h.addUser(ctx, projectID, *body.Email, body.Role)
 	} else {
@@ -179,6 +175,7 @@ func (h *ProjectMembers) Create(ctx context.Context, in *CreateProjectMemberInpu
 	if err != nil {
 		return nil, err
 	}
+	audit(ctx, "member.added", memberAttrs(projectID, member, "role", member.Role)...)
 	return &CreateProjectMemberOutput{
 		Location: "/api/v1/projects/" + projectID.String() + "/members/" + member.ID,
 		Body:     member,
@@ -225,15 +222,12 @@ func (h *ProjectMembers) addGroup(ctx context.Context, projectID pgtype.UUID, gr
 }
 
 func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInput) (*ProjectMemberOutput, error) {
-	projectID, err := h.authorize(ctx, in.ID, PermManage)
-	if err != nil {
-		return nil, err
-	}
+	projectID := projectIDFromContext(ctx)
 	memberID, err := parseUUID(in.MemberID)
 	if err != nil {
 		return nil, err
 	}
-	_, err = h.store.UpdateProjectMemberRole(ctx, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role})
+	updated, err := h.store.UpdateProjectMemberRole(ctx, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role})
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No row is updated if the member does not exist or is the last user Owner.
 		if _, getErr := h.get(ctx, projectID, memberID); getErr != nil {
@@ -248,18 +242,12 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 	if err != nil {
 		return nil, err
 	}
+	audit(ctx, "member.role_changed", memberAttrs(projectID, member, "before", updated.PreviousRole, "after", member.Role)...)
 	return &ProjectMemberOutput{Body: member}, nil
 }
 
 func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*struct{}, error) {
-	projectID, err := parseUUID(in.ID)
-	if err != nil {
-		return nil, err
-	}
-	role, err := requireProject(ctx, h.store, projectID, PermRead)
-	if err != nil {
-		return nil, err
-	}
+	projectID := projectIDFromContext(ctx)
 	memberID, err := parseUUID(in.MemberID)
 	if err != nil {
 		return nil, err
@@ -268,22 +256,23 @@ func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*st
 	if err != nil {
 		return nil, mapMemberError(err)
 	}
-	// Owners may remove anyone; other members may only remove their own user assignment.
-	if !Allows(role, PermManage) {
-		self, err := callerID(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if row.UserID != self {
-			return nil, huma.Error403Forbidden("only Owners can remove other members")
-		}
-	}
-	if _, err := h.store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errLastOwner()
-		}
+	self, err := callerID(ctx)
+	if err != nil {
 		return nil, err
 	}
+	// Owners may remove anyone; other members may only remove their own user assignment.
+	if !Allows(RoleFromContext(ctx), PermManage) && row.UserID != self {
+		return nil, huma.Error403Forbidden("only Owners can remove other members")
+	}
+	removed, err := h.store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errLastOwner()
+	}
+	if err != nil {
+		return nil, err
+	}
+	member := memberIdentity(row)
+	audit(ctx, "member.removed", memberAttrs(projectID, member, "before", removed.ProjectRole, "self", row.UserID == self)...)
 	return nil, nil
 }
 
@@ -301,15 +290,6 @@ func (h *ProjectMembers) ListGroups(ctx context.Context, _ *struct{}) (*Assignab
 		out.Body = append(out.Body, AssignableGroup{GroupID: g.GroupID, Name: g.Name})
 	}
 	return out, nil
-}
-
-func (h *ProjectMembers) authorize(ctx context.Context, rawID string, permission Permission) (pgtype.UUID, error) {
-	projectID, err := parseUUID(rawID)
-	if err != nil {
-		return projectID, err
-	}
-	_, err = requireProject(ctx, h.store, projectID, permission)
-	return projectID, err
 }
 
 func (h *ProjectMembers) get(ctx context.Context, projectID, memberID pgtype.UUID) (ProjectMember, error) {
@@ -346,13 +326,21 @@ func (h *ProjectMembers) newNameResolver() *nameResolver {
 	return &nameResolver{directory: h.directory, down: h.directory == nil}
 }
 
+// memberIdentity converts a row without display names.
+func memberIdentity(row db.GetProjectMemberRow) ProjectMember {
+	m := ProjectMember{ID: row.ID.String(), Role: row.ProjectRole, AssignedAt: row.AssignedAt.Time, Type: "group",
+		GroupID: row.ExternalIamGroupID}
+	if row.UserID.Valid {
+		userID := row.UserID.String()
+		m.Type, m.UserID, m.GroupID = "user", &userID, nil
+	}
+	return m
+}
+
 func (n *nameResolver) member(ctx context.Context, row db.GetProjectMemberRow) ProjectMember {
-	m := ProjectMember{ID: row.ID.String(), Role: row.ProjectRole, AssignedAt: row.AssignedAt.Time}
+	m := memberIdentity(row)
 	switch {
 	case row.UserID.Valid:
-		m.Type = "user"
-		userID := row.UserID.String()
-		m.UserID = &userID
 		if row.ExternalIamSub != nil && !n.down {
 			user, err := n.directory.ResolveUser(ctx, *row.ExternalIamSub)
 			n.note(err)
@@ -361,8 +349,6 @@ func (n *nameResolver) member(ctx context.Context, row db.GetProjectMemberRow) P
 			}
 		}
 	default:
-		m.Type = "group"
-		m.GroupID = row.ExternalIamGroupID
 		if row.ExternalIamGroupID != nil && !n.down {
 			group, err := n.directory.ResolveGroup(ctx, *row.ExternalIamGroupID)
 			n.note(err)

@@ -8,9 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/thi-taramisu/taramisu/backend/internal/db"
-
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
@@ -21,13 +18,9 @@ func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) 
 
 type healthQueries struct {
 	statusReaderFunc
+	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
-}
-
-// GetProjectRole resolves the method that both embedded store interfaces declare.
-func (healthQueries) GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error) {
-	return "", pgx.ErrNoRows
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {

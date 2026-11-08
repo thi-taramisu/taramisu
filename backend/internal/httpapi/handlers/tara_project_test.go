@@ -22,6 +22,7 @@ const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
 	statusReaderFunc
+	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	project   db.TaraProject
 	found     bool
@@ -295,5 +296,22 @@ func TestTaraProjectListUsesCallerAndGroups(t *testing.T) {
 	}
 	if store.listQuery.UserID != testUUIDValue(t, authtest.UserID) || len(store.listQuery.GroupIds) != 1 || store.listQuery.GroupIds[0] != groups[0] {
 		t.Fatalf("list query = %+v", store.listQuery)
+	}
+}
+
+func TestTaraProjectDeleteIsAudited(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	h := httpapi.New(newFakeProjects(true), manager)
+	entries := captureAudit(t, func() {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNoContent {
+			t.Fatalf("delete: %d %s", rr.Code, rr.Body.String())
+		}
+	})
+	if len(entries) != 1 || entries[0]["event"] != "project.deleted" || entries[0]["project"] != projectID || entries[0]["actor"] != authtest.UserID {
+		t.Fatalf("delete audit = %v", entries)
 	}
 }

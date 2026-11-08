@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,22 +134,24 @@ func (f *fakeMembers) protectsLastOwner(i int) bool {
 	return true
 }
 
-func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, a db.UpdateProjectMemberRoleParams) (pgtype.UUID, error) {
+func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, a db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error) {
 	i := f.find(a.ID)
 	if i < 0 || (a.Role != db.ProjectRoleOWNER && f.protectsLastOwner(i)) {
-		return pgtype.UUID{}, pgx.ErrNoRows
+		return db.UpdateProjectMemberRoleRow{}, pgx.ErrNoRows
 	}
+	previous := f.members[i].ProjectRole
 	f.members[i].ProjectRole = a.Role
-	return a.ID, nil
+	return db.UpdateProjectMemberRoleRow{ID: a.ID, PreviousRole: previous}, nil
 }
 
-func (f *fakeMembers) DeleteProjectMember(_ context.Context, a db.DeleteProjectMemberParams) (pgtype.UUID, error) {
+func (f *fakeMembers) DeleteProjectMember(_ context.Context, a db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error) {
 	i := f.find(a.ID)
 	if i < 0 || f.protectsLastOwner(i) {
-		return pgtype.UUID{}, pgx.ErrNoRows
+		return db.DeleteProjectMemberRow{}, pgx.ErrNoRows
 	}
+	removed := f.members[i]
 	f.members = append(f.members[:i], f.members[i+1:]...)
-	return a.ID, nil
+	return db.DeleteProjectMemberRow{ID: a.ID, ProjectRole: removed.ProjectRole}, nil
 }
 
 type fakeDirectory struct {
@@ -388,5 +391,61 @@ func TestPermissionMatrix(t *testing.T) {
 			handlers.Allows(tc.role, handlers.PermManage) != tc.admin {
 			t.Fatalf("permissions of %q do not match the specification", tc.role)
 		}
+	}
+}
+
+// captureAudit collects the "audit" log entries written while fn runs.
+func captureAudit(t *testing.T, fn func()) []map[string]any {
+	t.Helper()
+	var buf strings.Builder
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+	defer slog.SetDefault(previous)
+	fn()
+	var entries []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		var entry map[string]any
+		if json.Unmarshal([]byte(line), &entry) == nil && entry["msg"] == "audit" {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
+func TestProjectMemberAuditLog(t *testing.T) {
+	api := newMemberAPI(t, newFakeMembers(db.ProjectRoleOWNER), &fakeDirectory{})
+	entries := captureAudit(t, func() {
+		api.call(http.MethodPost, membersPath, `{"email":"new@example.com","role":"VIEWER"}`)
+		api.call(http.MethodPatch, membersPath+"/"+otherMemberID, `{"role":"EDITOR"}`)
+		api.call(http.MethodDelete, membersPath+"/"+groupMemberID, "")
+		api.call(http.MethodPatch, membersPath+"/"+ownerMemberID, `{"role":"VIEWER"}`) // last Owner: 409, no entry
+	})
+	want := []map[string]any{
+		{"event": "member.added", "member_type": "user", "role": "VIEWER"},
+		{"event": "member.role_changed", "member": otherMemberID, "user": otherUserID, "before": "OWNER", "after": "EDITOR"},
+		{"event": "member.removed", "member": groupMemberID, "group": teamGroupID, "before": "EDITOR", "self": false},
+	}
+	if len(entries) != len(want) {
+		t.Fatalf("audit entries = %v, want %d", entries, len(want))
+	}
+	for i, fields := range want {
+		if entries[i]["actor"] != authtest.UserID || entries[i]["project"] != projectID {
+			t.Fatalf("entry %d has actor %v, project %v", i, entries[i]["actor"], entries[i]["project"])
+		}
+		for key, value := range fields {
+			if entries[i][key] != value {
+				t.Fatalf("entry %d: %s = %v, want %v (%v)", i, key, entries[i][key], value, entries[i])
+			}
+		}
+		if _, ok := entries[i]["email"]; ok {
+			t.Fatalf("entry %d contains an email address: %v", i, entries[i])
+		}
+	}
+
+	// A Viewer leaving is recorded as removing themselves.
+	viewer := newMemberAPI(t, newFakeMembers(db.ProjectRoleVIEWER), &fakeDirectory{})
+	entries = captureAudit(t, func() { viewer.call(http.MethodDelete, membersPath+"/"+ownerMemberID, "") })
+	if len(entries) != 1 || entries[0]["event"] != "member.removed" || entries[0]["self"] != true || entries[0]["before"] != "VIEWER" {
+		t.Fatalf("leave audit = %v", entries)
 	}
 }
