@@ -38,7 +38,7 @@ verify that the entity's owning item belongs to the requested project; the curre
 | `/login` | Login | | public, depends on the IAM decision (#46), not routed yet |
 | `/projects` | Project list | Project / Start | user |
 | `/projects/:projectId/settings` | Project settings, General | Project Settings (1) | manage |
-| `/projects/:projectId/settings/members` | Project settings, Members | Project Settings (2) | manage |
+| `/projects/:projectId/settings/members` | Project settings, Members | Project Settings (2) | read, changes need manage |
 | `/projects/:projectId` | Project workspace (header, element tree, empty content) | Add Items / Layout | read |
 | `/projects/:projectId/items/:itemId` | Item: Definition (form, supporting files, React Flow diagram) | Items / Item Definition | read, edit needs write |
 | `…/items/:itemId/assets` | Item: Assets table | Items / Item Assets | read |
