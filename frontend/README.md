@@ -34,7 +34,7 @@ src/
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" menu
+  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
