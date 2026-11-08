@@ -70,3 +70,29 @@ func TestAuthRoutes(t *testing.T) {
 		t.Fatalf("missing auth configuration: %d", w.Code)
 	}
 }
+
+func TestProjectMemberRoutesRequireBearer(t *testing.T) {
+	manager, _ := authtest.NewManagerAndToken(t)
+	handler := New(nil, manager, WithDirectory(nil))
+	const members = "/api/v1/projects/00000000-0000-4000-8000-000000000001/members"
+	const member = members + "/00000000-0000-4000-8000-000000000002"
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, members},
+		{http.MethodPost, members},
+		{http.MethodPatch, member},
+		{http.MethodDelete, member},
+		{http.MethodGet, "/api/v1/groups"},
+	} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(route.method, route.path, http.NoBody))
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s without token: got %d, want 401", route.method, route.path, w.Code)
+		}
+	}
+	spec := OpenAPI()
+	for path, item := range map[string]*huma.PathItem{members: spec.Paths["/api/v1/projects/{id}/members"], "/api/v1/groups": spec.Paths["/api/v1/groups"]} {
+		if item == nil || item.Get == nil || item.Get.Security[0]["bearer"] == nil {
+			t.Fatalf("OpenAPI does not document bearer security on %s", path)
+		}
+	}
+}

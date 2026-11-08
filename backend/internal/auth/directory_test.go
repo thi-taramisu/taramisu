@@ -21,20 +21,17 @@ func TestDirectoryResolverCachesAndExpiresUsersAndGroups(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/api/v3/core/users/":
+			// Authentik cannot filter by uid, so the resolver reads the whole list.
 			userCalls.Add(1)
-			uuid := r.URL.Query().Get("uuid")
-			if uuid == "user-uuid-1" {
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"results": []map[string]string{{
-						"uuid":     "user-uuid-1",
-						"username": "alice",
-						"name":     "Alice Example",
-						"email":    "alice@example.com",
-					}},
-				})
-				return
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"results": []any{}})
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"pagination": map[string]int{"next": 0},
+				"results": []map[string]any{{
+					"uid":      "user-uuid-1",
+					"username": "alice",
+					"name":     "Alice Example",
+					"email":    "alice@example.com",
+				}},
+			})
 		case "/auth/api/v3/core/groups/group-uuid-1/":
 			groupCalls.Add(1)
 			_ = json.NewEncoder(w).Encode(map[string]string{
@@ -203,5 +200,106 @@ func TestTTLCacheUpdateDoesNotEvict(t *testing.T) {
 	}
 	if v, ok := c.get("b"); !ok || v != 20 {
 		t.Fatalf("expected 'b' to return updated value 20, got %v (found: %v)", v, ok)
+	}
+}
+
+func TestDirectoryResolverReadsAllUserPages(t *testing.T) {
+	var pages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		pages = append(pages, page)
+		w.Header().Set("Content-Type", "application/json")
+		if page == "1" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"pagination": map[string]int{"next": 2},
+				"results":    []map[string]any{{"uid": "first", "name": "First"}},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"pagination": map[string]int{"next": 0},
+			"results":    []map[string]any{{"uid": "second", "name": "Second"}},
+		})
+	}))
+	t.Cleanup(server.Close)
+	resolver, err := NewDirectoryResolver(DirectoryConfig{BaseURL: server.URL, Token: "tok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u, err := resolver.ResolveUser(context.Background(), "second"); err != nil || u.Name != "Second" {
+		t.Fatalf("ResolveUser(second) = %+v, %v", u, err)
+	}
+	// The first page was cached during the same read.
+	if u, err := resolver.ResolveUser(context.Background(), "first"); err != nil || u.Name != "First" || len(pages) != 2 {
+		t.Fatalf("ResolveUser(first) = %+v, %v after pages %v", u, err, pages)
+	}
+}
+
+func TestDirectoryResolverFindsActiveUserByEmail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if r.URL.Path != "/api/v3/core/users/" || q.Get("is_active") != "true" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		results := []map[string]any{}
+		if q.Get("email") == "bob@example.com" {
+			results = append(results, map[string]any{"uid": "bob-sub", "username": "bob", "email": "Bob@Example.com", "is_active": true})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+	}))
+	t.Cleanup(server.Close)
+	resolver, err := NewDirectoryResolver(DirectoryConfig{BaseURL: server.URL, Token: "tok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := resolver.FindActiveUserByEmail(context.Background(), " bob@example.com ")
+	if err != nil || u.Subject != "bob-sub" {
+		t.Fatalf("FindActiveUserByEmail = %+v, %v", u, err)
+	}
+	if _, err := resolver.FindActiveUserByEmail(context.Background(), "nobody@example.com"); !errors.Is(err, ErrPrincipalNotFound) {
+		t.Fatalf("unknown email: %v, want ErrPrincipalNotFound", err)
+	}
+	if _, err := resolver.FindActiveUserByEmail(context.Background(), " "); err == nil {
+		t.Fatal("expected error for empty email")
+	}
+}
+
+func TestDirectoryResolverAssignableGroups(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v3/core/groups/":
+			if r.URL.Query().Get("attributes") != `{"taramisu_assignable": true}` {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{
+				{"pk": "team-a", "name": "Team A", "attributes": map[string]any{"taramisu_assignable": true}},
+				// Defensive: entries without the attribute are dropped even if the filter returned them.
+				{"pk": "admins", "name": "Admins", "attributes": map[string]any{}},
+			}})
+		case "/api/v3/core/groups/admins/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"pk": "admins", "name": "Admins", "attributes": map[string]any{}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	resolver, err := NewDirectoryResolver(DirectoryConfig{BaseURL: server.URL, Token: "tok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups, err := resolver.ListAssignableGroups(context.Background())
+	if err != nil || len(groups) != 1 || groups[0].GroupID != "team-a" || !groups[0].Assignable {
+		t.Fatalf("ListAssignableGroups = %+v, %v", groups, err)
+	}
+	// Listed groups are cached, so resolving them needs no further request.
+	if g, err := resolver.ResolveGroup(context.Background(), "team-a"); err != nil || g.Name != "Team A" {
+		t.Fatalf("ResolveGroup(team-a) = %+v, %v", g, err)
+	}
+	if g, err := resolver.ResolveGroup(context.Background(), "admins"); err != nil || g.Assignable {
+		t.Fatalf("ResolveGroup(admins) = %+v, %v; want not assignable", g, err)
 	}
 }

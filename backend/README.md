@@ -65,6 +65,16 @@ The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs
 `iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
 `GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
 
+## Authorization
+
+Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specified in
+[project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
+`internal/httpapi/handlers/project_access.go`. Members are managed under `/api/v1/projects/{id}/members`.
+
+Adding members and showing member names needs the Authentik Core API: set `AUTHENTIK_API_URL` (for example
+`http://localhost/auth`) and `AUTHENTIK_API_TOKEN` (a token that can read users and groups). Without them the API starts,
+omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
+
 ## Checks
 
 ```sh
