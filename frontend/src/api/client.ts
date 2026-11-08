@@ -9,8 +9,11 @@ export interface ApiClientOptions {
   onUnauthorized?: () => void
 }
 
+// The paths in `schema.d.ts` are complete (`/api/v1/me`, `/health/live`, `/auth/login`), because the
+// backend mounts them that way and the proxy forwards the full URI. So the base URL is only the
+// origin: empty for the same origin, `VITE_API_BASE_URL` for a backend elsewhere.
 export function createApiClient({
-  baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
+  baseUrl = import.meta.env.VITE_API_BASE_URL ?? '',
   getToken,
   onUnauthorized,
 }: ApiClientOptions = {}) {

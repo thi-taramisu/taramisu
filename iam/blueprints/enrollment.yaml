@@ -1,0 +1,207 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+version: 1
+metadata:
+  name: Taramisu registration
+  labels:
+    blueprints.goauthentik.io/instantiate: "false"
+entries:
+  - model: authentik_flows.flow
+    id: enrollment
+    identifiers:
+      slug: taramisu-enrollment
+    attrs:
+      name: Taramisu registration
+      title: Register for Taramisu
+      designation: enrollment
+      authentication: require_unauthenticated
+  - model: authentik_stages_prompt.prompt
+    id: username
+    identifiers:
+      name: taramisu-enrollment-username
+    attrs:
+      field_key: username
+      label: Username
+      type: username
+      required: true
+      order: 0
+  - model: authentik_stages_prompt.prompt
+    id: name
+    identifiers:
+      name: taramisu-enrollment-name
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      order: 1
+  - model: authentik_stages_prompt.prompt
+    id: email
+    identifiers:
+      name: taramisu-enrollment-email
+    attrs:
+      field_key: email
+      label: Email
+      type: email
+      required: true
+      order: 2
+  - model: authentik_stages_prompt.prompt
+    id: password
+    identifiers:
+      name: taramisu-enrollment-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      order: 3
+  - model: authentik_stages_prompt.prompt
+    id: password_repeat
+    identifiers:
+      name: taramisu-enrollment-password_repeat
+    attrs:
+      field_key: password_repeat
+      label: Confirm password
+      type: password
+      required: true
+      order: 4
+  - model: authentik_policies_password.passwordpolicy
+    id: password-policy
+    identifiers:
+      name: taramisu-enrollment-password
+    attrs:
+      length_min: 12
+      error_message: Use at least 12 characters for your password.
+  - model: authentik_policies_expression.expressionpolicy
+    id: username-policy
+    identifiers:
+      name: taramisu-enrollment-unique-username
+    attrs:
+      expression: |
+        import re
+        from django.db.models import Q
+        from authentik.core.models import User
+
+        data = request.context["prompt_data"]
+        username = data["username"].lower()
+        if not re.fullmatch(r"[a-z0-9._-]{1,150}", username):
+            ak_message("Use letters, numbers, dots, underscores or hyphens for your username.")
+            return False
+        users = User.objects.all()
+        if request.user.is_authenticated:
+            users = users.exclude(pk=request.user.pk)
+        if users.filter(username__iexact=username).exists():
+            ak_message("Username is already taken.")
+            return False
+        email = data["email"].strip().lower()
+        if users.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
+            ak_message("Email address is already in use.")
+            return False
+        data["username"] = username
+        data["email"] = email
+        return True
+  - model: authentik_stages_prompt.promptstage
+    id: details
+    identifiers:
+      name: taramisu-enrollment-details
+    attrs:
+      fields:
+        - !KeyOf username
+        - !KeyOf name
+        - !KeyOf email
+        - !KeyOf password
+        - !KeyOf password_repeat
+      validation_policies:
+        - !KeyOf password-policy
+        - !KeyOf username-policy
+  - model: authentik_stages_user_write.userwritestage
+    id: create-user
+    identifiers:
+      name: taramisu-enrollment-create-user
+    attrs:
+      user_creation_mode: always_create
+      create_users_as_inactive: true
+  - model: authentik_stages_prompt.prompt
+    id: confirmation-message
+    identifiers:
+      name: taramisu-enrollment-confirmation-message
+    attrs:
+      field_key: registration_confirmation
+      type: static
+      label: Registration submitted
+      initial_value: Registration submitted. An administrator must approve your account before you can sign in.
+      required: false
+      order: 0
+  - model: authentik_stages_prompt.promptstage
+    id: confirmation
+    identifiers:
+      name: taramisu-enrollment-confirmation
+    attrs:
+      fields:
+        - !KeyOf confirmation-message
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf details
+      order: 10
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf create-user
+      order: 20
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf confirmation
+      order: 30
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      user_fields: [email, username]
+      enrollment_flow: !KeyOf enrollment
+      case_insensitive_matching: true
+      show_matched_user: false
+  - model: authentik_stages_prompt.promptstage
+    identifiers:
+      name: default-user-settings
+    attrs:
+      validation_policies:
+        - !Find [authentik_policies_expression.expressionpolicy, [name, default-user-settings-authorization]]
+        - !KeyOf username-policy
+  - model: authentik_stages_deny.denystage
+    id: ambiguous-login
+    identifiers:
+      name: taramisu-ambiguous-login
+    attrs:
+      deny_message: This login identifier is ambiguous. Use your unique username or contact an administrator.
+  - model: authentik_flows.flowstagebinding
+    id: ambiguous-login-binding
+    identifiers:
+      target: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      stage: !KeyOf ambiguous-login
+      order: 15
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies_expression.expressionpolicy
+    id: ambiguous-login-policy
+    identifiers:
+      name: taramisu-ambiguous-login
+    attrs:
+      expression: |
+        from django.db.models import Q
+        from authentik.core.models import User
+
+        identifier = request.context.get("pending_user_identifier")
+        if not identifier:
+            return False
+        return User.objects.filter(
+            Q(username__iexact=identifier) | Q(email__iexact=identifier)
+        ).count() > 1
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf ambiguous-login-binding
+      policy: !KeyOf ambiguous-login-policy
+      order: 0
+    attrs:
+      failure_result: true

@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "CreateTaraProjectInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -89,6 +106,23 @@
         ],
         "type": "object"
       },
+      "ReplaceTaraProjectInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "StatusOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -101,14 +135,63 @@
         ],
         "type": "object"
       },
+      "TaraProjectBody": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "UpdateTaraProjectInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "User": {
         "additionalProperties": false,
         "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
           },
           "issuer": {
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           },
           "subject": {
@@ -118,16 +201,18 @@
         "required": [
           "id",
           "issuer",
-          "subject"
+          "subject",
+          "name",
+          "email"
         ],
         "type": "object"
       }
     },
     "securitySchemes": {
-      "session": {
-        "in": "cookie",
-        "name": "taramisu_session",
-        "type": "apiKey"
+      "bearer": {
+        "bearerFormat": "JWT",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -164,95 +249,291 @@
         },
         "security": [
           {
-            "session": []
+            "bearer": []
           }
         ],
         "summary": "Get the current user"
       }
     },
-    "/auth/callback": {
+    "/api/v1/projects": {
       "get": {
-        "operationId": "auth-callback",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "state",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+        "operationId": "list-tara-projects",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaraProjectBody"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
           },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
           {
-            "in": "query",
-            "name": "code",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "cookie",
-            "name": "taramisu_login",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "bearer": []
           }
         ],
-        "responses": {
-          "302": {
-            "description": "Clears taramisu_login, sets taramisu_session and redirects to /api/v1/me."
-          },
-          "400": {
-            "description": "Invalid, expired or rejected login attempt."
-          },
-          "401": {
-            "description": "Invalid identity token or claims."
-          },
-          "502": {
-            "description": "Token exchange failed or identity token missing."
-          },
-          "503": {
-            "description": "User database unavailable."
-          }
-        },
-        "summary": "Complete browser login"
-      }
-    },
-    "/auth/login": {
-      "get": {
-        "operationId": "auth-login",
-        "responses": {
-          "302": {
-            "description": "Sets taramisu_login and redirects to Authentik."
-          }
-        },
-        "summary": "Start browser login"
-      }
-    },
-    "/auth/logout": {
+        "summary": "List TARA projects",
+        "tags": [
+          "Tara Project"
+        ]
+      },
       "post": {
-        "operationId": "auth-logout",
+        "operationId": "create-tara-project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaraProjectInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a TARA project",
+        "tags": [
+          "Tara Project"
+        ]
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "delete": {
+        "operationId": "delete-tara-project",
         "parameters": [
           {
-            "description": "Must match APP_URL.",
-            "in": "header",
-            "name": "Origin",
+            "in": "path",
+            "name": "id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": "Clears taramisu_session. The Authentik SSO session remains active."
+            "description": "No Content"
           },
-          "403": {
-            "description": "Missing or invalid Origin header."
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
           }
         },
-        "summary": "End the backend session"
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a TARA project",
+        "tags": [
+          "Tara Project"
+        ]
+      },
+      "get": {
+        "operationId": "get-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a TARA project",
+        "tags": [
+          "Tara Project"
+        ]
+      },
+      "patch": {
+        "operationId": "update-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaraProjectInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Partially update a TARA project",
+        "tags": [
+          "Tara Project"
+        ]
+      },
+      "put": {
+        "operationId": "replace-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceTaraProjectInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a TARA project",
+        "tags": [
+          "Tara Project"
+        ]
       }
     },
     "/health/live": {
@@ -311,5 +592,11 @@
         "summary": "Get health ready"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "Create, read, replace, update and delete TARA projects.",
+      "name": "Tara Project"
+    }
+  ]
 }
