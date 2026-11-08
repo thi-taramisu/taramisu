@@ -4,15 +4,87 @@
  */
 
 export interface paths {
-    "/health": {
+    "/api/v1/me": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Liveness check */
-        get: operations["getHealth"];
+        /** Get the current user */
+        get: operations["current-user"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List TARA projects */
+        get: operations["list-tara-projects"];
+        put?: never;
+        /** Create a TARA project */
+        post: operations["create-tara-project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a TARA project */
+        get: operations["get-tara-project"];
+        /** Replace a TARA project */
+        put: operations["replace-tara-project"];
+        post?: never;
+        /** Delete a TARA project */
+        delete: operations["delete-tara-project"];
+        options?: never;
+        head?: never;
+        /** Partially update a TARA project */
+        patch: operations["update-tara-project"];
+        trace?: never;
+    };
+    "/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get health live */
+        get: operations["get-health-live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get health ready */
+        get: operations["get-health-ready"];
         put?: never;
         post?: never;
         delete?: never;
@@ -25,12 +97,82 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Health: {
-            /** @enum {string} */
-            status: "ok";
+        CreateTaraProjectInputBody: {
+            description?: string;
+            name: string;
         };
-        Error: {
+        ErrorDetail: {
+            /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
+            location?: string;
+            /** @description Error message text */
+            message?: string;
+            /** @description The value at the given location */
+            value?: unknown;
+        };
+        ErrorModel: {
+            /**
+             * @description A human-readable explanation specific to this occurrence of the problem.
+             * @example Property foo is required but is missing.
+             */
+            detail?: string;
+            /** @description Optional list of individual error details */
+            errors?: components["schemas"]["ErrorDetail"][] | null;
+            /**
+             * Format: uri
+             * @description A URI reference that identifies the specific occurrence of the problem.
+             * @example https://example.com/error-log/abc123
+             */
+            instance?: string;
+            /**
+             * Format: int64
+             * @description HTTP status code
+             * @example 400
+             */
+            status?: number;
+            /**
+             * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+             * @example Bad Request
+             */
+            title?: string;
+            /**
+             * Format: uri
+             * @description A URI reference to human-readable documentation for the error.
+             * @default about:blank
+             * @example https://example.com/errors/example
+             */
+            type: string;
+        };
+        ReadyOutputBody: {
             message: string;
+            status: string;
+        };
+        ReplaceTaraProjectInputBody: {
+            description?: string;
+            name: string;
+        };
+        StatusOutputBody: {
+            status: string;
+        };
+        TaraProjectBody: {
+            /** Format: date-time */
+            created_at: string;
+            description?: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        UpdateTaraProjectInputBody: {
+            description?: string | null;
+            name?: string;
+        };
+        User: {
+            /** Format: email */
+            email: string;
+            /** Format: uuid */
+            id: string;
+            issuer: string;
+            name: string;
+            subject: string;
         };
     };
     responses: never;
@@ -41,7 +183,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getHealth: {
+    "current-user": {
         parameters: {
             query?: never;
             header?: never;
@@ -50,22 +192,272 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Service is up */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Health"];
+                    "application/json": components["schemas"]["User"];
                 };
             };
-            /** @description Missing or invalid credentials */
-            401: {
+            /** @description Error */
+            default: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-tara-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "create-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaraProjectInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "replace-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplaceTaraProjectInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "delete-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaraProjectInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-health-live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-health-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
         };
