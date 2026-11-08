@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
@@ -140,11 +139,7 @@ func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOu
 	if err != nil {
 		return nil, err
 	}
-	groups := auth.UserFromContext(ctx).Groups
-	if groups == nil {
-		groups = []string{}
-	}
-	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{UserID: userID, GroupIds: groups})
+	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{UserID: userID, GroupIds: callerGroups(ctx)})
 	if err != nil {
 		return nil, err
 	}

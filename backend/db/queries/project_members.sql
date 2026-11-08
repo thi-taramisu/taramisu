@@ -54,3 +54,9 @@ WHERE a.tara_project_id = sqlc.arg(project_id) AND a.id = sqlc.arg(id)
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
 RETURNING a.id;
+
+-- Serializes membership changes per project. Store.UpdateProjectMemberRole and
+-- Store.DeleteProjectMember take this lock before the guarded statement, so two Owners cannot
+-- downgrade or remove each other at the same moment.
+-- name: LockTaraProject :one
+SELECT id FROM tara_project WHERE id = $1 FOR UPDATE;

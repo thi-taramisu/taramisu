@@ -239,7 +239,7 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 		if _, getErr := h.get(ctx, projectID, memberID); getErr != nil {
 			return nil, getErr
 		}
-		return nil, errLastOwner
+		return nil, errLastOwner()
 	}
 	if err != nil {
 		return nil, err
@@ -280,7 +280,7 @@ func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*st
 	}
 	if _, err := h.store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errLastOwner
+			return nil, errLastOwner()
 		}
 		return nil, err
 	}
@@ -320,7 +320,9 @@ func (h *ProjectMembers) get(ctx context.Context, projectID, memberID pgtype.UUI
 	return h.newNameResolver().member(ctx, row), nil
 }
 
-var errLastOwner = huma.Error409Conflict("a project needs at least one user with the Owner role")
+func errLastOwner() error {
+	return huma.Error409Conflict("a project needs at least one user with the Owner role")
+}
 
 func mapMemberError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {

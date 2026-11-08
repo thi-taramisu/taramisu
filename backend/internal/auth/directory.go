@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -48,6 +49,12 @@ type DirectoryResolver struct {
 	client  *http.Client
 	users   *ttlCache[string, UserMetadata]
 	groups  *ttlCache[string, GroupMetadata]
+
+	// listMu guards listedAt, the time of the last full user list read. Unknown subjects (for
+	// example deleted accounts) are not looked up again until the cache TTL has passed.
+	listMu   sync.Mutex
+	listedAt time.Time
+	listTTL  time.Duration
 }
 
 // NewDirectoryResolver validates the configuration and constructs a cached Authentik directory resolver.
@@ -64,12 +71,14 @@ func NewDirectoryResolver(cfg DirectoryConfig) (*DirectoryResolver, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Second}
 	}
+	users := newTTLCache[string, UserMetadata](cfg.TTL, cfg.MaxEntries)
 	return &DirectoryResolver{
 		baseURL: trimmed,
 		token:   cfg.Token,
 		client:  client,
-		users:   newTTLCache[string, UserMetadata](cfg.TTL, cfg.MaxEntries),
+		users:   users,
 		groups:  newTTLCache[string, GroupMetadata](cfg.TTL, cfg.MaxEntries),
+		listTTL: users.ttl,
 	}, nil
 }
 
@@ -119,6 +128,8 @@ func listAll[T any](ctx context.Context, d *DirectoryResolver, path string, quer
 
 // ResolveUser returns display metadata for a token subject (external_iam_sub), serving from the local TTL cache when fresh.
 // Authentik cannot filter users by the hashed subject, so a cache miss reads the user list once and caches every user.
+// After a full read, a subject that is still unknown returns ErrPrincipalNotFound without another read until the TTL
+// has passed, so deleted accounts in a member list do not trigger one full read each.
 func (d *DirectoryResolver) ResolveUser(ctx context.Context, subject string) (UserMetadata, error) {
 	if subject == "" {
 		return UserMetadata{}, errors.New("subject is required")
@@ -126,10 +137,20 @@ func (d *DirectoryResolver) ResolveUser(ctx context.Context, subject string) (Us
 	if cached, ok := d.users.get(subject); ok {
 		return cached, nil
 	}
+	d.listMu.Lock()
+	defer d.listMu.Unlock()
+	// Another request may have read the list while this one waited for the lock.
+	if cached, ok := d.users.get(subject); ok {
+		return cached, nil
+	}
+	if !d.listedAt.IsZero() && d.users.now().Sub(d.listedAt) < d.listTTL {
+		return UserMetadata{}, ErrPrincipalNotFound
+	}
 	users, err := listAll[authentikUser](ctx, d, "/api/v3/core/users/", url.Values{})
 	if err != nil {
 		return UserMetadata{}, err
 	}
+	d.listedAt = d.users.now()
 	var found *UserMetadata
 	for _, user := range users {
 		if user.UID == "" {
@@ -147,14 +168,16 @@ func (d *DirectoryResolver) ResolveUser(ctx context.Context, subject string) (Us
 	return *found, nil
 }
 
-// FindActiveUserByEmail returns the active Authentik user with exactly this email address.
-// Its Subject is the value the user's tokens carry in the sub claim.
+// FindActiveUserByEmail returns the active Authentik user with this email address, ignoring case.
+// Its Subject is the value the user's tokens carry in the sub claim. Authentik's email filter is
+// case-sensitive, so this uses the search parameter (substring match on email, name, and
+// username) and compares the email here.
 func (d *DirectoryResolver) FindActiveUserByEmail(ctx context.Context, email string) (UserMetadata, error) {
 	email = strings.TrimSpace(email)
 	if email == "" {
 		return UserMetadata{}, errors.New("email is required")
 	}
-	users, err := listAll[authentikUser](ctx, d, "/api/v3/core/users/", url.Values{"email": {email}, "is_active": {"true"}})
+	users, err := listAll[authentikUser](ctx, d, "/api/v3/core/users/", url.Values{"search": {email}, "is_active": {"true"}})
 	if err != nil {
 		return UserMetadata{}, err
 	}

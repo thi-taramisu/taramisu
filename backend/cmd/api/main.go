@@ -48,7 +48,7 @@ func run() error {
 		return err
 	}
 	defer closePool(pool, poolCloseTimeout)
-	queries := db.New(pool)
+	queries := db.NewStore(pool)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,

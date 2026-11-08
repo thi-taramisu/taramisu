@@ -66,6 +66,16 @@ func callerID(ctx context.Context) (pgtype.UUID, error) {
 	return id, nil
 }
 
+// callerGroups returns the caller's assignable Authentik groups from the token claim
+// taramisu_groups. It returns an empty list instead of nil, so the role queries always get an
+// array rather than NULL.
+func callerGroups(ctx context.Context) []string {
+	if groups := auth.UserFromContext(ctx).Groups; groups != nil {
+		return groups
+	}
+	return []string{}
+}
+
 // requireProject returns the caller's highest role in the project if it grants permission.
 // Callers without any role get 404, so the response does not reveal whether the project exists.
 // Members whose role is too low get 403.
@@ -74,11 +84,7 @@ func requireProject(ctx context.Context, store ProjectAccessStore, projectID pgt
 	if err != nil {
 		return "", err
 	}
-	groups := auth.UserFromContext(ctx).Groups
-	if groups == nil {
-		groups = []string{}
-	}
-	role, err := store.GetProjectRole(ctx, db.GetProjectRoleParams{ProjectID: projectID, UserID: userID, GroupIds: groups})
+	role, err := store.GetProjectRole(ctx, db.GetProjectRoleParams{ProjectID: projectID, UserID: userID, GroupIds: callerGroups(ctx)})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", huma.Error404NotFound("project not found")
 	}

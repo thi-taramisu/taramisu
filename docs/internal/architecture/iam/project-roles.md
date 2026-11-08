@@ -134,6 +134,9 @@ permission instead of a place in the order (see [Open questions](#open-questions
 - Only Authentik groups with the attribute `taramisu_assignable: true` can be assigned. This keeps administrator and system
   groups out of the selection.
 - Group membership is read from the token claim `taramisu_groups` (group UUIDs). It is not copied into the database.
+- Owners add users by the email address of their active Authentik account; case does not matter. Because every user can
+  create a project, every user can find out whether an email address has an active account (`201` or `422`). This is
+  accepted for an internal tool whose users are approved in Authentik.
 
 ### Leaving a project
 

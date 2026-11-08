@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -242,9 +243,13 @@ func TestDirectoryResolverFindsActiveUserByEmail(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		// Like Authentik's search: case-insensitive substring match, so similar addresses come back too.
 		results := []map[string]any{}
-		if q.Get("email") == "bob@example.com" {
-			results = append(results, map[string]any{"uid": "bob-sub", "username": "bob", "email": "Bob@Example.com", "is_active": true})
+		stored := "notbob@example.com"
+		if search := strings.ToLower(q.Get("search")); search != "" && strings.Contains(stored, search) {
+			results = append(results,
+				map[string]any{"uid": "notbob-sub", "username": "notbob", "email": "notbob@example.com", "is_active": true},
+				map[string]any{"uid": "bob-sub", "username": "bob", "email": "Bob@Example.com", "is_active": true})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
@@ -254,7 +259,7 @@ func TestDirectoryResolverFindsActiveUserByEmail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u, err := resolver.FindActiveUserByEmail(context.Background(), " bob@example.com ")
+	u, err := resolver.FindActiveUserByEmail(context.Background(), " BOB@example.com ")
 	if err != nil || u.Subject != "bob-sub" {
 		t.Fatalf("FindActiveUserByEmail = %+v, %v", u, err)
 	}
@@ -263,6 +268,41 @@ func TestDirectoryResolverFindsActiveUserByEmail(t *testing.T) {
 	}
 	if _, err := resolver.FindActiveUserByEmail(context.Background(), " "); err == nil {
 		t.Fatal("expected error for empty email")
+	}
+}
+
+func TestDirectoryResolverRemembersUnknownSubjects(t *testing.T) {
+	var reads int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reads++
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{{"uid": "alice-sub", "username": "alice"}}})
+	}))
+	t.Cleanup(server.Close)
+	resolver, err := NewDirectoryResolver(DirectoryConfig{BaseURL: server.URL, Token: "tok", TTL: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	resolver.users.now = func() time.Time { return now }
+	ctx := context.Background()
+	for range 3 {
+		if _, err := resolver.ResolveUser(ctx, "deleted-sub"); !errors.Is(err, ErrPrincipalNotFound) {
+			t.Fatalf("unknown subject: %v, want ErrPrincipalNotFound", err)
+		}
+	}
+	if _, err := resolver.ResolveUser(ctx, "alice-sub"); err != nil {
+		t.Fatalf("known subject: %v", err)
+	}
+	if reads != 1 {
+		t.Fatalf("user list read %d times within the TTL, want 1", reads)
+	}
+	now = now.Add(2 * time.Minute)
+	if _, err := resolver.ResolveUser(ctx, "deleted-sub"); !errors.Is(err, ErrPrincipalNotFound) {
+		t.Fatalf("unknown subject after TTL: %v", err)
+	}
+	if reads != 2 {
+		t.Fatalf("user list read %d times after the TTL, want 2", reads)
 	}
 }
 

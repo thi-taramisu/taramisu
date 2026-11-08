@@ -155,6 +155,20 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID pgtype.UUID)
 	return items, nil
 }
 
+const lockTaraProject = `-- name: LockTaraProject :one
+SELECT id FROM tara_project WHERE id = $1 FOR UPDATE
+`
+
+// Serializes membership changes per project. Store.UpdateProjectMemberRole and
+// Store.DeleteProjectMember take this lock before the guarded statement, so two Owners cannot
+// downgrade or remove each other at the same moment.
+func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, lockTaraProject, id)
+	var id_2 pgtype.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const updateProjectMemberRole = `-- name: UpdateProjectMemberRole :one
 UPDATE project_role_assignment a
 SET project_role = $1
