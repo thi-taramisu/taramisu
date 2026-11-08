@@ -81,7 +81,7 @@ The request flow including token refresh is described in [request flows](../requ
 
 ## Protecting a new endpoint
 
-> The function names below are planned in #186 and may still change. This section will be updated with the merged code.
+The helpers live in [`project_access.go`](../../../../backend/internal/httpapi/handlers/project_access.go) (#186).
 
 Access is **denied by default**. Every operation under `/api/` declares, when it is registered, which permission it needs and
 which record leads to its project. The check then runs centrally before the handler, so a handler cannot forget it. If an
