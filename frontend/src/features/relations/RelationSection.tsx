@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import type { EntityRef, EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, entityPath, entityTitle } from '../workspace/entities'
-import { AddRelationMenu } from './AddRelationMenu'
+import { AddRelationDialog } from './AddRelationDialog'
 
 export interface RelationRow extends EntityRef {
   /** Shown after the name, e.g. the C / I / A properties of the link. */
@@ -27,11 +27,14 @@ interface RelationSectionProps {
   /** Type of the linked elements. */
   type: EntityType
   title: string
-  addLabel: string
+  /** Singular name of the linked elements, e.g. "Asset". */
+  elementLabel: string
   rows: RelationRow[]
   /** Existing elements that can still be linked. */
   candidates: EntityRef[]
   onAdd: (id: string) => void
+  /** Shown in the add dialog, e.g. the properties of the new link. */
+  addFields?: ReactNode
   onRemove: (id: string) => void
   /** Blocks further changes while a request runs. */
   pending?: boolean
@@ -42,7 +45,7 @@ interface RelationSectionProps {
  * One block of a Relations tab (DS / TS Relation wireframes): the linked elements of one type with
  * "+ Add …" and remove. Knows nothing about the element it belongs to, so every Relations tab can use it.
  */
-export function RelationSection({ projectId, type, title, addLabel, rows, candidates, onAdd, onRemove, pending = false, error }: RelationSectionProps) {
+export function RelationSection({ projectId, type, title, elementLabel, rows, candidates, onAdd, addFields, onRemove, pending = false, error }: RelationSectionProps) {
   const headingId = useId()
 
   return (
@@ -52,7 +55,7 @@ export function RelationSection({ projectId, type, title, addLabel, rows, candid
         <h2 id={headingId} className="flex-1 text-sm font-medium">
           {title}
         </h2>
-        <AddRelationMenu label={addLabel} options={candidates} pending={pending} onAdd={(option) => onAdd(option.id)} />
+        <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} pending={pending} fields={addFields} onAdd={onAdd} />
       </div>
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">No {title.toLowerCase()} linked yet.</p>
@@ -113,7 +116,7 @@ function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelat
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove link to "{name}"?</AlertDialogTitle>
-          <AlertDialogDescription>Only the link is removed. The {typeLabel.toLowerCase()} itself is kept.</AlertDialogDescription>
+          <AlertDialogDescription>The {typeLabel.toLowerCase()} stays in the project. Only this link is removed.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>

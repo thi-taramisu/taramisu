@@ -1,0 +1,95 @@
+import { useId, useState, type ReactNode } from 'react'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import type { EntityRef } from '../../api/models/tree'
+
+// Names creating already, as in the wireframe; the create dialogs follow with the element types.
+const SEARCH_LABEL = 'Search by name, ID, or type a new name'
+
+interface AddRelationDialogProps {
+  /** Singular name of the linked elements, e.g. "Threat Scenario". */
+  elementLabel: string
+  /** Plural name of the linked elements in lower case, for the empty states. */
+  pluralLabel: string
+  /** Elements that can still be linked. */
+  options: EntityRef[]
+  onAdd: (id: string) => void
+  /** Keeps the dialog closed while a request runs; the focus stays on the button. */
+  pending?: boolean
+  /** Shown above the search, e.g. the properties of the new link. */
+  fields?: ReactNode
+}
+
+/** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
+export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, pending = false, fields }: AddRelationDialogProps) {
+  const id = useId()
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const title = `Add ${elementLabel}`
+  const term = search.trim().toLowerCase()
+  const matches = options.filter((option) => `${option.code} ${option.name}`.toLowerCase().includes(term))
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next && !pending)
+    setSearch('')
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm" aria-disabled={pending}>
+          <Plus aria-hidden="true" />
+          {title}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="gap-0 p-0 sm:max-w-xl">
+        <DialogHeader className="border-b px-4 py-3">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">Link an existing {elementLabel.toLowerCase()} of this item.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 p-4">
+          {fields}
+          <Input aria-label={SEARCH_LABEL} placeholder={SEARCH_LABEL} value={search} onChange={(event) => setSearch(event.target.value)} />
+          <div className="grid gap-1">
+            <h3 id={`${id}-existing`} className="font-medium">
+              Link existing in this item
+            </h3>
+            {matches.length === 0 ? (
+              <p className="py-2 text-muted-foreground">
+                {term ? `No ${pluralLabel} match "${search.trim()}".` : `No ${pluralLabel} left to link.`}
+              </p>
+            ) : (
+              <ul aria-labelledby={`${id}-existing`} className="max-h-64 overflow-y-auto">
+                {matches.map((option) => (
+                  <li key={option.id}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto w-full justify-start gap-3 py-2 font-normal whitespace-normal"
+                      onClick={() => {
+                        handleOpenChange(false)
+                        onAdd(option.id)
+                      }}
+                    >
+                      <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{option.code}</span>{' '}
+                      <span className="text-left">{option.name}</span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <DialogFooter className="mx-0 mb-0 justify-start p-2 sm:justify-start">
+          {/* Follows with the create dialogs of the element types, like the disabled entries of the "+ New" menu. */}
+          <Button type="button" variant="ghost" size="sm" disabled>
+            <Plus aria-hidden="true" />
+            Create new {elementLabel}…
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

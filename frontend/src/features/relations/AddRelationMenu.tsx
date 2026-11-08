@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -9,19 +8,15 @@ interface AddRelationMenuProps<T extends EntityRef> {
   /** Elements that can still be linked; the button is disabled without any. */
   options: T[]
   onAdd: (option: T) => void
-  /** Keeps the menu closed while a request runs; the focus stays on the button. */
-  pending?: boolean
   className?: string
 }
 
 /** "+ Add …" button with the existing elements that can be linked. */
-export function AddRelationMenu<T extends EntityRef>({ label, options, onAdd, pending = false, className }: AddRelationMenuProps<T>) {
-  const [open, setOpen] = useState(false)
-
+export function AddRelationMenu<T extends EntityRef>({ label, options, onAdd, className }: AddRelationMenuProps<T>) {
   return (
-    <DropdownMenu open={open} onOpenChange={(next) => setOpen(next && !pending)}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className={className} aria-disabled={pending} disabled={options.length === 0}>
+        <Button type="button" variant="outline" size="sm" className={className} disabled={options.length === 0}>
           <Plus aria-hidden="true" />
           {label}
         </Button>
