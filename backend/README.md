@@ -71,8 +71,9 @@ Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specifi
 [project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
 `internal/httpapi/handlers/project_access.go`. Members are managed under `/api/v1/projects/{id}/members`.
 
-Adding members and showing member names needs the Authentik Core API: set `AUTHENTIK_API_URL` (for example
-`http://localhost/auth`) and `AUTHENTIK_API_TOKEN` (a token that can read users and groups). Without them the API starts,
+Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
+The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
+host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
 omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
 
 ## Checks

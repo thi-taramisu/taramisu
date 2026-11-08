@@ -53,7 +53,7 @@ STUB
 chmod +x "$scratch/bin/docker" "$scratch/bin/curl"
 export PATH="$scratch/bin:$PATH"
 unset APP_URL OIDC_ISSUER OIDC_JWKS_URL OIDC_CLIENT_ID PG_PASS
-unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD
+unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD AUTHENTIK_API_TOKEN
 unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES
 unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
 unset PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL
@@ -140,6 +140,17 @@ partial=$(cksum "$scratch/iam/.env")
 expect_failure
 ! grep -q ' up ' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$partial"
+cp "$scratch/valid.env" "$scratch/iam/.env"
+
+# iam/.env files from before the API token get it appended; other secrets stay unchanged.
+grep -v -e '^AUTHENTIK_API_TOKEN=' -e '^# Token of the taramisu-api' "$scratch/valid.env" > "$scratch/iam/.env"
+cp "$scratch/iam/.env" "$scratch/old.env"
+run --init
+grep -q 'Added AUTHENTIK_API_TOKEN' "$scratch/output"
+grep -Eq '^AUTHENTIK_API_TOKEN=[0-9a-f]{64}$' "$scratch/iam/.env"
+test "$(grep -v -e '^AUTHENTIK_API_TOKEN=' -e '^# Token of the taramisu-api' "$scratch/iam/.env" | sed '/^$/d')" = "$(sed '/^$/d' "$scratch/old.env")"
+run --init
+! grep -q 'Added AUTHENTIK_API_TOKEN' "$scratch/output"
 cp "$scratch/valid.env" "$scratch/iam/.env"
 
 export DB_FAIL=1
@@ -232,6 +243,8 @@ assert api['environment']['APP_URL'] == 'http://127.0.0.1:8080'
 assert worker['environment']['OIDC_REDIRECT_URI'] == 'http://127.0.0.1:8080/auth/callback'
 assert api['environment']['OIDC_CLIENT_ID'] == worker['environment']['OIDC_CLIENT_ID'] == 'review-client'
 assert 'OIDC_CLIENT_SECRET' not in api['environment']
+assert api['environment']['AUTHENTIK_API_URL'] == 'http://authentik-server:9000/auth'
+assert api['environment']['AUTHENTIK_API_TOKEN'] == worker['environment']['AUTHENTIK_API_TOKEN'] != ''
 assert 'OIDC_CLIENT_SECRET' not in worker['environment']
 assert api['environment']['OIDC_ISSUER'] == 'http://127.0.0.1:8080/auth/application/o/taramisu/'
 assert api['environment']['OIDC_JWKS_URL'] == 'http://authentik-server:9000/auth/application/o/taramisu/jwks/'
