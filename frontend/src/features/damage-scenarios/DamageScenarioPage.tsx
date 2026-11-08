@@ -33,7 +33,7 @@ export function DamageScenarioPage() {
       type="damage-scenarios"
       name={scenario.data.title}
       code={scenario.data.code}
-      tabLabels={relations.data && { relations: `Relations (${relations.data.assets.length + relations.data.threatScenarios.length})` }}
+      tabCounts={relations.data && { relations: relations.data.assets.length + relations.data.threatScenarios.length }}
       actions={
         // A failed refetch keeps the loaded damage scenario, so unsaved edits in the tabs survive.
         scenario.isError && (

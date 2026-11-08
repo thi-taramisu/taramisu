@@ -54,7 +54,7 @@ describe('damage scenario relations', () => {
 
     expect(await section('Threat Scenarios').findByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
     expect(await within(tree()).findByRole('link', { name: /TS-02 Replayed headlamp command/ })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'Relations (3)' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Relations 3' })).toBeInTheDocument()
     expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-01', 'TS-02'])
   })
 
@@ -96,7 +96,7 @@ describe('damage scenario relations', () => {
     await remove(user, 'Threat Scenarios', TS01)
 
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'Relations (1)' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Relations 1' })).toBeInTheDocument()
     expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-01' }))
   })
 
