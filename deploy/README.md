@@ -119,36 +119,77 @@ reachable, forbidden paths (for example proxy → database, API → Authentik da
 
 ## Server (VM) setup and updates
 
-`taramisu-ctl.sh` sets up and updates the stack on a Debian VM (ARM64 or x86_64). Unlike `dev.sh` it uses only
-`compose.yaml` (no dev ports) and pulls the API, frontend and docs images from GHCR instead of building them.
-Run it as root from a clone of the repository:
+`taramisu-ctl.sh` installs and updates a taramisu release on a Linux host with Docker (ARM64 or x86_64).
+Unlike `dev.sh` it uses only `compose.yaml` (no dev ports) and pulls the API, frontend and docs images from GHCR
+instead of building them. One release tag `vX.Y.Z` selects both the Git checkout (compose files, nginx config,
+Authentik blueprints, migrations) and the three images, so they always fit together.
+
+### Prerequisites
+
+Docker Engine with the Compose plugin ([install docs](https://docs.docker.com/engine/install/)), `git`, `curl` and `openssl`.
+The script checks them and does not install anything.
+
+### Host setup (once, as root)
+
+1. Create a `taramisu` user as the only member of the `docker` group, and clone over HTTPS as that user
+   (no GitHub account needed):
+
+   ```sh
+   useradd --system --create-home --groups docker taramisu
+   install -d -o taramisu -g taramisu /opt/taramisu
+   sudo -u taramisu git clone https://github.com/thi-taramisu/taramisu.git /opt/taramisu
+   ```
+
+2. Allow the people who deploy to run only this script as `taramisu`, not root or a shell:
+
+   ```text
+   # /etc/sudoers.d/taramisu (edit with visudo -f)
+   %taramisu-admins ALL=(taramisu) NOPASSWD: /opt/taramisu/deploy/taramisu-ctl.sh
+   ```
+
+3. Read-only log access for everyone on the VM: set Docker's log driver to journald in `/etc/docker/daemon.json`
+   (not in the compose files, because Docker Desktop has no journald) and restart Docker before the first deployment:
+
+   ```json
+   { "log-driver": "journald", "log-opts": { "tag": "{{.Name}}" } }
+   ```
+
+   Members of the `systemd-journal` group can then read the logs without Docker access or sudo, for example
+   `journalctl CONTAINER_NAME=taramisu-api-1 -f`; journald handles rotation. This group can read the whole system journal.
+
+### Usage
 
 ```sh
-git clone https://github.com/thi-taramisu/taramisu.git && cd taramisu
-sudo deploy/taramisu-ctl.sh --bootstrap        # blank VM: install Docker, generate secrets, start the stack
-sudo deploy/taramisu-ctl.sh                    # update: pull latest images, migrate, recreate changed containers
-sudo deploy/taramisu-ctl.sh --set api=v0.3.0   # pin one service (api, frontend, docs); repeatable
-sudo deploy/taramisu-ctl.sh --set api=latest   # remove the pin, back to the newest image
-sudo deploy/taramisu-ctl.sh --prune            # also remove images no container uses any more
+sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh                   # apply the installed release again; fresh clone: newest release
+sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh --update          # install the newest release if it is newer
+sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh --version v0.3.0  # install a specific release (also rollback)
+sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh --prune           # also remove taramisu images no container uses
 ```
 
-- `--bootstrap` installs Docker Engine and the Compose plugin from Docker's apt repository if missing,
-  generates `iam/.env` with the same code as `dev.sh` and adds `PROXY_BIND=0.0.0.0`, so the proxy accepts connections from outside.
-  Locally the proxy stays on `127.0.0.1`.
-- Tags come from the publish workflow: `latest` (newest `main`), `sha-a1b2c3d` (one commit), `v0.3.0` (release).
-  Pinned tags are stored in `deploy/.image-tags` (not in Git), so later runs keep them. Pinning an older tag is a rollback;
-  database migrations are not rolled back.
-- Every run waits for the health checks (up to 10 minutes for Authentik, whose first start migrates its database),
-  checks `/health/ready` through the proxy and ends with a table of services, image tags and digests.
+- The script refuses to run as root, because root would own `iam/.env` and Git objects and break the next regular run.
+- It fetches the release tags, checks out the selected tag (detached) and continues with the script of that release.
+  Releases older than the script cannot be installed with it. Database migrations are not rolled back.
+- On the first run it generates `iam/.env` with the same code as `dev.sh` and adds `PROXY_BIND=0.0.0.0`,
+  so the proxy accepts connections from outside. Locally the proxy stays on `127.0.0.1`.
+- Every run pulls the images, runs pending migrations, recreates changed containers, waits for the health checks
+  (up to 10 minutes for Authentik, whose first start migrates its database), checks `/health/ready` through the proxy
+  and ends with a table of services, image tags and digests.
+- `--prune` removes only `ghcr.io/thi-taramisu/*` images; images of other projects on the host stay.
 - The images are public, so no GHCR login is needed. The docs image contains its site URL from the repository variable `DOCS_SITE_URL`.
-- Not covered yet: HTTPS, and Authentik settings for a public host name (`OIDC_ISSUER`, see #103).
 
-`deploy/test-bootstrap.sh` runs the bootstrap in a throwaway privileged `debian:trixie` container (Docker in Docker),
-so it can be tried without a VM. The first run takes about 10–15 minutes because every image is downloaded.
+Two notes on `PROXY_BIND=0.0.0.0`: ports published by Docker bypass UFW (filter in the `DOCKER-USER` chain or in the
+provider's firewall), and until HTTPS is in place (#103) the server must not be reachable from the internet.
+`PROXY_BIND` in `iam/.env` can also be an internal or VPN address instead.
+
+### Testing without a VM
+
+`deploy/test-bootstrap.sh` runs the script in a throwaway privileged `docker:dind` container: a `taramisu` user in the
+`docker` group owns a real clone with all tags plus two test releases made from the working tree (`v99.0.0`, `v99.0.1`).
+They have no published images, so the test uses the `latest` images. The first run takes about 10–15 minutes.
 
 ```sh
-deploy/test-bootstrap.sh                 # run taramisu-ctl.sh --bootstrap in a fresh "VM"
-deploy/test-bootstrap.sh sh              # open a shell in the fresh "VM" instead
+deploy/test-bootstrap.sh       # install the newest test release, ends with the status table
+deploy/test-bootstrap.sh sh    # or a shell as taramisu, e.g. to try --version v99.0.0 and --update
 ```
 
 ## Database password mismatch

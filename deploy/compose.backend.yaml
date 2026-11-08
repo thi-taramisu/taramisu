@@ -59,7 +59,7 @@ services:
 
   api:
     networks: [proxy, app-db]
-    image: ghcr.io/thi-taramisu/taramisu-api:${API_IMAGE_TAG:-latest}
+    image: ghcr.io/thi-taramisu/taramisu-api:${TARAMISU_VERSION:-latest}
     build:
       context: ../backend
     environment:

@@ -1,79 +1,53 @@
 #!/bin/sh
-# Sets up and updates taramisu on a Debian VM (#110). Run as root.
+# Installs and updates a taramisu release on a Linux host with Docker (#110).
+# Run it as the user that owns the checkout, e.g. through the sudoers rule in deploy/README.md:
 #
-#   sudo deploy/taramisu-ctl.sh --bootstrap           # blank VM: install Docker, then set up the stack
-#   sudo deploy/taramisu-ctl.sh                       # update: pull images, migrate, recreate changed containers
-#   sudo deploy/taramisu-ctl.sh --set api=v0.3.0      # pin a tag (api, frontend, docs); repeatable
-#   sudo deploy/taramisu-ctl.sh --set api=latest      # remove the pin again
-#   sudo deploy/taramisu-ctl.sh --prune               # also remove unused old images after the update
+#   sudo -u taramisu deploy/taramisu-ctl.sh                   # apply the installed release again; fresh clone: newest release
+#   sudo -u taramisu deploy/taramisu-ctl.sh --update          # install the newest release if it is newer
+#   sudo -u taramisu deploy/taramisu-ctl.sh --version v0.3.0  # install a specific release (also rollback)
+#   sudo -u taramisu deploy/taramisu-ctl.sh --prune           # also remove taramisu images no container uses
 #
-# Pinned tags are kept in deploy/.image-tags (not in Git), so later runs keep them.
+# One release tag selects both the Git checkout (compose files, nginx config, blueprints, migrations)
+# and the api, frontend and docs images, so they always fit together.
 set -eu
 cd "$(dirname "$0")"
 
 usage() {
-    echo 'Usage: sudo deploy/taramisu-ctl.sh [--bootstrap] [--set SERVICE=TAG]... [--prune]' >&2
-    echo '       SERVICE is api, frontend or docs; TAG e.g. latest, v0.3.0, sha-a1b2c3d' >&2
+    echo 'Usage: deploy/taramisu-ctl.sh [--update | --version vX.Y.Z] [--prune]' >&2
     exit 2
 }
 
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 
-# Docker's official apt repository, see https://docs.docker.com/engine/install/debian/
-install_docker() {
-    [ -r /etc/os-release ] || die 'cannot detect the OS (/etc/os-release missing)'
-    . /etc/os-release
-    [ "${ID:-}" = debian ] || die "only Debian is supported, found ${ID:-unknown}"
-    log "Installing Docker Engine and Compose plugin for Debian $VERSION_CODENAME"
-    apt-get update -qq
-    apt-get install -y -qq ca-certificates curl > /dev/null
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL "https://download.docker.com/linux/$ID/gpg" -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$ID $VERSION_CODENAME stable" \
-        > /etc/apt/sources.list.d/docker.list
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin > /dev/null
-}
+release_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
 
-start_docker() {
-    if docker info > /dev/null 2>&1; then
-        return
-    fi
-    if [ -d /run/systemd/system ]; then
-        log 'Starting Docker (systemd)'
-        systemctl enable --now docker
-    else
-        # No systemd, e.g. in deploy/test-bootstrap.sh: start the daemon directly.
-        log 'Starting Docker daemon (no systemd)'
-        dockerd > /var/log/dockerd.log 2>&1 &
-    fi
-    tries=0
-    until docker info > /dev/null 2>&1; do
-        tries=$((tries + 1))
-        [ "$tries" -le 30 ] || die 'Docker did not start; see /var/log/dockerd.log or journalctl -u docker'
-        sleep 1
+# Git on the repository root; no pager, because the script runs through sudo without a terminal setup.
+repo_git() { git -C .. --no-pager "$@"; }
+
+check_prerequisites() {
+    # Root would leave iam/.env and .git objects owned by root, so the next regular run fails.
+    [ "$(id -u)" -ne 0 ] || die 'do not run as root; use: sudo -u taramisu deploy/taramisu-ctl.sh ...'
+    for tool in git curl openssl; do
+        command -v "$tool" > /dev/null 2>&1 || die "$tool is required"
     done
+    docker compose version > /dev/null 2>&1 \
+        || die 'Docker Engine with the Compose plugin is required, see https://docs.docker.com/engine/install/'
+    docker info > /dev/null 2>&1 \
+        || die 'cannot reach the Docker daemon; use: sudo -u taramisu deploy/taramisu-ctl.sh ...'
 }
 
-ensure_docker() {
-    if command -v docker > /dev/null 2>&1 && docker compose version > /dev/null 2>&1; then
-        log "Docker already installed ($(docker --version))"
-    else
-        install_docker
-    fi
-    start_docker
-    log "$(docker version --format 'Docker Engine {{.Server.Version}}')"
-    log "$(docker compose version)"
+# Release tag of the current checkout, empty if HEAD is not a release.
+installed_version() {
+    repo_git tag --points-at HEAD --list 'v*' --sort=-v:refname | grep -E "$release_pattern" | head -n 1
+}
+
+newest_version() {
+    repo_git tag --list 'v*' --sort=-v:refname | grep -E "$release_pattern" | head -n 1
 }
 
 # Secrets live in iam/.env, generated by the same code as for local development.
 ensure_env() {
-    if ! command -v openssl > /dev/null 2>&1; then
-        apt-get install -y -qq openssl > /dev/null
-    fi
     if [ -e ../iam/.env ]; then
         log 'Keeping existing iam/.env'
     else
@@ -90,43 +64,8 @@ ensure_env() {
     log "iam/.env ok ($(stat -c %a ../iam/.env))"
 }
 
-tags_file=.image-tags
-
-# --set api=v0.3.0 -> API_IMAGE_TAG=v0.3.0 in .image-tags; "latest" removes the pin.
-set_tag() {
-    service=${1%%=*}
-    tag=${1#*=}
-    case "$service" in
-        api | frontend | docs) ;;
-        *) die "unknown service '$service' in --set (api, frontend or docs)" ;;
-    esac
-    printf '%s' "$tag" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$' || die "invalid tag '$tag'"
-    var=$(printf '%s_IMAGE_TAG' "$service" | tr '[:lower:]' '[:upper:]')
-    touch "$tags_file"
-    grep -v "^$var=" "$tags_file" > "$tags_file.new" || true
-    if [ "$tag" != latest ]; then
-        echo "$var=$tag" >> "$tags_file.new"
-    fi
-    mv "$tags_file.new" "$tags_file"
-    log "$service: ${tag}"
-}
-
-load_tags() {
-    if [ -s "$tags_file" ]; then
-        log "Pinned tags: $(tr '\n' ' ' < "$tags_file")"
-        set -a
-        . "./$tags_file"
-        set +a
-    fi
-}
-
 # Server stack: compose.yaml only (no dev ports), images from GHCR instead of local builds.
 compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
-
-pull_images() {
-    log 'Pulling images'
-    compose pull --quiet
-}
 
 # Waits until all given services report healthy. Unlike "compose up --wait" it keeps waiting
 # when a service is briefly unhealthy, e.g. while Authentik migrates its database on first start.
@@ -167,12 +106,28 @@ start_stack() {
     rm "$blueprint_log"
     log 'Running migrations and starting the API, frontend, docs and proxy'
     compose up -d --no-build --wait --wait-timeout 300 --remove-orphans
-    # Pick up new container addresses after recreated containers.
-    compose exec -T proxy nginx -s reload 2> /dev/null
+    # Compose does not recreate the proxy when its bind-mounted config changes, and the reload
+    # also picks up new container addresses. Test first, so a broken config keeps the old one running.
+    compose exec -T proxy nginx -t -q || die 'nginx config test failed; the proxy keeps its old config'
+    # nginx reports even a successful reload on stderr, so show its output only on failure.
+    reload_output=$(compose exec -T proxy nginx -s reload 2>&1) || die "nginx reload failed: $reload_output"
     if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused --retry-delay 1 \
         --retry-max-time 30 http://localhost/health/ready > /dev/null; then
         die 'API not ready through the proxy; see: docker compose -f deploy/compose.yaml logs api proxy'
     fi
+}
+
+# Removes only our own images; images of other projects on the host stay.
+prune_images() {
+    log 'Removing unused taramisu images'
+    docker image ls --filter 'reference=ghcr.io/thi-taramisu/*' \
+        --format '{{if eq .Tag "<none>"}}{{.ID}}{{else}}{{.Repository}}:{{.Tag}}{{end}}' \
+        | while read -r image; do
+            # Docker refuses to remove an image that a container still uses, so those stay.
+            if docker image rm "$image" > /dev/null 2>&1; then
+                log "Removed $image"
+            fi
+        done
 }
 
 # Running services with tag and image digest, so an update or rollback can be checked.
@@ -189,51 +144,70 @@ show_status() {
         done | sort
     } | awk -F '\t' '
         { for (i = 1; i <= NF; i++) { cell[NR, i] = $i; if (length($i) > width[i]) width[i] = length($i) } }
-        END { for (r = 1; r <= NR; r++) { for (i = 1; i <= 4; i++) printf "%-*s  ", width[i], cell[r, i]; print "" } }'
+        END { for (r = 1; r <= NR; r++) { for (i = 1; i <= 4; i++) printf "%-" width[i] "s  ", cell[r, i]; print "" } }'
 }
 
-bootstrap=false
+update=false
+version=
 prune=false
-sets=
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --bootstrap) bootstrap=true ;;
-        --prune) prune=true ;;
-        --set)
+        --update) update=true ;;
+        --version)
             [ "$#" -ge 2 ] || usage
-            sets="$sets $2"
+            version=$2
             shift
             ;;
-        --set=*) sets="$sets ${1#--set=}" ;;
-        -h | --help) usage ;;
+        --version=*) version=${1#--version=} ;;
+        --prune) prune=true ;;
         *) usage ;;
     esac
     shift
 done
-
-[ "$(id -u)" -eq 0 ] || die 'run as root: sudo deploy/taramisu-ctl.sh ...'
-export DEBIAN_FRONTEND=noninteractive
-
-if $bootstrap; then
-    ensure_docker
-    ensure_env
-else
-    command -v docker > /dev/null 2>&1 || die 'Docker is not installed; run with --bootstrap first'
-    [ -e ../iam/.env ] || die 'iam/.env is missing; run with --bootstrap first'
-    start_docker
+if $update && [ -n "$version" ]; then
+    usage
 fi
-for item in $sets; do
-    case "$item" in
-        *=*) set_tag "$item" ;;
-        *) die "--set expects SERVICE=TAG, got '$item'" ;;
-    esac
-done
-load_tags
-pull_images
+if [ -n "$version" ]; then
+    printf '%s\n' "$version" | grep -Eq "$release_pattern" || die "invalid version '$version', expected vX.Y.Z"
+fi
+
+check_prerequisites
+
+log 'Fetching release tags'
+repo_git fetch --quiet --tags origin || die 'git fetch failed'
+installed=$(installed_version)
+if [ -n "$version" ]; then
+    repo_git rev-parse --quiet --verify "refs/tags/$version" > /dev/null || die "release $version does not exist"
+    target=$version
+elif $update || [ -z "$installed" ]; then
+    target=$(newest_version)
+    [ -n "$target" ] || die 'no release tag vX.Y.Z found'
+else
+    target=$installed
+fi
+repo_git cat-file -e "$target:deploy/taramisu-ctl.sh" 2> /dev/null \
+    || die "release $target is older than taramisu-ctl.sh and cannot be installed with it"
+
+if [ "$target" != "$installed" ]; then
+    repo_git diff --quiet HEAD || die 'the checkout has local changes; remove them first (git status)'
+    log "Switching the checkout from ${installed:-$(repo_git rev-parse --short HEAD)} to $target"
+    repo_git checkout --quiet --detach "refs/tags/$target"
+    # sh reads this file while it runs, so continue with the script of the new release.
+    if $prune; then
+        exec ./taramisu-ctl.sh --version "$target" --prune
+    fi
+    exec ./taramisu-ctl.sh --version "$target"
+fi
+
+log "Release $target"
+# The release tag is also the image tag. TARAMISU_IMAGE_TAG overrides it only for deploy/test-bootstrap.sh,
+# whose test release has no published images.
+export TARAMISU_VERSION="${TARAMISU_IMAGE_TAG:-$target}"
+ensure_env
+log 'Pulling images'
+compose pull --quiet
 start_stack
 if $prune; then
-    log 'Removing unused images'
-    # -a: also tagged images that no container uses any more, e.g. an old pinned version.
-    docker image prune -af > /dev/null
+    prune_images
 fi
 show_status
