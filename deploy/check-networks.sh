@@ -4,6 +4,8 @@
 #
 # A throwaway busybox container joins one network at a time and tries to open a TCP connection.
 # This tests the network itself, so it also covers distroless images like the API, which have no shell.
+# Allowed paths use service names, as the services do. Forbidden paths use the target's IP address in its own network:
+# Docker's DNS does not resolve a name outside its networks, so a name would fail even if traffic were possible.
 #
 # Usage: make -C deploy check-networks   (the stack must be running, e.g. make -C deploy up)
 set -euo pipefail
@@ -29,7 +31,21 @@ check() {
   fi
 }
 
+# IP of a service in one of its networks, e.g. ip_of db app-db; fails if the service is not running.
+ip_of() {
+  local ip
+  ip=$(docker inspect -f "{{with index .NetworkSettings.Networks \"${PROJECT}_$2\"}}{{.IPAddress}}{{end}}" "${PROJECT}-$1-1") || exit 1
+  [ -n "$ip" ] || { echo "$1 has no address in network $2; is the stack running?" >&2; exit 1; }
+  echo "$ip"
+}
+
 docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE" >/dev/null
+
+db=$(ip_of db app-db)
+authentik_db=$(ip_of authentik-db iam-db)
+api=$(ip_of api proxy)
+frontend=$(ip_of frontend proxy)
+docs=$(ip_of docs proxy)
 
 echo "Allowed:"
 check proxy  frontend:80              open "proxy forwards to the frontend"
@@ -41,14 +57,14 @@ check iam-db authentik-db:5432        open "Authentik reaches its database"
 check edge   "$INTERNET"              open "edge has internet access (shows that the check itself works)"
 
 echo "Forbidden:"
-check proxy  db:5432                  closed "proxy network cannot reach the database"
-check proxy  authentik-db:5432        closed "proxy network cannot reach the Authentik database"
-check app-db authentik-db:5432        closed "API cannot reach the Authentik database"
-check iam-db db:5432                  closed "Authentik cannot reach the application database"
-check edge   api:8080                 closed "edge cannot reach the API directly"
-check edge   frontend:80              closed "edge cannot reach the frontend directly"
-check edge   docs:80                  closed "edge cannot reach the docs directly"
-check edge   db:5432                  closed "edge cannot reach the database"
+check proxy  "$db:5432"               closed "proxy network cannot reach the database"
+check proxy  "$authentik_db:5432"     closed "proxy network cannot reach the Authentik database"
+check app-db "$authentik_db:5432"     closed "API cannot reach the Authentik database"
+check iam-db "$db:5432"               closed "Authentik cannot reach the application database"
+check edge   "$api:8080"              closed "edge cannot reach the API directly"
+check edge   "$frontend:80"           closed "edge cannot reach the frontend directly"
+check edge   "$docs:80"               closed "edge cannot reach the docs directly"
+check edge   "$db:5432"               closed "edge cannot reach the database"
 check proxy  "$INTERNET"              closed "API, frontend, docs and Authentik server have no internet access"
 check app-db "$INTERNET"              closed "database network has no internet access"
 check iam-db "$INTERNET"              closed "Authentik database network has no internet access"

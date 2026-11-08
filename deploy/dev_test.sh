@@ -210,16 +210,18 @@ for service, networks in expected_networks.items():
 assert not any(network.get('external') for network in model['networks'].values())
 assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
     'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True}
-assert 'authentik.localhost' in services['authentik-server']['networks']['proxy']['aliases']
+assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
 # Without the dev override only the proxy publishes a port.
 assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}
 dev = json.loads((root / 'dev.json').read_text())
-assert not dev['networks']['dev'].get('internal')
+assert not any(dev['networks'][network].get('internal') for network in ('dev-app', 'dev-iam'))
 expected_ports = {'proxy': '80', 'db': '5432', 'pgadmin': '5050', 'authentik-server': '9000'}
+# Separate dev networks, so the published ports do not connect the application and the Authentik side.
+dev_networks = {'db': {'dev-app'}, 'pgadmin': {'dev-app'}, 'authentik-server': {'dev-iam'}}
 for name, service in dev['services'].items():
     published = {port['published'] for port in service.get('ports', [])}
     assert published == ({expected_ports[name]} if name in expected_ports else set()), name
-    assert set(service['networks']) == expected_networks[name] | ({'dev'} if name in expected_ports and name != 'proxy' else set()), name
+    assert set(service['networks']) == expected_networks[name] | dev_networks.get(name, set()), name
 assert all(port['host_ip'] == '127.0.0.1' for service in dev['services'].values() for port in service.get('ports', []))
 api = services['api']
 worker = services['authentik-worker']

@@ -77,11 +77,12 @@ with the project name (for example `taramisu_proxy`); no externally created netw
 | `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests (incl. `/auth/` to Authentik); API fetches JWKS from `authentik-server:9000` |
 | `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
 | `iam-db` | yes | Authentik server, worker, and database | IAM database |
-| `dev` | no | db, pgAdmin, Authentik server | only from `compose.dev.yaml`, so these services can publish ports locally |
+| `dev-app` | no | db, pgAdmin | only from `compose.dev.yaml`, so these services can publish ports locally |
+| `dev-iam` | no | Authentik server | only from `compose.dev.yaml`, separate from `dev-app` so Authentik cannot reach the application database |
 
 Two containers can only reach each other if they share a network. The proxy can reach the frontend, the API, docs and Authentik, but no
 database; the API cannot reach the Authentik database. Internal networks have no internet access, and containers that are only in
-internal networks cannot publish ports. `compose.dev.yaml` therefore adds the `dev` network together with the local ports
+internal networks cannot publish ports. `compose.dev.yaml` therefore adds the `dev-app` and `dev-iam` networks together with the local ports
 (db 5432, pgAdmin 5050, Authentik 9000). `dev.sh` and the Makefile always load it; without it only the proxy publishes a port.
 
 For the default project name `taramisu`, volume names preserve the former Authentik branch's data:
@@ -116,6 +117,7 @@ They cover startup ordering, first-run secrets, missing secrets with existing da
 A live check should also start a fresh stack, verify readiness/login redirects, and restart it to check persistence.
 `check-networks` starts a throwaway busybox container in one network at a time and tries to open TCP connections: allowed paths must be
 reachable, forbidden paths (for example proxy → database, API → Authentik database, internet from internal networks) must not be.
+Forbidden paths use the target's IP address, because Docker's DNS does not resolve service names outside their networks.
 
 ## Database password mismatch
 
