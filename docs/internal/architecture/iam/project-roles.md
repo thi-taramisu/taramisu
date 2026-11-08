@@ -88,28 +88,27 @@ which record leads to its project. The check then runs centrally before the hand
 operation has no declaration, the API refuses to start and every test fails.
 
 ```go
-huma.Register(api, ProjectOperation(h.store, huma.Operation{
+Register(api, huma.Operation{
     OperationID: "update-asset",
     Method:      http.MethodPatch,
     Path:        "/api/v1/item-definitions/{item_definition_id}/assets/{id}",
-}, ScopeItemDefinition, PermEdit), h.Update)
+}, InProject(h.access, ScopeItemDefinition, PermEdit), h.Update)
 ```
 
 What the lines mean, for readers new to Go:
 
-- `huma.Register` connects a URL to a handler function (`h.Update`). `ProjectOperation(...)` adds the check to the operation
-  before it is registered.
-- `ScopeItemDefinition` says where the project comes from: the `{item_definition_id}` in the path (step 3). There are scopes
-  for projects and threat scenarios too.
+- `Register` connects a URL to a handler function (`h.Update`) and adds the check described by its third argument.
+- `InProject(...)` says the operation belongs to a project. `ScopeItemDefinition` says where the project comes from: the
+  `{item_definition_id}` in the path (step 3). There are scopes for projects and threat scenarios too.
 - `PermEdit` names *what* the operation does, not *who* may do it. Which roles have which permission is defined in one place
   only.
 - Inside the handler, the caller is already allowed. The handler can read the caller's role from the request context (step 2)
   if it needs it, for example to let members remove only themselves.
-- Operations without a project, such as the project list or `GET /api/v1/me`, are declared with `WithoutProject(...)`.
+- Operations without a project, such as the project list or `GET /api/v1/me`, use `WithoutProject()` instead of `InProject`.
 
 Checklist for every endpoint:
 
-- [ ] Register it with `ProjectOperation` and the scope of the record's parent, or with `WithoutProject` if it has no project.
+- [ ] Register it with `InProject` and the scope of the record's parent, or with `WithoutProject()` if it has no project.
 - [ ] Use `PermRead` for `GET`, `PermEdit` for changes to analysis content, `PermManage` for settings, members, archive, and delete.
 - [ ] Keep the record's parent in every SQL `WHERE` clause so a record cannot be reached through another project.
 - [ ] Test `401` without a token, `404` for a non-member, `403` for a role that is too low, and success for the lowest allowed role.
