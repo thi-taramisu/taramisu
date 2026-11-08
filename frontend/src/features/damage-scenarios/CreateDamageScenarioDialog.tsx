@@ -7,8 +7,8 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty, ItemAsset } from '../../api/models/asset'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { useCreateDamageScenario, useItemAssets, useProjectTree } from '../../api/queries/items'
+import { AddAssetMenu } from '../assets/AddAssetMenu'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
-import { AddRelationMenu } from '../relations/AddRelationMenu'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
 
@@ -137,10 +137,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
             ))}
           </ul>
         )}
-        <AddRelationMenu
-          label="Add Asset"
-          className="justify-self-start border-dashed"
-          options={assets?.filter((asset) => !links.some((link) => link.assetId === asset.id)) ?? []}
+        <AddAssetMenu
+          assets={assets?.filter((asset) => !links.some((link) => link.assetId === asset.id)) ?? []}
           onAdd={(asset) => changeLinks([...links, { assetId: asset.id }])}
         />
         {linkError && (

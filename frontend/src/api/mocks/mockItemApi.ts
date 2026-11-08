@@ -123,6 +123,8 @@ function syncLinks(entry: StoredItem) {
     const threatIds = new Set(entry.threatDamageLinks.filter((link) => scenarioIds.has(link.damage_scenario_id)).map((link) => link.threat_scenario_id))
     asset.damageScenarios = scenarioIds.size
     asset.threatScenarios = threatIds.size
+    // Without threat scenarios nothing is rated; the mock cannot recalculate the value when one is linked again.
+    if (threatIds.size === 0) asset.maxRisk = null
     const node = entry.children.find((child) => child.type === 'assets' && child.id === asset.id)
     if (!node) continue
     const others = node.children?.filter((child) => child.type !== 'damage-scenarios') ?? []

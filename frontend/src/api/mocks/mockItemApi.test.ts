@@ -218,7 +218,7 @@ describe('retryUnlessNotFound', () => {
       expect(await treeBelow(api, 'a-01')).toBeUndefined()
       expect(await treeBelow(api, 'a-02')).toMatchObject([{ code: 'DS-01', children: [{ code: 'TS-01', children: [{ code: 'AP-01' }, { code: 'AP-02' }] }] }])
       const assets = await api.content.assets(project, 'i-01')
-      expect(assets.find((a) => a.id === 'a-01')).toMatchObject({ damageScenarios: 0, threatScenarios: 0 })
+      expect(assets.find((a) => a.id === 'a-01')).toMatchObject({ damageScenarios: 0, threatScenarios: 0, maxRisk: null })
       expect(assets.find((a) => a.id === 'a-02')).toMatchObject({ damageScenarios: 1, threatScenarios: 1 })
     })
 

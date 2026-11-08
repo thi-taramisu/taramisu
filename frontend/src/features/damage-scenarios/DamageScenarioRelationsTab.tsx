@@ -57,7 +57,9 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         elementLabel="Asset"
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
         pending={assetLink.isPending}
-        error={assetLink.isError ? SAVE_ERROR : itemAssets.isError ? 'The assets of this item could not be loaded.' : undefined}
+        candidatesLoading={itemAssets.isPending}
+        candidatesError={itemAssets.isLoadingError ? 'The assets of this item could not be loaded.' : undefined}
+        error={assetLink.isError ? SAVE_ERROR : undefined}
         // New links start with all properties of the asset, as in the create dialog; they are refined in the table.
         onAdd={(assetId) => {
           const properties = assetCandidates.find((asset) => asset.id === assetId)?.properties ?? []
@@ -88,7 +90,9 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         elementLabel="Threat Scenario"
         candidates={threatCandidates}
         pending={threatLink.isPending}
-        error={threatLink.isError ? SAVE_ERROR : itemThreats.isError ? 'The threat scenarios of this item could not be loaded.' : undefined}
+        candidatesLoading={itemThreats.isPending}
+        candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
+        error={threatLink.isError ? SAVE_ERROR : undefined}
         onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
         onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
         rows={threats}
