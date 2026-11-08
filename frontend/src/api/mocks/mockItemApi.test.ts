@@ -171,14 +171,6 @@ describe('createMockItemApi', () => {
 
     expect((await second.items.get(project, 'i-01')).name).toBe('Headlamp system')
   })
-})
-
-describe('retryUnlessNotFound', () => {
-  it('does not retry 404s but retries other errors up to three times', () => {
-    expect(retryUnlessNotFound(0, new ApiError(404, 'gone'))).toBe(false)
-    expect(retryUnlessNotFound(0, new ApiError(500, 'oops'))).toBe(true)
-    expect(retryUnlessNotFound(3, new Error('network'))).toBe(false)
-  })
 
   describe('damage scenario relations', () => {
     it('returns the linked assets with their properties and the linked threat scenarios', async () => {
@@ -231,5 +223,13 @@ describe('retryUnlessNotFound', () => {
 
       expect((await treeBelow(api, 'a-01'))![0].children).toMatchObject([{ code: 'TS-01', children: [{ code: 'AP-01' }, { code: 'AP-02' }] }])
     })
+  })
+})
+
+describe('retryUnlessNotFound', () => {
+  it('does not retry 404s but retries other errors up to three times', () => {
+    expect(retryUnlessNotFound(0, new ApiError(404, 'gone'))).toBe(false)
+    expect(retryUnlessNotFound(0, new ApiError(500, 'oops'))).toBe(true)
+    expect(retryUnlessNotFound(3, new Error('network'))).toBe(false)
   })
 })

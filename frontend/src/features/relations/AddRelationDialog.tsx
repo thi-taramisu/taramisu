@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode, type Ref } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -28,10 +28,11 @@ interface AddRelationDialogProps {
   onAdd: (id: string) => void
   /** Keeps the dialog closed while a request runs; the focus stays on the button. */
   pending?: boolean
+  triggerRef?: Ref<HTMLButtonElement>
 }
 
 /** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
-export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false }: AddRelationDialogProps) {
+export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false, triggerRef }: AddRelationDialogProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -47,7 +48,7 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" aria-disabled={pending}>
+        <Button ref={triggerRef} type="button" variant="outline" size="sm" className={pending ? 'opacity-50' : undefined} aria-disabled={pending}>
           <Plus aria-hidden="true" />
           {title}
         </Button>

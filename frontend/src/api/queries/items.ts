@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { CiaProperty, NewAsset } from '../models/asset'
-import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
+import type { DamageScenarioBody, DamageScenarioRelations, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { TreeNode } from '../models/tree'
 
@@ -160,27 +160,37 @@ export function useUpdateImpactRatings(projectId: string, damageScenarioId: stri
   })
 }
 
+/** Keeps the saved relations even if the refetch fails, so the next change does not start from the old ones. */
+function useStoreRelations(projectId: string, damageScenarioId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidateProject(projectId)
+  return (relations: DamageScenarioRelations) => {
+    queryClient.setQueryData(keys.damageScenarioRelations(projectId, damageScenarioId), relations)
+    return invalidate()
+  }
+}
+
 /** Links an asset with the given properties or changes them; no properties remove the link. */
 export function useSetDamageScenarioAssetLink(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const invalidate = useInvalidateProject(projectId)
+  const storeRelations = useStoreRelations(projectId, damageScenarioId)
   return useMutation({
     mutationFn: ({ assetId, properties }: { assetId: string; properties: CiaProperty[] }) =>
       properties.length > 0
         ? api.damageScenarios.linkAsset(projectId, damageScenarioId, assetId, properties)
         : api.damageScenarios.unlinkAsset(projectId, damageScenarioId, assetId),
-    onSuccess: invalidate,
+    onSuccess: storeRelations,
   })
 }
 
 export function useSetDamageScenarioThreatLink(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const invalidate = useInvalidateProject(projectId)
+  const storeRelations = useStoreRelations(projectId, damageScenarioId)
   return useMutation({
     mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
       linked
         ? api.damageScenarios.linkThreatScenario(projectId, damageScenarioId, threatScenarioId)
         : api.damageScenarios.unlinkThreatScenario(projectId, damageScenarioId, threatScenarioId),
-    onSuccess: invalidate,
+    onSuccess: storeRelations,
   })
 }
