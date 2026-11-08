@@ -43,7 +43,8 @@ import uuid
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 ENV_FILE = REPO_ROOT / "iam" / ".env"
-COMPOSE_FILE = SCRIPT_DIR / "compose.yaml"
+# Same files as dev.sh and the Makefile, so compose sees the stack exactly as dev.sh started it.
+COMPOSE_FILES = (SCRIPT_DIR / "compose.yaml", SCRIPT_DIR / "compose.dev.yaml")
 PROXY_CONF = REPO_ROOT / "proxy" / "nginx.conf"
 
 # Unique identifier for this test run so proxy access logs can be correlated
@@ -133,7 +134,8 @@ def _run(
 
 
 def run_compose(*args: str, check: bool = True, new_session: bool = False) -> subprocess.CompletedProcess[str]:
-    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), "-f", str(COMPOSE_FILE), *args]
+    files = [arg for path in COMPOSE_FILES for arg in ("-f", str(path))]
+    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), *files, *args]
     return _run(cmd, check, COMPOSE_TIMEOUT, new_session)
 
 

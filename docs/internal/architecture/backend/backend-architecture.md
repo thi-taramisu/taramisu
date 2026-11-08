@@ -62,11 +62,11 @@ together. Handlers are not registered on a bare `humatest` API, because that ski
 
 - **Fake Store** - Replaces the database, not the router. A fake must satisfy the `Queries` interface passed to `httpapi.New`; embed the
   interfaces it does not implement.
-- **Authentication** - `/api/` routes require a session. Tests call `authtest.Login(t)` (`backend/internal/auth/authtest/authtest.go`),
-  which returns a real `*auth.Manager` backed by a fake OIDC provider and a valid `taramisu_session` cookie. Pass the manager to
-  `httpapi.New` and add the cookie to each request. `authtest` is a temporary fake of the login flow and may change, so tests should only
-  use `authtest.Login` and not build their own.
-- **Unauthenticated requests** - Tests that expect `401` send the request without the cookie.
+- **Authentication** - `/api/` routes require a Bearer JWT. Tests call `authtest.NewManagerAndToken(t)`
+  (`backend/internal/auth/authtest/authtest.go`), which returns a real `*auth.Manager` backed by a local JWKS server and a valid
+  `Bearer <JWT>` value. Pass the manager to `httpapi.New` and set the value as the `Authorization` header of each request. Tests that need
+  custom claims use `authtest.NewFixture` and `Fixture.Token`; tests should not sign their own tokens.
+- **Unauthenticated requests** - Tests that expect `401` send the request without the `Authorization` header.
 
 ### Two test types per resource
 

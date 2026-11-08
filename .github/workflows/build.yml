@@ -298,7 +298,7 @@ jobs:
 
       - name: Compose logs on failure
         if: failure()
-        run: docker compose --env-file iam/.env -f deploy/compose.yaml logs --no-color > stack-logs.txt
+        run: docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml logs --no-color > stack-logs.txt
 
       - name: Upload stack logs on failure
         if: failure()

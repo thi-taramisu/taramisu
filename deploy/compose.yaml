@@ -7,8 +7,14 @@ include:
   - ./compose.proxy.yaml
   - ./compose.docs.yaml
 
+# Network segmentation from the architecture overview (#87).
+# Only edge has published ports and internet access; the others are internal.
+# Containers only in internal networks cannot publish ports, see compose.dev.yaml.
 networks:
-  backend:
-  iam:
-  auth:
-  taramisu-proxy:
+  edge:
+  proxy:
+    internal: true
+  app-db:
+    internal: true
+  iam-db:
+    internal: true

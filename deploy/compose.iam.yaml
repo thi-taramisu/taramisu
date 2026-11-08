@@ -5,6 +5,8 @@ x-authentik-environment: &authentik-environment
   AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS:?Set PG_PASS in iam/.env; see iam/.env.example}
   AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Set AUTHENTIK_SECRET_KEY in iam/.env; see iam/.env.example}
   AUTHENTIK_WEB__PATH: /auth/
+  # Authentik has no internet access (internal networks only), so its update check would keep failing.
+  AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
 
 x-authentik: &authentik
   image: ghcr.io/goauthentik/server:2026.8.3
@@ -25,7 +27,7 @@ x-authentik: &authentik
 
 services:
   authentik-db:
-    networks: [iam]
+    networks: [iam-db]
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: authentik
@@ -43,17 +45,11 @@ services:
   authentik-server:
     <<: *authentik
     command: server
-    networks:
-      iam:
-      taramisu-proxy:
-      auth:
-        aliases: [authentik.localhost]
-    ports:
-      - '127.0.0.1:9000:9000'
+    networks: [iam-db, proxy]
   authentik-worker:
     <<: *authentik
     command: worker
-    networks: [iam]
+    networks: [iam-db]
     environment:
       <<: *authentik-environment
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
