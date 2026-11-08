@@ -207,7 +207,7 @@ describe('damage scenario page', () => {
   it('shows the number of relations in the tab', async () => {
     renderApp(page)
 
-    expect(await screen.findByRole('link', { name: 'Relations (2)' })).toHaveAttribute('href', `${page}/relations`)
+    expect(await screen.findByRole('link', { name: 'Relations 2' })).toHaveAttribute('href', `${page}/relations`)
   })
 })
 

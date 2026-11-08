@@ -33,7 +33,7 @@ export function DamageScenarioPage() {
     <EntityPage
       type="damage-scenarios"
       title={entityTitle({ code: scenario.data.code, name: scenario.data.title })}
-      tabLabels={relations.data && { relations: `Relations (${relations.data.assets.length + relations.data.threatScenarios.length})` }}
+      tabCounts={relations.data && { relations: relations.data.assets.length + relations.data.threatScenarios.length }}
       actions={
         // A failed refetch keeps the loaded damage scenario, so unsaved edits in the tabs survive.
         scenario.isError && (
