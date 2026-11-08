@@ -188,7 +188,8 @@ fi
 repo_git cat-file -e "$target:deploy/taramisu-ctl.sh" 2> /dev/null \
     || die "release $target is older than taramisu-ctl.sh and cannot be installed with it"
 
-if [ "$target" != "$installed" ]; then
+# Compare commits, not tag names: several release tags can point at the same commit.
+if [ "$(repo_git rev-parse HEAD)" != "$(repo_git rev-parse "refs/tags/$target^{commit}")" ]; then
     repo_git diff --quiet HEAD || die 'the checkout has local changes; remove them first (git status)'
     log "Switching the checkout from ${installed:-$(repo_git rev-parse --short HEAD)} to $target"
     repo_git checkout --quiet --detach "refs/tags/$target"

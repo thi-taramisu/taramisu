@@ -1,11 +1,12 @@
 #!/bin/sh
 # Simulates the VM in a throwaway Docker-in-Docker container and runs taramisu-ctl.sh in it.
 # Like the host setup in deploy/README.md, a "taramisu" user in the docker group owns a real Git clone
-# in /opt/taramisu. The clone has all release tags plus two test releases made from the current working tree:
-# v99.0.0 and v99.0.1 (no changes), followed by one commit that is not a release, as on a fresh clone of main.
+# in /opt/taramisu. The clone has all release tags plus three test releases made from the current working tree:
+# v99.0.0, v99.0.1 (no changes) and v99.0.2 (same commit as v99.0.1), followed by one commit that is not a release,
+# as on a fresh clone of main.
 # The test releases have no published images, so the api, frontend and docs images use the tag "latest".
 #
-#   deploy/test-bootstrap.sh                 # run taramisu-ctl.sh (installs the newest release, v99.0.1)
+#   deploy/test-bootstrap.sh                 # run taramisu-ctl.sh (installs the newest release, v99.0.2)
 #   deploy/test-bootstrap.sh sh              # open a shell as taramisu in /opt/taramisu instead
 #   deploy/test-bootstrap.sh <command ...>   # run any other command as taramisu in /opt/taramisu
 set -eu
@@ -53,6 +54,7 @@ as_taramisu sh -c '
     git tag v99.0.0
     commit "Test release without changes"
     git tag v99.0.1
+    git tag v99.0.2
     commit "Not a release"
 '
 

@@ -178,14 +178,15 @@ sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh --prune           # also r
 - The images are public, so no GHCR login is needed. The docs image contains its site URL from the repository variable `DOCS_SITE_URL`.
 
 Two notes on `PROXY_BIND=0.0.0.0`: ports published by Docker bypass UFW (filter in the `DOCKER-USER` chain or in the
-provider's firewall), and until HTTPS is in place (#103) the server must not be reachable from the internet.
+provider's firewall), and until HTTPS is in place (#101) the server must not be reachable from the internet.
 `PROXY_BIND` in `iam/.env` can also be an internal or VPN address instead.
 
 ### Testing without a VM
 
 `deploy/test-bootstrap.sh` runs the script in a throwaway privileged `docker:dind` container: a `taramisu` user in the
-`docker` group owns a real clone with all tags plus two test releases made from the working tree (`v99.0.0`, `v99.0.1`).
-They have no published images, so the test uses the `latest` images. The first run takes about 10–15 minutes.
+`docker` group owns a real clone with all tags plus test releases made from the working tree: `v99.0.0`, `v99.0.1`,
+and `v99.0.2` on the same commit as `v99.0.1`. They have no published images, so the test uses the `latest` images.
+The first run takes about 10–15 minutes.
 
 ```sh
 deploy/test-bootstrap.sh       # install the newest test release, ends with the status table
