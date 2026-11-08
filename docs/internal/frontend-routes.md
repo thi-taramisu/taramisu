@@ -60,7 +60,8 @@ tool). Route guards come with the IAM decision (#46).
 
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
-`&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders. Items come from the item API in `frontend/src/api/`, an in-memory mock
+`&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.
+Items come from the item API in `frontend/src/api/`, an in-memory mock
 (`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
 item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
