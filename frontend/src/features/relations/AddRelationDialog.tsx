@@ -8,22 +8,25 @@ import type { EntityRef } from '../../api/models/tree'
 // Names creating already, as in the wireframe; the create dialogs follow with the element types.
 const SEARCH_LABEL = 'Search by name, ID, or type a new name'
 
+export interface RelationCandidate extends EntityRef {
+  /** Shown after the name, e.g. the C / I / A properties of an asset. */
+  details?: ReactNode
+}
+
 interface AddRelationDialogProps {
   /** Singular name of the linked elements, e.g. "Threat Scenario". */
   elementLabel: string
   /** Plural name of the linked elements in lower case, for the empty states. */
   pluralLabel: string
   /** Elements that can still be linked. */
-  options: EntityRef[]
+  options: RelationCandidate[]
   onAdd: (id: string) => void
   /** Keeps the dialog closed while a request runs; the focus stays on the button. */
   pending?: boolean
-  /** Shown above the search, e.g. the properties of the new link. */
-  fields?: ReactNode
 }
 
 /** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
-export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, pending = false, fields }: AddRelationDialogProps) {
+export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, pending = false }: AddRelationDialogProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -50,7 +53,6 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, p
           <DialogDescription className="sr-only">Link an existing {elementLabel.toLowerCase()} of this item.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 p-4">
-          {fields}
           <Input aria-label={SEARCH_LABEL} placeholder={SEARCH_LABEL} value={search} onChange={(event) => setSearch(event.target.value)} />
           <div className="grid gap-1">
             <h3 id={`${id}-existing`} className="font-medium">
@@ -74,7 +76,8 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, onAdd, p
                       }}
                     >
                       <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{option.code}</span>{' '}
-                      <span className="text-left">{option.name}</span>
+                      <span className="text-left">{option.name}</span>{' '}
+                      {option.details && <span className="ml-auto shrink-0">{option.details}</span>}
                     </Button>
                   </li>
                 ))}
