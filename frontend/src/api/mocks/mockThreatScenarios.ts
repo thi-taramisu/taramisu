@@ -1,7 +1,18 @@
 import { ApiError } from '../errors'
 import type { ThreatScenarioRelations } from '../models/threatScenario'
 import type { ThreatScenarioService } from '../services/threatScenarios'
-import { addThreatDamageLink, isThreatCause, removeThreatDamageLink, renameNodes, run, syncLinks, titleRef, validateTitle, type StoredItem } from './mockStore'
+import {
+  addThreatAttackPathLink,
+  addThreatDamageLink,
+  isThreatCause,
+  removeThreatAttackPathLink,
+  removeThreatDamageLink,
+  renameNodes,
+  run,
+  titleRef,
+  validateTitle,
+  type StoredItem,
+} from './mockStore'
 
 function relationsOf(entry: StoredItem, threatScenarioId: string): ThreatScenarioRelations {
   return {
@@ -67,21 +78,13 @@ export function createMockThreatScenarioService(db: Map<string, StoredItem>): Th
       run(() => {
         const { entry, scenario } = findThreatScenario(projectId, threatScenarioId)
         if (!entry.attackPaths.some((path) => path.id === attackPathId)) throw new ApiError(404, 'Attack path not found.')
-        // Same rule as the UNIQUE constraint of `threat_attack_path_link`.
-        if (entry.threatAttackPathLinks.some((link) => link.threat_scenario_id === scenario.id && link.attack_path_id === attackPathId)) {
-          throw new ApiError(409, 'The attack path is already linked.')
-        }
-        entry.threatAttackPathLinks.push({ threat_scenario_id: scenario.id, attack_path_id: attackPathId })
-        syncLinks(entry)
+        addThreatAttackPathLink(entry, scenario.id, attackPathId)
         return relationsOf(entry, scenario.id)
       }),
     unlinkAttackPath: (projectId, threatScenarioId, attackPathId) =>
       run(() => {
         const { entry, scenario } = findThreatScenario(projectId, threatScenarioId)
-        const remaining = entry.threatAttackPathLinks.filter((link) => link.threat_scenario_id !== scenario.id || link.attack_path_id !== attackPathId)
-        if (remaining.length === entry.threatAttackPathLinks.length) throw new ApiError(404, 'Link not found.')
-        entry.threatAttackPathLinks = remaining
-        syncLinks(entry)
+        removeThreatAttackPathLink(entry, scenario.id, attackPathId)
         return relationsOf(entry, scenario.id)
       }),
     setTargets: (projectId, threatScenarioId, targets) =>
