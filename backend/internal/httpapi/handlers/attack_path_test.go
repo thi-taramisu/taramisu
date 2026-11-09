@@ -268,7 +268,7 @@ func TestAttackPathRoutesRequireAuthentication(t *testing.T) {
 	manager, _ := authtest.NewManagerAndToken(t)
 	h := httpapi.New(&fakeAttackPaths{found: true}, manager)
 	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, attackPaths, nil))
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, attackPaths, http.NoBody))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
