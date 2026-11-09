@@ -321,4 +321,7 @@ nginx -g 'daemon off;'
     "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
 fi
 
+python3 -I stack_test.py --self-check >/dev/null
+make -n test-stack >/dev/null
+
 echo 'PASS: unified Compose model, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'
