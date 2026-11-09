@@ -35,17 +35,21 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	var project, item, otherItem string
-	if err := tx.QueryRow(ctx, "INSERT INTO tara_project (name) VALUES ('asset API test') RETURNING id").Scan(&project); err != nil {
-		t.Fatal(err)
+	queries := db.New(tx)
+	fixture := authtest.NewFixture(t, queries)
+	bearer := "Bearer " + fixture.Token(t, nil)
+	h := httpapi.New(queries, fixture.Manager)
+	createdProject := assetRequest(t, h, bearer, "POST", "/api/v1/projects", map[string]any{"name": "asset API test"})
+	var project handlers.TaraProjectBody
+	if createdProject.Code != 201 || json.Unmarshal(createdProject.Body.Bytes(), &project) != nil {
+		t.Fatalf("create project: %d %s", createdProject.Code, createdProject.Body)
 	}
+	var item, otherItem string
 	for _, dest := range []*string{&item, &otherItem} {
-		if err := tx.QueryRow(ctx, "INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project).Scan(dest); err != nil {
+		if err := tx.QueryRow(ctx, "INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project.ID).Scan(dest); err != nil {
 			t.Fatal(err)
 		}
 	}
-	manager, bearer := authtest.NewManagerAndToken(t)
-	h := httpapi.New(db.New(tx), manager)
 	request := func(method, path string, body any) *httptest.ResponseRecorder {
 		return assetRequest(t, h, bearer, method, path, body)
 	}

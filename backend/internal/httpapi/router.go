@@ -14,16 +14,29 @@ import (
 
 type Queries interface {
 	handlers.StatusReader
+	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
+	handlers.ProjectMemberStore
 	handlers.AssetStore
-	// Property and scenario-link handlers share this database implementation.
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
 }
 
-func New(queries Queries, manager *auth.Manager) http.Handler {
-	mux, _ := newAPI(queries, manager)
+// Option configures optional dependencies of the API.
+type Option func(*options)
+
+type options struct {
+	directory handlers.Directory
+}
+
+// WithDirectory enables Authentik user and group lookups for project members.
+func WithDirectory(directory handlers.Directory) Option {
+	return func(o *options) { o.directory = directory }
+}
+
+func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
+	mux, _ := newAPI(queries, manager, opts...)
 	return mux
 }
 
@@ -32,7 +45,11 @@ func OpenAPI() *huma.OpenAPI {
 	return api.OpenAPI()
 }
 
-func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
+func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, huma.API) {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
 	mux.Use(func(next http.Handler) http.Handler {
@@ -59,20 +76,24 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
-	handlers.NewTaraProject(queries).Register(api)
-	handlers.NewAssets(queries).Register(api)
-	// Register issue #160 property and link routes with Huma for validation, dispatch, and OpenAPI.
-	handlers.NewAssetCybersecurityProperties(queries).Register(api)
-	handlers.NewDamageScenarioAssetProperties(queries).Register(api)
-	handlers.NewThreatScenarioAssetProperties(queries).Register(api)
-	huma.Register(api, huma.Operation{
+	handlers.NewTaraProject(queries, queries).Register(api)
+	handlers.NewAssets(queries, queries).Register(api)
+	handlers.NewAssetCybersecurityProperties(queries, queries).Register(api)
+	handlers.NewDamageScenarioAssetProperties(queries, queries).Register(api)
+	handlers.NewThreatScenarioAssetProperties(queries, queries).Register(api)
+	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)
+	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/me",
 		Summary:     "Get the current user",
 		Security:    []map[string][]string{{"bearer": {}}},
-	}, func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
+	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	// Fail closed: an /api/ operation without an access declaration must not be served.
+	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
+		panic(err)
+	}
 	return mux, api
 }

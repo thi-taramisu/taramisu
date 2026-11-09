@@ -2,28 +2,27 @@ package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
+	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
 // Embed unused interfaces to satisfy the router without replacing its registration.
-type assetQueries struct {
-	handlers.TaraProjectStore
-	*assetStore
-	handlers.StatusReader
-	handlers.AssetCybersecurityPropertyStore
-	handlers.DamagePropertyLinkStore
-	handlers.ThreatPropertyLinkStore
-}
-
 type propertyQueries struct {
+	resourceAccess
+	handlers.ProjectMemberStore
 	handlers.TaraProjectStore
 	*propertyErrorStore
 	handlers.StatusReader
@@ -99,6 +98,107 @@ func TestResourceRoutesRequireBearerToken(t *testing.T) {
 					t.Fatalf("got %d, want 401: %s", r.Code, r.Body)
 				}
 			})
+		}
+	}
+}
+
+// resourceAccess supplies the shared project check independently from resource-storage errors.
+type resourceAccess struct {
+	handlers.ProjectAccessStore
+	role        db.ProjectRole
+	nonMember   bool
+	missingItem bool
+}
+
+func (a resourceAccess) GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error) {
+	if a.nonMember {
+		return "", pgx.ErrNoRows
+	}
+	if a.role == "" {
+		return db.ProjectRoleEDITOR, nil
+	}
+	return a.role, nil
+}
+
+func (a resourceAccess) ProjectIDForItemDefinition(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	if a.missingItem {
+		return pgtype.UUID{}, pgx.ErrNoRows
+	}
+	return mustUUID("aaaaaaaa-0000-4000-8000-000000000100"), nil
+}
+
+func TestResourceProjectPermissions(t *testing.T) {
+	routes := append(propertyRouteCases(), propertyRouteCase{"asset", assetCollection, assetPath, assetJSON})
+	for _, access := range []struct {
+		name  string
+		value resourceAccess
+	}{
+		{"non-member", resourceAccess{nonMember: true}},
+		{"missing item", resourceAccess{missingItem: true}},
+		{"viewer", resourceAccess{role: db.ProjectRoleVIEWER}},
+		{"editor", resourceAccess{role: db.ProjectRoleEDITOR}},
+		{"owner", resourceAccess{role: db.ProjectRoleOWNER}},
+	} {
+		for _, route := range routes {
+			t.Run(access.name+"/"+route.name, func(t *testing.T) {
+				var queries httpapi.Queries
+				var calls *int
+				if route.name == "asset" {
+					store := &assetStore{resourceAccess: access.value}
+					queries, calls = store, &store.calls
+				} else {
+					store := &propertyErrorStore{}
+					queries, calls = propertyQueries{resourceAccess: access.value, propertyErrorStore: store}, &store.calls
+				}
+				api := newRouteAPI(t, queries)
+				for _, operation := range []struct {
+					method, path string
+					success      int
+				}{
+					{"GET", route.collection, 200}, {"GET", route.member, 200},
+					{"POST", route.collection, 201}, {"PUT", route.member, 200},
+					{"PATCH", route.member, 200}, {"DELETE", route.member, 204},
+				} {
+					want := operation.success
+					if access.value.nonMember || access.value.missingItem {
+						want = 404
+					} else if access.value.role == db.ProjectRoleVIEWER && operation.method != "GET" {
+						want = 403
+					}
+					before := *calls
+					response := api.Do(operation.method, operation.path, strings.NewReader(route.body))
+					if response.Code != want {
+						t.Errorf("%s %s: got %d, want %d: %s", operation.method, operation.path, response.Code, want, response.Body)
+					}
+					if want >= 400 && *calls != before {
+						t.Fatal("denied request reached resource storage")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestResourceOpenAPIPermissions(t *testing.T) {
+	spec := httpapi.OpenAPI()
+	for path, item := range spec.Paths {
+		if !strings.HasPrefix(path, "/api/v1/item-definitions/") {
+			continue
+		}
+		for method, operation := range map[string]*huma.Operation{"GET": item.Get, "POST": item.Post, "PUT": item.Put, "PATCH": item.Patch, "DELETE": item.Delete} {
+			if operation == nil {
+				continue
+			}
+			want := "edit"
+			if method == "GET" {
+				want = "read"
+			}
+			if operation.Extensions["x-taramisu-permission"] != want {
+				t.Errorf("%s %s: wrong permission: %+v", method, path, operation.Extensions)
+			}
+			if operation.Responses["403"] == nil {
+				t.Errorf("%s %s: missing forbidden response", method, path)
+			}
 		}
 	}
 }

@@ -10,12 +10,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 )
 
 // propertyFixture holds a test API, database transaction, and IDs from two separate item definitions.
 // The second item provides records used to verify that references cannot cross item boundaries.
 type propertyFixture struct {
+	authFixture                                     *authtest.Fixture
 	tx                                              pgx.Tx
 	api                                             *routeAPI
 	item, otherItem, asset, secondAsset, otherAsset string
@@ -56,9 +59,12 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		}
 		return id
 	}
-	f := propertyFixture{tx: tx}
+	queries := db.New(tx)
+	fixture := authtest.NewFixture(t, queries)
+	api := &routeAPI{t: t, handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
+	f := propertyFixture{tx: tx, api: api, authFixture: fixture}
 	for _, target := range []*string{&f.item, &f.otherItem} {
-		project := insertID("INSERT INTO tara_project (name) VALUES ('property API test') RETURNING id")
+		project := propertyResponse(t, api.Post("/api/v1/projects", map[string]any{"name": "property API test"}), 201)["id"].(string)
 		*target = insertID("INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project)
 	}
 	for _, row := range []struct {
@@ -82,7 +88,6 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		*row.dest = insertID("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'threat') RETURNING id", row.item)
 	}
 	// Fixture setup and handler queries share the transaction and roll back together.
-	f.api = newRouteAPI(t, db.New(tx))
 	return f
 }
 

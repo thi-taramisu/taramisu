@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -72,51 +71,28 @@ func TestAuthRoutes(t *testing.T) {
 	}
 }
 
-func TestAssetOpenAPI(t *testing.T) {
+func TestProjectMemberRoutesRequireBearer(t *testing.T) {
+	manager, _ := authtest.NewManagerAndToken(t)
+	handler := New(nil, manager, WithDirectory(nil))
+	const members = "/api/v1/projects/00000000-0000-4000-8000-000000000001/members"
+	const member = members + "/00000000-0000-4000-8000-000000000002"
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, members},
+		{http.MethodPost, members},
+		{http.MethodPatch, member},
+		{http.MethodDelete, member},
+		{http.MethodGet, "/api/v1/groups"},
+	} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(route.method, route.path, http.NoBody))
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s without token: got %d, want 401", route.method, route.path, w.Code)
+		}
+	}
 	spec := OpenAPI()
-	collection := spec.Paths["/api/v1/item-definitions/{item_definition_id}/assets"]
-	resource := spec.Paths["/api/v1/item-definitions/{item_definition_id}/assets/{id}"]
-	if collection == nil || resource == nil {
-		t.Fatal("missing asset paths")
-	}
-	for _, op := range []*huma.Operation{collection.Get, collection.Post, resource.Get, resource.Put, resource.Patch, resource.Delete} {
-		if op == nil || len(op.Security) != 1 {
-			t.Fatal("missing asset operation or security")
+	for path, item := range map[string]*huma.PathItem{members: spec.Paths["/api/v1/projects/{id}/members"], "/api/v1/groups": spec.Paths["/api/v1/groups"]} {
+		if item == nil || item.Get == nil || item.Get.Security[0]["bearer"] == nil {
+			t.Fatalf("OpenAPI does not document bearer security on %s", path)
 		}
-		if _, ok := op.Security[0]["bearer"]; !ok {
-			t.Fatal("missing Bearer JWT security")
-		}
-	}
-	if collection.Post.Responses["201"] == nil || resource.Delete.Responses["204"] == nil {
-		t.Fatal("incorrect CRUD status codes")
-	}
-}
-
-func TestAssetNullableEnumContract(t *testing.T) {
-	for _, name := range []string{"Asset", "AssetBody", "UpdateAssetInputBody"} {
-		t.Run(name, func(t *testing.T) {
-			data, err := json.Marshal(OpenAPI().Components.Schemas.Map()[name])
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Decode only the field under test; other properties have scalar types.
-			var object struct {
-				Properties map[string]json.RawMessage `json:"properties"`
-			}
-			if err := json.Unmarshal(data, &object); err != nil {
-				t.Fatal(err)
-			}
-			var field struct {
-				Type []string `json:"type"`
-				Enum []any    `json:"enum"`
-			}
-			if err := json.Unmarshal(object.Properties["identification_source"], &field); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(field.Type, []string{"string", "null"}) ||
-				!reflect.DeepEqual(field.Enum, []any{"ITEM_DEF", "IMPACT_RATING", "THREAT_DERIVED", "CATALOGUE", nil}) {
-				t.Fatalf("invalid nullable enum contract: %+v", field)
-			}
-		})
 	}
 }

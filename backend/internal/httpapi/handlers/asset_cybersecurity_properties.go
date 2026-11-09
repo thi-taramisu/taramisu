@@ -29,11 +29,12 @@ type AssetCybersecurityPropertyStore interface {
 // AssetCybersecurityProperties handles HTTP requests using the supplied database operations.
 type AssetCybersecurityProperties struct {
 	queries AssetCybersecurityPropertyStore
+	access  ProjectAccessStore
 }
 
 // NewAssetCybersecurityProperties creates a handler using the supplied database implementation.
-func NewAssetCybersecurityProperties(queries AssetCybersecurityPropertyStore) *AssetCybersecurityProperties {
-	return &AssetCybersecurityProperties{queries: queries}
+func NewAssetCybersecurityProperties(queries AssetCybersecurityPropertyStore, access ProjectAccessStore) *AssetCybersecurityProperties {
+	return &AssetCybersecurityProperties{queries: queries, access: access}
 }
 
 // Register connects HTTP methods and URLs to the handler methods and documents them in OpenAPI.
@@ -41,18 +42,20 @@ func NewAssetCybersecurityProperties(queries AssetCybersecurityPropertyStore) *A
 func (h *AssetCybersecurityProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/assets/{asset_id}/cybersecurity-properties"
 	const member = collection + "/{id}"
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
 	// Build operation metadata using the shared Bearer JWT security and error declarations.
 	op := func(id, method, path, summary string) huma.Operation {
 		return propertyOperation(id, method, path, "Asset cybersecurity properties", summary)
 	}
-	huma.Register(api, op("list-asset-cybersecurity-properties", http.MethodGet, collection, "List an asset's cybersecurity properties"), h.List)
-	huma.Register(api, op("get-asset-cybersecurity-property", http.MethodGet, member, "Get an asset cybersecurity property"), h.Get)
-	huma.Register(api, op("create-asset-cybersecurity-property", http.MethodPost, collection, "Create an asset cybersecurity property"), h.Create)
-	huma.Register(api, op("replace-asset-cybersecurity-property", http.MethodPut, member, "Replace an asset cybersecurity property"), h.Replace)
-	huma.Register(api, op("update-asset-cybersecurity-property", http.MethodPatch, member, "Partially update an asset cybersecurity property"), h.Update)
+	Register(api, op("list-asset-cybersecurity-properties", http.MethodGet, collection, "List an asset's cybersecurity properties"), read, h.List)
+	Register(api, op("get-asset-cybersecurity-property", http.MethodGet, member, "Get an asset cybersecurity property"), read, h.Get)
+	Register(api, op("create-asset-cybersecurity-property", http.MethodPost, collection, "Create an asset cybersecurity property"), edit, h.Create)
+	Register(api, op("replace-asset-cybersecurity-property", http.MethodPut, member, "Replace an asset cybersecurity property"), edit, h.Replace)
+	Register(api, op("update-asset-cybersecurity-property", http.MethodPatch, member, "Partially update an asset cybersecurity property"), edit, h.Update)
 	del := op("delete-asset-cybersecurity-property", http.MethodDelete, member, "Delete an asset cybersecurity property")
 	del.Description = "Also deletes damage and threat scenario links for this property."
-	huma.Register(api, del, h.Delete)
+	Register(api, del, edit, h.Delete)
 }
 
 // AssetCybersecurityPropertyBody contains the editable JSON fields for POST and PUT.

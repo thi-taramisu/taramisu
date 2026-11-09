@@ -27,11 +27,14 @@ type ThreatPropertyLinkStore interface {
 }
 
 // ThreatScenarioAssetProperties handles the HTTP API for threat scenario/property links.
-type ThreatScenarioAssetProperties struct{ queries ThreatPropertyLinkStore }
+type ThreatScenarioAssetProperties struct {
+	queries ThreatPropertyLinkStore
+	access  ProjectAccessStore
+}
 
 // NewThreatScenarioAssetProperties creates a handler using the supplied database implementation.
-func NewThreatScenarioAssetProperties(queries ThreatPropertyLinkStore) *ThreatScenarioAssetProperties {
-	return &ThreatScenarioAssetProperties{queries: queries}
+func NewThreatScenarioAssetProperties(queries ThreatPropertyLinkStore, access ProjectAccessStore) *ThreatScenarioAssetProperties {
+	return &ThreatScenarioAssetProperties{queries: queries, access: access}
 }
 
 // Register connects collection and individual-link URLs to HTTP handlers and OpenAPI documentation.
@@ -39,16 +42,18 @@ func NewThreatScenarioAssetProperties(queries ThreatPropertyLinkStore) *ThreatSc
 func (h *ThreatScenarioAssetProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/threat-scenario-asset-properties"
 	const member = collection + "/{id}"
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
 	// Build route metadata using the shared Bearer JWT and error declarations.
 	op := func(id, method, path, summary string) huma.Operation {
 		return propertyOperation(id, method, path, "Threat scenario asset properties", summary)
 	}
-	huma.Register(api, op("list-threat-scenario-asset-properties", http.MethodGet, collection, "List threat scenario asset property links"), h.List)
-	huma.Register(api, op("get-threat-scenario-asset-property", http.MethodGet, member, "Get a threat scenario asset property link"), h.Get)
-	huma.Register(api, op("create-threat-scenario-asset-property", http.MethodPost, collection, "Create a threat scenario asset property link"), h.Create)
-	huma.Register(api, op("replace-threat-scenario-asset-property", http.MethodPut, member, "Replace a threat scenario asset property link"), h.Replace)
-	huma.Register(api, op("update-threat-scenario-asset-property", http.MethodPatch, member, "Partially update a threat scenario asset property link"), h.Update)
-	huma.Register(api, op("delete-threat-scenario-asset-property", http.MethodDelete, member, "Delete a threat scenario asset property link"), h.Delete)
+	Register(api, op("list-threat-scenario-asset-properties", http.MethodGet, collection, "List threat scenario asset property links"), read, h.List)
+	Register(api, op("get-threat-scenario-asset-property", http.MethodGet, member, "Get a threat scenario asset property link"), read, h.Get)
+	Register(api, op("create-threat-scenario-asset-property", http.MethodPost, collection, "Create a threat scenario asset property link"), edit, h.Create)
+	Register(api, op("replace-threat-scenario-asset-property", http.MethodPut, member, "Replace a threat scenario asset property link"), edit, h.Replace)
+	Register(api, op("update-threat-scenario-asset-property", http.MethodPatch, member, "Partially update a threat scenario asset property link"), edit, h.Update)
+	Register(api, op("delete-threat-scenario-asset-property", http.MethodDelete, member, "Delete a threat scenario asset property link"), edit, h.Delete)
 }
 
 // ThreatPropertyLinkBody supplies the two existing records to connect.

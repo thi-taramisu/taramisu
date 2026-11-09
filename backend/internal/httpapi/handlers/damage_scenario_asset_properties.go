@@ -27,11 +27,14 @@ type DamagePropertyLinkStore interface {
 }
 
 // DamageScenarioAssetProperties handles the HTTP API for damage scenario/property links.
-type DamageScenarioAssetProperties struct{ queries DamagePropertyLinkStore }
+type DamageScenarioAssetProperties struct {
+	queries DamagePropertyLinkStore
+	access  ProjectAccessStore
+}
 
 // NewDamageScenarioAssetProperties creates a handler using the supplied database implementation.
-func NewDamageScenarioAssetProperties(queries DamagePropertyLinkStore) *DamageScenarioAssetProperties {
-	return &DamageScenarioAssetProperties{queries: queries}
+func NewDamageScenarioAssetProperties(queries DamagePropertyLinkStore, access ProjectAccessStore) *DamageScenarioAssetProperties {
+	return &DamageScenarioAssetProperties{queries: queries, access: access}
 }
 
 // Register connects collection and individual-link URLs to HTTP handlers and OpenAPI documentation.
@@ -39,16 +42,18 @@ func NewDamageScenarioAssetProperties(queries DamagePropertyLinkStore) *DamageSc
 func (h *DamageScenarioAssetProperties) Register(api huma.API) {
 	const collection = itemDefinitionPath + "/damage-scenario-asset-properties"
 	const member = collection + "/{id}"
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
 	// Build route metadata using the shared Bearer JWT and error declarations.
 	op := func(id, method, path, summary string) huma.Operation {
 		return propertyOperation(id, method, path, "Damage scenario asset properties", summary)
 	}
-	huma.Register(api, op("list-damage-scenario-asset-properties", http.MethodGet, collection, "List damage scenario asset property links"), h.List)
-	huma.Register(api, op("get-damage-scenario-asset-property", http.MethodGet, member, "Get a damage scenario asset property link"), h.Get)
-	huma.Register(api, op("create-damage-scenario-asset-property", http.MethodPost, collection, "Create a damage scenario asset property link"), h.Create)
-	huma.Register(api, op("replace-damage-scenario-asset-property", http.MethodPut, member, "Replace a damage scenario asset property link"), h.Replace)
-	huma.Register(api, op("update-damage-scenario-asset-property", http.MethodPatch, member, "Partially update a damage scenario asset property link"), h.Update)
-	huma.Register(api, op("delete-damage-scenario-asset-property", http.MethodDelete, member, "Delete a damage scenario asset property link"), h.Delete)
+	Register(api, op("list-damage-scenario-asset-properties", http.MethodGet, collection, "List damage scenario asset property links"), read, h.List)
+	Register(api, op("get-damage-scenario-asset-property", http.MethodGet, member, "Get a damage scenario asset property link"), read, h.Get)
+	Register(api, op("create-damage-scenario-asset-property", http.MethodPost, collection, "Create a damage scenario asset property link"), edit, h.Create)
+	Register(api, op("replace-damage-scenario-asset-property", http.MethodPut, member, "Replace a damage scenario asset property link"), edit, h.Replace)
+	Register(api, op("update-damage-scenario-asset-property", http.MethodPatch, member, "Partially update a damage scenario asset property link"), edit, h.Update)
+	Register(api, op("delete-damage-scenario-asset-property", http.MethodDelete, member, "Delete a damage scenario asset property link"), edit, h.Delete)
 }
 
 // DamagePropertyLinkBody supplies the two existing records to connect and an optional explanation.

@@ -134,7 +134,7 @@ type propertyRouteCase struct {
 
 // propertyRouteCases builds valid example requests and paths for properties and both link types.
 func propertyRouteCases() []propertyRouteCase {
-	root := "/api/v1/item-definitions/" + itemID
+	root := "/api/v1/item-definitions/" + assetItemID
 	propertyCollection := root + "/assets/" + assetID + "/cybersecurity-properties"
 	return []propertyRouteCase{
 		{"property", propertyCollection, propertyCollection + "/" + assetID, `{"property_type":"INTEGRITY"}`},
@@ -193,14 +193,14 @@ func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 			{"POST", route.collection, `{"unexpected":true}`},
 			{"POST", route.collection, `{`},
 			{"PUT", route.member, "{}"},
-			{"GET", strings.Replace(route.collection, itemID, "bad-id", 1), ""},
+			{"GET", strings.Replace(route.collection, assetItemID, "bad-id", 1), ""},
 			{"GET", route.member + "-bad", ""},
 			{"GET", route.collection + "?limit=0", ""},
 			{"GET", route.collection + "?limit=101", ""},
 			{"GET", route.collection + "?offset=-1", ""},
 			{"GET", route.collection + "?offset=2147483648", ""},
 			{"PATCH", route.member, `{"id":"` + assetID + `"}`},
-			{"PATCH", route.member, `{"item_definition_id":"` + itemID + `"}`},
+			{"PATCH", route.member, `{"item_definition_id":"` + assetItemID + `"}`},
 		}
 		if route.name == "property" {
 			cases = append(cases,

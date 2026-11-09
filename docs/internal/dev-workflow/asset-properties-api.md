@@ -19,6 +19,10 @@ The prefix below is `/api/v1/item-definitions/{item_definition_id}`:
 | Damage scenario asset property link | `/damage-scenario-asset-properties` |
 | Threat scenario asset property link | `/threat-scenario-asset-properties` |
 
+Viewers can read; Editors and Owners can write. Direct project assignments and assignable groups
+from the signed `taramisu_groups` claim are supported by the
+[shared project authorization](../architecture/iam/project-roles.md).
+
 Every collection supports `GET` (list) and `POST` (create). Append `/{id}` for
 `GET` (read), `PUT` (replace), `PATCH` (partial update), and `DELETE`.
 
@@ -100,12 +104,14 @@ Errors use `application/problem+json`:
 | Status | Meaning |
 | --- | --- |
 | `401` | Missing, invalid, or expired Bearer token |
-| `404` | Record or referenced parent not found in the URL's item definition |
+| `403` | Project member whose role does not permit this operation |
+| `404` | No project role, unknown item, or record/reference outside the URL's item definition |
 | `409` | Duplicate asset/property type or scenario/property pair |
 | `422` | Invalid UUID, enum, body, pagination, or a reference deleted during the request |
 | `503` | Authentication configuration or database unavailable |
 
-Malformed JSON returns `400`. A list for an unknown parent returns `[]`.
+Malformed JSON returns `400`. An unknown or inaccessible item returns `404`, including list requests.
+A property list for an unknown asset within an accessible item returns `[]`.
 The `409` mapping applies to the property/link routes; assets have no uniqueness constraint on names.
 
 The generated contract is [`backend/openapi.json`](../../../backend/openapi.json).

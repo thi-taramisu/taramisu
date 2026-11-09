@@ -20,8 +20,8 @@ import (
 )
 
 const assetID = "00000000-0000-4000-8000-000000000001"
-const itemID = "00000000-0000-4000-8000-000000000002"
-const assetCollection = "/api/v1/item-definitions/" + itemID + "/assets"
+const assetItemID = "00000000-0000-4000-8000-000000000002"
+const assetCollection = "/api/v1/item-definitions/" + assetItemID + "/assets"
 const assetPath = assetCollection + "/" + assetID
 const assetJSON = `{"name":"ECU"}`
 
@@ -30,6 +30,11 @@ type assetStore struct {
 	handlers.AssetStore
 	handlers.TaraProjectStore
 	handlers.StatusReader
+	resourceAccess
+	handlers.ProjectMemberStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	err   error
 	calls int
 }
@@ -55,9 +60,9 @@ func TestAssetValidation(t *testing.T) {
 		{"GET", assetCollection + "?limit=101", ""},
 		{"GET", assetCollection + "?offset=2147483648", ""},
 		{"GET", assetCollection + "?offset=4294967296", ""},
-		{"POST", "/api/v1/item-definitions/urn:uuid:" + itemID + "/assets", assetJSON},
-		{"POST", "/api/v1/item-definitions/{" + itemID + "}/assets", assetJSON},
-		{"POST", "/api/v1/item-definitions/" + strings.ReplaceAll(itemID, "-", "") + "/assets", assetJSON},
+		{"POST", "/api/v1/item-definitions/urn:uuid:" + assetItemID + "/assets", assetJSON},
+		{"POST", "/api/v1/item-definitions/{" + assetItemID + "}/assets", assetJSON},
+		{"POST", "/api/v1/item-definitions/" + strings.ReplaceAll(assetItemID, "-", "") + "/assets", assetJSON},
 		{"GET", assetCollection + "/urn:uuid:" + assetID, ""},
 		{"GET", assetCollection + "/{" + assetID + "}", ""},
 		{"POST", assetCollection, `{}`},
@@ -120,4 +125,17 @@ func assetRequest(t testing.TB, h http.Handler, bearer string, method, path stri
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	return rr
+}
+
+func (s *assetStore) ListAssets(context.Context, db.ListAssetsParams) ([]db.Asset, error) {
+	s.calls++
+	return nil, s.err
+}
+func (s *assetStore) ReplaceAsset(context.Context, db.ReplaceAssetParams) (db.Asset, error) {
+	s.calls++
+	return db.Asset{}, s.err
+}
+func (s *assetStore) UpdateAsset(context.Context, db.UpdateAssetParams) (db.Asset, error) {
+	s.calls++
+	return db.Asset{}, s.err
 }

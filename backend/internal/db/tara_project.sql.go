@@ -12,17 +12,35 @@ import (
 )
 
 const createTaraProject = `-- name: CreateTaraProject :one
-INSERT INTO tara_project (name, description) VALUES ($1, $2) RETURNING id, name, description, created_at
+WITH project AS (
+    INSERT INTO tara_project (name, description)
+    VALUES ($1, $2)
+    RETURNING id, name, description, created_at
+), owner AS (
+    INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
+    SELECT id, $3, 'OWNER' FROM project
+)
+SELECT id, name, description, created_at FROM project
 `
 
 type CreateTaraProjectParams struct {
 	Name        string
 	Description *string
+	OwnerID     pgtype.UUID
 }
 
-func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectParams) (TaraProject, error) {
-	row := q.db.QueryRow(ctx, createTaraProject, arg.Name, arg.Description)
-	var i TaraProject
+type CreateTaraProjectRow struct {
+	ID          pgtype.UUID
+	Name        string
+	Description *string
+	CreatedAt   pgtype.Timestamptz
+}
+
+// Create the project and make its creator the first Owner in one statement,
+// so a project never exists without an Owner.
+func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectParams) (CreateTaraProjectRow, error) {
+	row := q.db.QueryRow(ctx, createTaraProject, arg.Name, arg.Description, arg.OwnerID)
+	var i CreateTaraProjectRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -61,23 +79,44 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 }
 
 const listTaraProjects = `-- name: ListTaraProjects :many
-SELECT id, name, description, created_at FROM tara_project ORDER BY created_at DESC, id
+SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_role AS role
+FROM tara_project p
+JOIN project_role_assignment a ON a.tara_project_id = p.id
+LEFT JOIN iam_group g ON g.id = a.group_id
+WHERE a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[])
+GROUP BY p.id
+ORDER BY p.created_at DESC, p.id
 `
 
-func (q *Queries) ListTaraProjects(ctx context.Context) ([]TaraProject, error) {
-	rows, err := q.db.Query(ctx, listTaraProjects)
+type ListTaraProjectsParams struct {
+	UserID   pgtype.UUID
+	GroupIds []string
+}
+
+type ListTaraProjectsRow struct {
+	ID          pgtype.UUID
+	Name        string
+	Description *string
+	CreatedAt   pgtype.Timestamptz
+	Role        ProjectRole
+}
+
+// List only projects the caller has a role in, with the caller's highest role.
+func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsParams) ([]ListTaraProjectsRow, error) {
+	rows, err := q.db.Query(ctx, listTaraProjects, arg.UserID, arg.GroupIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TaraProject
+	var items []ListTaraProjectsRow
 	for rows.Next() {
-		var i TaraProject
+		var i ListTaraProjectsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.Description,
 			&i.CreatedAt,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}

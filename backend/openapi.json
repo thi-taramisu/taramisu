@@ -134,6 +134,49 @@
         ],
         "type": "object"
       },
+      "AssignableGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "group_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateProjectMemberInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "description": "Email of an active Authentik user",
+            "format": "email",
+            "type": "string"
+          },
+          "group_id": {
+            "description": "UUID of an assignable Authentik group",
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "VIEWER",
+              "EDITOR",
+              "OWNER"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "type": "object"
+      },
       "CreateTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -279,6 +322,54 @@
         },
         "type": "object"
       },
+      "ProjectMember": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "group_id": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "VIEWER",
+              "EDITOR",
+              "OWNER"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "role",
+          "assigned_at"
+        ],
+        "type": "object"
+      },
       "ReadyOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -340,12 +431,21 @@
           },
           "name": {
             "type": "string"
+          },
+          "role": {
+            "enum": [
+              "VIEWER",
+              "EDITOR",
+              "OWNER"
+            ],
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
-          "created_at"
+          "created_at",
+          "role"
         ],
         "type": "object"
       },
@@ -464,6 +564,23 @@
         },
         "type": "object"
       },
+      "UpdateProjectMemberInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "VIEWER",
+              "EDITOR",
+              "OWNER"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "type": "object"
+      },
       "UpdateTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -542,6 +659,49 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/groups": {
+      "get": {
+        "description": "Groups with the taramisu_assignable attribute. Returns 503 when Authentik is not configured or unavailable.",
+        "operationId": "list-assignable-groups",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssignableGroup"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List Authentik groups that can get a project role",
+        "tags": [
+          "Project members"
+        ]
+      }
+    },
     "/api/v1/item-definitions/{item_definition_id}/assets": {
       "get": {
         "operationId": "list-assets",
@@ -608,6 +768,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -657,7 +827,8 @@
         "summary": "List assets",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "post": {
         "operationId": "create-asset",
@@ -711,6 +882,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -760,7 +941,8 @@
         "summary": "Create an asset",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/assets/{asset_id}/cybersecurity-properties": {
@@ -839,6 +1021,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -898,7 +1090,8 @@
         "summary": "List an asset's cybersecurity properties",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "post": {
         "operationId": "create-asset-cybersecurity-property",
@@ -962,6 +1155,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -1021,7 +1224,8 @@
         "summary": "Create an asset cybersecurity property",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/assets/{asset_id}/cybersecurity-properties/{id}": {
@@ -1073,6 +1277,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1133,7 +1347,8 @@
         "summary": "Delete an asset cybersecurity property",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "get": {
         "operationId": "get-asset-cybersecurity-property",
@@ -1189,6 +1404,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1249,7 +1474,8 @@
         "summary": "Get an asset cybersecurity property",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "patch": {
         "description": "Omitted fields remain unchanged. Required fields cannot be null; optional text fields can be cleared with null.",
@@ -1317,6 +1543,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -1376,7 +1612,8 @@
         "summary": "Partially update an asset cybersecurity property",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "put": {
         "operationId": "replace-asset-cybersecurity-property",
@@ -1443,6 +1680,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -1502,7 +1749,8 @@
         "summary": "Replace an asset cybersecurity property",
         "tags": [
           "Asset cybersecurity properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/assets/{id}": {
@@ -1544,6 +1792,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1594,7 +1852,8 @@
         "summary": "Delete an asset",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "get": {
         "operationId": "get-asset",
@@ -1640,6 +1899,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1690,7 +1959,8 @@
         "summary": "Get an asset",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "patch": {
         "description": "Omitted fields remain unchanged. Set description or identification_source to null to clear them.",
@@ -1748,6 +2018,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -1797,7 +2077,8 @@
         "summary": "Partially update an asset",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "put": {
         "operationId": "replace-asset",
@@ -1854,6 +2135,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -1903,7 +2194,8 @@
         "summary": "Replace an asset",
         "tags": [
           "Assets"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/damage-scenario-asset-properties": {
@@ -1972,6 +2264,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -2031,7 +2333,8 @@
         "summary": "List damage scenario asset property links",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "post": {
         "operationId": "create-damage-scenario-asset-property",
@@ -2084,6 +2387,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2144,7 +2457,8 @@
         "summary": "Create a damage scenario asset property link",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/damage-scenario-asset-properties/{id}": {
@@ -2185,6 +2499,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2245,7 +2569,8 @@
         "summary": "Delete a damage scenario asset property link",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "get": {
         "operationId": "get-damage-scenario-asset-property",
@@ -2291,6 +2616,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2351,7 +2686,8 @@
         "summary": "Get a damage scenario asset property link",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "patch": {
         "description": "Omitted fields remain unchanged. Required fields cannot be null; optional text fields can be cleared with null.",
@@ -2408,6 +2744,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2468,7 +2814,8 @@
         "summary": "Partially update a damage scenario asset property link",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "put": {
         "operationId": "replace-damage-scenario-asset-property",
@@ -2524,6 +2871,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2584,7 +2941,8 @@
         "summary": "Replace a damage scenario asset property link",
         "tags": [
           "Damage scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/threat-scenario-asset-properties": {
@@ -2653,6 +3011,16 @@
             },
             "description": "Unauthorized"
           },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -2712,7 +3080,8 @@
         "summary": "List threat scenario asset property links",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "post": {
         "operationId": "create-threat-scenario-asset-property",
@@ -2765,6 +3134,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2825,7 +3204,8 @@
         "summary": "Create a threat scenario asset property link",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/item-definitions/{item_definition_id}/threat-scenario-asset-properties/{id}": {
@@ -2866,6 +3246,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -2926,7 +3316,8 @@
         "summary": "Delete a threat scenario asset property link",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "get": {
         "operationId": "get-threat-scenario-asset-property",
@@ -2972,6 +3363,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3032,7 +3433,8 @@
         "summary": "Get a threat scenario asset property link",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "patch": {
         "description": "Omitted fields remain unchanged. Required fields cannot be null; optional text fields can be cleared with null.",
@@ -3089,6 +3491,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3149,7 +3561,8 @@
         "summary": "Partially update a threat scenario asset property link",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       },
       "put": {
         "operationId": "replace-threat-scenario-asset-property",
@@ -3205,6 +3618,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3265,7 +3688,8 @@
         "summary": "Replace a threat scenario asset property link",
         "tags": [
           "Threat scenario asset properties"
-        ]
+        ],
+        "x-taramisu-permission": "edit"
       }
     },
     "/api/v1/me": {
@@ -3405,7 +3829,7 @@
           "204": {
             "description": "No Content"
           },
-          "default": {
+          "403": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3413,7 +3837,37 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -3424,7 +3878,8 @@
         "summary": "Delete a TARA project",
         "tags": [
           "Tara Project"
-        ]
+        ],
+        "x-taramisu-permission": "manage"
       },
       "get": {
         "operationId": "get-tara-project",
@@ -3450,7 +3905,7 @@
             },
             "description": "OK"
           },
-          "default": {
+          "403": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3458,7 +3913,37 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -3469,7 +3954,8 @@
         "summary": "Get a TARA project",
         "tags": [
           "Tara Project"
-        ]
+        ],
+        "x-taramisu-permission": "read"
       },
       "patch": {
         "operationId": "update-tara-project",
@@ -3505,7 +3991,7 @@
             },
             "description": "OK"
           },
-          "default": {
+          "403": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3513,7 +3999,37 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -3524,7 +4040,8 @@
         "summary": "Partially update a TARA project",
         "tags": [
           "Tara Project"
-        ]
+        ],
+        "x-taramisu-permission": "manage"
       },
       "put": {
         "operationId": "replace-tara-project",
@@ -3560,7 +4077,7 @@
             },
             "description": "OK"
           },
-          "default": {
+          "403": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3568,7 +4085,37 @@
                 }
               }
             },
-            "description": "Error"
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "security": [
@@ -3579,7 +4126,364 @@
         "summary": "Replace a TARA project",
         "tags": [
           "Tara Project"
-        ]
+        ],
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/members": {
+      "get": {
+        "description": "Any project role. Names and email addresses are omitted when Authentik is unavailable.",
+        "operationId": "list-project-members",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectMember"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List project members",
+        "tags": [
+          "Project members"
+        ],
+        "x-taramisu-permission": "read"
+      },
+      "post": {
+        "description": "Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group. Returns 409 if several active users share the email.",
+        "operationId": "add-project-member",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectMemberInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMember"
+                }
+              }
+            },
+            "description": "Created",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a project member",
+        "tags": [
+          "Project members"
+        ],
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/members/{member_id}": {
+      "delete": {
+        "description": "Owners can remove anyone; every member can remove their own user assignment (leave). Returns 409 for the last user Owner.",
+        "operationId": "remove-project-member",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a project member",
+        "tags": [
+          "Project members"
+        ],
+        "x-taramisu-permission": "read"
+      },
+      "patch": {
+        "description": "Owner only. Returns 409 if this would remove the last user Owner.",
+        "operationId": "update-project-member",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "member_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectMemberInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMember"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a member's role",
+        "tags": [
+          "Project members"
+        ],
+        "x-taramisu-permission": "manage"
       }
     },
     "/health/live": {
@@ -3643,6 +4547,10 @@
     {
       "description": "Create, read, replace, update and delete TARA projects.",
       "name": "Tara Project"
+    },
+    {
+      "description": "Give users and Authentik groups a role in a project.",
+      "name": "Project members"
     }
   ]
 }
