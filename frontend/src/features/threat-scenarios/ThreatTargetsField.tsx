@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { CiaProperty } from '../../api/models/asset'
 import type { ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { CIA_PROPERTIES } from '../assets/ciaProperties'
@@ -73,16 +74,20 @@ function DamageScenarioTargets({ scenario, value, onChange, selection }: DamageS
             : undefined
           return (
             <label key={`${asset.id}:${property}`} className="flex min-h-10 cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:bg-muted/30 has-checked:bg-muted/50">
-              <input
-                type={single ? 'radio' : 'checkbox'}
-                name={`${groupId}-${asset.id}`}
-                checked={checked}
-                onChange={toggle}
-                // A checked radio button fires no change event, and a threat can also have no target yet.
-                onClick={() => {
-                  if (single && checked) toggle()
-                }}
-              />
+              {single ? (
+                <input
+                  type="radio"
+                  name={`${groupId}-${asset.id}`}
+                  checked={checked}
+                  onChange={toggle}
+                  // A checked radio button fires no change event, and a threat can also have no target yet.
+                  onClick={() => {
+                    if (checked) toggle()
+                  }}
+                />
+              ) : (
+                <Checkbox checked={checked} onCheckedChange={toggle} />
+              )}
               <span
                 aria-hidden="true"
                 className={`inline-flex size-6 shrink-0 items-center justify-center rounded-lg border font-mono ${
