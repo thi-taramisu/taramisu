@@ -10,6 +10,9 @@ import { ItemPage } from './features/items/ItemPage'
 import { ItemRisksTab } from './features/items/ItemRisksTab'
 import { GeneralSettings } from './features/project-settings/GeneralSettings'
 import { MembersSettings } from './features/project-settings/MembersSettings'
+import { ThreatScenarioDefinitionTab } from './features/threat-scenarios/ThreatScenarioDefinitionTab'
+import { ThreatScenarioPage } from './features/threat-scenarios/ThreatScenarioPage'
+import { ThreatScenarioRelationsTab } from './features/threat-scenarios/ThreatScenarioRelationsTab'
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
@@ -25,6 +28,7 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 const PAGES: Partial<Record<EntityType, ReactNode>> = {
   items: <ItemPage />,
   'damage-scenarios': <DamageScenarioPage />,
+  'threat-scenarios': <ThreatScenarioPage />,
 }
 
 // Tabs that already have content, everything else renders a placeholder.
@@ -35,6 +39,8 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'damage-scenarios/': <DamageScenarioDefinitionTab />,
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
   'damage-scenarios/relations': <DamageScenarioRelationsTab />,
+  'threat-scenarios/': <ThreatScenarioDefinitionTab />,
+  'threat-scenarios/relations': <ThreatScenarioRelationsTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md
