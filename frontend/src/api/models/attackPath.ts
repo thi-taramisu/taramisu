@@ -18,7 +18,8 @@ export interface AttackPath {
   title: string
   analysis_approach: AnalysisApproach | null
   is_partial_early_stage: boolean
-  attack_steps_and_weaknesses: AttackStep[]
+  /** Null while the column has no value yet. */
+  attack_steps_and_weaknesses: AttackStep[] | null
 }
 
 /** PATCH body: only the given fields change. */
