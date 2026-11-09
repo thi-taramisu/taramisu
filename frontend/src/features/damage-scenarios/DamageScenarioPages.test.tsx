@@ -33,7 +33,7 @@ describe('create damage scenario', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
-    expect(within(tree()).getByRole('link', { name: 'Diagnostic key leaked' })).toHaveAttribute('aria-current', 'page')
+    expect(within(tree()).getByRole('link', { name: 'DS-02 Diagnostic key leaked' })).toHaveAttribute('aria-current', 'page')
     expect((await api.content.assets('headlamp', 'i-01')).find((asset) => asset.id === 'a-04')).toMatchObject({ damageScenarios: 1 })
   })
 
@@ -228,7 +228,7 @@ describe('damage scenario definition', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
-    expect(within(tree()).getByRole('link', { name: 'Low beam fails at night' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({
       title: 'Low beam fails at night',
       road_user_harm_description: null,

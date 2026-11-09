@@ -22,7 +22,7 @@ describe('routing', () => {
       'href',
       `${project}/items/i-01`,
     )
-    expect(within(tree).getByRole('link', { name: 'Malicious device on the OBD-II connector' })).toHaveAttribute('href', `${project}/attack-paths/ap-02`)
+    expect(within(tree).getByRole('link', { name: 'AP-02 Malicious device on the OBD-II connector' })).toHaveAttribute('href', `${project}/attack-paths/ap-02`)
   })
 
   it('shows the item definition diagram on the item route', async () => {
@@ -61,7 +61,7 @@ describe('routing', () => {
     expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
-    expect(within(tree).getByRole('link', { name: 'Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
+    expect(within(tree).getByRole('link', { name: 'A-01 Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
   })
 
   it('toggles the graph view with the header switch', async () => {

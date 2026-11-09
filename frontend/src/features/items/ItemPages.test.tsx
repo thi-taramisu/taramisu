@@ -22,7 +22,7 @@ describe('sidebar tree', () => {
 
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
-    expect(within(tree()).getByRole('link', { name: 'Malicious device on the OBD-II connector' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'AP-02 Malicious device on the OBD-II connector' })).toBeInTheDocument()
   })
 })
 
