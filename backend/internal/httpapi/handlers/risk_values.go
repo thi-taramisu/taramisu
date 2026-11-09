@@ -73,7 +73,7 @@ func (h *RiskValues) Register(api huma.API) {
 	Register(api, riskOperation("get-risk-value", http.MethodGet, member, "Get risk value"), read, h.Get)
 	Register(api, riskOperation("create-risk-value", http.MethodPost, collection, "Create risk value"), edit, h.Create)
 	Register(api, riskOperation("replace-risk-value", http.MethodPut, member, "Replace risk value"), edit, h.Replace)
-	Register(api, riskOperation("patch-risk-value", http.MethodPatch, member, "Patch risk value"), edit, h.Patch)
+	Register(api, riskOperation("update-risk-value", http.MethodPatch, member, "Patch risk value"), edit, h.Patch)
 	Register(api, riskOperation("delete-risk-value", http.MethodDelete, member, "Delete risk value"), edit, h.Delete)
 }
 func (h *RiskValues) List(ctx context.Context, in *RiskListInput) (*ListRiskValuesOutput, error) {

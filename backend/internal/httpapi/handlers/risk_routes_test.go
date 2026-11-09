@@ -266,7 +266,7 @@ func TestRiskOpenAPI(t *testing.T) {
 		for id, op := range map[string]*huma.Operation{
 			"list-" + slug: collection.Get, "create-" + singular: collection.Post,
 			"get-" + singular: member.Get, "replace-" + singular: member.Put,
-			"patch-" + singular: member.Patch, "delete-" + singular: member.Delete,
+			"update-" + singular: member.Patch, "delete-" + singular: member.Delete,
 		} {
 			if op == nil || len(op.Security) != 1 || op.Security[0]["bearer"] == nil {
 				t.Fatal("missing authenticated operation")

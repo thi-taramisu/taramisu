@@ -162,7 +162,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Patch risk treatment decision */
-        patch: operations["patch-risk-treatment-decision"];
+        patch: operations["update-risk-treatment-decision"];
         trace?: never;
     };
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-values": {
@@ -200,7 +200,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Patch risk value */
-        patch: operations["patch-risk-value"];
+        patch: operations["update-risk-value"];
         trace?: never;
     };
     "/health/live": {
@@ -1414,7 +1414,7 @@ export interface operations {
             };
         };
     };
-    "patch-risk-treatment-decision": {
+    "update-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -1888,7 +1888,7 @@ export interface operations {
             };
         };
     };
-    "patch-risk-value": {
+    "update-risk-value": {
         parameters: {
             query?: never;
             header?: never;

@@ -75,7 +75,7 @@ func (h *RiskTreatmentDecisions) Register(api huma.API) {
 	Register(api, riskOperation("get-risk-treatment-decision", http.MethodGet, member, "Get risk treatment decision"), read, h.Get)
 	Register(api, riskOperation("create-risk-treatment-decision", http.MethodPost, collection, "Create risk treatment decision"), edit, h.Create)
 	Register(api, riskOperation("replace-risk-treatment-decision", http.MethodPut, member, "Replace risk treatment decision"), edit, h.Replace)
-	Register(api, riskOperation("patch-risk-treatment-decision", http.MethodPatch, member, "Patch risk treatment decision"), edit, h.Patch)
+	Register(api, riskOperation("update-risk-treatment-decision", http.MethodPatch, member, "Patch risk treatment decision"), edit, h.Patch)
 	Register(api, riskOperation("delete-risk-treatment-decision", http.MethodDelete, member, "Delete risk treatment decision"), edit, h.Delete)
 }
 func (h *RiskTreatmentDecisions) List(ctx context.Context, in *RiskListInput) (*ListRiskTreatmentDecisionsOutput, error) {

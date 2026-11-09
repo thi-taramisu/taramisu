@@ -1819,7 +1819,7 @@
         "x-taramisu-permission": "read"
       },
       "patch": {
-        "operationId": "patch-risk-treatment-decision",
+        "operationId": "update-risk-treatment-decision",
         "parameters": [
           {
             "in": "path",
@@ -2494,7 +2494,7 @@
         "x-taramisu-permission": "read"
       },
       "patch": {
-        "operationId": "patch-risk-value",
+        "operationId": "update-risk-value",
         "parameters": [
           {
             "in": "path",
