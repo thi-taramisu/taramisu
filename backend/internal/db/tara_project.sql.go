@@ -114,19 +114,25 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 const updateTaraProject = `-- name: UpdateTaraProject :one
 UPDATE tara_project
 SET name = COALESCE($1, name),
-    description = COALESCE($2, description)
-WHERE id = $3
+    description = CASE WHEN $2::boolean THEN $3::text ELSE description END
+WHERE id = $4
 RETURNING id, name, description, created_at
 `
 
 type UpdateTaraProjectParams struct {
-	Name        *string
-	Description *string
-	ID          pgtype.UUID
+	Name           *string
+	SetDescription bool
+	Description    *string
+	ID             pgtype.UUID
 }
 
 func (q *Queries) UpdateTaraProject(ctx context.Context, arg UpdateTaraProjectParams) (TaraProject, error) {
-	row := q.db.QueryRow(ctx, updateTaraProject, arg.Name, arg.Description, arg.ID)
+	row := q.db.QueryRow(ctx, updateTaraProject,
+		arg.Name,
+		arg.SetDescription,
+		arg.Description,
+		arg.ID,
+	)
 	var i TaraProject
 	err := row.Scan(
 		&i.ID,

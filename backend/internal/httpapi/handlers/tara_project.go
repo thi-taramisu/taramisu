@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -30,14 +33,14 @@ func NewTaraProject(store TaraProjectStore) *TaraProject {
 }
 
 func (h *TaraProject) Register(api huma.API) {
-	const collection = "/api/tara-projects"
+	const collection = "/api/v1/projects"
 	const member = collection + "/{id}"
 	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
 		Name: "Tara Project", Description: "Create, read, replace, update and delete TARA projects.",
 	})
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"session": {}}}}
+			Tags: []string{"Tara Project"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
 	huma.Register(api, op("list-tara-projects", http.MethodGet, collection, "List TARA projects"), h.List)
 	create := op("create-tara-project", http.MethodPost, collection, "Create a TARA project")
@@ -72,7 +75,7 @@ type TaraProjectIDInput struct {
 
 type CreateTaraProjectInput struct {
 	Body struct {
-		Name        string  `json:"name" minLength:"1"`
+		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
 	}
 }
@@ -80,16 +83,33 @@ type CreateTaraProjectInput struct {
 type ReplaceTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        string  `json:"name" minLength:"1"`
+		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
 	}
+}
+
+// Optional distinguishes an omitted PATCH field from an explicit JSON null.
+type Optional[T any] struct {
+	Set   bool
+	Value *T
+}
+
+func (o *Optional[T]) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	return json.Unmarshal(data, &o.Value)
+}
+
+func (o Optional[T]) Schema(r huma.Registry) *huma.Schema {
+	s := *r.Schema(reflect.TypeFor[T](), true, "")
+	s.Nullable = true
+	return &s
 }
 
 type UpdateTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        *string `json:"name,omitempty" minLength:"1"`
-		Description *string `json:"description,omitempty"`
+		Name        *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
+		Description Optional[string] `json:"description,omitempty"`
 	}
 }
 
@@ -150,9 +170,10 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 		return nil, err
 	}
 	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:          id,
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
+		ID:             id,
+		Name:           in.Body.Name,
+		SetDescription: in.Body.Description.Set,
+		Description:    in.Body.Description.Value,
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -186,6 +207,10 @@ func parseUUID(s string) (pgtype.UUID, error) {
 func mapTaraProjectError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("project not found")
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
+		return huma.Error409Conflict("project still contains item definitions")
 	}
 	return err
 }
