@@ -1,7 +1,7 @@
 COMPOSE := docker compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml
 
 .DEFAULT_GOAL := up
-.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate seed test check-networks
+.PHONY: init up down reset db pgadmin migrate migrate-diff migrate-validate seed test test-stack check-networks
 init:
 	./dev.sh --init
 up:
@@ -25,5 +25,7 @@ seed: init
 	$(COMPOSE) --profile seed run --rm seed
 test:
 	sh dev_test.sh
+test-stack:
+	python3 stack_test.py
 check-networks:
 	./check-networks.sh

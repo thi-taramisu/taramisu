@@ -68,12 +68,12 @@ erDiagram
 
     IAM_USER {
         uuid id PK "Internal UUID"
-        string external_iam_sub UK "Keycloak 'sub' or ORY Kratos 'identity.id'"
+        string external_iam_sub UK "Authentik 'sub' claim"
     }
 
     IAM_GROUP {
         uuid id PK "Internal UUID"
-        string external_iam_group_id UK "Keycloak Group ID / Role or ORY Group"
+        string external_iam_group_id UK "Authentik group UUID"
     }
 
     IAM_USER_GROUP_MEMBER {
@@ -235,11 +235,15 @@ erDiagram
   specific assessment scope, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** /
   **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
 * **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
-  externally (e.g., via Keycloak or ORY Kratos). Following strict separation of concerns, no redundant user-specific
+  externally by Authentik. Following strict separation of concerns, no redundant user-specific
   metadata (such as emails or display names) is stored in the application database; it stores only immutable external
   references (`external_iam_sub`, `external_iam_group_id`).
 * **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`OWNER`, `EDITOR`, `REVIEWER`,
   `VIEWER`) on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
+* **Proposed changes (#143, implementation in #186):** The [project roles specification](iam/project-roles.md) defines the role
+  set and its permissions. It proposes one role per user or group and project, ordering the enum by rank (`VIEWER`, `EDITOR`,
+  `OWNER`; `REVIEWER` pending), and removing `IAM_USER_GROUP_MEMBER` because group membership comes from the Authentik access
+  token. The diagram above shows the currently implemented schema until #186 is merged.
 
 ### 2.2 Separation of Assets and Cybersecurity Properties (`[RQ-15-02]`, `[WP-15-02]`)
 

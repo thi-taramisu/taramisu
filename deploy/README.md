@@ -196,6 +196,42 @@ deploy/test-bootstrap.sh       # install the newest test release, ends with the 
 deploy/test-bootstrap.sh sh    # or a shell as taramisu, e.g. to try --version v99.0.0 and --update
 ```
 
+### Live multi-replica and failover verification
+
+```sh
+make -C deploy test-stack
+```
+
+Requires a running stack (`make -C deploy up`); the runner does not start one.
+It obtains an access token through the OIDC PKCE flow against Authentik via NGINX (`/auth/`), checks its claims,
+and temporarily scales `api` to 2 replicas.
+It verifies direct token acceptance and rejection on each replica's container IP
+and that sequential requests through NGINX reach both replicas.
+Under continuous load, it verifies that no request fails while a replica is stopped (`docker stop`, SIGTERM)
+or killed (`docker kill`, SIGKILL).
+In rolling-deploy order, it starts a replacement replica, stops an old one, and verifies that NGINX serves the new one
+and drops the old one, and that the new replica accepts the token with a cold cache.
+It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130; 2 if the restore fails);
+further signals are ignored while it restores.
+`python3 deploy/stack_test.py --self-check`, run by `make -C deploy test`, checks offline that `proxy/nginx.conf`
+still matches the timings and log format the runner parses.
+To run single tests, pass their names, e.g. `python3 deploy/stack_test.py MultiReplicaFailoverTest.test_04_sigterm_stop_failover`.
+Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
+
+Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:
+
+- Retry: `proxy_next_upstream` resends a request to the other replica when its connection is refused (logged as `502`)
+  or times out after `proxy_connect_timeout 2s` (`504`); the access log records both attempts in `$upstream_addr` and `$upstream_status`.
+- Passive health check: `max_fails=1 fail_timeout=10s` marks a replica down for 10 seconds after one failed attempt.
+- Runtime re-resolution: `resolver 127.0.0.11 valid=2s` re-queries Docker's embedded DNS, which drops a stopped container's address,
+  so NGINX removes it from the upstream pool within the TTL.
+  The test waits until `fail_timeout` and the TTL have passed and then expects no further attempts on the dead replica.
+
+> **Worktrees and multiple checkouts:** Compose uses fixed host ports and the project name `taramisu`,
+> so every checkout and worktree talks to the same running stack.
+> Bind mounts such as the proxy's `nginx.conf` point to the checkout that last recreated the container;
+> run `make -C deploy up` from your main checkout when you finish in a worktree.
+
 ## Database password mismatch
 
 `POSTGRES_PASSWORD` initializes a new database; changing `PG_PASS` in `iam/.env` does not update a password stored in an existing volume.
