@@ -18,6 +18,8 @@ interface CreateElementDialogProps {
   onOpenChange: (open: boolean) => void
   /** Gets the focus back on close; opened from a menu, the dialog would otherwise drop it after Cancel. */
   returnFocusTo?: HTMLButtonElement | null
+  /** Name to start with, e.g. typed into a search before. */
+  initialName?: string
   namePlaceholder: string
   nameMaxLength?: number
   /** Where the new element shows up, e.g. in the tree. */
@@ -42,6 +44,7 @@ export function CreateElementDialog({
   open,
   onOpenChange,
   returnFocusTo,
+  initialName = '',
   namePlaceholder,
   nameMaxLength,
   hint,
@@ -52,7 +55,7 @@ export function CreateElementDialog({
 }: CreateElementDialogProps) {
   const id = useId()
   const navigate = useNavigate()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [nameError, setNameError] = useState<string>()
   const [created, setCreated] = useState<string>()
   const [pending, setPending] = useState(false)
