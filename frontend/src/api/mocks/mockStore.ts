@@ -87,42 +87,42 @@ export function syncLinks(entry: StoredItem) {
   }
 }
 
-function isThreatDamageLink(link: ThreatDamageLink, threatScenarioId: string, damageScenarioId: string) {
-  return link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === damageScenarioId
+function addLink<Link>(entry: StoredItem, links: Link[], link: Link, isSame: (other: Link) => boolean, conflict: string) {
+  if (links.some(isSame)) throw new ApiError(409, conflict)
+  links.push(link)
+  syncLinks(entry)
 }
 
-export function addThreatDamageLink(entry: StoredItem, threatScenarioId: string, damageScenarioId: string) {
-  // Same rule as the UNIQUE constraint of `threat_damage_link`.
-  if (entry.threatDamageLinks.some((link) => isThreatDamageLink(link, threatScenarioId, damageScenarioId))) {
-    throw new ApiError(409, 'The scenarios are already linked.')
-  }
-  entry.threatDamageLinks.push({ threat_scenario_id: threatScenarioId, damage_scenario_id: damageScenarioId })
+function removeLink<Link>(entry: StoredItem, links: Link[], isSame: (other: Link) => boolean) {
+  const index = links.findIndex(isSame)
+  if (index === -1) throw new ApiError(404, 'Link not found.')
+  links.splice(index, 1)
   syncLinks(entry)
+}
+
+const isThreatDamageLink = (threatScenarioId: string, damageScenarioId: string) => (link: ThreatDamageLink) =>
+  link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === damageScenarioId
+
+const isThreatAttackPathLink = (threatScenarioId: string, attackPathId: string) => (link: ThreatAttackPathLink) =>
+  link.threat_scenario_id === threatScenarioId && link.attack_path_id === attackPathId
+
+// The conflicts are the same rules as the UNIQUE constraints of `threat_damage_link` and `threat_attack_path_link`.
+export function addThreatDamageLink(entry: StoredItem, threatScenarioId: string, damageScenarioId: string) {
+  const link = { threat_scenario_id: threatScenarioId, damage_scenario_id: damageScenarioId }
+  addLink(entry, entry.threatDamageLinks, link, isThreatDamageLink(threatScenarioId, damageScenarioId), 'The scenarios are already linked.')
 }
 
 export function removeThreatDamageLink(entry: StoredItem, threatScenarioId: string, damageScenarioId: string) {
-  if (!entry.threatDamageLinks.some((link) => isThreatDamageLink(link, threatScenarioId, damageScenarioId))) throw new ApiError(404, 'Link not found.')
-  entry.threatDamageLinks = entry.threatDamageLinks.filter((link) => !isThreatDamageLink(link, threatScenarioId, damageScenarioId))
-  syncLinks(entry)
-}
-
-function isThreatAttackPathLink(link: ThreatAttackPathLink, threatScenarioId: string, attackPathId: string) {
-  return link.threat_scenario_id === threatScenarioId && link.attack_path_id === attackPathId
+  removeLink(entry, entry.threatDamageLinks, isThreatDamageLink(threatScenarioId, damageScenarioId))
 }
 
 export function addThreatAttackPathLink(entry: StoredItem, threatScenarioId: string, attackPathId: string) {
-  // Same rule as the UNIQUE constraint of `threat_attack_path_link`.
-  if (entry.threatAttackPathLinks.some((link) => isThreatAttackPathLink(link, threatScenarioId, attackPathId))) {
-    throw new ApiError(409, 'The attack path is already linked.')
-  }
-  entry.threatAttackPathLinks.push({ threat_scenario_id: threatScenarioId, attack_path_id: attackPathId })
-  syncLinks(entry)
+  const link = { threat_scenario_id: threatScenarioId, attack_path_id: attackPathId }
+  addLink(entry, entry.threatAttackPathLinks, link, isThreatAttackPathLink(threatScenarioId, attackPathId), 'The attack path is already linked.')
 }
 
 export function removeThreatAttackPathLink(entry: StoredItem, threatScenarioId: string, attackPathId: string) {
-  if (!entry.threatAttackPathLinks.some((link) => isThreatAttackPathLink(link, threatScenarioId, attackPathId))) throw new ApiError(404, 'Link not found.')
-  entry.threatAttackPathLinks = entry.threatAttackPathLinks.filter((link) => !isThreatAttackPathLink(link, threatScenarioId, attackPathId))
-  syncLinks(entry)
+  removeLink(entry, entry.threatAttackPathLinks, isThreatAttackPathLink(threatScenarioId, attackPathId))
 }
 
 /** Runs `fn` like a request: async, with a copy of the result, errors as rejections. */
