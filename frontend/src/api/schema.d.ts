@@ -162,7 +162,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update selected item definition fields */
-        patch: operations["patch-item-definition"];
+        patch: operations["update-item-definition"];
         trace?: never;
     };
     "/health/live": {
@@ -1407,7 +1407,7 @@ export interface operations {
             };
         };
     };
-    "patch-item-definition": {
+    "update-item-definition": {
         parameters: {
             query?: never;
             header?: never;

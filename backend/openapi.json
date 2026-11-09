@@ -1864,7 +1864,7 @@
         "x-taramisu-permission": "read"
       },
       "patch": {
-        "operationId": "patch-item-definition",
+        "operationId": "update-item-definition",
         "parameters": [
           {
             "in": "path",

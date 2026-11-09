@@ -250,6 +250,6 @@ func (h *ItemDefinitions) Register(api huma.API) {
 	Register(api, operation("create-item-definition", http.MethodPost, collection, "Create an item definition", 201), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Create)
 	Register(api, operation("get-item-definition", http.MethodGet, member, "Get an item definition", 200), InProject(h.access, ScopeProject("project_id"), PermRead), h.Get)
 	Register(api, operation("replace-item-definition", http.MethodPut, member, "Replace an item definition", 200), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Replace)
-	Register(api, operation("patch-item-definition", http.MethodPatch, member, "Update selected item definition fields", 200), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Patch)
+	Register(api, operation("update-item-definition", http.MethodPatch, member, "Update selected item definition fields", 200), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Patch)
 	Register(api, operation("delete-item-definition", http.MethodDelete, member, "Delete an item definition", 204), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Delete)
 }
