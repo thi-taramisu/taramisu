@@ -24,12 +24,12 @@ describe('element header', () => {
     expect(screen.getByText('Asset #01')).toBeInTheDocument()
 
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
-    await user.click(within(tree).getByRole('link', { name: 'Body control ECU firmware' }))
+    await user.click(within(tree).getByRole('link', { name: 'A-02 Body control ECU firmware' }))
     await screen.findByRole('heading', { name: 'Body control ECU firmware' })
     expect(screen.getByText('Asset #02')).toBeInTheDocument()
     expect(screen.queryByText('Asset #01')).not.toBeInTheDocument()
 
-    await user.click(within(tree).getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' }))
+    await user.click(within(tree).getByRole('link', { name: 'TS-01 Spoofed headlamp command on the CAN bus' }))
     await screen.findByRole('heading', { name: 'Spoofed headlamp command on the CAN bus' })
     expect(screen.getByText('Threat scenario #01')).toBeInTheDocument()
     expect(screen.queryByText('Asset #02')).not.toBeInTheDocument()

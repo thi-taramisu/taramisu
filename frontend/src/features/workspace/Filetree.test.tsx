@@ -35,7 +35,7 @@ function renderTree(path = project, tree = nodes) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Filetree', () => {
-  it('shows element names without their IDs in labels, tooltips and toggles', () => {
+  it('hides element IDs visually but keeps them in accessible names', () => {
     const allTypes: TreeNode[] = [{
       type: 'items', id: 'i-10', code: 'I-10', name: 'Gateway', children: [{
         type: 'assets', id: 'a-12', code: 'A-12', name: 'CAN bus', children: [{
@@ -51,22 +51,38 @@ describe('Filetree', () => {
 
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
     const anyCode = /\b[A-Z]{1,2}-\d+\b/
+    // Codes appear only in screen-reader text; the visible labels and tooltips show names only.
+    const codes = within(tree).getAllByText(anyCode)
+    expect(codes.map((code) => code.textContent?.trim())).toEqual(['I-10', 'A-12', 'DS-11', 'TS-14', 'AP-15'])
+    for (const code of codes) expect(code).toHaveClass('sr-only')
     const links = within(tree).getAllByRole('link')
-    expect(links.map((link) => link.textContent)).toEqual(['Gateway', 'CAN bus', 'Bus flooding', 'Spoofed frames', 'Compromised ECU'])
     for (const link of links) expect(link.title).not.toMatch(anyCode)
-    for (const button of within(tree).getAllByRole('button')) expect(button).not.toHaveAccessibleName(anyCode)
-    expect(within(tree).getByRole('link', { name: 'CAN bus' })).toHaveAttribute('title', 'Asset: CAN bus')
-    expect(within(tree).getByRole('button', { name: 'Collapse Spoofed frames' })).toBeInTheDocument()
+    expect(links).toHaveLength(5)
+    expect(within(tree).getByRole('link', { name: 'A-12 CAN bus' })).toHaveAttribute('title', 'Asset: CAN bus')
+    expect(within(tree).getByRole('button', { name: 'Collapse TS-14 Spoofed frames' })).toBeInTheDocument()
+  })
+
+  it('keeps elements with the same name distinguishable for assistive technology', () => {
+    const twins: TreeNode[] = [
+      { type: 'damage-scenarios', id: 'ds-01', code: 'DS-01', name: 'Loss of light', children: [{ type: 'threat-scenarios', id: 'ts-01', code: 'TS-01', name: 'Spoofing' }] },
+      { type: 'damage-scenarios', id: 'ds-02', code: 'DS-02', name: 'Loss of light', children: [{ type: 'threat-scenarios', id: 'ts-02', code: 'TS-02', name: 'Spoofing' }] },
+    ]
+    renderTree(project, twins)
+
+    expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01`)
+    expect(screen.getByRole('link', { name: 'DS-02 Loss of light' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-02`)
+    expect(screen.getByRole('button', { name: 'Collapse DS-01 Loss of light' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse DS-02 Loss of light' })).toBeInTheDocument()
   })
 
   it('uses the supplied project and keeps the active entity on its tabs and in graph view', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01/risks?view=graph&filter=open`)
 
-    const asset = screen.getByRole('link', { name: 'Long asset name' })
+    const asset = screen.getByRole('link', { name: 'A-01 Long asset name' })
     expect(asset).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'Headlamp' })).not.toHaveAttribute('aria-current')
-    const damage = screen.getByRole('link', { name: 'Loss of light' })
+    expect(screen.getByRole('link', { name: 'I-01 Headlamp' })).not.toHaveAttribute('aria-current')
+    const damage = screen.getByRole('link', { name: 'DS-01 Loss of light' })
     expect(damage).toHaveAttribute('href', `${project}/damage-scenarios/ds-01?view=graph&filter=open`)
 
     await user.click(damage)
@@ -79,80 +95,80 @@ describe('Filetree', () => {
     renderTree()
 
     await user.tab()
-    const initialToggle = screen.getByRole('button', { name: 'Collapse Headlamp' })
+    const initialToggle = screen.getByRole('button', { name: 'Collapse I-01 Headlamp' })
     const content = document.getElementById(initialToggle.getAttribute('aria-controls')!)
     expect(initialToggle).toHaveFocus()
     await user.keyboard(' ')
-    const rootToggle = screen.getByRole('button', { name: 'Expand Headlamp' })
+    const rootToggle = screen.getByRole('button', { name: 'Expand I-01 Headlamp' })
     expect(rootToggle).toHaveAttribute('aria-expanded', 'false')
     expect(content).not.toBeVisible()
-    expect(screen.queryByRole('link', { name: 'Long asset name' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Headlamp' })).not.toHaveAttribute('aria-current')
+    expect(screen.queryByRole('link', { name: 'A-01 Long asset name' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'I-01 Headlamp' })).not.toHaveAttribute('aria-current')
 
     await user.keyboard('{Enter}')
-    await user.click(screen.getByRole('button', { name: 'Collapse Long asset name' }))
-    await user.click(screen.getByRole('button', { name: 'Collapse Headlamp' }))
-    await user.click(screen.getByRole('button', { name: 'Expand Headlamp' }))
-    expect(screen.getByRole('button', { name: 'Expand Long asset name' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Loss of light' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Firmware/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Collapse A-01 Long asset name' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Expand I-01 Headlamp' }))
+    expect(screen.getByRole('button', { name: 'Expand A-01 Long asset name' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'DS-01 Loss of light' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'A-02 Firmware' })).toBeVisible()
   })
 
   it('moves between visible entries with arrows, Home and End', async () => {
     const user = userEvent.setup()
     renderTree()
-    const root = screen.getByRole('link', { name: 'Headlamp' })
+    const root = screen.getByRole('link', { name: 'I-01 Headlamp' })
     root.focus()
 
     await user.keyboard('{ArrowRight}')
-    expect(screen.getByRole('link', { name: 'Long asset name' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'A-01 Long asset name' })).toHaveFocus()
     await user.keyboard('{ArrowLeft}')
-    expect(screen.getByRole('button', { name: 'Expand Long asset name' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand A-01 Long asset name' })).toBeInTheDocument()
     await user.keyboard('{ArrowDown}')
-    expect(screen.getByRole('link', { name: 'Firmware' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'A-02 Firmware' })).toHaveFocus()
     await user.keyboard('{ArrowLeft}')
     expect(root).toHaveFocus()
     await user.keyboard('{End}')
-    expect(screen.getByRole('link', { name: 'Firmware' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'A-02 Firmware' })).toHaveFocus()
     await user.keyboard('{ArrowUp}')
-    expect(screen.getByRole('link', { name: 'Long asset name' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'A-01 Long asset name' })).toHaveFocus()
     await user.keyboard('{Home}{ArrowLeft}{ArrowRight}{ArrowRight}')
-    expect(screen.getByRole('link', { name: 'Long asset name' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: 'A-01 Long asset name' })).toHaveFocus()
   })
 
   it('reveals ancestors when another link opens a hidden descendant', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01`)
-    await user.click(screen.getByRole('button', { name: 'Collapse Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' }))
     await user.click(screen.getByRole('link', { name: 'Open impact externally' }))
 
-    expect(screen.getByRole('link', { name: 'Loss of light' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Collapse Headlamp' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('preserves a manual collapse when switching tabs or graph view on the same entity', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01`)
-    await user.click(screen.getByRole('button', { name: 'Collapse Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' }))
 
     for (const name of ['Open asset risks', 'Open asset relations', 'Open asset definition', 'Open asset graph']) {
       await user.click(screen.getByRole('link', { name }))
-      expect(screen.getByRole('button', { name: 'Expand Headlamp' })).toHaveAttribute('aria-expanded', 'false')
-      expect(screen.queryByRole('link', { name: 'Long asset name' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand I-01 Headlamp' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('link', { name: 'A-01 Long asset name' })).not.toBeInTheDocument()
     }
 
     await user.click(screen.getByRole('link', { name: 'Open impact externally' }))
-    expect(screen.getByRole('link', { name: 'Loss of light' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('keeps shared entities independently expandable under different parents', async () => {
     const user = userEvent.setup()
     const tree: TreeNode[] = [nodes[0], { ...nodes[0], id: 'i-02', code: 'I-02', name: 'Second item' }]
     renderTree(project, tree)
-    const occurrences = screen.getAllByRole('button', { name: 'Collapse Long asset name' })
+    const occurrences = screen.getAllByRole('button', { name: 'Collapse A-01 Long asset name' })
     await user.click(occurrences[0])
 
-    expect(screen.getAllByRole('link', { name: 'Loss of light' })).toHaveLength(1)
+    expect(screen.getAllByRole('link', { name: 'DS-01 Loss of light' })).toHaveLength(1)
     expect(occurrences[1]).toHaveAttribute('aria-expanded', 'true')
   })
 
@@ -166,7 +182,7 @@ describe('Filetree', () => {
   it('scrolls overflowing labels on hover and resets them on leave', async () => {
     const user = userEvent.setup()
     renderTree()
-    const link = screen.getByRole('link', { name: 'Long asset name' })
+    const link = screen.getByRole('link', { name: 'A-01 Long asset name' })
     const label = within(link).getByText('Long asset name')
     const cancel = vi.fn<() => void>()
     const animate = vi.fn<(frames: Keyframe[], options: KeyframeAnimationOptions) => Pick<Animation, 'cancel'>>().mockReturnValue({ cancel })
@@ -188,7 +204,7 @@ describe('Filetree', () => {
 
   it.each(['hover', 'focus'] as const)('keeps scrolling while hover and focus overlap (%s first)', (first) => {
     renderTree()
-    const link = screen.getByRole('link', { name: 'Long asset name' })
+    const link = screen.getByRole('link', { name: 'A-01 Long asset name' })
     const label = within(link).getByText('Long asset name')
     const cancel = vi.fn<() => void>()
     const animate = vi.fn<() => Pick<Animation, 'cancel'>>().mockReturnValue({ cancel })
@@ -222,7 +238,7 @@ describe('Filetree', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const user = userEvent.setup()
     renderTree()
-    const link = screen.getByRole('link', { name: 'Long asset name' })
+    const link = screen.getByRole('link', { name: 'A-01 Long asset name' })
     const label = within(link).getByText('Long asset name')
     const animate = vi.fn<(frames: Keyframe[], options: KeyframeAnimationOptions) => Animation>()
     Object.defineProperty(label, 'scrollWidth', { value: 300 })
