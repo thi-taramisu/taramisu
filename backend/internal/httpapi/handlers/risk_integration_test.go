@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
@@ -42,21 +43,25 @@ func TestRiskPostgresLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	const project = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	const item = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 	const otherItem = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 	const otherThreat = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 	const otherImpact = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 	const damage = "ffffffff-ffff-4fff-8fff-ffffffffffff"
 	const otherDamage = "99999999-9999-4999-8999-999999999999"
-	exec(`INSERT INTO iam_user(id,external_iam_sub) VALUES($1,'risk-api-test')`, authtest.UserID)
-	exec(`INSERT INTO tara_project(id,name) VALUES($1,'Risk test')`, project)
+	queries := db.New(tx)
+	fixture := authtest.NewFixture(t, queries)
+	a := &riskAPI{handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
+	createdProject := a.call("POST", "/api/v1/projects", `{"name":"Risk test"}`)
+	var projectBody handlers.TaraProjectBody
+	if createdProject.Code != 201 || json.Unmarshal(createdProject.Body.Bytes(), &projectBody) != nil {
+		t.Fatalf("create project: %d %s", createdProject.Code, createdProject.Body)
+	}
+	project := projectBody.ID
 	exec(`INSERT INTO item_definition(id,tara_project_id,name,scope_type) VALUES($1,$3,'First','ITEM'),($2,$3,'Other','ITEM')`, item, otherItem, project)
 	exec(`INSERT INTO threat_scenario(id,item_definition_id,title) VALUES($1,$2,'Threat'),($3,$4,'Other threat')`, riskThreat, item, otherThreat, otherItem)
 	exec(`INSERT INTO damage_scenario(id,item_definition_id,title) VALUES($1,$2,'Damage'),($3,$4,'Other damage')`, damage, item, otherDamage, otherItem)
 	exec(`INSERT INTO impact_rating(id,damage_scenario_id,impact_category) VALUES($1,$2,'SAFETY'),($3,$4,'SAFETY')`, riskImpact, damage, otherImpact, otherDamage)
-	exec(`INSERT INTO project_role_assignment(tara_project_id,user_id,project_role) VALUES($1,$2,'OWNER')`, project, authtest.UserID)
-	a := newRiskAPI(t, db.New(tx))
 	call := func(method, path, body string, want int) *httptest.ResponseRecorder {
 		t.Helper()
 		exec("SAVEPOINT risk_request")
@@ -161,19 +166,29 @@ func TestRiskPostgresLifecycle(t *testing.T) {
 	call("GET", decisions+"?limit=1&offset=0", "", 200)
 	// Project roles are enforced for reads and writes, including inherited group assignments.
 	exec(`UPDATE project_role_assignment SET project_role='VIEWER' WHERE tara_project_id=$1`, project)
-	for _, collection := range []string{values, decisions} {
-		call("GET", collection, "", 200)
+	for _, resource := range []struct{ collection, member, body string }{{values, path, riskJSON}, {decisions, dpath, treatmentJSON}} {
+		call("GET", resource.collection, "", 200)
+		call("GET", resource.member, "", 200)
+		for _, method := range []string{"POST", "PUT", "PATCH", "DELETE"} {
+			target := resource.member
+			if method == "POST" {
+				target = resource.collection
+			}
+			call(method, target, resource.body, 403)
+		}
 	}
-	call("POST", values, riskJSON, 404)
-	call("PATCH", path, `{}`, 404)
-	call("DELETE", dpath, "", 404)
 	exec(`DELETE FROM project_role_assignment WHERE tara_project_id=$1`, project)
 	call("GET", values, "", 404)
 	call("GET", decisions, "", 404)
 	const group = "88888888-8888-4888-8888-888888888888"
-	exec(`INSERT INTO iam_group(id,external_iam_group_id) VALUES($1,'risk-test-group')`, group)
-	exec(`INSERT INTO iam_user_group_member(user_id,group_id) VALUES($1,$2)`, authtest.UserID, group)
+	const externalGroup = "77777777-7777-4777-8777-777777777777"
+	exec(`INSERT INTO iam_group(id,external_iam_group_id) VALUES($1,$2)`, group, externalGroup)
 	exec(`INSERT INTO project_role_assignment(tara_project_id,group_id,project_role) VALUES($1,$2,'EDITOR')`, project, group)
+	// A group assignment alone grants nothing until the signed token carries that group.
+	call("PATCH", path, `{"risk_score":2}`, 404)
+	a.token = "Bearer " + fixture.Token(t, map[string]any{"taramisu_groups": []string{externalGroup}})
+	call("GET", values, "", 200)
+	call("GET", decisions, "", 200)
 	call("PATCH", path, `{"risk_score":2}`, 200)
 	call("DELETE", dpath, "", 204)
 	call("DELETE", dpath, "", 404)

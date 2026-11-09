@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,15 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/auth"
-	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
 const riskScenarioPath = "/api/v1/threat-scenarios/{threat_scenario_id}"
-
-type RiskAccessStore interface {
-	CanAccessRiskScenario(context.Context, db.CanAccessRiskScenarioParams) (bool, error)
-}
 
 type RiskScenarioPath struct {
 	ThreatScenarioID string `path:"threat_scenario_id" format:"uuid"`
@@ -34,39 +26,9 @@ type RiskListInput struct {
 	Offset int32 `query:"offset" default:"0" minimum:"0"`
 }
 
-// riskField distinguishes omitted PATCH fields from explicit JSON null.
-type riskField[T any] struct {
-	Sent  bool
-	Value *T
-}
-
-func (f *riskField[T]) UnmarshalJSON(data []byte) error {
-	f.Sent = true
-	return json.Unmarshal(data, &f.Value)
-}
-func (riskField[T]) Schema(huma.Registry) *huma.Schema {
-	typ := "string"
-	switch any(new(T)).(type) {
-	case *int32:
-		typ = "integer"
-	case *bool:
-		typ = "boolean"
-	}
-	return &huma.Schema{Type: typ, Nullable: false}
-}
-
-// nullableRiskField permits explicit null for nullable database columns.
-type nullableRiskField[T any] struct{ riskField[T] }
-
-func (nullableRiskField[T]) Schema(r huma.Registry) *huma.Schema {
-	schema := (riskField[T]{}).Schema(r)
-	schema.Nullable = true
-	return schema
-}
-
 func riskUUID(value string) pgtype.UUID {
 	var id pgtype.UUID
-	// Huma validates UUID input before dispatch; authenticated user IDs are internal UUIDs.
+	// Huma validates request UUIDs before dispatch.
 	_ = id.Scan(value)
 	return id
 }
@@ -82,21 +44,6 @@ func riskUUIDString(id pgtype.UUID) *string {
 	}
 	value := id.String()
 	return &value
-}
-func authorizeRisk(ctx context.Context, store RiskAccessStore, scenario string, readOnly bool) (pgtype.UUID, error) {
-	id := riskUUID(scenario)
-	user := riskUUID(auth.UserFromContext(ctx).ID)
-	if !user.Valid {
-		return id, huma.Error401Unauthorized("authentication required")
-	}
-	allowed, err := store.CanAccessRiskScenario(ctx, db.CanAccessRiskScenarioParams{ThreatScenarioID: id, UserID: user, ReadOnly: readOnly})
-	if err != nil {
-		return id, riskError(err)
-	}
-	if !allowed {
-		return id, huma.Error404NotFound("threat scenario not found")
-	}
-	return id, nil
 }
 func riskError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {

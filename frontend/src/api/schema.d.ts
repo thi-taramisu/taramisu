@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Authentik groups that can get a project role
+         * @description Groups with the taramisu_assignable attribute. Returns 503 when Authentik is not configured or unavailable.
+         */
+        get: operations["list-assignable-groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -59,6 +79,54 @@ export interface paths {
         patch: operations["update-tara-project"];
         trace?: never;
     };
+    "/api/v1/projects/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List project members
+         * @description Any project role. Names and email addresses are omitted when Authentik is unavailable.
+         */
+        get: operations["list-project-members"];
+        put?: never;
+        /**
+         * Add a project member
+         * @description Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group. Returns 409 if several active users share the email.
+         */
+        post: operations["add-project-member"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/members/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a project member
+         * @description Owners can remove anyone; every member can remove their own user assignment (leave). Returns 409 for the last user Owner.
+         */
+        delete: operations["remove-project-member"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a member's role
+         * @description Owner only. Returns 409 if this would remove the last user Owner.
+         */
+        patch: operations["update-project-member"];
+        trace?: never;
+    };
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions": {
         parameters: {
             query?: never;
@@ -66,11 +134,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List risk treatment decision */
+        /** List risk treatment decisions */
         get: operations["list-risk-treatment-decisions"];
         put?: never;
         /** Create risk treatment decision */
-        post: operations["create-risk-treatment-decisions"];
+        post: operations["create-risk-treatment-decision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -85,16 +153,16 @@ export interface paths {
             cookie?: never;
         };
         /** Get risk treatment decision */
-        get: operations["get-risk-treatment-decisions"];
+        get: operations["get-risk-treatment-decision"];
         /** Replace risk treatment decision */
-        put: operations["replace-risk-treatment-decisions"];
+        put: operations["replace-risk-treatment-decision"];
         post?: never;
         /** Delete risk treatment decision */
-        delete: operations["delete-risk-treatment-decisions"];
+        delete: operations["delete-risk-treatment-decision"];
         options?: never;
         head?: never;
         /** Patch risk treatment decision */
-        patch: operations["patch-risk-treatment-decisions"];
+        patch: operations["patch-risk-treatment-decision"];
         trace?: never;
     };
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-values": {
@@ -104,11 +172,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List risk value */
+        /** List risk values */
         get: operations["list-risk-values"];
         put?: never;
         /** Create risk value */
-        post: operations["create-risk-values"];
+        post: operations["create-risk-value"];
         delete?: never;
         options?: never;
         head?: never;
@@ -123,16 +191,16 @@ export interface paths {
             cookie?: never;
         };
         /** Get risk value */
-        get: operations["get-risk-values"];
+        get: operations["get-risk-value"];
         /** Replace risk value */
-        put: operations["replace-risk-values"];
+        put: operations["replace-risk-value"];
         post?: never;
         /** Delete risk value */
-        delete: operations["delete-risk-values"];
+        delete: operations["delete-risk-value"];
         options?: never;
         head?: never;
         /** Patch risk value */
-        patch: operations["patch-risk-values"];
+        patch: operations["patch-risk-value"];
         trace?: never;
     };
     "/health/live": {
@@ -173,6 +241,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AssignableGroup: {
+            group_id: string;
+            name: string;
+        };
+        CreateProjectMemberInputBody: {
+            /**
+             * Format: email
+             * @description Email of an active Authentik user
+             */
+            email?: string;
+            /**
+             * Format: uuid
+             * @description UUID of an assignable Authentik group
+             */
+            group_id?: string;
+            /** @enum {string} */
+            role: "VIEWER" | "EDITOR" | "OWNER";
+        };
         CreateTaraProjectInputBody: {
             description?: string;
             name: string;
@@ -231,7 +317,23 @@ export interface components {
             determination_method?: "RISK_MATRIX" | "RISK_FORMULA";
             /** Format: uuid */
             impact_rating_id?: string;
+            /** Format: int32 */
             risk_score?: number;
+        };
+        ProjectMember: {
+            /** Format: date-time */
+            assigned_at: string;
+            email?: string;
+            group_id?: string;
+            /** Format: uuid */
+            id: string;
+            name?: string;
+            /** @enum {string} */
+            role: "VIEWER" | "EDITOR" | "OWNER";
+            /** @enum {string} */
+            type: "user" | "group";
+            /** Format: uuid */
+            user_id?: string;
         };
         ReadyOutputBody: {
             message: string;
@@ -291,6 +393,12 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
+            /** @enum {string} */
+            role: "VIEWER" | "EDITOR" | "OWNER";
+        };
+        UpdateProjectMemberInputBody: {
+            /** @enum {string} */
+            role: "VIEWER" | "EDITOR" | "OWNER";
         };
         UpdateTaraProjectInputBody: {
             description?: string | null;
@@ -314,6 +422,35 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "list-assignable-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignableGroup"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "current-user": {
         parameters: {
             query?: never;
@@ -425,8 +562,35 @@ export interface operations {
                     "application/json": components["schemas"]["TaraProjectBody"];
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -460,8 +624,35 @@ export interface operations {
                     "application/json": components["schemas"]["TaraProjectBody"];
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -489,8 +680,35 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Error */
-            default: {
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -524,8 +742,276 @@ export interface operations {
                     "application/json": components["schemas"]["TaraProjectBody"];
                 };
             };
-            /** @description Error */
-            default: {
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-project-members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMember"][] | null;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-project-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProjectMemberInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMember"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-project-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                member_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "update-project-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                member_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProjectMemberInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectMember"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -567,6 +1053,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -605,7 +1100,7 @@ export interface operations {
             };
         };
     };
-    "create-risk-treatment-decisions": {
+    "create-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -639,6 +1134,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -677,7 +1181,7 @@ export interface operations {
             };
         };
     };
-    "get-risk-treatment-decisions": {
+    "get-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -707,6 +1211,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -745,7 +1258,7 @@ export interface operations {
             };
         };
     };
-    "replace-risk-treatment-decisions": {
+    "replace-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -779,6 +1292,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -817,7 +1339,7 @@ export interface operations {
             };
         };
     };
-    "delete-risk-treatment-decisions": {
+    "delete-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -845,6 +1367,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -883,7 +1414,7 @@ export interface operations {
             };
         };
     };
-    "patch-risk-treatment-decisions": {
+    "patch-risk-treatment-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -910,6 +1441,15 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -987,6 +1527,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1025,7 +1574,7 @@ export interface operations {
             };
         };
     };
-    "create-risk-values": {
+    "create-risk-value": {
         parameters: {
             query?: never;
             header?: never;
@@ -1059,6 +1608,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1097,7 +1655,7 @@ export interface operations {
             };
         };
     };
-    "get-risk-values": {
+    "get-risk-value": {
         parameters: {
             query?: never;
             header?: never;
@@ -1127,6 +1685,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1165,7 +1732,7 @@ export interface operations {
             };
         };
     };
-    "replace-risk-values": {
+    "replace-risk-value": {
         parameters: {
             query?: never;
             header?: never;
@@ -1199,6 +1766,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1237,7 +1813,7 @@ export interface operations {
             };
         };
     };
-    "delete-risk-values": {
+    "delete-risk-value": {
         parameters: {
             query?: never;
             header?: never;
@@ -1265,6 +1841,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1303,7 +1888,7 @@ export interface operations {
             };
         };
     };
-    "patch-risk-values": {
+    "patch-risk-value": {
         parameters: {
             query?: never;
             header?: never;
@@ -1330,6 +1915,15 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

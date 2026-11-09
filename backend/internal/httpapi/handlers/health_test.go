@@ -16,15 +16,13 @@ type statusReaderFunc func(context.Context) (string, error)
 
 func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) { return f(ctx) }
 
-type riskStores interface {
-	handlers.RiskValueStore
-	handlers.RiskTreatmentDecisionStore
-}
-
 type healthQueries struct {
 	statusReaderFunc
+	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
-	riskStores
+	handlers.ProjectMemberStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {

@@ -5,6 +5,22 @@ metadata:
   labels:
     blueprints.goauthentik.io/instantiate: "false"
 entries:
+  # Adds the user's assignable groups to the token for project roles (docs/internal/architecture/iam/project-roles.md).
+  # Bound to the profile scope, which the SPA always requests. Only direct memberships count.
+  - model: authentik_providers_oauth2.scopemapping
+    id: taramisu-groups-scope
+    identifiers:
+      name: "Taramisu: assignable groups"
+    attrs:
+      scope_name: profile
+      expression: |
+        return {
+            "taramisu_groups": [
+                str(group.pk)
+                for group in request.user.groups.all()
+                if group.attributes.get("taramisu_assignable") is True
+            ]
+        }
   - model: authentik_providers_oauth2.oauth2provider
     id: taramisu-provider
     identifiers:
@@ -33,6 +49,7 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-offline_access]]
+        - !KeyOf taramisu-groups-scope
   - model: authentik_core.application
     id: taramisu-app
     identifiers:
@@ -67,3 +84,31 @@ entries:
       email: dev@taramisu.localhost
       is_active: true
       password: !Env DEV_PASSWORD
+  # Service account the API uses to read users and groups for the members API (#186).
+  - model: authentik_rbac.role
+    id: taramisu-directory-reader
+    identifiers:
+      name: taramisu-directory-reader
+    attrs:
+      permissions:
+        - authentik_core.view_user
+        - authentik_core.view_group
+  - model: authentik_core.user
+    id: taramisu-api-user
+    identifiers:
+      username: taramisu-api
+    attrs:
+      name: Taramisu API (directory reader)
+      type: service_account
+      path: taramisu/service-accounts
+      roles:
+        - !KeyOf taramisu-directory-reader
+  - model: authentik_core.token
+    identifiers:
+      identifier: taramisu-api-directory
+    attrs:
+      user: !KeyOf taramisu-api-user
+      intent: api
+      expiring: false
+      key: !Env AUTHENTIK_API_TOKEN
+      description: Read access to users and groups for the Taramisu API.

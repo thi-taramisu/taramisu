@@ -56,16 +56,21 @@ sequenceDiagram
         API->>DB: UpsertIAMUser(sub) -> internal iam_user.id (UUID)
         DB-->>API: UserID (cached in memory per replica)
     end
-    API->>DB: Resolve role of UserID (direct or via group) on project {id}
+    API->>DB: Resolve highest role of UserID or its token groups (taramisu_groups) on project {id}
     DB-->>API: e.g. EDITOR
     alt Role sufficient
         API->>DB: Query threats
         DB-->>API: Rows
         API-->>SPA: 200 OK + JSON
-    else No or insufficient role
-        API-->>SPA: 403 Forbidden / 404 Not Found
+    else Member, but role too low
+        API-->>SPA: 403 Forbidden
+    else No role in the project
+        API-->>SPA: 404 Not Found
     end
 ```
+
+Roles, permissions, and the group claim are specified in [project roles](iam/project-roles.md) (proposal for #143; group claim and
+role lookup are implemented in #186).
 
 ---
 
