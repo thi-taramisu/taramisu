@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -268,6 +269,47 @@ func TestDirectoryResolverFindsActiveUserByEmail(t *testing.T) {
 	}
 	if _, err := resolver.FindActiveUserByEmail(context.Background(), " "); err == nil {
 		t.Fatal("expected error for empty email")
+	}
+}
+
+func TestDirectoryResolverRejectsSharedEmail(t *testing.T) {
+	user := func(uid, email string, active bool) map[string]any {
+		return map[string]any{"uid": uid, "email": email, "is_active": active}
+	}
+	for _, tc := range []struct {
+		name  string
+		pages [][]map[string]any
+		want  error
+	}{
+		{"same page", [][]map[string]any{{user("a", "shared@example.com", true), user("b", "Shared@Example.com", true)}}, ErrAmbiguousEmail},
+		{"separate pages", [][]map[string]any{{user("a", "shared@example.com", true)}, {user("b", "SHARED@example.com", true)}}, ErrAmbiguousEmail},
+		{"inactive duplicate", [][]map[string]any{{user("a", "shared@example.com", true), user("b", "shared@example.com", false)}}, nil},
+		{"same account twice", [][]map[string]any{{user("a", "shared@example.com", true)}, {user("a", "shared@example.com", true)}}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+				if page < 1 || page > len(tc.pages) {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				next := 0
+				if page < len(tc.pages) {
+					next = page + 1
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"pagination": map[string]int{"next": next}, "results": tc.pages[page-1]})
+			}))
+			t.Cleanup(server.Close)
+			resolver, err := NewDirectoryResolver(DirectoryConfig{BaseURL: server.URL, Token: "tok"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			u, err := resolver.FindActiveUserByEmail(context.Background(), "shared@example.com")
+			if !errors.Is(err, tc.want) || (tc.want == nil && u.Subject != "a") {
+				t.Fatalf("FindActiveUserByEmail = %+v, %v, want error %v", u, err, tc.want)
+			}
+		})
 	}
 }
 

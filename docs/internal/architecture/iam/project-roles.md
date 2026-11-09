@@ -137,6 +137,9 @@ permission instead of a place in the order (see [Open questions](#open-questions
 - Owners add users by the email address of their active Authentik account; case does not matter. Because every user can
   create a project, every user can find out whether an email address has an active account (`201` or `422`). This is
   accepted for an internal tool whose users are approved in Authentik.
+- Authentik does not enforce unique email addresses (see [Identifier collisions](registration-flow.md#identifier-collisions)).
+  If several active accounts share the email, the request fails with `409` until an administrator fixes it, like login
+  by that email.
 
 ### Leaving a project
 

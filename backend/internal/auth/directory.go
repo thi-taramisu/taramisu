@@ -16,6 +16,10 @@ import (
 // ErrPrincipalNotFound is returned when an external IAM user or group UUID does not exist in Authentik.
 var ErrPrincipalNotFound = errors.New("IAM principal not found")
 
+// ErrAmbiguousEmail is returned when several active Authentik users share an email address. Authentik does not
+// enforce unique email addresses, so such an address does not identify one person.
+var ErrAmbiguousEmail = errors.New("several active users share this email address")
+
 // UserMetadata holds display metadata resolved on-the-fly from Authentik without storing PII in taramisu-db.
 type UserMetadata struct {
 	Subject  string `json:"subject"`
@@ -171,7 +175,8 @@ func (d *DirectoryResolver) ResolveUser(ctx context.Context, subject string) (Us
 // FindActiveUserByEmail returns the active Authentik user with this email address, ignoring case.
 // Its Subject is the value the user's tokens carry in the sub claim. Authentik's email filter is
 // case-sensitive, so this uses the search parameter (substring match on email, name, and
-// username) and compares the email here.
+// username) and compares the email here. If several active users match, it returns
+// ErrAmbiguousEmail instead of picking one.
 func (d *DirectoryResolver) FindActiveUserByEmail(ctx context.Context, email string) (UserMetadata, error) {
 	email = strings.TrimSpace(email)
 	if email == "" {
@@ -181,14 +186,22 @@ func (d *DirectoryResolver) FindActiveUserByEmail(ctx context.Context, email str
 	if err != nil {
 		return UserMetadata{}, err
 	}
+	var found *UserMetadata
 	for _, user := range users {
-		if user.IsActive && user.UID != "" && strings.EqualFold(user.Email, email) {
-			meta := user.metadata()
-			d.users.set(user.UID, meta)
-			return meta, nil
+		if !user.IsActive || user.UID == "" || !strings.EqualFold(user.Email, email) {
+			continue
 		}
+		if found != nil && found.Subject != user.UID {
+			return UserMetadata{}, ErrAmbiguousEmail
+		}
+		meta := user.metadata()
+		d.users.set(user.UID, meta)
+		found = &meta
 	}
-	return UserMetadata{}, ErrPrincipalNotFound
+	if found == nil {
+		return UserMetadata{}, ErrPrincipalNotFound
+	}
+	return *found, nil
 }
 
 // authentikGroup is the subset of an Authentik Core API group that Taramisu reads.

@@ -94,7 +94,7 @@ export interface paths {
         put?: never;
         /**
          * Add a project member
-         * @description Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group.
+         * @description Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group. Returns 409 if several active users share the email.
          */
         post: operations["add-project-member"];
         delete?: never;

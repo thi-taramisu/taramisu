@@ -905,7 +905,7 @@
         "x-taramisu-permission": "read"
       },
       "post": {
-        "description": "Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group.",
+        "description": "Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group. Returns 409 if several active users share the email.",
         "operationId": "add-project-member",
         "parameters": [
           {

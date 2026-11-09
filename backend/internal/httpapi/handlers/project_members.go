@@ -64,7 +64,8 @@ func (h *ProjectMembers) Register(api huma.API) {
 	Register(api, op("list-project-members", http.MethodGet, collection, "List project members",
 		"Any project role. Names and email addresses are omitted when Authentik is unavailable."), project(PermRead), h.List)
 	create := op("add-project-member", http.MethodPost, collection, "Add a project member",
-		"Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group.")
+		"Owner only. Send either the email of an active Authentik user or the ID of an assignable Authentik group. "+
+			"Returns 409 if several active users share the email.")
 	create.DefaultStatus = http.StatusCreated
 	Register(api, create, project(PermManage), h.Create)
 	Register(api, op("update-project-member", http.MethodPatch, member, "Change a member's role",
@@ -186,6 +187,9 @@ func (h *ProjectMembers) addUser(ctx context.Context, projectID pgtype.UUID, ema
 	user, err := h.directory.FindActiveUserByEmail(ctx, email)
 	if errors.Is(err, auth.ErrPrincipalNotFound) {
 		return pgtype.UUID{}, huma.Error422UnprocessableEntity("no active user with this email address")
+	}
+	if errors.Is(err, auth.ErrAmbiguousEmail) {
+		return pgtype.UUID{}, huma.Error409Conflict("several active users share this email address; an administrator must fix this in Authentik")
 	}
 	if err != nil {
 		slog.Error("find Authentik user", "error", err)

@@ -171,7 +171,11 @@ func (d *fakeDirectory) FindActiveUserByEmail(_ context.Context, email string) (
 	if d.err != nil {
 		return auth.UserMetadata{}, d.err
 	}
-	if email != "new@example.com" {
+	switch email {
+	case "new@example.com":
+	case "shared@example.com":
+		return auth.UserMetadata{}, auth.ErrAmbiguousEmail
+	default:
 		return auth.UserMetadata{}, auth.ErrPrincipalNotFound
 	}
 	return auth.UserMetadata{Subject: "new-sub", Name: "New", Email: email}, nil
@@ -269,6 +273,7 @@ func TestProjectMembersCreate(t *testing.T) {
 		{"unknown role", db.ProjectRoleOWNER, &fakeDirectory{}, nil, `{"email":"new@example.com","role":"REVIEWER"}`, http.StatusUnprocessableEntity},
 		{"no directory", db.ProjectRoleOWNER, nil, nil, `{"email":"new@example.com","role":"VIEWER"}`, http.StatusServiceUnavailable},
 		{"unknown email", db.ProjectRoleOWNER, &fakeDirectory{}, nil, `{"email":"nobody@example.com","role":"VIEWER"}`, http.StatusUnprocessableEntity},
+		{"shared email", db.ProjectRoleOWNER, &fakeDirectory{}, nil, `{"email":"shared@example.com","role":"OWNER"}`, http.StatusConflict},
 		{"directory down", db.ProjectRoleOWNER, &fakeDirectory{err: errors.New("down")}, nil, `{"email":"new@example.com","role":"VIEWER"}`, http.StatusServiceUnavailable},
 		{"group not assignable", db.ProjectRoleOWNER, &fakeDirectory{}, nil, `{"group_id":"dddddddd-0000-4000-8000-000000000001","role":"VIEWER"}`, http.StatusUnprocessableEntity},
 		{"unknown group", db.ProjectRoleOWNER, &fakeDirectory{}, nil, `{"group_id":"dddddddd-0000-4000-8000-000000000002","role":"VIEWER"}`, http.StatusUnprocessableEntity},
