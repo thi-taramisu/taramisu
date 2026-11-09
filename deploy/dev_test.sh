@@ -338,4 +338,7 @@ fi
 # the access token lifetime (docs/internal/architecture/iam/project-roles.md). Update both together.
 grep -q '^ *access_token_validity: minutes=10$' ../iam/blueprints/taramisu.yaml
 
+python3 -I stack_test.py --self-check >/dev/null
+make -n test-stack >/dev/null
+
 echo 'PASS: unified Compose model, access token lifetime, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'
