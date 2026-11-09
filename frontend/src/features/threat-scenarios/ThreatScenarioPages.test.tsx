@@ -198,6 +198,22 @@ describe('threat scenario definition', () => {
     expect((await api.threatScenarios.relations('headlamp', 'ts-01')).targets).toEqual([])
   })
 
+  it('drops a target that was removed elsewhere while the tab was closed, so saving still works', async () => {
+    const { user, api } = renderApp(page)
+    await findTargets()
+    await user.click(within(tree()).getByRole('link', { name: /DS-01/ }))
+    await user.click(await screen.findByRole('link', { name: /^Relations/ }))
+    await user.click(await (await findSection('Assets')).findByRole('button', { name: 'A-01 Integrity' }))
+    await waitFor(async () => expect((await api.threatScenarios.relations('headlamp', 'ts-01')).targets).toEqual([]))
+
+    await user.click(within(tree()).getByRole('link', { name: /TS-01/ }))
+    await user.click(await screen.findByRole('link', { name: 'Definition' }))
+    await user.type(await screen.findByLabelText('Cause of Compromise'), ' via gateway')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  })
+
   it('points to the Relations tab while no damage scenario is linked', async () => {
     renderApp(`${project}/threat-scenarios/ts-02`)
 
