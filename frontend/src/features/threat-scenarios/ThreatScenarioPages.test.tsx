@@ -84,7 +84,7 @@ describe('threat scenario definition', () => {
     await user.clear(name)
     await user.type(name, ' Forged low beam command ')
     await user.clear(screen.getByLabelText('Cause of Compromise'))
-    await user.selectOptions(screen.getByLabelText('Elicitation'), 'Not set')
+    await user.selectOptions(screen.getByLabelText('Elicitation'), 'Select…')
     await user.clear(screen.getByLabelText('Technical Notes'))
     await user.type(screen.getByLabelText('Technical Notes'), 'Attacker with OBD access')
     await user.click(screen.getByRole('button', { name: 'Save' }))
