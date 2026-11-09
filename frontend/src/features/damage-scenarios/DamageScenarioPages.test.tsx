@@ -204,10 +204,10 @@ describe('damage scenario page', () => {
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
-  it('keeps the relations tab as a placeholder', async () => {
-    renderApp(`${page}/relations`)
+  it('shows the number of relations in the tab', async () => {
+    renderApp(page)
 
-    expect(await screen.findByText('Relations: not implemented yet')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Relations 2' })).toHaveAttribute('href', `${page}/relations`)
   })
 })
 

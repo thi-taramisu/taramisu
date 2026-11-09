@@ -1,4 +1,5 @@
 import type { CiaProperty } from './asset'
+import type { EntityRef } from './tree'
 
 // Damage scenarios follow `DAMAGE_SCENARIO` and `IMPACT_RATING` of the data model. A damage scenario
 // belongs to one item; several assets can lead to it. Not in the backend spec yet.
@@ -26,6 +27,18 @@ export type DamageScenarioBody = Pick<DamageScenario, 'item_definition_id' | 'ti
 
 /** PATCH body: only the given fields change. */
 export type PatchDamageScenarioBody = Partial<Pick<DamageScenario, 'title' | 'functionality_adverse_relation' | 'road_user_harm_description'>>
+
+/** Asset linked to a damage scenario: `properties` are those of the asset, `linkedProperties` lead to the damage. */
+export interface LinkedAsset extends EntityRef {
+  properties: CiaProperty[]
+  linkedProperties: CiaProperty[]
+}
+
+/** Content of the Relations tab. */
+export interface DamageScenarioRelations {
+  assets: LinkedAsset[]
+  threatScenarios: EntityRef[]
+}
 
 export type ImpactCategory = 'SAFETY' | 'FINANCIAL' | 'OPERATIONAL' | 'PRIVACY'
 

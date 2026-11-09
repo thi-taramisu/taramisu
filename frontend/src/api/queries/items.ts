@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
-import type { NewAsset } from '../models/asset'
-import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
+import type { CiaProperty, NewAsset } from '../models/asset'
+import type { DamageScenarioBody, DamageScenarioRelations, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { TreeNode } from '../models/tree'
 
@@ -14,8 +14,10 @@ const keys = {
   children: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'children'] as const,
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
+  threatScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'threat-scenarios'] as const,
   damageScenario: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id] as const,
   impactRatings: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'impact'] as const,
+  damageScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'relations'] as const,
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
@@ -62,6 +64,11 @@ export function useItemAssets(projectId: string, itemId: string) {
 export function useItemRisks(projectId: string, itemId: string) {
   const api = useApi()
   return useQuery({ queryKey: keys.risks(projectId, itemId), queryFn: () => api.content.risks(projectId, itemId) })
+}
+
+export function useItemThreatScenarios(projectId: string, itemId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.threatScenarios(projectId, itemId), queryFn: () => api.content.threatScenarios(projectId, itemId) })
 }
 
 function useInvalidateProject(projectId: string) {
@@ -121,6 +128,14 @@ export function useImpactRatings(projectId: string, damageScenarioId: string) {
   })
 }
 
+export function useDamageScenarioRelations(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.damageScenarioRelations(projectId, damageScenarioId),
+    queryFn: () => api.damageScenarios.relations(projectId, damageScenarioId),
+  })
+}
+
 export function useCreateDamageScenario(projectId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
@@ -142,5 +157,40 @@ export function useUpdateImpactRatings(projectId: string, damageScenarioId: stri
   return useMutation({
     mutationFn: (body: ImpactRatingBody[]) => api.damageScenarios.updateImpactRatings(projectId, damageScenarioId, body),
     onSuccess: invalidate,
+  })
+}
+
+/** Keeps the saved relations even if the refetch fails, so the next change does not start from the old ones. */
+function useStoreRelations(projectId: string, damageScenarioId: string) {
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidateProject(projectId)
+  return (relations: DamageScenarioRelations) => {
+    queryClient.setQueryData(keys.damageScenarioRelations(projectId, damageScenarioId), relations)
+    return invalidate()
+  }
+}
+
+/** Links an asset with the given properties or changes them; no properties remove the link. */
+export function useSetDamageScenarioAssetLink(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const storeRelations = useStoreRelations(projectId, damageScenarioId)
+  return useMutation({
+    mutationFn: ({ assetId, properties }: { assetId: string; properties: CiaProperty[] }) =>
+      properties.length > 0
+        ? api.damageScenarios.linkAsset(projectId, damageScenarioId, assetId, properties)
+        : api.damageScenarios.unlinkAsset(projectId, damageScenarioId, assetId),
+    onSuccess: storeRelations,
+  })
+}
+
+export function useSetDamageScenarioThreatLink(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const storeRelations = useStoreRelations(projectId, damageScenarioId)
+  return useMutation({
+    mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
+      linked
+        ? api.damageScenarios.linkThreatScenario(projectId, damageScenarioId, threatScenarioId)
+        : api.damageScenarios.unlinkThreatScenario(projectId, damageScenarioId, threatScenarioId),
+    onSuccess: storeRelations,
   })
 }
