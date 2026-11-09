@@ -29,7 +29,7 @@ describe('create damage scenario', () => {
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
@@ -57,7 +57,7 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
   })
 
   it('links further assets with the properties they have', async () => {
@@ -132,7 +132,7 @@ describe('create damage scenario', () => {
     act(() => loadAssets())
     await within(dialog).findByRole('button', { name: 'A-02 Integrity' })
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Manipulated firmware' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario #02' })).toBeInTheDocument()
   })
 
   it('keeps the dialog open with "Create & add another"', async () => {
@@ -176,7 +176,7 @@ describe('damage scenario page', () => {
   it('shows the type label with the ID as #number above the title', async () => {
     renderApp(page)
 
-    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })
+    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
     expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
     expect(heading.parentElement).not.toHaveTextContent('DS-01')
   })
@@ -190,14 +190,24 @@ describe('damage scenario page', () => {
     })
     const { user } = renderApp(page, api)
 
-    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night' })
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
     expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
     await user.click(await within(tree()).findByRole('link', { name: 'DS-02 Diagnostic key leaked' }))
 
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${second.id}`)
-    await screen.findByRole('heading', { name: 'Diagnostic key leaked' })
+    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })
     expect(screen.getByText('Damage scenario #02')).toBeInTheDocument()
     expect(screen.queryByText('Damage scenario #01')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the tree code when the API returns an empty code', async () => {
+    const api = createMockItemApi()
+    const get = api.damageScenarios.get
+    api.damageScenarios.get = async (...args) => ({ ...(await get(...args)), code: '' })
+    renderApp(page, api)
+
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown damage scenarios', async () => {
@@ -220,7 +230,7 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be refreshed')
-    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
@@ -247,7 +257,7 @@ describe('damage scenario definition', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Low beam fails at night' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage scenario #01' })).toBeInTheDocument()
     expect(within(tree()).getByRole('link', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({
       title: 'Low beam fails at night',

@@ -27,16 +27,20 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
   const { data: tree } = useProjectTree(projectId)
   const { label, tabs } = ENTITY_TYPES[type]
   const node = tree && findNode(type, entityId, tree)
-  const displayCode = code ?? node?.code
+  // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
+  const displayCode = code || node?.code
+  const typeAndId = displayCode ? `${label} ${formatEntityId(displayCode)}` : label
 
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <p className="text-xs uppercase tabular-nums text-muted-foreground">
-            {displayCode ? `${label} ${formatEntityId(displayCode)}` : label}
-          </p>
-          <h1 className="text-xl font-semibold">{name ?? node?.name ?? entityId}</h1>
+          <p className="text-xs uppercase tabular-nums text-muted-foreground">{typeAndId}</p>
+          <h1 className="text-xl font-semibold">
+            {name ?? node?.name ?? entityId}
+            {/* Keeps the ID in the heading's accessible name for heading navigation; the line above shows it visually. */}
+            {displayCode && <span className="sr-only">, {typeAndId}</span>}
+          </h1>
         </div>
         {actions}
       </div>
