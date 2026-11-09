@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/url"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -17,6 +18,34 @@ func New(options sentry.ClientOptions, output io.Writer) (*slog.Logger, func(tim
 	console := slog.NewJSONHandler(output, nil)
 	if options.Dsn == "" {
 		return slog.New(console), func(time.Duration) bool { return true }, nil
+	}
+	if options.Environment == "" {
+		options.Environment = "development"
+	}
+	off := &sentry.KeyValueCollectionBehavior{Mode: sentry.CollectionOff}
+	options.DataCollection = &sentry.DataCollection{
+		UserInfo: sentry.Set(false), Cookies: off, QueryParams: off,
+		HTTPHeaders: &sentry.HeaderCollectionConfig{Request: off, Response: off},
+		HTTPBodies:  []sentry.BodyType{},
+	}
+	beforeSend := options.BeforeSend
+	options.BeforeSend = func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+		if beforeSend != nil {
+			event = beforeSend(event, hint)
+		}
+		if event != nil && event.Request != nil {
+			event.Request.Data = ""
+			event.Request.Headers = nil
+			event.Request.Cookies = ""
+			event.Request.QueryString = ""
+			event.Request.Env = nil
+			if parsed, err := url.Parse(event.Request.URL); err == nil {
+				parsed.RawQuery = ""
+				parsed.User = nil
+				event.Request.URL = parsed.String()
+			}
+		}
+		return event
 	}
 	client, err := sentry.NewClient(options)
 	if err != nil {

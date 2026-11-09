@@ -56,6 +56,23 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 > **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
 > It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
 
+## Sentry
+
+Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Info, Warn, and Error logs and
+HTTP panics are reported. Request bodies, headers, cookies, query parameters, and automatically collected user
+information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
+the Compose API stop timeout is 15 seconds to cover all three phases.
+
+For **host execution** (`make run`), set `SENTRY_DSN`, `SENTRY_ENVIRONMENT=development`, and optionally
+`SENTRY_RELEASE` in `backend/.env`. The host sends directly unless `SENTRY_TUNNEL_URL` is configured.
+
+For **Compose/server execution**, set the backend project's `SENTRY_DSN` in **`iam/.env`**. `backend/.env` is not
+read by Compose. Backend and frontend Compose builds share `SENTRY_ENVIRONMENT` (default `production`).
+The API remains on internal networks and sends through `http://sentry-ingest:8081`; the dedicated ingest proxy forwards only POSTs to
+that DSN's Sentry SaaS project envelope endpoint, with TLS verification. Port 8081 is not published and the
+public listener has no ingest route. The original DSN stays in SDK envelopes and authentication headers.
+See [deployment configuration](../deploy/README.md#sentry-reporting) for frontend build settings and verification.
+
 ## Authentication
 
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)
@@ -64,6 +81,19 @@ The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs
 `email` claims) against Authentik's JWKS keys (`OIDC_JWKS_URL`, cached in memory per replica) and resolves `sub` (`hashed_user_id`) to the local
 `iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
 `GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
+
+## Authorization
+
+Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specified in
+[project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
+`internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
+`handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
+`/api/v1/projects/{id}/members`; member and project changes are written as `audit` log entries.
+
+Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
+The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
+host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
+omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
 
 ## Checks
 
@@ -172,19 +202,62 @@ internal/httpapi/handlers/     HTTP handlers
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
-## Logging
+## Item definitions
 
-The API writes JSON logs to stderr using `log/slog`. Set `SENTRY_DSN` in `.env` to also send Info, Warn
-and Error logs to Sentry Logs through the official Sentry slog integration. Without a DSN, logging stays
-local. Both `make run` and the Compose API container use these settings.
+All routes below require an Authentik-issued Bearer JWT and are under `/api/v1/projects/{project_id}/item-definitions`.
 
-Copy the DSN from your Sentry project settings. Set `SENTRY_ENVIRONMENT` (example: `development`) and
-optionally `SENTRY_RELEASE` to identify deployments. Logs are flushed for up to five seconds on shutdown,
-including startup failures. An invalid DSN fails startup. Avoid logging credentials or personal data.
+| Method | Path suffix | Result |
+| --- | --- | --- |
+| GET | (none) | List items, with `limit` (default 50, maximum 100) and `offset` (default 0) |
+| POST | (none) | Create an item; return 201 and a `Location` header |
+| GET | `/{item_id}` | Read an item |
+| PUT | `/{item_id}` | Replace an existing item; omitted optional fields become null |
+| PATCH | `/{item_id}` | Update supplied fields; omitted fields stay unchanged |
+| DELETE | `/{item_id}` | Delete an item; return 204 |
 
-Use the `taramisu-backend` project in the `thi-nf` organization. HTTP panics are captured with
-request context before being rethrown to Go's HTTP server. Set the DSN in the deployment environment
-as well as locally. Error-level logs remain Sentry Logs; captured panics appear under Issues.
+Create and replace require a nonblank `name` (up to 255 characters) and `scope_type`
+(`ITEM` or `COMPONENT`). Optional text fields are `lifecycle_phase`,
+`boundary`, `functions`, `operational_environment`, `item_definition_wp_09_01`,
+`cybersecurity_specs_wp_10_01`, and `architectural_design`.
+The three definition fields can be filled in independently after creating a draft item. The legacy
+`item_definition_wp_09_01` remains available for unstructured imported definitions; it is not synchronized
+with the three structured fields.
+PATCH accepts explicit `null` to clear optional fields; `name` and `scope_type` cannot be null.
+The database supplies `id` and `created_at`, which updates preserve.
+
+Use Swagger UI at `/api/docs` and authorize with a Bearer JWT to try the routes. Example
+request body for POST:
+
+```json
+{
+  "name": "Headlamp",
+  "scope_type": "ITEM",
+  "lifecycle_phase": "development"
+}
+```
+
+Access uses the [shared project authorization](../docs/internal/architecture/iam/project-roles.md):
+Viewers can read; Editors and Owners can create, replace, update, or delete. Direct assignments and
+assignable Authentik groups from the signed `taramisu_groups` token claim are supported.
+
+Invalid inputs return 422. Missing or inaccessible projects and items return 404; members whose role
+is too low receive 403. Deleting an item also deletes its assets, damage scenarios, threat scenarios,
+attack paths, and their dependent properties, links, ratings, risk values, and treatment decisions.
+The frontend must ask for confirmation before deletion. Responses use the existing problem JSON
+error format without database details.
+
+Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
+for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
+for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
+roll back their fixtures and do not require a live Authentik instance.
+
+## Risk values and treatment decisions
+
+The risk API provides authenticated CRUD under `/api/v1/threat-scenarios/{threat_scenario_id}/risk-values`
+and `/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions`.
+It uses the existing schema and shared project authorization: Viewers can read; Editors and Owners can write.
+Non-members receive 404; members with insufficient roles receive 403. Related records and treatment claims are validated.
+See the [frontend API handoff](../docs/internal/dev-workflow/risk-api.md) for methods, fields, pagination, and errors.
 
 ## OpenAPI contract
 

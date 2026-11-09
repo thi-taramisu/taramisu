@@ -2,13 +2,13 @@ services:
   proxy:
     image: nginx:1.28-alpine
     ports:
-      - "127.0.0.1:80:80"
+      # Local: only this machine. The server sets PROXY_BIND=0.0.0.0 in iam/.env (taramisu-ctl.sh).
+      - "${PROXY_BIND:-127.0.0.1}:80:80"
     volumes:
       - ../proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # edge is the only network with published ports and internet access; proxy reaches frontend, api and Authentik.
+    networks: [edge, proxy]
     depends_on:
       - api
       - frontend
       - docs
-    networks:
-      - default
-      - taramisu-proxy

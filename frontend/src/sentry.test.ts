@@ -36,7 +36,8 @@ describe('Sentry configuration', () => {
     })
   })
 
-  it('defaults to the Vite mode and leaves the release unset', async () => {
+  it.each([undefined, ''])('defaults an unset or empty environment to Vite mode (%s)', async (environment) => {
+    vi.stubEnv('VITE_SENTRY_ENVIRONMENT', environment)
     vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.com/1')
     vi.stubEnv('MODE', 'test')
     vi.stubEnv('VITE_SENTRY_RELEASE', '')

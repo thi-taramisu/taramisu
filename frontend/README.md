@@ -47,6 +47,8 @@ The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/fr
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
 entity independently expandable, highlights the active entity on its subpages, and preserves URL query parameters (including graph view).
+Entries show the element name only; the code (e.g. `A-01`) stays in the element's page header and in the accessible names of tree links
+and toggles, so screen readers can tell same-named elements apart.
 Branches start expanded; navigating to a hidden descendant reveals its ancestors. Use Tab to reach links and disclosure buttons, Enter to
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
@@ -89,23 +91,22 @@ that has no service yet (project list, project settings, example project).
 
 ## Sentry
 
-Copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the `taramisu-frontend` project in the
-`thi-nf` organization. Sentry captures browser exceptions, unhandled rejections, and React render errors.
-An empty DSN disables reporting. Set `VITE_SENTRY_ENVIRONMENT` and optionally `VITE_SENTRY_RELEASE`
-to identify deployments. Vite embeds these values at build time; configure them before building and rebuild
-after changes. Never put a Sentry auth token in a `VITE_` variable.
+For the Vite dev server, copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the frontend Sentry project.
+An empty DSN disables reporting. `VITE_SENTRY_ENVIRONMENT` defaults to the Vite mode when unset or empty;
+`VITE_SENTRY_RELEASE` is optional. The SDK captures browser exceptions, unhandled rejections, and React render errors.
+Never put a Sentry auth token in a `VITE_` variable.
 
-Docker builds accept these settings as build arguments. To build with Compose using your frontend
-environment file, run this from the repository root:
+For the full **Compose stack**, put `VITE_SENTRY_DSN` and the shared `SENTRY_ENVIRONMENT` in **`iam/.env`**,
+then rebuild with `make -C deploy up`. Compose does not read `frontend/.env.local` automatically. Backend and frontend
+Compose settings default to `production`; set `SENTRY_ENVIRONMENT=development` for a development stack.
+Vite embeds these values during the build; changing container runtime variables cannot update a built image.
 
-```bash
-docker compose --env-file frontend/.env.local -f deploy/compose.frontend.yaml build frontend
-```
+The **GHCR publishing workflow** passes the repository Actions variable `VITE_SENTRY_DSN` into the frontend build,
+uses `SENTRY_ENVIRONMENT` (default `production`), and records the Git commit as the frontend release.
+Configure those repository variables before publishing. A deployment using a prebuilt GHCR image must use the
+same environment name for its runtime backend; changing frontend settings requires publishing a new image.
 
-Compose also accepts `VITE_SENTRY_*` values exported in your shell. Container runtime variables do not
-change the compiled frontend; rebuild the image after changing these settings.
-
-Source map upload is not configured yet; production stack traces may reference bundled code.
+Source-map uploads are not configured; production stack traces may reference bundled code.
 
 ## UI components
 
