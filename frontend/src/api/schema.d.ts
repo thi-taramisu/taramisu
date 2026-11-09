@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List damage scenarios of an item definition */
+        /** List damage scenarios of an item definition (paginated) */
         get: operations["list-damage-scenarios"];
         put?: never;
         /** Create a damage scenario */
@@ -90,7 +90,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List threat scenario to damage scenario links of an item definition */
+        /** List threat scenario to damage scenario links of an item definition (paginated) */
         get: operations["list-threat-damage-links"];
         put?: never;
         /** Link a threat scenario to a damage scenario */
@@ -365,7 +365,10 @@ export type $defs = Record<string, never>;
 export interface operations {
     "list-damage-scenarios": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 item_definition_id: string;
@@ -771,7 +774,10 @@ export interface operations {
     };
     "list-threat-damage-links": {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path: {
                 item_definition_id: string;
