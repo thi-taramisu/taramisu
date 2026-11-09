@@ -25,7 +25,7 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
       title="Damage Scenarios"
       removeEffect={LINK_REMOVE_WITH_TARGETS}
       elementLabel="Damage Scenario"
-      rows={linked.map(({ id, code, name }) => ({ id, code, name }))}
+      rows={linked}
       candidates={itemScenarios.data?.filter((ds) => !linked.some((l) => l.id === ds.id)) ?? []}
       candidatesLoading={itemScenarios.isPending}
       candidatesError={itemScenarios.isLoadingError ? 'The damage scenarios of this item could not be loaded.' : undefined}

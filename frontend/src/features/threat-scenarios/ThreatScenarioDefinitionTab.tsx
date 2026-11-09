@@ -62,10 +62,14 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
   const [saved, setSaved] = useState(values)
   const [targets, setTargets] = useState<ThreatTarget[]>(relations.targets)
   const [savedTargets, setSavedTargets] = useState(relations.targets)
+  // The form can start from a cached list; targets that no linked damage scenario leads to anymore are gone.
+  const causes = relations.damageScenarios.flatMap((ds) => ds.causes)
+  const isCause = (target: ThreatTarget) => causes.some((cause) => cause.asset.id === target.assetId && cause.property === target.property)
+  const currentTargets = targets.filter(isCause)
   const [titleError, setTitleError] = useState<string>()
   const save = useSaveThreatDefinition(projectId, scenario.id)
   const dirty =
-    !hasSameTargets(targets, savedTargets) ||
+    !hasSameTargets(currentTargets, savedTargets.filter(isCause)) ||
     (Object.keys(values) as (keyof FormValues)[]).some((key) =>
       // The title is saved trimmed, so surrounding spaces alone are no change.
       key === 'title' ? values.title.trim() !== saved.title : values[key] !== saved[key],
@@ -92,7 +96,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           elicitation_method: values.elicitation_method || null,
           technical_notes: values.technical_notes || null,
         },
-        targets,
+        targets: currentTargets,
       },
       {
         onSuccess: (result) => {
@@ -160,7 +164,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
       </div>
       <ThreatTargetsField
         damageScenarios={relations.damageScenarios}
-        value={targets}
+        value={currentTargets}
         onChange={(next) => {
           setTargets(next)
           save.reset()
