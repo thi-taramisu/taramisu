@@ -64,6 +64,9 @@ CREATE TABLE item_definition (
     name text NOT NULL,
     scope_type scope_type NOT NULL,
     lifecycle_phase text,
+    boundary text,
+    functions text,
+    operational_environment text,
     item_definition_wp_09_01 text,
     cybersecurity_specs_wp_10_01 text,
     architectural_design text,
@@ -74,7 +77,7 @@ CREATE INDEX item_definition_tara_project_id_idx ON item_definition (tara_projec
 
 CREATE TABLE asset (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     name text NOT NULL,
     description text,
     identification_source identification_source
@@ -92,7 +95,7 @@ CREATE TABLE asset_cybersecurity_property (
 
 CREATE TABLE damage_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     functionality_adverse_relation text,
     road_user_harm_description text
@@ -130,7 +133,7 @@ CREATE TABLE impact_rating (
 
 CREATE TABLE threat_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     cause_of_compromise text,
     elicitation_method elicitation_method,
@@ -162,7 +165,7 @@ CREATE INDEX threat_damage_link_damage_scenario_id_idx ON threat_damage_link (da
 
 CREATE TABLE attack_path (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     analysis_approach analysis_approach,
     is_partial_early_stage boolean NOT NULL DEFAULT true,

@@ -21,6 +21,7 @@ type healthQueries struct {
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {
