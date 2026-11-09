@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -31,7 +32,7 @@ func (h *AttackFeasibilityRating) Register(api huma.API) {
 	const path = itemPath + "/attack-paths/{attack_path_id}/feasibility-rating"
 	op := func(id, method, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"session": {}}}}
+			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
 	huma.Register(api, op("get-attack-feasibility-rating", http.MethodGet, "Get the attack feasibility rating of an attack path"), h.Get)
 	huma.Register(api, op("replace-attack-feasibility-rating", http.MethodPut, "Create or replace the attack feasibility rating of an attack path"), h.Upsert)
@@ -172,6 +173,10 @@ func (h *AttackFeasibilityRating) Delete(ctx context.Context, in *FeasibilityRat
 func mapRatingError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("attack feasibility rating not found")
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+		return huma.Error422UnprocessableEntity("ap_total_score must equal the sum of the five attack potential factors, all of which must be set")
 	}
 	return err
 }

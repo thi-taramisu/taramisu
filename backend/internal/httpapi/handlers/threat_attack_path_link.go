@@ -31,7 +31,7 @@ func (h *ThreatAttackPathLink) Register(api huma.API) {
 	const member = collection + "/{id}"
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"session": {}}}}
+			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
 	huma.Register(api, op("list-threat-attack-path-links", http.MethodGet, collection, "List threat scenario to attack path links of an item"), h.List)
 	create := op("create-threat-attack-path-link", http.MethodPost, collection, "Link a threat scenario to an attack path")

@@ -37,7 +37,7 @@ func (h *AttackPath) Register(api huma.API) {
 	})
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"session": {}}}}
+			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
 	huma.Register(api, op("list-attack-paths", http.MethodGet, collection, "List attack paths of an item"), h.List)
 	create := op("create-attack-path", http.MethodPost, collection, "Create an attack path")

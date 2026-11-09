@@ -82,6 +82,7 @@ type fakeRatings struct {
 	handlers.ThreatAttackPathLinkStore
 	statusReaderFunc
 	belongs, found bool
+	writeErr       error
 }
 
 func (f *fakeRatings) rating() db.AttackFeasibilityRating {
@@ -102,6 +103,9 @@ func (f *fakeRatings) GetAttackFeasibilityRating(context.Context, pgtype.UUID) (
 	return f.rating(), nil
 }
 func (f *fakeRatings) UpsertAttackFeasibilityRating(context.Context, db.UpsertAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error) {
+	if f.writeErr != nil {
+		return db.AttackFeasibilityRating{}, f.writeErr
+	}
 	return f.rating(), nil
 }
 func (f *fakeRatings) UpdateAttackFeasibilityRating(context.Context, db.UpdateAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error) {
@@ -152,7 +156,7 @@ func (f *fakeLinks) DeleteThreatAttackPathLink(context.Context, db.DeleteThreatA
 
 func TestAttackPathRoutes(t *testing.T) {
 	member := attackPaths + "/" + attackPathID
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, tc := range []struct {
 		name   string
 		found  bool
@@ -181,7 +185,7 @@ func TestAttackPathRoutes(t *testing.T) {
 			h := httpapi.New(&fakeAttackPaths{found: tc.found}, manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.AddCookie(session)
+			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 			if rr.Code != tc.code {
@@ -192,7 +196,7 @@ func TestAttackPathRoutes(t *testing.T) {
 }
 
 func TestAttackFeasibilityRatingRoutes(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, tc := range []struct {
 		name    string
 		belongs bool
@@ -217,7 +221,7 @@ func TestAttackFeasibilityRatingRoutes(t *testing.T) {
 			h := httpapi.New(&fakeRatings{belongs: tc.belongs, found: tc.found}, manager)
 			req := httptest.NewRequest(tc.method, ratingPath, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.AddCookie(session)
+			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 			if rr.Code != tc.code {
@@ -228,7 +232,7 @@ func TestAttackFeasibilityRatingRoutes(t *testing.T) {
 }
 
 func TestThreatAttackPathLinkRoutes(t *testing.T) {
-	manager, session := authtest.Login(t)
+	manager, bearer := authtest.NewManagerAndToken(t)
 	const body = `{"threat_scenario_id":"` + itemDefID + `","attack_path_id":"` + attackPathID + `"}`
 	for _, tc := range []struct {
 		name   string
@@ -250,12 +254,35 @@ func TestThreatAttackPathLinkRoutes(t *testing.T) {
 			h := httpapi.New(&fakeLinks{mode: tc.mode}, manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
-			req.AddCookie(session)
+			req.Header.Set("Authorization", bearer)
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)
 			if rr.Code != tc.code {
 				t.Fatalf("status = %d, want %d: %s", rr.Code, tc.code, rr.Body.String())
 			}
 		})
+	}
+}
+
+func TestAttackPathRoutesRequireAuthentication(t *testing.T) {
+	manager, _ := authtest.NewManagerAndToken(t)
+	h := httpapi.New(&fakeAttackPaths{found: true}, manager)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, attackPaths, nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAttackFeasibilityRatingCheckViolationIs422(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	h := httpapi.New(&fakeRatings{belongs: true, found: true, writeErr: &pgconn.PgError{Code: "23514"}}, manager)
+	req := httptest.NewRequest(http.MethodPut, ratingPath, strings.NewReader(`{"ap_total_score":7}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", bearer)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d: %s", rr.Code, http.StatusUnprocessableEntity, rr.Body.String())
 	}
 }
