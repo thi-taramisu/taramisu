@@ -18,6 +18,72 @@
         ],
         "type": "object"
       },
+      "CreateThreatDamageLinkInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "damage_scenario_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "threat_scenario_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "threat_scenario_id",
+          "damage_scenario_id"
+        ],
+        "type": "object"
+      },
+      "DamageScenarioBody": {
+        "additionalProperties": false,
+        "properties": {
+          "functionality_adverse_relation": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "item_definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "road_user_harm_description": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "item_definition_id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "DamageScenarioFields": {
+        "additionalProperties": false,
+        "properties": {
+          "functionality_adverse_relation": {
+            "type": "string"
+          },
+          "road_user_harm_description": {
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -90,6 +156,94 @@
         },
         "type": "object"
       },
+      "ImpactRatingBody": {
+        "additionalProperties": false,
+        "properties": {
+          "damage_scenario_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "impact_category": {
+            "enum": [
+              "SAFETY",
+              "FINANCIAL",
+              "OPERATIONAL",
+              "PRIVACY"
+            ],
+            "type": "string"
+          },
+          "is_omitted_by_pm_15_07": {
+            "type": "boolean"
+          },
+          "omission_or_rating_rationale": {
+            "type": "string"
+          },
+          "rating_value": {
+            "enum": [
+              "SEVERE",
+              "MAJOR",
+              "MODERATE",
+              "NEGLIGIBLE",
+              "OMITTED"
+            ],
+            "type": "string"
+          },
+          "reused_from_functional_safety": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "damage_scenario_id",
+          "impact_category",
+          "is_omitted_by_pm_15_07",
+          "reused_from_functional_safety"
+        ],
+        "type": "object"
+      },
+      "ImpactRatingFields": {
+        "additionalProperties": false,
+        "properties": {
+          "impact_category": {
+            "enum": [
+              "SAFETY",
+              "FINANCIAL",
+              "OPERATIONAL",
+              "PRIVACY"
+            ],
+            "type": "string"
+          },
+          "is_omitted_by_pm_15_07": {
+            "description": "Must be true exactly when rating_value is OMITTED.",
+            "type": "boolean"
+          },
+          "omission_or_rating_rationale": {
+            "type": "string"
+          },
+          "rating_value": {
+            "enum": [
+              "SEVERE",
+              "MAJOR",
+              "MODERATE",
+              "NEGLIGIBLE",
+              "OMITTED"
+            ],
+            "type": "string"
+          },
+          "reused_from_functional_safety": {
+            "description": "Only allowed for the SAFETY category.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "impact_category"
+        ],
+        "type": "object"
+      },
       "ReadyOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -160,6 +314,89 @@
         ],
         "type": "object"
       },
+      "ThreatDamageLinkBody": {
+        "additionalProperties": false,
+        "properties": {
+          "damage_scenario_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "threat_scenario_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "threat_scenario_id",
+          "damage_scenario_id"
+        ],
+        "type": "object"
+      },
+      "UpdateDamageScenarioInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "functionality_adverse_relation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "road_user_harm_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateImpactRatingInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "impact_category": {
+            "enum": [
+              "SAFETY",
+              "FINANCIAL",
+              "OPERATIONAL",
+              "PRIVACY"
+            ],
+            "type": "string"
+          },
+          "is_omitted_by_pm_15_07": {
+            "type": "boolean"
+          },
+          "omission_or_rating_rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rating_value": {
+            "enum": [
+              "SEVERE",
+              "MAJOR",
+              "MODERATE",
+              "NEGLIGIBLE",
+              "OMITTED"
+            ],
+            "type": "string"
+          },
+          "reused_from_functional_safety": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "UpdateTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -222,6 +459,944 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/item-definitions/{item_definition_id}/damage-scenarios": {
+      "get": {
+        "operationId": "list-damage-scenarios",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DamageScenarioBody"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List damage scenarios of an item definition (paginated)",
+        "tags": [
+          "Damage Scenario"
+        ]
+      },
+      "post": {
+        "operationId": "create-damage-scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DamageScenarioFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DamageScenarioBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a damage scenario",
+        "tags": [
+          "Damage Scenario"
+        ]
+      }
+    },
+    "/api/v1/item-definitions/{item_definition_id}/damage-scenarios/{damage_scenario_id}/impact-ratings": {
+      "get": {
+        "operationId": "list-impact-ratings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImpactRatingBody"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List impact ratings of a damage scenario",
+        "tags": [
+          "Impact Rating"
+        ]
+      },
+      "post": {
+        "operationId": "create-impact-rating",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImpactRatingFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactRatingBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an impact rating",
+        "tags": [
+          "Impact Rating"
+        ]
+      }
+    },
+    "/api/v1/item-definitions/{item_definition_id}/damage-scenarios/{damage_scenario_id}/impact-ratings/{id}": {
+      "delete": {
+        "operationId": "delete-impact-rating",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an impact rating",
+        "tags": [
+          "Impact Rating"
+        ]
+      },
+      "get": {
+        "operationId": "get-impact-rating",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactRatingBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an impact rating",
+        "tags": [
+          "Impact Rating"
+        ]
+      },
+      "patch": {
+        "description": "Omitted fields remain unchanged. Only the rationale can be cleared with null; use PUT to clear rating_value.",
+        "operationId": "update-impact-rating",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateImpactRatingInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactRatingBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Partially update an impact rating",
+        "tags": [
+          "Impact Rating"
+        ]
+      },
+      "put": {
+        "operationId": "replace-impact-rating",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "damage_scenario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImpactRatingFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactRatingBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace an impact rating",
+        "tags": [
+          "Impact Rating"
+        ]
+      }
+    },
+    "/api/v1/item-definitions/{item_definition_id}/damage-scenarios/{id}": {
+      "delete": {
+        "operationId": "delete-damage-scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a damage scenario with its impact ratings and links",
+        "tags": [
+          "Damage Scenario"
+        ]
+      },
+      "get": {
+        "operationId": "get-damage-scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DamageScenarioBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a damage scenario",
+        "tags": [
+          "Damage Scenario"
+        ]
+      },
+      "patch": {
+        "operationId": "update-damage-scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDamageScenarioInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DamageScenarioBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Partially update a damage scenario",
+        "tags": [
+          "Damage Scenario"
+        ]
+      },
+      "put": {
+        "operationId": "replace-damage-scenario",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DamageScenarioFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DamageScenarioBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a damage scenario",
+        "tags": [
+          "Damage Scenario"
+        ]
+      }
+    },
+    "/api/v1/item-definitions/{item_definition_id}/threat-damage-links": {
+      "get": {
+        "operationId": "list-threat-damage-links",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ThreatDamageLinkBody"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List threat scenario to damage scenario links of an item definition (paginated)",
+        "tags": [
+          "Damage Scenario"
+        ]
+      },
+      "post": {
+        "operationId": "create-threat-damage-link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThreatDamageLinkInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreatDamageLinkBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Link a threat scenario to a damage scenario",
+        "tags": [
+          "Damage Scenario"
+        ]
+      }
+    },
+    "/api/v1/item-definitions/{item_definition_id}/threat-damage-links/{id}": {
+      "delete": {
+        "operationId": "delete-threat-damage-link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_definition_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a threat scenario to damage scenario link",
+        "tags": [
+          "Damage Scenario"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "current-user",
@@ -597,6 +1772,14 @@
     {
       "description": "Create, read, replace, update and delete TARA projects.",
       "name": "Tara Project"
+    },
+    {
+      "description": "Create, read, replace, update and delete damage scenarios of an item definition.",
+      "name": "Damage Scenario"
+    },
+    {
+      "description": "Create, read, replace, update and delete the impact ratings of a damage scenario.",
+      "name": "Impact Rating"
     }
   ]
 }

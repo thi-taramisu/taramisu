@@ -15,6 +15,9 @@ import (
 type Queries interface {
 	handlers.StatusReader
 	handlers.TaraProjectStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 }
 
 func New(queries Queries, manager *auth.Manager) http.Handler {
@@ -55,6 +58,9 @@ func newAPI(queries Queries, manager *auth.Manager) (*chi.Mux, huma.API) {
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
 	handlers.NewTaraProject(queries).Register(api)
+	handlers.NewDamageScenario(queries).Register(api)
+	handlers.NewImpactRating(queries).Register(api)
+	handlers.NewThreatDamageLink(queries).Register(api)
 	huma.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
