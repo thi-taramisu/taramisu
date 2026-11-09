@@ -1,6 +1,6 @@
 import { ApiError } from '../errors'
 import type { CiaProperty, ItemAsset } from '../models/asset'
-import type { AttackPath } from '../models/attackPath'
+import type { AttackFeasibilityRating, AttackPath } from '../models/attackPath'
 import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../models/damageScenario'
 import type { ItemDefinition } from '../models/item'
 import type { RiskGroup } from '../models/risk'
@@ -22,6 +22,7 @@ export interface StoredItem {
   threatTargets: ThreatScenarioAssetProperty[]
   attackPaths: AttackPath[]
   threatAttackPathLinks: ThreatAttackPathLink[]
+  attackFeasibilityRatings: AttackFeasibilityRating[]
 }
 
 export function validateTitle(title: string | undefined) {
@@ -102,6 +103,25 @@ export function addThreatDamageLink(entry: StoredItem, threatScenarioId: string,
 export function removeThreatDamageLink(entry: StoredItem, threatScenarioId: string, damageScenarioId: string) {
   if (!entry.threatDamageLinks.some((link) => isThreatDamageLink(link, threatScenarioId, damageScenarioId))) throw new ApiError(404, 'Link not found.')
   entry.threatDamageLinks = entry.threatDamageLinks.filter((link) => !isThreatDamageLink(link, threatScenarioId, damageScenarioId))
+  syncLinks(entry)
+}
+
+function isThreatAttackPathLink(link: ThreatAttackPathLink, threatScenarioId: string, attackPathId: string) {
+  return link.threat_scenario_id === threatScenarioId && link.attack_path_id === attackPathId
+}
+
+export function addThreatAttackPathLink(entry: StoredItem, threatScenarioId: string, attackPathId: string) {
+  // Same rule as the UNIQUE constraint of `threat_attack_path_link`.
+  if (entry.threatAttackPathLinks.some((link) => isThreatAttackPathLink(link, threatScenarioId, attackPathId))) {
+    throw new ApiError(409, 'The attack path is already linked.')
+  }
+  entry.threatAttackPathLinks.push({ threat_scenario_id: threatScenarioId, attack_path_id: attackPathId })
+  syncLinks(entry)
+}
+
+export function removeThreatAttackPathLink(entry: StoredItem, threatScenarioId: string, attackPathId: string) {
+  if (!entry.threatAttackPathLinks.some((link) => isThreatAttackPathLink(link, threatScenarioId, attackPathId))) throw new ApiError(404, 'Link not found.')
+  entry.threatAttackPathLinks = entry.threatAttackPathLinks.filter((link) => !isThreatAttackPathLink(link, threatScenarioId, attackPathId))
   syncLinks(entry)
 }
 

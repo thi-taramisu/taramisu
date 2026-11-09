@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { CiaProperty, NewAsset } from '../models/asset'
+import type { AttackFeasibilityRatingBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { PatchThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
@@ -23,6 +24,9 @@ const keys = {
   itemAttackPaths: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'attack-paths'] as const,
   threatScenario: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id] as const,
   threatScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id, 'relations'] as const,
+  attackPath: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id] as const,
+  attackPathRating: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'rating'] as const,
+  attackPathRelations: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'relations'] as const,
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
@@ -259,6 +263,48 @@ export function useSetThreatAttackPathLink(projectId: string, threatScenarioId: 
       linked
         ? api.threatScenarios.linkAttackPath(projectId, threatScenarioId, attackPathId)
         : api.threatScenarios.unlinkAttackPath(projectId, threatScenarioId, attackPathId),
+    onSuccess: storeRelations,
+  })
+}
+
+export function useAttackPath(projectId: string, attackPathId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.attackPath(projectId, attackPathId), queryFn: () => api.attackPaths.get(projectId, attackPathId) })
+}
+
+export function useUpdateAttackPath(projectId: string, attackPathId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: PatchAttackPathBody) => api.attackPaths.update(projectId, attackPathId, body), onSuccess: invalidate })
+}
+
+export function useAttackPathRating(projectId: string, attackPathId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.attackPathRating(projectId, attackPathId), queryFn: () => api.attackPaths.rating(projectId, attackPathId) })
+}
+
+export function useUpdateAttackPathRating(projectId: string, attackPathId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: (body: AttackFeasibilityRatingBody) => api.attackPaths.updateRating(projectId, attackPathId, body),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAttackPathRelations(projectId: string, attackPathId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.attackPathRelations(projectId, attackPathId), queryFn: () => api.attackPaths.relations(projectId, attackPathId) })
+}
+
+export function useSetAttackPathThreatLink(projectId: string, attackPathId: string) {
+  const api = useApi()
+  const storeRelations = useStoreRelations(projectId, keys.attackPathRelations(projectId, attackPathId))
+  return useMutation({
+    mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
+      linked
+        ? api.attackPaths.linkThreatScenario(projectId, attackPathId, threatScenarioId)
+        : api.attackPaths.unlinkThreatScenario(projectId, attackPathId, threatScenarioId),
     onSuccess: storeRelations,
   })
 }

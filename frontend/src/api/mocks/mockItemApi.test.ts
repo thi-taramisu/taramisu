@@ -290,6 +290,66 @@ describe('createMockItemApi', () => {
       expect((await treeBelow(api, 'a-01'))![0].children).toMatchObject([{ code: 'TS-01' }, { code: 'TS-02', children: [{ code: 'AP-03' }] }])
     })
   })
+
+  describe('attack paths', () => {
+    const complete = {
+      ap_elapsed_time: 4,
+      ap_specialist_expertise: 3,
+      ap_knowledge_of_item: 3,
+      ap_window_of_opportunity: 1,
+      ap_equipment: 0,
+      ap_total_score: 11,
+      feasibility_rating: 'HIGH' as const,
+      rationale: null,
+    }
+
+    it('patches the given fields, trims the title and renames every tree occurrence', async () => {
+      const api = createMockItemApi()
+
+      const updated = await api.attackPaths.update(project, 'ap-01', { title: '  Remote exploit ', analysis_approach: 'BOTTOM_UP' })
+
+      expect(updated).toMatchObject({ title: 'Remote exploit', analysis_approach: 'BOTTOM_UP', is_partial_early_stage: false })
+      expect((await treeBelow(api, 'a-01'))![0].children![0].children![0]).toMatchObject({ code: 'AP-01', name: 'Remote exploit' })
+      await expect(api.attackPaths.update(project, 'ap-01', { title: ' ' })).rejects.toMatchObject({ status: 422 })
+    })
+
+    it('returns 404 for unknown attack paths and other projects', async () => {
+      const { attackPaths } = createMockItemApi()
+
+      await expect(attackPaths.get(project, 'nope')).rejects.toMatchObject({ status: 404 })
+      await expect(attackPaths.get('other', 'ap-01')).rejects.toMatchObject({ status: 404 })
+    })
+
+    it('creates a rating once and then replaces it', async () => {
+      const { attackPaths } = createMockItemApi()
+      expect(await attackPaths.rating(project, 'ap-03')).toBeNull()
+
+      const created = await attackPaths.updateRating(project, 'ap-03', complete)
+      const replaced = await attackPaths.updateRating(project, 'ap-03', { ...complete, rationale: 'Checked' })
+
+      expect(replaced).toMatchObject({ id: created.id, attack_path_id: 'ap-03', rationale: 'Checked' })
+      expect(await attackPaths.rating(project, 'ap-03')).toEqual(replaced)
+    })
+
+    it('rejects ratings that the database constraints do not allow', async () => {
+      const { attackPaths } = createMockItemApi()
+
+      await expect(attackPaths.updateRating(project, 'ap-03', { ...complete, ap_total_score: 12 })).rejects.toMatchObject({ status: 422 })
+      await expect(attackPaths.updateRating(project, 'ap-03', { ...complete, ap_equipment: null })).rejects.toMatchObject({ status: 422 })
+      await expect(attackPaths.updateRating(project, 'ap-03', { ...complete, ap_equipment: -1, ap_total_score: null })).rejects.toMatchObject({ status: 422 })
+    })
+
+    it('links and unlinks threat scenarios from the attack path side', async () => {
+      const { attackPaths, threatScenarios } = createMockItemApi()
+
+      expect((await attackPaths.linkThreatScenario(project, 'ap-03', 'ts-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-01'])
+      expect((await threatScenarios.relations(project, 'ts-01')).attackPaths.map((p) => p.code)).toEqual(['AP-01', 'AP-02', 'AP-03'])
+      await expect(attackPaths.linkThreatScenario(project, 'ap-03', 'ts-01')).rejects.toMatchObject({ status: 409 })
+      await expect(attackPaths.linkThreatScenario(project, 'ap-03', 'nope')).rejects.toMatchObject({ status: 404 })
+      expect((await attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).threatScenarios).toEqual([])
+      await expect(attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).rejects.toMatchObject({ status: 404 })
+    })
+  })
 })
 
 describe('retryUnlessNotFound', () => {
