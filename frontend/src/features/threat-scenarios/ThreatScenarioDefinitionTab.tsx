@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { useSaveThreatDefinition, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
 import { entityPath } from '../workspace/entities'
@@ -143,9 +144,9 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           id={`${id}-elicitation`}
           value={values.elicitation_method}
           onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
-          className="w-full"
+          className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
         >
-          <NativeSelectOption value="">Not set</NativeSelectOption>
+          <NativeSelectOption value="">Select…</NativeSelectOption>
           {ELICITATION_METHODS.map((method) => (
             <NativeSelectOption key={method.value} value={method.value}>
               {method.label}

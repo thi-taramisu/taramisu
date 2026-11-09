@@ -71,6 +71,9 @@ without a link are not in the tree until the "Unassigned" group exists; threat s
 The threat scenario page (#194) has the Definition tab (name, cause, elicitation, technical notes, targets) and the Relations tab (damage
 scenarios, attack paths), both on the mock API. Its Risks and Treatment tabs are still placeholders.
 
+The attack path page (#195) has the Definition tab (name, analysis approach, partial flag, steps), the Rating tab (attack potential with
+the five factors, total and feasibility) and the Relations tab (threat scenarios), all on the mock API.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:

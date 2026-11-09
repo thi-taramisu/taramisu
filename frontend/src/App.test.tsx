@@ -39,7 +39,7 @@ describe('routing', () => {
     ),
   )('routes %s tab "%s"', async (type, path, label) => {
     // Item and scenario pages load the element from the API, so they need an existing one.
-    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01' }
+    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01', 'attack-paths': 'ap-01' }
     renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
 
     const tabs = await screen.findByRole('navigation', { name: `${ENTITY_TYPES[type].label} tabs` })

@@ -6,6 +6,7 @@ import type { ItemApi } from '../services/items'
 import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
 import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
+  headlampAttackFeasibilityRatings,
   headlampAttackPaths,
   headlampThreatAttackPathLinks,
   headlampThreatDamageLinks,
@@ -23,6 +24,7 @@ import {
   validateTitle,
   type StoredItem,
 } from './mockStore'
+import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
 // MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
@@ -42,6 +44,7 @@ function seed(): Map<string, StoredItem> {
     threatDamageLinks: headlampThreatDamageLinks,
     threatAttackPathLinks: headlampThreatAttackPathLinks,
     attackPaths: headlampAttackPaths,
+    attackFeasibilityRatings: headlampAttackFeasibilityRatings,
     threatTargets: headlampThreatTargets,
   })
   return new Map([[headlampItem.id, entry]])
@@ -143,6 +146,7 @@ export function createMockItemApi(): ItemApi {
             threatDamageLinks: [],
             threatAttackPathLinks: [],
             attackPaths: [],
+            attackFeasibilityRatings: [],
             threatTargets: [],
           })
           return item
@@ -279,5 +283,6 @@ export function createMockItemApi(): ItemApi {
         }),
     },
     threatScenarios: createMockThreatScenarioService(db),
+    attackPaths: createMockAttackPathService(db),
   }
 }

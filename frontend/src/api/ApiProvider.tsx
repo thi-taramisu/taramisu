@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { createApiClient, type ApiClient } from './client'
 import { createMockItemApi } from './mocks/mockItemApi'
+import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
 import type { ThreatScenarioService } from './services/threatScenarios'
@@ -16,6 +17,7 @@ export interface Api {
   content: ItemContentService
   damageScenarios: DamageScenarioService
   threatScenarios: ThreatScenarioService
+  attackPaths: AttackPathService
 }
 
 const ApiContext = createContext<Api | null>(null)
@@ -49,8 +51,9 @@ export function ApiProvider({
       content: api?.content ?? defaultMocks.content,
       damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
       threatScenarios: api?.threatScenarios ?? defaultMocks.threatScenarios,
+      attackPaths: api?.attackPaths ?? defaultMocks.attackPaths,
     }),
-    [api?.content, api?.damageScenarios, api?.items, api?.threatScenarios, client, defaultMocks],
+    [api?.attackPaths, api?.content, api?.damageScenarios, api?.items, api?.threatScenarios, client, defaultMocks],
   )
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>
