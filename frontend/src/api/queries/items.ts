@@ -192,16 +192,28 @@ export function useSetDamageScenarioAssetLink(projectId: string, damageScenarioI
   })
 }
 
-export function useSetDamageScenarioThreatLink(projectId: string, damageScenarioId: string) {
-  const api = useApi()
-  const storeRelations = useStoreRelations(projectId, keys.damageScenarioRelations(projectId, damageScenarioId))
+/** Links or unlinks an element; the service returns the relations, which replace the stored ones. */
+function useLinkMutation<Relations>(
+  projectId: string,
+  key: QueryKey,
+  link: (id: string) => Promise<Relations>,
+  unlink: (id: string) => Promise<Relations>,
+) {
+  const storeRelations = useStoreRelations(projectId, key)
   return useMutation({
-    mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
-      linked
-        ? api.damageScenarios.linkThreatScenario(projectId, damageScenarioId, threatScenarioId)
-        : api.damageScenarios.unlinkThreatScenario(projectId, damageScenarioId, threatScenarioId),
+    mutationFn: ({ id, linked }: { id: string; linked: boolean }) => (linked ? link(id) : unlink(id)),
     onSuccess: storeRelations,
   })
+}
+
+export function useSetDamageScenarioThreatLink(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  return useLinkMutation(
+    projectId,
+    keys.damageScenarioRelations(projectId, damageScenarioId),
+    (id) => api.damageScenarios.linkThreatScenario(projectId, damageScenarioId, id),
+    (id) => api.damageScenarios.unlinkThreatScenario(projectId, damageScenarioId, id),
+  )
 }
 
 export function useItemDamageScenarios(projectId: string, itemId: string) {
@@ -245,26 +257,22 @@ export function useThreatScenarioRelations(projectId: string, threatScenarioId: 
 
 export function useSetThreatDamageLink(projectId: string, threatScenarioId: string) {
   const api = useApi()
-  const storeRelations = useStoreRelations(projectId, keys.threatScenarioRelations(projectId, threatScenarioId))
-  return useMutation({
-    mutationFn: ({ damageScenarioId, linked }: { damageScenarioId: string; linked: boolean }) =>
-      linked
-        ? api.threatScenarios.linkDamageScenario(projectId, threatScenarioId, damageScenarioId)
-        : api.threatScenarios.unlinkDamageScenario(projectId, threatScenarioId, damageScenarioId),
-    onSuccess: storeRelations,
-  })
+  return useLinkMutation(
+    projectId,
+    keys.threatScenarioRelations(projectId, threatScenarioId),
+    (id) => api.threatScenarios.linkDamageScenario(projectId, threatScenarioId, id),
+    (id) => api.threatScenarios.unlinkDamageScenario(projectId, threatScenarioId, id),
+  )
 }
 
 export function useSetThreatAttackPathLink(projectId: string, threatScenarioId: string) {
   const api = useApi()
-  const storeRelations = useStoreRelations(projectId, keys.threatScenarioRelations(projectId, threatScenarioId))
-  return useMutation({
-    mutationFn: ({ attackPathId, linked }: { attackPathId: string; linked: boolean }) =>
-      linked
-        ? api.threatScenarios.linkAttackPath(projectId, threatScenarioId, attackPathId)
-        : api.threatScenarios.unlinkAttackPath(projectId, threatScenarioId, attackPathId),
-    onSuccess: storeRelations,
-  })
+  return useLinkMutation(
+    projectId,
+    keys.threatScenarioRelations(projectId, threatScenarioId),
+    (id) => api.threatScenarios.linkAttackPath(projectId, threatScenarioId, id),
+    (id) => api.threatScenarios.unlinkAttackPath(projectId, threatScenarioId, id),
+  )
 }
 
 export function useAttackPath(projectId: string, attackPathId: string) {
@@ -299,12 +307,10 @@ export function useAttackPathRelations(projectId: string, attackPathId: string) 
 
 export function useSetAttackPathThreatLink(projectId: string, attackPathId: string) {
   const api = useApi()
-  const storeRelations = useStoreRelations(projectId, keys.attackPathRelations(projectId, attackPathId))
-  return useMutation({
-    mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
-      linked
-        ? api.attackPaths.linkThreatScenario(projectId, attackPathId, threatScenarioId)
-        : api.attackPaths.unlinkThreatScenario(projectId, attackPathId, threatScenarioId),
-    onSuccess: storeRelations,
-  })
+  return useLinkMutation(
+    projectId,
+    keys.attackPathRelations(projectId, attackPathId),
+    (id) => api.attackPaths.linkThreatScenario(projectId, attackPathId, id),
+    (id) => api.attackPaths.unlinkThreatScenario(projectId, attackPathId, id),
+  )
 }

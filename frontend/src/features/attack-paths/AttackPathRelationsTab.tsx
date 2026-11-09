@@ -37,8 +37,8 @@ function Relations({ projectId, path }: { projectId: string; path: AttackPath })
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
         pending={link.isPending}
         error={link.isError ? LINK_SAVE_ERROR : undefined}
-        onAdd={(threatScenarioId) => link.mutate({ threatScenarioId, linked: true })}
-        onRemove={(threatScenarioId) => link.mutate({ threatScenarioId, linked: false })}
+        onAdd={(id) => link.mutate({ id, linked: true })}
+        onRemove={(id) => link.mutate({ id, linked: false })}
         rows={threatScenarios}
       />
       <p className="text-xs text-muted-foreground">Removing a link does not delete the element.</p>

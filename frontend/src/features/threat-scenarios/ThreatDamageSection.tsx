@@ -31,15 +31,15 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
       candidatesError={itemScenarios.isLoadingError ? 'The damage scenarios of this item could not be loaded.' : undefined}
       pending={link.isPending}
       error={link.isError ? LINK_SAVE_ERROR : undefined}
-      onAdd={(damageScenarioId) => link.mutate({ damageScenarioId, linked: true })}
-      onRemove={(damageScenarioId) => link.mutate({ damageScenarioId, linked: false })}
+      onAdd={(id) => link.mutate({ id, linked: true })}
+      onRemove={(id) => link.mutate({ id, linked: false })}
       renderCreateDialog={(dialog) => (
         <CreateDamageScenarioDialog
           {...dialog}
           projectId={projectId}
           projectName={exampleProject.name}
           lockedItemId={scenario.item_definition_id}
-          onCreated={(created) => link.mutateAsync({ damageScenarioId: created.id, linked: true })}
+          onCreated={(created) => link.mutateAsync({ id: created.id, linked: true })}
         />
       )}
     />

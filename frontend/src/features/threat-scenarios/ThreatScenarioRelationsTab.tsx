@@ -39,8 +39,8 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
         candidatesError={itemPaths.isLoadingError ? 'The attack paths of this item could not be loaded.' : undefined}
         pending={pathLink.isPending}
         error={pathLink.isError ? LINK_SAVE_ERROR : undefined}
-        onAdd={(attackPathId) => pathLink.mutate({ attackPathId, linked: true })}
-        onRemove={(attackPathId) => pathLink.mutate({ attackPathId, linked: false })}
+        onAdd={(id) => pathLink.mutate({ id, linked: true })}
+        onRemove={(id) => pathLink.mutate({ id, linked: false })}
         rows={attackPaths}
       />
       <p className="text-xs text-muted-foreground">

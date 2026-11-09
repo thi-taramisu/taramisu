@@ -88,8 +88,8 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
         error={threatLink.isError ? LINK_SAVE_ERROR : undefined}
-        onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
-        onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
+        onAdd={(id) => threatLink.mutate({ id, linked: true })}
+        onRemove={(id) => threatLink.mutate({ id, linked: false })}
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">
