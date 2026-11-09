@@ -3,6 +3,7 @@ import type { ThreatScenario } from '../../api/models/threatScenario'
 import { useItemAttackPaths, useSetThreatAttackPathLink, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
 import { LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
+import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 import { ThreatDamageSection } from './ThreatDamageSection'
 
 /** Relations tab of a threat scenario ("TS Relations" wireframe): its damage scenarios and attack paths. */
@@ -20,20 +21,12 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
   const itemPaths = useItemAttackPaths(projectId, scenario.item_definition_id)
   const pathLink = useSetThreatAttackPathLink(projectId, scenario.id)
 
-  if (!relations.data) {
-    return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The relations could not be loaded.</p>
-    ) : (
-      <output className="text-sm text-muted-foreground">Loading relations…</output>
-    )
-  }
+  if (!relations.data) return <RelationsQueryStatus query={relations} />
 
   const { damageScenarios, attackPaths } = relations.data
   return (
     <div className="space-y-4">
-      {relations.isError && (
-        <p role="alert" className="text-sm text-destructive">The relations could not be refreshed.</p>
-      )}
+      <RelationsQueryStatus query={relations} />
       <ThreatDamageSection projectId={projectId} scenario={scenario} linked={damageScenarios} />
       <RelationSection
         projectId={projectId}
