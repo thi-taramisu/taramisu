@@ -26,6 +26,7 @@ type fakeProjects struct {
 	statusReaderFunc
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	project   db.TaraProject
 	found     bool
 	deleteErr error

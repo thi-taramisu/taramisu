@@ -17,6 +17,7 @@ type Queries interface {
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 }
@@ -75,6 +76,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	huma.Get(api, "/health/live", h.Live)
 	huma.Get(api, "/health/ready", h.Ready)
 	handlers.NewTaraProject(queries, queries).Register(api)
+	handlers.NewItemDefinitions(queries, queries).Register(api)
 	handlers.NewRiskValues(queries, queries).Register(api)
 	handlers.NewRiskTreatmentDecisions(queries, queries).Register(api)
 	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)

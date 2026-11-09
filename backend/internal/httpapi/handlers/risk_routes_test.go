@@ -39,6 +39,7 @@ type riskFake struct {
 	handlers.TaraProjectStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	allowed        bool
 	accessErr, err error
 	access         db.GetProjectRoleParams
