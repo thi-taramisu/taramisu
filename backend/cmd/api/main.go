@@ -48,7 +48,7 @@ func run() error {
 		return err
 	}
 	defer closePool(pool, poolCloseTimeout)
-	queries := db.New(pool)
+	queries := db.NewStore(pool)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,
@@ -57,7 +57,21 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}
-	server := &http.Server{Handler: httpapi.New(queries, iam), ReadHeaderTimeout: 5 * time.Second}
+	var opts []httpapi.Option
+	if cfg.AuthentikURL != "" && cfg.AuthentikToken != "" {
+		directory, err := auth.NewDirectoryResolver(auth.DirectoryConfig{
+			BaseURL: cfg.AuthentikURL,
+			Token:   cfg.AuthentikToken,
+			TTL:     cfg.AuthentikMetadataCacheTTL,
+		})
+		if err != nil {
+			return fmt.Errorf("configure Authentik directory: %w", err)
+		}
+		opts = append(opts, httpapi.WithDirectory(directory))
+	} else {
+		slog.Warn("AUTHENTIK_API_URL or AUTHENTIK_API_TOKEN not set: member names are hidden and adding members is disabled")
+	}
+	server := &http.Server{Handler: httpapi.New(queries, iam, opts...), ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
 		return err

@@ -65,6 +65,19 @@ The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs
 `iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
 `GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
 
+## Authorization
+
+Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specified in
+[project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
+`internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
+`handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
+`/api/v1/projects/{id}/members`; member and project changes are written as `audit` log entries.
+
+Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
+The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
+host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
+omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
+
 ## Checks
 
 ```sh
