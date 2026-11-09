@@ -234,6 +234,14 @@ for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrat
 for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
 roll back their fixtures and do not require a live Authentik instance.
 
+## Risk values and treatment decisions
+
+The risk API provides authenticated CRUD under `/api/v1/threat-scenarios/{threat_scenario_id}/risk-values`
+and `/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions`.
+It uses the existing schema and shared project authorization: Viewers can read; Editors and Owners can write.
+Non-members receive 404; members with insufficient roles receive 403. Related records and treatment claims are validated.
+See the [frontend API handoff](../docs/internal/dev-workflow/risk-api.md) for methods, fields, pagination, and errors.
+
 ## OpenAPI contract
 
 With the Compose stack running: OpenAPI 3.1 at [http://localhost/openapi.json](http://localhost/openapi.json), Swagger UI at

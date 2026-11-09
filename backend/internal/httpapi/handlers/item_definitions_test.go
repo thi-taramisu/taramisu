@@ -30,6 +30,8 @@ type itemStore struct {
 	handlers.TaraProjectStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 	handlers.StatusReader
 	role    db.ProjectRole
 	err     error
