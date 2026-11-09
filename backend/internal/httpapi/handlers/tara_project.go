@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -86,23 +84,6 @@ type ReplaceTaraProjectInput struct {
 		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
 	}
-}
-
-// Optional distinguishes an omitted PATCH field from an explicit JSON null.
-type Optional[T any] struct {
-	Set   bool
-	Value *T
-}
-
-func (o *Optional[T]) UnmarshalJSON(data []byte) error {
-	o.Set = true
-	return json.Unmarshal(data, &o.Value)
-}
-
-func (o Optional[T]) Schema(r huma.Registry) *huma.Schema {
-	s := *r.Schema(reflect.TypeFor[T](), true, "")
-	s.Nullable = true
-	return &s
 }
 
 type UpdateTaraProjectInput struct {

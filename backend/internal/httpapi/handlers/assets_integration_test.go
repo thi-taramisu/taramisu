@@ -3,12 +3,15 @@ package handlers_test
 import (
 	"context"
 	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
@@ -41,10 +44,14 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	api := newRouteAPI(t, db.New(tx))
+	manager, bearer := authtest.NewManagerAndToken(t)
+	h := httpapi.New(db.New(tx), manager)
+	request := func(method, path string, body any) *httptest.ResponseRecorder {
+		return assetRequest(t, h, bearer, method, path, body)
+	}
 	collection := "/api/v1/item-definitions/" + item + "/assets"
 	otherCollection := "/api/v1/item-definitions/" + otherItem + "/assets"
-	created := api.Post(collection, map[string]any{"name": "ECU", "description": "original", "identification_source": "ITEM_DEF"})
+	created := request("POST", collection, map[string]any{"name": "ECU", "description": "original", "identification_source": "ITEM_DEF"})
 	if created.Code != 201 {
 		t.Fatalf("create: %d %s", created.Code, created.Body)
 	}
@@ -58,7 +65,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 	}
 	read := func() handlers.Asset {
 		t.Helper()
-		r := api.Get(path)
+		r := request("GET", path, nil)
 		if r.Code != 200 {
 			t.Fatalf("get: %d %s", r.Code, r.Body)
 		}
@@ -73,32 +80,32 @@ func TestAssetPostgresCRUD(t *testing.T) {
 		t.Fatalf("created asset: %+v", a)
 	}
 	// Changing one field must preserve the others in the database.
-	if r := api.Patch(path, strings.NewReader(`{"name":"updated"}`)); r.Code != 200 {
+	if r := request("PATCH", path, strings.NewReader(`{"name":"updated"}`)); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	a = read()
 	if a.Name != "updated" || a.Description == nil || *a.Description != "original" || a.IdentificationSource == nil {
 		t.Fatalf("patch lost fields: %+v", a)
 	}
-	if r := api.Patch(path, strings.NewReader(`{"description":null,"identification_source":null}`)); r.Code != 200 {
+	if r := request("PATCH", path, strings.NewReader(`{"description":null,"identification_source":null}`)); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	a = read()
 	if a.Description != nil || a.IdentificationSource != nil || a.Name != "updated" {
 		t.Fatalf("clear fields: %+v", a)
 	}
-	if r := api.Patch(path, map[string]any{"description": "", "identification_source": "CATALOGUE"}); r.Code != 200 {
+	if r := request("PATCH", path, map[string]any{"description": "", "identification_source": "CATALOGUE"}); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	a = read()
 	if a.ItemDefinitionID != item || a.Description == nil || *a.Description != "" || a.IdentificationSource == nil || *a.IdentificationSource != db.IdentificationSourceCATALOGUE {
 		t.Fatalf("patch values: %+v", a)
 	}
-	if r := api.Get(otherCollection); r.Code != 200 || r.Body.String() != "[]\n" {
+	if r := request("GET", otherCollection, nil); r.Code != 200 || r.Body.String() != "[]\n" {
 		t.Fatalf("filter: %s", r.Body)
 	}
 	{
-		r := api.Get(collection + "?limit=1&offset=0")
+		r := request("GET", collection+"?limit=1&offset=0", nil)
 		var rows []handlers.Asset
 		if err := json.Unmarshal(r.Body.Bytes(), &rows); err != nil {
 			t.Fatal(err)
@@ -108,11 +115,11 @@ func TestAssetPostgresCRUD(t *testing.T) {
 		}
 	}
 	for _, offset := range []string{"1", "2147483647"} {
-		if r := api.Get(collection + "?offset=" + offset); r.Code != 200 || r.Body.String() != "[]\n" {
+		if r := request("GET", collection+"?offset="+offset, nil); r.Code != 200 || r.Body.String() != "[]\n" {
 			t.Fatalf("pagination: %s", r.Body)
 		}
 	}
-	if r := api.Put(path, map[string]any{"name": "replacement"}); r.Code != 200 {
+	if r := request("PUT", path, map[string]any{"name": "replacement"}); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	a = read()
@@ -121,7 +128,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 	}
 	// A valid asset ID under another parent must not be readable or mutable.
 	for _, method := range []string{"GET", "PUT", "PATCH", "DELETE"} {
-		r := api.Do(method, otherCollection+"/"+asset.ID, map[string]any{"name": "wrong parent"})
+		r := request(method, otherCollection+"/"+asset.ID, map[string]any{"name": "wrong parent"})
 		if r.Code != 404 {
 			t.Fatalf("cross-parent %s: %d %s", method, r.Code, r.Body)
 		}
@@ -131,7 +138,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 		if method == "POST" {
 			target = collection
 		}
-		r := api.Do(method, target, map[string]any{"name": "move", "item_definition_id": otherItem})
+		r := request(method, target, map[string]any{"name": "move", "item_definition_id": otherItem})
 		if r.Code != 422 {
 			t.Fatalf("parent in %s body accepted: %d %s", method, r.Code, r.Body)
 		}
@@ -144,7 +151,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 	if _, err := tx.Exec(ctx, "INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'INTEGRITY')", asset.ID); err != nil {
 		t.Fatal(err)
 	}
-	if r := api.Delete(path); r.Code != 204 {
+	if r := request("DELETE", path, nil); r.Code != 204 {
 		t.Fatal(r.Body)
 	}
 	var properties int
@@ -155,7 +162,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 		t.Fatal("asset properties were not deleted")
 	}
 	for _, method := range []string{"GET", "DELETE"} {
-		r := api.Do(method, path, map[string]any{"name": "missing"})
+		r := request(method, path, map[string]any{"name": "missing"})
 		if r.Code != 404 {
 			t.Fatalf("missing %s: %d %s", method, r.Code, r.Body)
 		}
