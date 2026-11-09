@@ -32,6 +32,7 @@ type assetStore struct {
 	handlers.StatusReader
 	resourceAccess
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore

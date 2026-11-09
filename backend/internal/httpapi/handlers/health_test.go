@@ -21,6 +21,7 @@ type healthQueries struct {
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	handlers.AssetStore
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore

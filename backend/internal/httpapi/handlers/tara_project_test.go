@@ -24,6 +24,7 @@ type fakeProjects struct {
 	statusReaderFunc
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	handlers.AssetStore
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore

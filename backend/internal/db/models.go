@@ -569,6 +569,9 @@ type ItemDefinition struct {
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
+	Boundary                 *string
+	Functions                *string
+	OperationalEnvironment   *string
 	ItemDefinitionWp0901     *string
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string

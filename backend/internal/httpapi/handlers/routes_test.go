@@ -23,6 +23,7 @@ import (
 type propertyQueries struct {
 	resourceAccess
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 	handlers.TaraProjectStore
 	*propertyErrorStore
 	handlers.StatusReader
