@@ -11,38 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const canAccessItemDefinitions = `-- name: CanAccessItemDefinitions :one
-SELECT EXISTS (
-    SELECT 1 FROM project_role_assignment AS role
-    WHERE role.tara_project_id = $1
-      AND (role.user_id = $2 OR role.group_id IN (
-          SELECT group_id FROM iam_user_group_member WHERE user_id = $2
-      ))
-      AND ($3::boolean OR role.project_role IN ('OWNER', 'EDITOR'))
-)
-`
-
-type CanAccessItemDefinitionsParams struct {
-	ProjectID pgtype.UUID
-	UserID    pgtype.UUID
-	ReadOnly  bool
-}
-
-func (q *Queries) CanAccessItemDefinitions(ctx context.Context, arg CanAccessItemDefinitionsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, canAccessItemDefinitions, arg.ProjectID, arg.UserID, arg.ReadOnly)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const createItemDefinition = `-- name: CreateItemDefinition :one
 INSERT INTO item_definition (
-    tara_project_id, name, scope_type, lifecycle_phase,
+    tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment,
     item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design
 ) VALUES (
     $1, $2, $3, $4,
-    $5, $6, $7
-) RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+    $5, $6, $7,
+    $8, $9, $10
+) RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
 `
 
 type CreateItemDefinitionParams struct {
@@ -50,6 +27,9 @@ type CreateItemDefinitionParams struct {
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
+	Boundary                 *string
+	Functions                *string
+	OperationalEnvironment   *string
 	ItemDefinitionWp0901     *string
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string
@@ -61,6 +41,9 @@ func (q *Queries) CreateItemDefinition(ctx context.Context, arg CreateItemDefini
 		arg.Name,
 		arg.ScopeType,
 		arg.LifecyclePhase,
+		arg.Boundary,
+		arg.Functions,
+		arg.OperationalEnvironment,
 		arg.ItemDefinitionWp0901,
 		arg.CybersecuritySpecsWp1001,
 		arg.ArchitecturalDesign,
@@ -72,6 +55,9 @@ func (q *Queries) CreateItemDefinition(ctx context.Context, arg CreateItemDefini
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
 		&i.ItemDefinitionWp0901,
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
@@ -99,7 +85,7 @@ func (q *Queries) DeleteItemDefinition(ctx context.Context, arg DeleteItemDefini
 }
 
 const getItemDefinition = `-- name: GetItemDefinition :one
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
 WHERE tara_project_id = $1 AND id = $2
 `
 
@@ -117,6 +103,9 @@ func (q *Queries) GetItemDefinition(ctx context.Context, arg GetItemDefinitionPa
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
 		&i.ItemDefinitionWp0901,
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
@@ -126,7 +115,7 @@ func (q *Queries) GetItemDefinition(ctx context.Context, arg GetItemDefinitionPa
 }
 
 const listItemDefinitions = `-- name: ListItemDefinitions :many
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
 WHERE tara_project_id = $1
 ORDER BY created_at, id
 LIMIT $3 OFFSET $2
@@ -153,6 +142,9 @@ func (q *Queries) ListItemDefinitions(ctx context.Context, arg ListItemDefinitio
 			&i.Name,
 			&i.ScopeType,
 			&i.LifecyclePhase,
+			&i.Boundary,
+			&i.Functions,
+			&i.OperationalEnvironment,
 			&i.ItemDefinitionWp0901,
 			&i.CybersecuritySpecsWp1001,
 			&i.ArchitecturalDesign,
@@ -172,33 +164,48 @@ const patchItemDefinition = `-- name: PatchItemDefinition :one
 UPDATE item_definition SET
     name = COALESCE($1::text, name),
     scope_type = COALESCE($2::scope_type, scope_type),
-    lifecycle_phase = CASE WHEN $3::boolean THEN $4::text ELSE lifecycle_phase END,
-    item_definition_wp_09_01 = CASE WHEN $5::boolean THEN $6::text ELSE item_definition_wp_09_01 END,
-    cybersecurity_specs_wp_10_01 = CASE WHEN $7::boolean THEN $8::text ELSE cybersecurity_specs_wp_10_01 END,
-    architectural_design = CASE WHEN $9::boolean THEN $10::text ELSE architectural_design END
-WHERE tara_project_id = $11 AND id = $12
-RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+    boundary = CASE WHEN $3::boolean THEN $4::text ELSE boundary END,
+    functions = CASE WHEN $5::boolean THEN $6::text ELSE functions END,
+    operational_environment = CASE WHEN $7::boolean THEN $8::text ELSE operational_environment END,
+    lifecycle_phase = CASE WHEN $9::boolean THEN $10::text ELSE lifecycle_phase END,
+    item_definition_wp_09_01 = CASE WHEN $11::boolean THEN $12::text ELSE item_definition_wp_09_01 END,
+    cybersecurity_specs_wp_10_01 = CASE WHEN $13::boolean THEN $14::text ELSE cybersecurity_specs_wp_10_01 END,
+    architectural_design = CASE WHEN $15::boolean THEN $16::text ELSE architectural_design END
+WHERE tara_project_id = $17 AND id = $18
+RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
 `
 
 type PatchItemDefinitionParams struct {
-	Name                     *string
-	ScopeType                *ScopeType
-	SetLifecyclePhase        bool
-	LifecyclePhase           *string
-	SetItemDefinition        bool
-	ItemDefinitionWp0901     *string
-	SetCybersecuritySpecs    bool
-	CybersecuritySpecsWp1001 *string
-	SetArchitecturalDesign   bool
-	ArchitecturalDesign      *string
-	ProjectID                pgtype.UUID
-	ID                       pgtype.UUID
+	Name                      *string
+	ScopeType                 *ScopeType
+	SetBoundary               bool
+	Boundary                  *string
+	SetFunctions              bool
+	Functions                 *string
+	SetOperationalEnvironment bool
+	OperationalEnvironment    *string
+	SetLifecyclePhase         bool
+	LifecyclePhase            *string
+	SetItemDefinition         bool
+	ItemDefinitionWp0901      *string
+	SetCybersecuritySpecs     bool
+	CybersecuritySpecsWp1001  *string
+	SetArchitecturalDesign    bool
+	ArchitecturalDesign       *string
+	ProjectID                 pgtype.UUID
+	ID                        pgtype.UUID
 }
 
 func (q *Queries) PatchItemDefinition(ctx context.Context, arg PatchItemDefinitionParams) (ItemDefinition, error) {
 	row := q.db.QueryRow(ctx, patchItemDefinition,
 		arg.Name,
 		arg.ScopeType,
+		arg.SetBoundary,
+		arg.Boundary,
+		arg.SetFunctions,
+		arg.Functions,
+		arg.SetOperationalEnvironment,
+		arg.OperationalEnvironment,
 		arg.SetLifecyclePhase,
 		arg.LifecyclePhase,
 		arg.SetItemDefinition,
@@ -217,6 +224,9 @@ func (q *Queries) PatchItemDefinition(ctx context.Context, arg PatchItemDefiniti
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
 		&i.ItemDefinitionWp0901,
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
@@ -229,17 +239,23 @@ const replaceItemDefinition = `-- name: ReplaceItemDefinition :one
 UPDATE item_definition SET
     name = $1, scope_type = $2,
     lifecycle_phase = $3,
-    item_definition_wp_09_01 = $4,
-    cybersecurity_specs_wp_10_01 = $5,
-    architectural_design = $6
-WHERE tara_project_id = $7 AND id = $8
-RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+    boundary = $4,
+    functions = $5,
+    operational_environment = $6,
+    item_definition_wp_09_01 = $7,
+    cybersecurity_specs_wp_10_01 = $8,
+    architectural_design = $9
+WHERE tara_project_id = $10 AND id = $11
+RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
 `
 
 type ReplaceItemDefinitionParams struct {
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
+	Boundary                 *string
+	Functions                *string
+	OperationalEnvironment   *string
 	ItemDefinitionWp0901     *string
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string
@@ -252,6 +268,9 @@ func (q *Queries) ReplaceItemDefinition(ctx context.Context, arg ReplaceItemDefi
 		arg.Name,
 		arg.ScopeType,
 		arg.LifecyclePhase,
+		arg.Boundary,
+		arg.Functions,
+		arg.OperationalEnvironment,
 		arg.ItemDefinitionWp0901,
 		arg.CybersecuritySpecsWp1001,
 		arg.ArchitecturalDesign,
@@ -265,6 +284,9 @@ func (q *Queries) ReplaceItemDefinition(ctx context.Context, arg ReplaceItemDefi
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
 		&i.ItemDefinitionWp0901,
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,

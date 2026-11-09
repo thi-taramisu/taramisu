@@ -21,6 +21,7 @@ type healthQueries struct {
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {
@@ -28,10 +29,10 @@ func statusFunc(f func(context.Context) (string, error)) healthQueries {
 }
 
 func TestLiveness(t *testing.T) {
-	h := httpapi.New(healthStore{StatusReader: statusFunc(func(context.Context) (string, error) {
+	h := httpapi.New(statusFunc(func(context.Context) (string, error) {
 		t.Fatal("liveness must not query the database")
 		return "", nil
-	})}, nil)
+	}), nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health/live", http.NoBody))
 	if rr.Code != http.StatusOK {

@@ -185,6 +185,55 @@ internal/httpapi/handlers/     HTTP handlers
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
+## Item definitions
+
+All routes below require an Authentik-issued Bearer JWT and are under `/api/v1/projects/{project_id}/item-definitions`.
+
+| Method | Path suffix | Result |
+| --- | --- | --- |
+| GET | (none) | List items, with `limit` (default 50, maximum 100) and `offset` (default 0) |
+| POST | (none) | Create an item; return 201 and a `Location` header |
+| GET | `/{item_id}` | Read an item |
+| PUT | `/{item_id}` | Replace an existing item; omitted optional fields become null |
+| PATCH | `/{item_id}` | Update supplied fields; omitted fields stay unchanged |
+| DELETE | `/{item_id}` | Delete an item; return 204 |
+
+Create and replace require a nonblank `name` (up to 255 characters) and `scope_type`
+(`ITEM` or `COMPONENT`). Optional text fields are `lifecycle_phase`,
+`boundary`, `functions`, `operational_environment`, `item_definition_wp_09_01`,
+`cybersecurity_specs_wp_10_01`, and `architectural_design`.
+The three definition fields can be filled in independently after creating a draft item. The legacy
+`item_definition_wp_09_01` remains available for unstructured imported definitions; it is not synchronized
+with the three structured fields.
+PATCH accepts explicit `null` to clear optional fields; `name` and `scope_type` cannot be null.
+The database supplies `id` and `created_at`, which updates preserve.
+
+Use Swagger UI at `/api/docs` and authorize with a Bearer JWT to try the routes. Example
+request body for POST:
+
+```json
+{
+  "name": "Headlamp",
+  "scope_type": "ITEM",
+  "lifecycle_phase": "development"
+}
+```
+
+Access uses the [shared project authorization](../docs/internal/architecture/iam/project-roles.md):
+Viewers can read; Editors and Owners can create, replace, update, or delete. Direct assignments and
+assignable Authentik groups from the signed `taramisu_groups` token claim are supported.
+
+Invalid inputs return 422. Missing or inaccessible projects and items return 404; members whose role
+is too low receive 403. Deleting an item also deletes its assets, damage scenarios, threat scenarios,
+attack paths, and their dependent properties, links, ratings, risk values, and treatment decisions.
+The frontend must ask for confirmation before deletion. Responses use the existing problem JSON
+error format without database details.
+
+Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
+for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
+for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
+roll back their fixtures and do not require a live Authentik instance.
+
 ## OpenAPI contract
 
 With the Compose stack running: OpenAPI 3.1 at [http://localhost/openapi.json](http://localhost/openapi.json), Swagger UI at

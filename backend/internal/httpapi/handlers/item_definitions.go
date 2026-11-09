@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,14 +11,11 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
 // ItemDefinitionStore is implemented by the sqlc-generated queries.
 type ItemDefinitionStore interface {
-	CanAccessItemDefinitions(context.Context, db.CanAccessItemDefinitionsParams) (bool, error)
 	ListItemDefinitions(context.Context, db.ListItemDefinitionsParams) ([]db.ItemDefinition, error)
 	GetItemDefinition(context.Context, db.GetItemDefinitionParams) (db.ItemDefinition, error)
 	CreateItemDefinition(context.Context, db.CreateItemDefinitionParams) (db.ItemDefinition, error)
@@ -28,10 +24,13 @@ type ItemDefinitionStore interface {
 	DeleteItemDefinition(context.Context, db.DeleteItemDefinitionParams) (int64, error)
 }
 
-type ItemDefinitions struct{ store ItemDefinitionStore }
+type ItemDefinitions struct {
+	store  ItemDefinitionStore
+	access ProjectAccessStore
+}
 
-func NewItemDefinitions(store ItemDefinitionStore) *ItemDefinitions {
-	return &ItemDefinitions{store: store}
+func NewItemDefinitions(store ItemDefinitionStore, access ProjectAccessStore) *ItemDefinitions {
+	return &ItemDefinitions{store: store, access: access}
 }
 
 type ProjectPath struct {
@@ -52,6 +51,9 @@ type ListItemDefinitionsInput struct {
 type ItemDefinitionBody struct {
 	Name                     string       `json:"name" minLength:"1" maxLength:"255"`
 	ScopeType                db.ScopeType `json:"scope_type" enum:"ITEM,COMPONENT"`
+	Boundary                 *string      `json:"boundary,omitempty" nullable:"true"`
+	Functions                *string      `json:"functions,omitempty" nullable:"true"`
+	OperationalEnvironment   *string      `json:"operational_environment,omitempty" nullable:"true"`
 	LifecyclePhase           *string      `json:"lifecycle_phase,omitempty" nullable:"true"`
 	ItemDefinitionWP0901     *string      `json:"item_definition_wp_09_01,omitempty" nullable:"true"`
 	CybersecuritySpecsWP1001 *string      `json:"cybersecurity_specs_wp_10_01,omitempty" nullable:"true"`
@@ -67,29 +69,16 @@ type ReplaceItemDefinitionInput struct {
 	Body ItemDefinitionBody
 }
 
-// PatchText distinguishes an omitted field from an explicit JSON null.
-// Null clears optional text fields; omitted fields retain their existing values.
-type PatchText struct {
-	Sent  bool
-	Value *string
-}
-
-func (p *PatchText) UnmarshalJSON(data []byte) error {
-	p.Sent = true
-	return json.Unmarshal(data, &p.Value)
-}
-
-func (PatchText) Schema(huma.Registry) *huma.Schema {
-	return &huma.Schema{Type: "string", Nullable: true}
-}
-
 type PatchItemDefinitionBody struct {
-	Name                     PatchText `json:"name,omitempty" nullable:"false" minLength:"1" maxLength:"255"`
-	ScopeType                PatchText `json:"scope_type,omitempty" nullable:"false" enum:"ITEM,COMPONENT"`
-	LifecyclePhase           PatchText `json:"lifecycle_phase,omitempty"`
-	ItemDefinitionWP0901     PatchText `json:"item_definition_wp_09_01,omitempty"`
-	CybersecuritySpecsWP1001 PatchText `json:"cybersecurity_specs_wp_10_01,omitempty"`
-	ArchitecturalDesign      PatchText `json:"architectural_design,omitempty"`
+	Name                     Optional[string] `json:"name,omitempty" nullable:"false" minLength:"1" maxLength:"255"`
+	ScopeType                Optional[string] `json:"scope_type,omitempty" nullable:"false" enum:"ITEM,COMPONENT"`
+	Boundary                 Optional[string] `json:"boundary,omitempty"`
+	Functions                Optional[string] `json:"functions,omitempty"`
+	OperationalEnvironment   Optional[string] `json:"operational_environment,omitempty"`
+	LifecyclePhase           Optional[string] `json:"lifecycle_phase,omitempty"`
+	ItemDefinitionWP0901     Optional[string] `json:"item_definition_wp_09_01,omitempty"`
+	CybersecuritySpecsWP1001 Optional[string] `json:"cybersecurity_specs_wp_10_01,omitempty"`
+	ArchitecturalDesign      Optional[string] `json:"architectural_design,omitempty"`
 }
 
 type PatchItemDefinitionInput struct {
@@ -116,18 +105,11 @@ func itemDefinition(row db.ItemDefinition) ItemDefinition {
 		ID: row.ID.String(), TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
 		ItemDefinitionBody: ItemDefinitionBody{
 			Name: row.Name, ScopeType: row.ScopeType, LifecyclePhase: row.LifecyclePhase,
+			Boundary: row.Boundary, Functions: row.Functions, OperationalEnvironment: row.OperationalEnvironment,
 			ItemDefinitionWP0901: row.ItemDefinitionWp0901, CybersecuritySpecsWP1001: row.CybersecuritySpecsWp1001,
 			ArchitecturalDesign: row.ArchitecturalDesign,
 		},
 	}
-}
-
-func uuid(value string) (pgtype.UUID, error) {
-	var id pgtype.UUID
-	if err := id.Scan(value); err != nil || !id.Valid {
-		return id, huma.Error422UnprocessableEntity("invalid UUID")
-	}
-	return id, nil
 }
 
 func itemDefinitionError(err error) error {
@@ -142,31 +124,8 @@ func itemDefinitionError(err error) error {
 	return huma.Error500InternalServerError("could not process item definition")
 }
 
-func (h *ItemDefinitions) authorize(ctx context.Context, project string, readOnly bool) (pgtype.UUID, error) {
-	projectID, err := uuid(project)
-	if err != nil {
-		return projectID, err
-	}
-	userID, err := uuid(auth.UserFromContext(ctx).ID)
-	if err != nil {
-		return projectID, huma.Error401Unauthorized("authentication required")
-	}
-	allowed, err := h.store.CanAccessItemDefinitions(ctx, db.CanAccessItemDefinitionsParams{ProjectID: projectID, UserID: userID, ReadOnly: readOnly})
-	if err != nil {
-		return projectID, itemDefinitionError(err)
-	}
-	// Do not disclose whether an inaccessible project exists.
-	if !allowed {
-		return projectID, huma.Error404NotFound("project not found")
-	}
-	return projectID, nil
-}
-
 func (h *ItemDefinitions) List(ctx context.Context, in *ListItemDefinitionsInput) (*ListItemDefinitionsOutput, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, true)
-	if err != nil {
-		return nil, err
-	}
+	projectID := projectIDFromContext(ctx)
 	rows, err := h.store.ListItemDefinitions(ctx, db.ListItemDefinitionsParams{ProjectID: projectID, PageLimit: in.Limit, PageOffset: in.Offset})
 	if err != nil {
 		return nil, itemDefinitionError(err)
@@ -179,11 +138,8 @@ func (h *ItemDefinitions) List(ctx context.Context, in *ListItemDefinitionsInput
 }
 
 func (h *ItemDefinitions) Get(ctx context.Context, in *ItemDefinitionPath) (*ItemDefinitionOutput, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, true)
-	if err != nil {
-		return nil, err
-	}
-	id, err := uuid(in.ItemID)
+	projectID := projectIDFromContext(ctx)
+	id, err := parseUUID(in.ItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,15 +151,13 @@ func (h *ItemDefinitions) Get(ctx context.Context, in *ItemDefinitionPath) (*Ite
 }
 
 func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionInput) (*CreateItemDefinitionOutput, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, false)
-	if err != nil {
-		return nil, err
-	}
+	projectID := projectIDFromContext(ctx)
 	if strings.TrimSpace(in.Body.Name) == "" {
 		return nil, huma.Error422UnprocessableEntity("name must not be blank")
 	}
 	row, err := h.store.CreateItemDefinition(ctx, db.CreateItemDefinitionParams{
 		ProjectID: projectID, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
+		Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
 		LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
 		CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
 	})
@@ -214,11 +168,8 @@ func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionIn
 }
 
 func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinitionInput) (*ItemDefinitionOutput, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, false)
-	if err != nil {
-		return nil, err
-	}
-	id, err := uuid(in.ItemID)
+	projectID := projectIDFromContext(ctx)
+	id, err := parseUUID(in.ItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +178,7 @@ func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinition
 	}
 	row, err := h.store.ReplaceItemDefinition(ctx, db.ReplaceItemDefinitionParams{
 		ProjectID: projectID, ID: id, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
+		Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
 		LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
 		CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
 	})
@@ -237,20 +189,17 @@ func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinition
 }
 
 func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInput) (*ItemDefinitionOutput, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, false)
-	if err != nil {
-		return nil, err
-	}
-	id, err := uuid(in.ItemID)
+	projectID := projectIDFromContext(ctx)
+	id, err := parseUUID(in.ItemID)
 	if err != nil {
 		return nil, err
 	}
 	body := in.Body
-	if body.Name.Sent && (body.Name.Value == nil || strings.TrimSpace(*body.Name.Value) == "") {
+	if body.Name.Set && (body.Name.Value == nil || strings.TrimSpace(*body.Name.Value) == "") {
 		return nil, huma.Error422UnprocessableEntity("name must not be null or blank")
 	}
 	var scope *db.ScopeType
-	if body.ScopeType.Sent {
+	if body.ScopeType.Set {
 		if body.ScopeType.Value == nil || (*body.ScopeType.Value != "ITEM" && *body.ScopeType.Value != "COMPONENT") {
 			return nil, huma.Error422UnprocessableEntity("scope_type must be ITEM or COMPONENT")
 		}
@@ -259,10 +208,13 @@ func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInpu
 	}
 	row, err := h.store.PatchItemDefinition(ctx, db.PatchItemDefinitionParams{
 		ProjectID: projectID, ID: id, Name: body.Name.Value, ScopeType: scope,
-		SetLifecyclePhase: body.LifecyclePhase.Sent, LifecyclePhase: body.LifecyclePhase.Value,
-		SetItemDefinition: body.ItemDefinitionWP0901.Sent, ItemDefinitionWp0901: body.ItemDefinitionWP0901.Value,
-		SetCybersecuritySpecs: body.CybersecuritySpecsWP1001.Sent, CybersecuritySpecsWp1001: body.CybersecuritySpecsWP1001.Value,
-		SetArchitecturalDesign: body.ArchitecturalDesign.Sent, ArchitecturalDesign: body.ArchitecturalDesign.Value,
+		SetBoundary: body.Boundary.Set, Boundary: body.Boundary.Value,
+		SetFunctions: body.Functions.Set, Functions: body.Functions.Value,
+		SetOperationalEnvironment: body.OperationalEnvironment.Set, OperationalEnvironment: body.OperationalEnvironment.Value,
+		SetLifecyclePhase: body.LifecyclePhase.Set, LifecyclePhase: body.LifecyclePhase.Value,
+		SetItemDefinition: body.ItemDefinitionWP0901.Set, ItemDefinitionWp0901: body.ItemDefinitionWP0901.Value,
+		SetCybersecuritySpecs: body.CybersecuritySpecsWP1001.Set, CybersecuritySpecsWp1001: body.CybersecuritySpecsWP1001.Value,
+		SetArchitecturalDesign: body.ArchitecturalDesign.Set, ArchitecturalDesign: body.ArchitecturalDesign.Value,
 	})
 	if err != nil {
 		return nil, itemDefinitionError(err)
@@ -271,11 +223,8 @@ func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInpu
 }
 
 func (h *ItemDefinitions) Delete(ctx context.Context, in *ItemDefinitionPath) (*struct{}, error) {
-	projectID, err := h.authorize(ctx, in.ProjectID, false)
-	if err != nil {
-		return nil, err
-	}
-	id, err := uuid(in.ItemID)
+	projectID := projectIDFromContext(ctx)
+	id, err := parseUUID(in.ItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,12 +244,12 @@ func (h *ItemDefinitions) Register(api huma.API) {
 	operation := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
 			DefaultStatus: status, Tags: []string{"Item definitions"},
-			Security: []map[string][]string{{"session": {}}}, Errors: []int{401, 404, 409, 422, 500, 503}}
+			Security: []map[string][]string{{"bearer": {}}}, Errors: []int{401, 404, 409, 422, 500, 503}}
 	}
-	huma.Register(api, operation("list-item-definitions", http.MethodGet, collection, "List item definitions", 200), h.List)
-	huma.Register(api, operation("create-item-definition", http.MethodPost, collection, "Create an item definition", 201), h.Create)
-	huma.Register(api, operation("get-item-definition", http.MethodGet, member, "Get an item definition", 200), h.Get)
-	huma.Register(api, operation("replace-item-definition", http.MethodPut, member, "Replace an item definition", 200), h.Replace)
-	huma.Register(api, operation("patch-item-definition", http.MethodPatch, member, "Update selected item definition fields", 200), h.Patch)
-	huma.Register(api, operation("delete-item-definition", http.MethodDelete, member, "Delete an item definition", 204), h.Delete)
+	Register(api, operation("list-item-definitions", http.MethodGet, collection, "List item definitions", 200), InProject(h.access, ScopeProject("project_id"), PermRead), h.List)
+	Register(api, operation("create-item-definition", http.MethodPost, collection, "Create an item definition", 201), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Create)
+	Register(api, operation("get-item-definition", http.MethodGet, member, "Get an item definition", 200), InProject(h.access, ScopeProject("project_id"), PermRead), h.Get)
+	Register(api, operation("replace-item-definition", http.MethodPut, member, "Replace an item definition", 200), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Replace)
+	Register(api, operation("patch-item-definition", http.MethodPatch, member, "Update selected item definition fields", 200), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Patch)
+	Register(api, operation("delete-item-definition", http.MethodDelete, member, "Delete an item definition", 204), InProject(h.access, ScopeProject("project_id"), PermEdit), h.Delete)
 }

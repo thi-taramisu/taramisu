@@ -2,39 +2,39 @@ package handlers_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
-const projectID = "11111111-1111-4111-8111-111111111111"
-const itemID = "22222222-2222-4222-8222-222222222222"
-const userID = "33333333-3333-4333-8333-333333333333"
-const collection = "/api/v1/projects/" + projectID + "/item-definitions"
-const member = collection + "/" + itemID
+const itemProjectID = "11111111-1111-4111-8111-111111111111"
+const itemDefinitionID = "22222222-2222-4222-8222-222222222222"
+const itemUserID = "33333333-3333-4333-8333-333333333333"
+const itemCollection = "/api/v1/projects/" + itemProjectID + "/item-definitions"
+const itemMember = itemCollection + "/" + itemDefinitionID
 
 type itemStore struct {
+	handlers.TaraProjectStore
+	handlers.ProjectAccessStore
+	handlers.ProjectMemberStore
 	handlers.StatusReader
-	allowed bool
+	role    db.ProjectRole
 	err     error
 	calls   int
-	access  db.CanAccessItemDefinitionsParams
+	access  db.GetProjectRoleParams
 	patch   db.PatchItemDefinitionParams
 	replace db.ReplaceItemDefinitionParams
 	row     db.ItemDefinition
@@ -43,18 +43,21 @@ type itemStore struct {
 
 func newItemStore() *itemStore {
 	var project, item pgtype.UUID
-	if err := project.Scan(projectID); err != nil {
+	if err := project.Scan(itemProjectID); err != nil {
 		panic(err)
 	}
-	if err := item.Scan(itemID); err != nil {
+	if err := item.Scan(itemDefinitionID); err != nil {
 		panic(err)
 	}
-	return &itemStore{allowed: true, count: 1, row: db.ItemDefinition{ID: item, TaraProjectID: project, Name: "Headlamp", ScopeType: db.ScopeTypeITEM, CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}}}
+	return &itemStore{role: db.ProjectRoleEDITOR, count: 1, row: db.ItemDefinition{ID: item, TaraProjectID: project, Name: "Headlamp", ScopeType: db.ScopeTypeITEM, CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}}}
 }
-func (*itemStore) UpsertIAMUser(context.Context, string) (string, error) { return userID, nil }
-func (s *itemStore) CanAccessItemDefinitions(_ context.Context, p db.CanAccessItemDefinitionsParams) (bool, error) {
+func (*itemStore) UpsertIAMUser(context.Context, string) (string, error) { return itemUserID, nil }
+func (s *itemStore) GetProjectRole(_ context.Context, p db.GetProjectRoleParams) (db.ProjectRole, error) {
 	s.access = p
-	return s.allowed, nil
+	if s.role == "" {
+		return "", pgx.ErrNoRows
+	}
+	return s.role, nil
 }
 func (s *itemStore) ListItemDefinitions(context.Context, db.ListItemDefinitionsParams) ([]db.ItemDefinition, error) {
 	s.calls++
@@ -88,95 +91,21 @@ func (s *itemStore) DeleteItemDefinition(context.Context, db.DeleteItemDefinitio
 	return s.count, s.err
 }
 
-// Authenticate through the same OIDC/session flow used by the protected API.
-func authenticatedAPI(t *testing.T, store httpapi.Store, users auth.UserStore) (http.Handler, *http.Cookie) {
+// Authenticate through the same Bearer JWT middleware used by the protected API.
+func authenticatedAPI(t *testing.T, store httpapi.Queries, users auth.UserStore) (http.Handler, *string) {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var issuer, nonce string
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		var value any
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			value = map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/keys", "id_token_signing_alg_values_supported": []string{"RS256"}}
-		case "/keys":
-			value = jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}
-		case "/token":
-			payload, err := json.Marshal(map[string]any{"iss": issuer, "sub": "crud-test-user", "aud": "taramisu", "nonce": nonce, "exp": time.Now().Add(time.Hour).Unix()})
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			signed, err := signer.Sign(payload)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			raw, err := signed.CompactSerialize()
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			value = map[string]string{"access_token": "test", "token_type": "Bearer", "id_token": raw}
-		default:
-			http.NotFound(w, r)
-			return
-		}
-		if err := json.NewEncoder(w).Encode(value); err != nil {
-			t.Error(err)
-		}
-	}))
-	t.Cleanup(provider.Close)
-	issuer = provider.URL
-	manager, err := auth.New(context.Background(), auth.Config{Issuer: issuer, ClientID: "taramisu", ClientSecret: "test-secret", AppURL: "http://localhost:8080"}, users)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler := httpapi.New(store, manager)
-	login := request(handler, http.MethodGet, "/auth/login", "", nil)
-	redirect, err := url.Parse(login.Header().Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	nonce = redirect.Query().Get("nonce")
-	result := login.Result()
-	cookies := result.Cookies()
-	if err := result.Body.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if len(cookies) == 0 {
-		t.Fatal("missing login cookie")
-	}
-	callback := request(handler, http.MethodGet, "/auth/callback?code=test&state="+url.QueryEscape(redirect.Query().Get("state")), "", cookies[0])
-	result = callback.Result()
-	t.Cleanup(func() {
-		if err := result.Body.Close(); err != nil {
-			t.Error(err)
-		}
-	})
-	for _, cookie := range result.Cookies() {
-		if cookie.Name == "taramisu_session" {
-			return handler, cookie
-		}
-	}
-	t.Fatalf("login failed: %d %s", callback.Code, callback.Body.String())
-	return nil, nil
+	fixture := authtest.NewFixture(t, users)
+	token := "Bearer " + fixture.Token(t, nil)
+	return httpapi.New(store, fixture.Manager), &token
 }
 
-func request(handler http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+func request(handler http.Handler, method, path, body string, token *string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	if body != "" {
 		r.Header.Set("Content-Type", "application/json")
 	}
-	if cookie != nil {
-		r.AddCookie(cookie)
+	if token != nil {
+		r.Header.Set("Authorization", *token)
 	}
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -185,35 +114,35 @@ func request(handler http.Handler, method, path, body string, cookie *http.Cooki
 
 func TestItemDefinitionRoutes(t *testing.T) {
 	store := newItemStore()
-	handler, cookie := authenticatedAPI(t, store, store)
+	handler, token := authenticatedAPI(t, store, store)
 	for _, tc := range []struct {
 		method, path, body string
 		code               int
 	}{
-		{"POST", collection, `{"name":"Headlamp","scope_type":"ITEM"}`, 201},
-		{"GET", member, "", 200},
-		{"GET", collection, "", 200},
-		{"PUT", member, `{"name":"Replacement","scope_type":"COMPONENT"}`, 200},
-		{"PATCH", member, `{"name":"Updated","lifecycle_phase":null,"architectural_design":"diagram"}`, 200},
-		{"DELETE", member, "", 204},
+		{"POST", itemCollection, `{"name":"Headlamp","scope_type":"ITEM"}`, 201},
+		{"GET", itemMember, "", 200},
+		{"GET", itemCollection, "", 200},
+		{"PUT", itemMember, `{"name":"Replacement","scope_type":"COMPONENT"}`, 200},
+		{"PATCH", itemMember, `{"name":"Updated","lifecycle_phase":null,"architectural_design":"diagram"}`, 200},
+		{"DELETE", itemMember, "", 204},
 	} {
 		t.Run(tc.method+tc.path, func(t *testing.T) {
 			unauthorized := request(handler, tc.method, tc.path, tc.body, nil)
 			if unauthorized.Code != 401 {
 				t.Fatalf("unauthenticated: %d", unauthorized.Code)
 			}
-			w := request(handler, tc.method, tc.path, tc.body, cookie)
+			w := request(handler, tc.method, tc.path, tc.body, token)
 			if w.Code != tc.code {
 				t.Fatalf("got %d: %s", w.Code, w.Body.String())
 			}
-			if store.access.ProjectID.String() != projectID || store.access.UserID.String() != userID || store.access.ReadOnly != (tc.method == "GET") {
+			if store.access.ProjectID.String() != itemProjectID || store.access.UserID.String() != itemUserID {
 				t.Fatalf("wrong access check: %+v", store.access)
 			}
-			if tc.method == "POST" && w.Header().Get("Location") != member {
+			if tc.method == "POST" && w.Header().Get("Location") != itemMember {
 				t.Fatalf("Location: %s", w.Header().Get("Location"))
 			}
-			if tc.method == "GET" && tc.path == collection && strings.TrimSpace(w.Body.String()) != "[]" {
-				t.Fatalf("empty collection: %s", w.Body.String())
+			if tc.method == "GET" && tc.path == itemCollection && strings.TrimSpace(w.Body.String()) != "[]" {
+				t.Fatalf("empty itemCollection: %s", w.Body.String())
 			}
 			if tc.method == "PUT" && store.replace.LifecyclePhase != nil {
 				t.Fatal("replacement retained omitted optional field")
@@ -230,24 +159,24 @@ func TestItemDefinitionRoutes(t *testing.T) {
 
 func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	store := newItemStore()
-	handler, cookie := authenticatedAPI(t, store, store)
+	handler, token := authenticatedAPI(t, store, store)
 	for _, tc := range []struct{ method, path, body string }{
-		{"POST", collection, `{"name":"","scope_type":"ITEM"}`},
-		{"POST", collection, `{"name":"   ","scope_type":"ITEM"}`},
-		{"POST", collection, `{"name":"A","scope_type":"INVALID"}`},
-		{"POST", collection, `{"name":"A"}`},
-		{"PUT", member, `{"scope_type":"ITEM"}`},
-		{"PATCH", member, `{"name":null}`},
-		{"PATCH", member, `{"scope_type":null}`},
-		{"PATCH", member, `{"scope_type":"INVALID"}`},
-		{"PATCH", member, `{"lifecycle_phase":123}`},
-		{"PATCH", member, `{"unknown":"field"}`},
-		{"GET", collection + "?limit=101", ""},
-		{"GET", collection + "?offset=-1", ""},
-		{"GET", collection + "/not-a-uuid", ""},
+		{"POST", itemCollection, `{"name":"","scope_type":"ITEM"}`},
+		{"POST", itemCollection, `{"name":"   ","scope_type":"ITEM"}`},
+		{"POST", itemCollection, `{"name":"A","scope_type":"INVALID"}`},
+		{"POST", itemCollection, `{"name":"A"}`},
+		{"PUT", itemMember, `{"scope_type":"ITEM"}`},
+		{"PATCH", itemMember, `{"name":null}`},
+		{"PATCH", itemMember, `{"scope_type":null}`},
+		{"PATCH", itemMember, `{"scope_type":"INVALID"}`},
+		{"PATCH", itemMember, `{"lifecycle_phase":123}`},
+		{"PATCH", itemMember, `{"unknown":"field"}`},
+		{"GET", itemCollection + "?limit=101", ""},
+		{"GET", itemCollection + "?offset=-1", ""},
+		{"GET", itemCollection + "/not-a-uuid", ""},
 		{"GET", "/api/v1/projects/invalid/item-definitions", ""},
 	} {
-		w := request(handler, tc.method, tc.path, tc.body, cookie)
+		w := request(handler, tc.method, tc.path, tc.body, token)
 		if w.Code != 422 {
 			t.Errorf("%s %s %s: got %d %s", tc.method, tc.path, tc.body, w.Code, w.Body.String())
 		}
@@ -255,13 +184,13 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	if store.calls != 0 {
 		t.Fatal("invalid request reached storage")
 	}
-	store.allowed = false
+	store.role = ""
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
-		path, body := member, `{"name":"A","scope_type":"ITEM"}`
+		path, body := itemMember, `{"name":"A","scope_type":"ITEM"}`
 		if method == "POST" {
-			path = collection
+			path = itemCollection
 		}
-		w := request(handler, method, path, body, cookie)
+		w := request(handler, method, path, body, token)
 		if w.Code != 404 {
 			t.Errorf("inaccessible project %s: %d", method, w.Code)
 		}
@@ -269,7 +198,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	if store.calls != 0 {
 		t.Fatal("unauthorized request reached storage")
 	}
-	store.allowed = true
+	store.role = db.ProjectRoleEDITOR
 	for _, tc := range []struct {
 		err  error
 		code int
@@ -280,11 +209,11 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	} {
 		store.err = tc.err
 		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
-			path := member
+			path := itemMember
 			if method == "POST" {
-				path = collection
+				path = itemCollection
 			}
-			w := request(handler, method, path, `{"name":"A","scope_type":"ITEM"}`, cookie)
+			w := request(handler, method, path, `{"name":"A","scope_type":"ITEM"}`, token)
 			if w.Code != tc.code || strings.Contains(w.Body.String(), "private database details") {
 				t.Errorf("%s error: %d %s", method, w.Code, w.Body.String())
 			}
@@ -292,7 +221,7 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 	}
 	store.err = nil
 	store.count = 0
-	if w := request(handler, "DELETE", member, "", cookie); w.Code != 404 {
+	if w := request(handler, "DELETE", itemMember, "", token); w.Code != 404 {
 		t.Fatalf("missing delete: %d", w.Code)
 	}
 }
@@ -308,21 +237,59 @@ func TestItemDefinitionOpenAPI(t *testing.T) {
 			t.Fatalf("missing path %s", path)
 		}
 		for _, method := range methods {
-			var operationSecurity int
+			var operation *huma.Operation
 			switch method {
 			case "GET":
-				operationSecurity = len(item.Get.Security)
+				operation = item.Get
 			case "POST":
-				operationSecurity = len(item.Post.Security)
+				operation = item.Post
 			case "PUT":
-				operationSecurity = len(item.Put.Security)
+				operation = item.Put
 			case "PATCH":
-				operationSecurity = len(item.Patch.Security)
+				operation = item.Patch
 			case "DELETE":
-				operationSecurity = len(item.Delete.Security)
+				operation = item.Delete
 			}
-			if operationSecurity == 0 {
-				t.Errorf("missing authentication: %s %s", method, path)
+			want := "edit"
+			if method == http.MethodGet {
+				want = "read"
+			}
+			if operation.Extensions["x-taramisu-permission"] != want {
+				t.Errorf("wrong project permission: %s %s: %+v", method, path, operation.Extensions)
+			}
+			if len(operation.Security) != 1 || operation.Security[0]["bearer"] == nil {
+				t.Errorf("missing Bearer JWT authentication: %s %s", method, path)
+			}
+		}
+	}
+}
+
+func TestItemDefinitionPermissions(t *testing.T) {
+	store := newItemStore()
+	handler, token := authenticatedAPI(t, store, store)
+	for _, role := range []db.ProjectRole{"", db.ProjectRoleVIEWER, db.ProjectRoleEDITOR, db.ProjectRoleOWNER} {
+		store.role = role
+		for _, route := range []struct {
+			method, path string
+			success      int
+		}{
+			{"GET", itemCollection, 200}, {"GET", itemMember, 200},
+			{"POST", itemCollection, 201}, {"PUT", itemMember, 200},
+			{"PATCH", itemMember, 200}, {"DELETE", itemMember, 204},
+		} {
+			want := route.success
+			if role == "" {
+				want = 404
+			} else if role == db.ProjectRoleVIEWER && route.method != "GET" {
+				want = 403
+			}
+			before := store.calls
+			w := request(handler, route.method, route.path, `{"name":"Item","scope_type":"ITEM"}`, token)
+			if w.Code != want {
+				t.Errorf("%s %s %s: got %d, want %d: %s", role, route.method, route.path, w.Code, want, w.Body.String())
+			}
+			if want >= 400 && store.calls != before {
+				t.Fatal("denied request reached storage")
 			}
 		}
 	}
