@@ -40,7 +40,8 @@ export function WorkspaceLayout() {
             <p className="px-2 py-3 text-sm text-muted-foreground">{tree.isError ? 'The elements could not be loaded.' : 'Loading…'}</p>
           )}
         </ResizableSidebar>
-        <main className="min-w-0 flex-1 overflow-y-auto p-6">
+        {/* relative keeps absolutely positioned content such as sr-only text inside the scroll area; it would extend the page otherwise. */}
+        <main className="relative min-w-0 flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>

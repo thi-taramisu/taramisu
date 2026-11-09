@@ -10,9 +10,9 @@ import {
 } from '../../api/queries/items'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
+import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
 
-const SAVE_ERROR = 'The link could not be changed. Please try again.'
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
 export function DamageScenarioRelationsTab() {
@@ -55,11 +55,12 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         direction="up"
         title="Assets"
         elementLabel="Asset"
+        removeEffect={LINK_REMOVE_WITH_TARGETS}
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
         pending={assetLink.isPending}
         candidatesLoading={itemAssets.isPending}
         candidatesError={itemAssets.isLoadingError ? 'The assets of this item could not be loaded.' : undefined}
-        error={assetLink.isError ? SAVE_ERROR : undefined}
+        error={assetLink.isError ? LINK_SAVE_ERROR : undefined}
         // New links start with all properties of the asset, as in the create dialog; they are refined in the table.
         onAdd={(assetId) => {
           const properties = assetCandidates.find((asset) => asset.id === assetId)?.properties ?? []
@@ -88,11 +89,12 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         direction="down"
         title="Threat Scenarios"
         elementLabel="Threat Scenario"
+        removeEffect={LINK_REMOVE_WITH_TARGETS}
         candidates={threatCandidates}
         pending={threatLink.isPending}
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
-        error={threatLink.isError ? SAVE_ERROR : undefined}
+        error={threatLink.isError ? LINK_SAVE_ERROR : undefined}
         onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
         onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
         rows={threats}

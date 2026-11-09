@@ -38,8 +38,8 @@ describe('routing', () => {
       ENTITY_TYPES[type].tabs.filter((t) => t.path).map((t) => [type, t.path, t.label] as const),
     ),
   )('routes %s tab "%s"', async (type, path, label) => {
-    // Item and damage scenario pages load the element from the API, so they need an existing one.
-    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01' }
+    // Item and scenario pages load the element from the API, so they need an existing one.
+    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01' }
     renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
 
     const tabs = await screen.findByRole('navigation', { name: `${ENTITY_TYPES[type].label} tabs` })
@@ -49,7 +49,7 @@ describe('routing', () => {
   it('switches between tabs', async () => {
     const { user } = renderAt(`${project}/threat-scenarios/ts-01`)
 
-    await user.click(screen.getByRole('link', { name: 'Treatment' }))
+    await user.click(await screen.findByRole('link', { name: 'Treatment' }))
 
     expect(screen.getByText('Treatment: not implemented yet')).toBeInTheDocument()
   })
