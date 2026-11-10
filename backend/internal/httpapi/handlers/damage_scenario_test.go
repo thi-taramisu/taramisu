@@ -41,6 +41,9 @@ type fakeDamage struct {
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
 	statusReaderFunc
 	found bool
 	err   error

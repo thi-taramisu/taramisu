@@ -24,6 +24,9 @@ type fakeProjects struct {
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 	statusReaderFunc
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
