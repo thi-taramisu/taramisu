@@ -38,7 +38,7 @@ verify that the entity's owning item belongs to the requested project; the curre
 | `/login` | Login | | public, depends on the IAM decision (#46), not routed yet |
 | `/projects` | Project list | Project / Start | user |
 | `/projects/:projectId/settings` | Project settings, General | Project Settings (1) | manage |
-| `/projects/:projectId/settings/members` | Project settings, Members | Project Settings (2) | manage |
+| `/projects/:projectId/settings/members` | Project settings, Members | Project Settings (2) | read, changes need manage |
 | `/projects/:projectId` | Project workspace (header, element tree, empty content) | Add Items / Layout | read |
 | `/projects/:projectId/items/:itemId` | Item: Definition (form, supporting files, React Flow diagram) | Items / Item Definition | read, edit needs write |
 | `…/items/:itemId/assets` | Item: Assets table | Items / Item Assets | read |
@@ -55,8 +55,9 @@ verify that the entity's owning item belongs to the requested project; the curre
 | any element route + `?view=graph` | Graph view of the element and its relations | Graph Concept | read |
 | `*` | Not found | | public |
 
-Auth values: public means no login, user means logged in, and read, write and manage are the project access levels (as in the old THIARA
-tool). Route guards come with the IAM decision (#46).
+Auth values: public means no login, user means logged in, and read, write and manage are the project permissions from
+[project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
+Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 Everything else renders a placeholder. Items come from the item API in `frontend/src/api/`, an in-memory mock

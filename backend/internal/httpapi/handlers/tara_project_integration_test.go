@@ -38,8 +38,11 @@ func TestTaraProjectPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	manager, bearer := authtest.NewManagerAndToken(t)
-	handler := httpapi.New(db.New(tx), manager)
+	// Use the database as user store: creating a project assigns the caller as Owner,
+	// which needs a real iam_user row.
+	fixture := authtest.NewFixture(t, db.New(tx))
+	bearer := "Bearer " + fixture.Token(t, nil)
+	handler := httpapi.New(db.New(tx), fixture.Manager)
 	call := func(method, path, body string, want int) handlers.TaraProjectBody {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
