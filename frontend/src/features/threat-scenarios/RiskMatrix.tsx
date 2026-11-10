@@ -38,7 +38,7 @@ export function RiskMatrix({ impact, feasibility }: { impact: RatedImpact; feasi
                   className={cn(
                     'h-7 w-14 rounded-md border text-center font-medium tabular-nums',
                     RISK_CLASSES[value],
-                    current ? 'ring-2 ring-foreground ring-offset-1 ring-offset-background' : 'opacity-60',
+                    current && 'ring-2 ring-foreground ring-offset-1 ring-offset-background',
                   )}
                 >
                   {value}
