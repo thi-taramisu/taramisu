@@ -1,16 +1,17 @@
 import { useId, useState } from 'react'
-import { ArrowRight, ChevronDown, TriangleAlert } from 'lucide-react'
+import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import type { AttackFeasibility } from '../../api/models/attackPath'
 import type { ThreatScenarioRiskInputs } from '../../api/models/threatScenario'
 import { useThreatScenarioRiskInputs } from '../../api/queries/items'
 import { FEASIBILITY } from '../attack-paths/attackFeasibility'
 import { FeasibilityBadge } from '../attack-paths/FeasibilityBadge'
 import { CIA_PROPERTIES } from '../assets/ciaProperties'
-import { IMPACT_CLASSES, categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
+import { categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
 import { RiskBadge } from '../items/RiskBadge'
 import { entityPath } from '../workspace/entities'
 import { RiskCalculationDetails } from './RiskCalculationDetails'
@@ -35,6 +36,20 @@ export function ThreatScenarioRisksTab() {
   ) : (
     <RiskValues projectId={projectId} threatScenarioId={entityId} result={result} />
   )
+}
+
+// Solid dots in the rating colours; the label next to them always names the rating.
+const IMPACT_DOTS: Record<NonNullable<RiskRow['impact']>, string> = {
+  SEVERE: 'bg-impact-severe-border',
+  MAJOR: 'bg-impact-major-border',
+  MODERATE: 'bg-impact-moderate-border',
+  NEGLIGIBLE: 'bg-impact-negligible-border',
+}
+const FEASIBILITY_DOTS: Record<AttackFeasibility, string> = {
+  HIGH: 'bg-feasibility-high-border',
+  MEDIUM: 'bg-feasibility-medium-border',
+  LOW: 'bg-feasibility-low-border',
+  VERY_LOW: 'bg-feasibility-very-low-border',
 }
 
 type RatedRow = RiskRow & { impact: NonNullable<RiskRow['impact']>; risk: number }
@@ -154,12 +169,10 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
       </div>
       <>
           {/* Column labels for the rows: each one reads "impact × feasibility → risk". */}
-          <div aria-hidden="true" className="flex gap-x-4 px-4 pt-2 text-xs text-muted-foreground">
+          <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-xs text-muted-foreground">
             <span className="w-28">Category</span>
-            <span className="w-24 text-center">Impact</span>
-            <span className="w-2" />
-            <span className="w-24 text-center">Feasibility</span>
-            <span className="w-3.5" />
+            <span className="w-28">Impact</span>
+            <span className="w-28">Feasibility</span>
             <span>Risk</span>
           </div>
         <ul className="divide-y">
@@ -174,29 +187,27 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
               >
                 <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                   <span className="w-28 font-medium">{categoryLabel(row.category)}</span>
-                  {/* The inputs link to where they are rated and differ in shape from the result. */}
+                  {/* The inputs are plain values that link to where they are rated; the result is the badge. */}
                   <Link
                     to={impactPath}
                     title={`Rated on the Impact tab of ${row.damageScenario.code}`}
-                    className={`inline-flex h-6 w-24 items-center justify-center rounded-md border text-xs hover:underline ${IMPACT_CLASSES[row.impact]}`}
+                    className="flex w-28 items-center gap-2 hover:underline"
                   >
+                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${IMPACT_DOTS[row.impact]}`} />
                     {impactLabel(row.impact)}{' '}
                     <span className="sr-only">impact</span>
                   </Link>
-                  <span aria-hidden="true" className="w-2 text-center text-muted-foreground">
-                    ×
-                  </span>
                   {feasibility.decisive && (
                     <Link
                       to={`${entityPath(projectId, 'attack-paths', feasibility.decisive.id)}/rating`}
                       title={`Rated on the Rating tab of ${feasibility.decisive.code}, the most feasible attack path`}
-                      className={`inline-flex h-6 w-24 items-center justify-center rounded-md border text-xs hover:underline ${FEASIBILITY[feasibility.feasibility].classes}`}
+                      className="flex w-28 items-center gap-2 hover:underline"
                     >
+                      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${FEASIBILITY_DOTS[feasibility.feasibility]}`} />
                       {FEASIBILITY[feasibility.feasibility].label}{' '}
                       <span className="sr-only">feasibility</span>
                     </Link>
                   )}
-                  <ArrowRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
                   <RiskBadge value={row.risk} />
                   {isHighest && <span className="text-xs font-medium text-muted-foreground">Highest</span>}
                   <CollapsibleTrigger asChild>
@@ -220,10 +231,8 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
           {notRated.map((row) => (
             <li key={row.key} className="flex min-h-11 flex-wrap items-center gap-x-4 px-4 text-sm text-muted-foreground">
               <span className="w-28">{categoryLabel(row.category)}</span>
-              <Link
-                to={impactPath}
-                className="inline-flex h-6 w-24 items-center justify-center rounded-md border border-dashed border-foreground/30 text-xs text-foreground hover:bg-muted"
-              >
+              <Link to={impactPath} className="flex w-28 items-center gap-2 hover:underline">
+                <span aria-hidden="true" className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground" />
                 Not rated
               </Link>
             </li>
