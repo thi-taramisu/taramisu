@@ -61,6 +61,27 @@ export function createMockThreatScenarioService(db: Map<string, StoredItem>): Th
         const { entry, scenario } = findThreatScenario(projectId, threatScenarioId)
         return relationsOf(entry, scenario.id)
       }),
+    riskInputs: (projectId, threatScenarioId) =>
+      run(() => {
+        const { entry, scenario } = findThreatScenario(projectId, threatScenarioId)
+        const { damageScenarios, attackPaths, targets } = relationsOf(entry, scenario.id)
+        return {
+          damageScenarios: damageScenarios.map(({ id, code, name, causes }) => ({
+            id,
+            code,
+            name,
+            targetedCauses: causes.filter((cause) => targets.some((target) => target.assetId === cause.asset.id && target.property === cause.property)),
+            impactRatings: entry.impactRatings
+              .filter((rating) => rating.damage_scenario_id === id)
+              .map(({ impact_category, rating_value, omission_or_rating_rationale }) => ({ impact_category, rating_value, omission_or_rating_rationale })),
+          })),
+          attackPaths: attackPaths.map((path) => ({
+            ...path,
+            feasibility: entry.attackFeasibilityRatings.find((rating) => rating.attack_path_id === path.id)?.feasibility_rating ?? null,
+            isPartial: entry.attackPaths.find((ap) => ap.id === path.id)?.is_partial_early_stage ?? false,
+          })),
+        }
+      }),
     linkDamageScenario: (projectId, threatScenarioId, damageScenarioId) =>
       run(() => {
         const { entry, scenario } = findThreatScenario(projectId, threatScenarioId)

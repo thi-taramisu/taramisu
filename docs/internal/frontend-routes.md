@@ -69,7 +69,8 @@ built from `frontend/src/features/relations/`, which the threat scenario and att
 without a link are not in the tree until the "Unassigned" group exists; threat scenarios stay available in "+ Add Threat Scenario".
 
 The threat scenario page (#194) has the Definition tab (name, cause, elicitation, technical notes, targets) and the Relations tab (damage
-scenarios, attack paths), both on the mock API. Its Risks and Treatment tabs are still placeholders.
+scenarios, attack paths), both on the mock API. Its Risks tab calculates the risk values with the
+risk matrix from the impact of the linked damage scenarios and the most feasible linked attack path. Treatment is still a placeholder.
 
 The attack path page (#195) has the Definition tab (name, analysis approach, partial flag, steps), the Rating tab (attack potential with
 the five factors, total and feasibility) and the Relations tab (threat scenarios), all on the mock API.

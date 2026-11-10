@@ -1,4 +1,6 @@
+import type { AttackFeasibility } from './attackPath'
 import type { CiaProperty } from './asset'
+import type { ImpactRating } from './damageScenario'
 import type { EntityRef } from './tree'
 
 // Threat scenarios and their links follow `THREAT_SCENARIO`, `THREAT_DAMAGE_LINK`, `THREAT_ATTACK_PATH_LINK`
@@ -55,4 +57,14 @@ export interface ThreatScenarioRelations {
   damageScenarios: (EntityRef & { causes: ThreatCause[] })[]
   attackPaths: EntityRef[]
   targets: ThreatTarget[]
+}
+
+/** What the risk values of a threat scenario are calculated from: the impact of its damage scenarios and its rated attack paths. */
+export interface ThreatScenarioRiskInputs {
+  damageScenarios: (EntityRef & {
+    /** The threat's targets that lead to the damage scenario; empty if none does (RQ-15-03). */
+    targetedCauses: ThreatCause[]
+    impactRatings: Pick<ImpactRating, 'impact_category' | 'rating_value' | 'omission_or_rating_rationale'>[]
+  })[]
+  attackPaths: (EntityRef & { feasibility: AttackFeasibility | null; isPartial: boolean })[]
 }

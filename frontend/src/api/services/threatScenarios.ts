@@ -1,4 +1,4 @@
-import type { PatchThreatScenarioBody, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../models/threatScenario'
+import type { PatchThreatScenarioBody, ThreatScenario, ThreatScenarioRelations, ThreatScenarioRiskInputs, ThreatTarget } from '../models/threatScenario'
 
 /**
  * Threat scenarios with their links. Mocked until the threat scenario endpoints exist; calls reject
@@ -12,6 +12,8 @@ export interface ThreatScenarioService {
   unlinkDamageScenario(projectId: string, threatScenarioId: string, damageScenarioId: string): Promise<ThreatScenarioRelations>
   linkAttackPath(projectId: string, threatScenarioId: string, attackPathId: string): Promise<ThreatScenarioRelations>
   unlinkAttackPath(projectId: string, threatScenarioId: string, attackPathId: string): Promise<ThreatScenarioRelations>
+  /** Impact ratings of the linked damage scenarios and feasibility of the linked attack paths, for the risk values. */
+  riskInputs(projectId: string, threatScenarioId: string): Promise<ThreatScenarioRiskInputs>
   /** Replaces all targets; each has to be a cause of a linked damage scenario. */
   setTargets(projectId: string, threatScenarioId: string, targets: ThreatTarget[]): Promise<ThreatScenarioRelations>
 }

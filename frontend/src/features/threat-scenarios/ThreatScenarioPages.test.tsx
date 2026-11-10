@@ -42,13 +42,10 @@ describe('threat scenario page', () => {
     expect(await tabs.findByRole('link', { name: 'Relations 3' })).toHaveAttribute('href', `${page}/relations`)
   })
 
-  it.each([
-    ['risks', 'Risks'],
-    ['treatment', 'Treatment'],
-  ])('keeps the %s tab as a placeholder', async (path, title) => {
-    renderApp(`${page}/${path}`)
+  it('keeps the treatment tab as a placeholder', async () => {
+    renderApp(`${page}/treatment`)
 
-    expect(await screen.findByText(`${title}: not implemented yet`)).toBeInTheDocument()
+    expect(await screen.findByText('Treatment: not implemented yet')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown threat scenarios', async () => {

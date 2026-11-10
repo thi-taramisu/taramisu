@@ -7,36 +7,21 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/models/damageScenario'
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
+import { IMPACT_CATEGORIES, IMPACT_CLASSES, IMPACT_SCALE } from './impactScale'
 
-const CATEGORIES: { value: ImpactCategory; label: string }[] = [
-  { value: 'SAFETY', label: 'Safety' },
-  { value: 'FINANCIAL', label: 'Financial' },
-  { value: 'OPERATIONAL', label: 'Operational' },
-  { value: 'PRIVACY', label: 'Privacy' },
-]
+const CATEGORIES = IMPACT_CATEGORIES
 
 interface RatingOption {
   value: ImpactRatingValue
   label: string
 }
 
-const SCALE: RatingOption[] = [
-  { value: 'SEVERE', label: 'Severe' },
-  { value: 'MAJOR', label: 'Major' },
-  { value: 'MODERATE', label: 'Moderate' },
-  { value: 'NEGLIGIBLE', label: 'Negligible' },
-]
+const SCALE: RatingOption[] = IMPACT_SCALE
 
 // Not a level of the scale, so it is shown apart from it.
 const OMITTED: RatingOption = { value: 'OMITTED', label: 'Omitted' }
 
-const RATING_CLASSES: Record<ImpactRatingValue, string> = {
-  SEVERE: 'border-impact-severe-border bg-impact-severe text-impact-severe-foreground',
-  MAJOR: 'border-impact-major-border bg-impact-major text-impact-major-foreground',
-  MODERATE: 'border-impact-moderate-border bg-impact-moderate text-impact-moderate-foreground',
-  NEGLIGIBLE: 'border-impact-negligible-border bg-impact-negligible text-impact-negligible-foreground',
-  OMITTED: 'border-impact-omitted-border bg-impact-omitted text-impact-omitted-foreground',
-}
+const RATING_CLASSES = IMPACT_CLASSES
 
 interface CategoryValues {
   rating: ImpactRatingValue | null
