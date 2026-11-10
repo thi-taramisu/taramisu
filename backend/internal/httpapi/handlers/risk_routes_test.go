@@ -40,6 +40,9 @@ type riskFake struct {
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	allowed        bool
 	accessErr, err error
 	access         db.GetProjectRoleParams
