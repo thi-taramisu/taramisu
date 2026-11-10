@@ -68,6 +68,8 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-${APP_URL:-http://localhost}/auth/application/o/taramisu/}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://authentik-server:9000/auth/application/o/taramisu/jwks/}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
+      AUTHENTIK_API_URL: http://authentik-server:9000/auth
+      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}
     depends_on:
       migrate:
         condition: service_completed_successfully
