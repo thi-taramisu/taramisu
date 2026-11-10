@@ -20,6 +20,12 @@ type healthQueries struct {
 	statusReaderFunc
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
 	handlers.AssetStore

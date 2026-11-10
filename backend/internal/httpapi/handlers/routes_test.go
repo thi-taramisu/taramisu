@@ -21,6 +21,13 @@ import (
 
 // Embed unused interfaces to satisfy the router without replacing its registration.
 type propertyQueries struct {
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
+
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 

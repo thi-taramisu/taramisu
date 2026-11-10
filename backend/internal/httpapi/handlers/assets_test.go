@@ -27,6 +27,13 @@ const assetJSON = `{"name":"ECU"}`
 
 // Only error paths need a stub; the PostgreSQL test exercises successful CRUD.
 type assetStore struct {
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
+
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 
