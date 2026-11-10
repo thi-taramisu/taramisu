@@ -273,6 +273,21 @@ describe('createMockItemApi', () => {
       await expect(threatScenarios.setTargets(project, 'ts-01', [{ assetId: 'nope', property: 'I' }])).rejects.toMatchObject({ status: 404 })
     })
 
+    it('returns the impact ratings and attack path feasibilities the risks are calculated from', async () => {
+      const { threatScenarios } = createMockItemApi()
+
+      const inputs = await threatScenarios.riskInputs(project, 'ts-01')
+
+      expect(inputs.damageScenarios).toMatchObject([{ code: 'DS-01', targetedCauses: [{ asset: { code: 'A-01' }, property: 'I' }], impactRatings: [{ impact_category: 'SAFETY', rating_value: 'SEVERE' }, {}, {}] }])
+      expect(inputs.attackPaths.map((path) => [path.code, path.feasibility, path.isPartial])).toEqual([
+        ['AP-01', 'LOW', false],
+        ['AP-02', 'MEDIUM', false],
+      ])
+      await threatScenarios.setTargets(project, 'ts-01', [])
+      expect((await threatScenarios.riskInputs(project, 'ts-01')).damageScenarios[0].targetedCauses).toEqual([])
+      expect((await threatScenarios.riskInputs(project, 'ts-02')).damageScenarios).toEqual([])
+    })
+
     it('drops a target when its cause is no longer linked', async () => {
       const api = createMockItemApi()
 
