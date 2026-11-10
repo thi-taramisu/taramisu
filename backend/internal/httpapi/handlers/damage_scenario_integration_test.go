@@ -51,7 +51,15 @@ func TestDamageScenarioPostgresLifecycle(t *testing.T) {
 	seed(&otherItemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'b', 'ITEM') RETURNING id::text`, projectID)
 	seed(&threatID, `INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 't') RETURNING id::text`, itemID)
 
-	manager, bearer := authtest.NewManagerAndToken(t)
+	fixture := authtest.NewFixture(t, db.New(tx))
+	manager, bearer := fixture.Manager, "Bearer "+fixture.Token(t, nil)
+	userID, err := db.New(tx).UpsertIAMUser(ctx, authtest.Subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO project_role_assignment (tara_project_id, user_id, project_role) VALUES ($1, $2, 'EDITOR')`, projectID, userID); err != nil {
+		t.Fatal(err)
+	}
 	do := func(q db.DBTX, method, path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")

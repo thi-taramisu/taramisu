@@ -37,9 +37,27 @@ func dmgUUID(s string) pgtype.UUID {
 // lookups succeed; err is returned by every write that reaches the database.
 type fakeDamage struct {
 	handlers.TaraProjectStore
+	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 	statusReaderFunc
 	found bool
 	err   error
+	role  db.ProjectRole // caller's project role; empty means not a member
+}
+
+func (f *fakeDamage) GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error) {
+	if f.role == "" {
+		return "", pgx.ErrNoRows
+	}
+	return f.role, nil
+}
+func (f *fakeDamage) ProjectIDForItemDefinition(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	return dmgUUID("77777777-7777-7777-7777-777777777777"), nil
+}
+func (f *fakeDamage) ProjectIDForThreatScenario(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	return dmgUUID("77777777-7777-7777-7777-777777777777"), nil
 }
 
 func (f *fakeDamage) scenario() db.DamageScenario {
@@ -175,6 +193,8 @@ func TestDamageRoutes(t *testing.T) {
 		{"create rating duplicate category", true, pgCode("23505"), http.MethodPost, dmgRatings, `{"impact_category":"SAFETY"}`, http.StatusConflict},
 		{"create rating inconsistent omission", true, pgCode("23514"), http.MethodPost, dmgRatings, `{"impact_category":"SAFETY","rating_value":"OMITTED"}`, http.StatusUnprocessableEntity},
 		{"list ratings", true, nil, http.MethodGet, dmgRatings, "", http.StatusOK},
+		{"list ratings paged", true, nil, http.MethodGet, dmgRatings + "?limit=1&offset=0", "", http.StatusOK},
+		{"list ratings limit too large", true, nil, http.MethodGet, dmgRatings + "?limit=101", "", http.StatusUnprocessableEntity},
 		{"get rating", true, nil, http.MethodGet, rating, "", http.StatusOK},
 		{"get rating missing", false, nil, http.MethodGet, rating, "", http.StatusNotFound},
 		{"replace rating", true, nil, http.MethodPut, rating, `{"impact_category":"PRIVACY","rating_value":"MAJOR"}`, http.StatusOK},
@@ -199,7 +219,7 @@ func TestDamageRoutes(t *testing.T) {
 		{"delete link missing", false, nil, http.MethodDelete, dmgLinks + "/" + dmgRatingID, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(&fakeDamage{found: tc.found, err: tc.err}, manager)
+			h := httpapi.New(&fakeDamage{found: tc.found, err: tc.err, role: db.ProjectRoleEDITOR}, manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", bearer)
@@ -212,9 +232,78 @@ func TestDamageRoutes(t *testing.T) {
 	}
 }
 
+func TestDamageRoutesProjectRoles(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	scenario := dmgScenarios + "/" + dmgScenarioID
+	rating := dmgRatings + "/" + dmgRatingID
+	for _, tc := range []struct {
+		name, method, path, body string
+		write                    bool
+	}{
+		{"list scenarios", http.MethodGet, dmgScenarios, "", false},
+		{"create scenario", http.MethodPost, dmgScenarios, `{"title":"x"}`, true},
+		{"get scenario", http.MethodGet, scenario, "", false},
+		{"replace scenario", http.MethodPut, scenario, `{"title":"x"}`, true},
+		{"update scenario", http.MethodPatch, scenario, `{"title":"x"}`, true},
+		{"delete scenario", http.MethodDelete, scenario, "", true},
+		{"list ratings", http.MethodGet, dmgRatings, "", false},
+		{"create rating", http.MethodPost, dmgRatings, `{"impact_category":"SAFETY"}`, true},
+		{"get rating", http.MethodGet, rating, "", false},
+		{"replace rating", http.MethodPut, rating, `{"impact_category":"SAFETY"}`, true},
+		{"update rating", http.MethodPatch, rating, `{"rating_value":"MAJOR"}`, true},
+		{"delete rating", http.MethodDelete, rating, "", true},
+		{"list links", http.MethodGet, dmgLinks, "", false},
+		{"create link", http.MethodPost, dmgLinks, `{"threat_scenario_id":"` + dmgThreatID + `","damage_scenario_id":"` + dmgScenarioID + `"}`, true},
+		{"delete link", http.MethodDelete, dmgLinks + "/" + dmgRatingID, "", true},
+	} {
+		do := func(role db.ProjectRole) int {
+			h := httpapi.New(&fakeDamage{found: true, role: role}, manager)
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", bearer)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			return rr.Code
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := do(""); got != http.StatusNotFound {
+				t.Fatalf("non-member: status = %d, want 404", got)
+			}
+			viewer := do(db.ProjectRoleVIEWER)
+			if tc.write && viewer != http.StatusForbidden {
+				t.Fatalf("viewer: status = %d, want 403", viewer)
+			}
+			if !tc.write && viewer >= 400 {
+				t.Fatalf("viewer: status = %d, want success", viewer)
+			}
+			if got := do(db.ProjectRoleEDITOR); got >= 400 {
+				t.Fatalf("editor: status = %d, want success", got)
+			}
+		})
+	}
+}
+
+func TestDamageCreateSetsLocation(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	h := httpapi.New(&fakeDamage{found: true, role: db.ProjectRoleEDITOR}, manager)
+	for _, tc := range []struct{ path, body, want string }{
+		{dmgScenarios, `{"title":"x"}`, dmgScenarios + "/" + dmgScenarioID},
+		{dmgRatings, `{"impact_category":"SAFETY"}`, dmgRatings + "/" + dmgRatingID},
+	} {
+		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusCreated || rr.Header().Get("Location") != tc.want {
+			t.Fatalf("POST %s: status = %d, Location = %q, want %q", tc.path, rr.Code, rr.Header().Get("Location"), tc.want)
+		}
+	}
+}
+
 func TestDamageRoutesRequireAuthentication(t *testing.T) {
 	manager, _ := authtest.NewManagerAndToken(t)
-	h := httpapi.New(&fakeDamage{found: true}, manager)
+	h := httpapi.New(&fakeDamage{found: true, role: db.ProjectRoleEDITOR}, manager)
 	for _, path := range []string{dmgScenarios, dmgRatings, dmgLinks} {
 		rr := httptest.NewRecorder()
 		h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, http.NoBody))

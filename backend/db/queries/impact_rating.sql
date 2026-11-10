@@ -13,7 +13,8 @@ WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3;
 SELECT r.* FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.damage_scenario_id = $1 AND d.item_definition_id = $2
-ORDER BY r.impact_category, r.id;
+ORDER BY r.impact_category, r.id
+LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ReplaceImpactRating :one
 UPDATE impact_rating

@@ -18,27 +18,27 @@ type ThreatDamageLinkStore interface {
 }
 
 type ThreatDamageLink struct {
-	store ThreatDamageLinkStore
+	store  ThreatDamageLinkStore
+	access ProjectAccessStore
 }
 
-func NewThreatDamageLink(store ThreatDamageLinkStore) *ThreatDamageLink {
-	return &ThreatDamageLink{store: store}
+func NewThreatDamageLink(store ThreatDamageLinkStore, access ProjectAccessStore) *ThreatDamageLink {
+	return &ThreatDamageLink{store: store, access: access}
 }
 
 func (h *ThreatDamageLink) Register(api huma.API) {
 	const collection = "/api/v1/item-definitions/{item_definition_id}/threat-damage-links"
 	const member = collection + "/{id}"
-	op := func(id, method, path, summary string) huma.Operation {
+	op := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Damage Scenario"}, Security: []map[string][]string{{"bearer": {}}}}
+			Tags: []string{"Damage Scenario"}, Security: []map[string][]string{{"bearer": {}}},
+			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
-	huma.Register(api, op("list-threat-damage-links", http.MethodGet, collection, "List threat scenario to damage scenario links of an item definition (paginated)"), h.List)
-	create := op("create-threat-damage-link", http.MethodPost, collection, "Link a threat scenario to a damage scenario")
-	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	del := op("delete-threat-damage-link", http.MethodDelete, member, "Remove a threat scenario to damage scenario link")
-	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("list-threat-damage-links", http.MethodGet, collection, "List threat scenario to damage scenario links of an item definition (paginated)", http.StatusOK), read, h.List)
+	Register(api, op("create-threat-damage-link", http.MethodPost, collection, "Link a threat scenario to a damage scenario", http.StatusCreated), edit, h.Create)
+	Register(api, op("delete-threat-damage-link", http.MethodDelete, member, "Remove a threat scenario to damage scenario link", http.StatusNoContent), edit, h.Delete)
 }
 
 type ThreatDamageLinkBody struct {
@@ -47,8 +47,9 @@ type ThreatDamageLinkBody struct {
 	DamageScenarioID string `json:"damage_scenario_id" format:"uuid"`
 }
 
-type ThreatDamageLinkOutput struct {
-	Body ThreatDamageLinkBody
+type CreateThreatDamageLinkOutput struct {
+	Location string `header:"Location"`
+	Body     ThreatDamageLinkBody
 }
 
 type ThreatDamageLinkListOutput struct {
@@ -78,7 +79,7 @@ type CreateThreatDamageLinkInput struct {
 	}
 }
 
-func (h *ThreatDamageLink) Create(ctx context.Context, in *CreateThreatDamageLinkInput) (*ThreatDamageLinkOutput, error) {
+func (h *ThreatDamageLink) Create(ctx context.Context, in *CreateThreatDamageLinkInput) (*CreateThreatDamageLinkOutput, error) {
 	itemID, err := parseUUID(in.ItemDefinitionID)
 	if err != nil {
 		return nil, err
@@ -104,7 +105,10 @@ func (h *ThreatDamageLink) Create(ctx context.Context, in *CreateThreatDamageLin
 	if err != nil {
 		return nil, err
 	}
-	return &ThreatDamageLinkOutput{Body: toThreatDamageLinkBody(l)}, nil
+	return &CreateThreatDamageLinkOutput{
+		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/threat-damage-links/" + l.ID.String(),
+		Body:     toThreatDamageLinkBody(l),
+	}, nil
 }
 
 func (h *ThreatDamageLink) List(ctx context.Context, in *ListThreatDamageLinksInput) (*ThreatDamageLinkListOutput, error) {

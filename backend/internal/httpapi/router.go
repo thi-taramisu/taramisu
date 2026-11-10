@@ -83,9 +83,9 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewRiskValues(queries, queries).Register(api)
 	handlers.NewRiskTreatmentDecisions(queries, queries).Register(api)
 	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)
-	handlers.NewDamageScenario(queries).Register(api)
-	handlers.NewImpactRating(queries).Register(api)
-	handlers.NewThreatDamageLink(queries).Register(api)
+	handlers.NewDamageScenario(queries, queries).Register(api)
+	handlers.NewImpactRating(queries, queries).Register(api)
+	handlers.NewThreatDamageLink(queries, queries).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,

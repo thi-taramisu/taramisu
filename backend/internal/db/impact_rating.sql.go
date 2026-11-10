@@ -103,15 +103,23 @@ SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitt
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.damage_scenario_id = $1 AND d.item_definition_id = $2
 ORDER BY r.impact_category, r.id
+LIMIT $4 OFFSET $3
 `
 
 type ListImpactRatingsParams struct {
 	DamageScenarioID pgtype.UUID
 	ItemDefinitionID pgtype.UUID
+	PageOffset       int32
+	PageLimit        int32
 }
 
 func (q *Queries) ListImpactRatings(ctx context.Context, arg ListImpactRatingsParams) ([]ImpactRating, error) {
-	rows, err := q.db.Query(ctx, listImpactRatings, arg.DamageScenarioID, arg.ItemDefinitionID)
+	rows, err := q.db.Query(ctx, listImpactRatings,
+		arg.DamageScenarioID,
+		arg.ItemDefinitionID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -22,11 +22,12 @@ type ImpactRatingStore interface {
 }
 
 type ImpactRating struct {
-	store ImpactRatingStore
+	store  ImpactRatingStore
+	access ProjectAccessStore
 }
 
-func NewImpactRating(store ImpactRatingStore) *ImpactRating {
-	return &ImpactRating{store: store}
+func NewImpactRating(store ImpactRatingStore, access ProjectAccessStore) *ImpactRating {
+	return &ImpactRating{store: store, access: access}
 }
 
 func (h *ImpactRating) Register(api huma.API) {
@@ -35,22 +36,21 @@ func (h *ImpactRating) Register(api huma.API) {
 	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
 		Name: "Impact Rating", Description: "Create, read, replace, update and delete the impact ratings of a damage scenario.",
 	})
-	op := func(id, method, path, summary string) huma.Operation {
+	op := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Impact Rating"}, Security: []map[string][]string{{"bearer": {}}}}
+			Tags: []string{"Impact Rating"}, Security: []map[string][]string{{"bearer": {}}},
+			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
-	huma.Register(api, op("list-impact-ratings", http.MethodGet, collection, "List impact ratings of a damage scenario"), h.List)
-	create := op("create-impact-rating", http.MethodPost, collection, "Create an impact rating")
-	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	huma.Register(api, op("get-impact-rating", http.MethodGet, member, "Get an impact rating"), h.Get)
-	huma.Register(api, op("replace-impact-rating", http.MethodPut, member, "Replace an impact rating"), h.Replace)
-	patch := op("update-impact-rating", http.MethodPatch, member, "Partially update an impact rating")
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("list-impact-ratings", http.MethodGet, collection, "List impact ratings of a damage scenario (paginated)", http.StatusOK), read, h.List)
+	Register(api, op("create-impact-rating", http.MethodPost, collection, "Create an impact rating", http.StatusCreated), edit, h.Create)
+	Register(api, op("get-impact-rating", http.MethodGet, member, "Get an impact rating", http.StatusOK), read, h.Get)
+	Register(api, op("replace-impact-rating", http.MethodPut, member, "Replace an impact rating", http.StatusOK), edit, h.Replace)
+	patch := op("update-impact-rating", http.MethodPatch, member, "Partially update an impact rating", http.StatusOK)
 	patch.Description = "Omitted fields remain unchanged. Only the rationale can be cleared with null; use PUT to clear rating_value."
-	huma.Register(api, patch, h.Update)
-	del := op("delete-impact-rating", http.MethodDelete, member, "Delete an impact rating")
-	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	Register(api, patch, edit, h.Update)
+	Register(api, op("delete-impact-rating", http.MethodDelete, member, "Delete an impact rating", http.StatusNoContent), edit, h.Delete)
 }
 
 type ImpactRatingBody struct {
@@ -67,6 +67,11 @@ type ImpactRatingOutput struct {
 	Body ImpactRatingBody
 }
 
+type CreateImpactRatingOutput struct {
+	Location string `header:"Location"`
+	Body     ImpactRatingBody
+}
+
 type ImpactRatingListOutput struct {
 	Body []ImpactRatingBody
 }
@@ -74,6 +79,12 @@ type ImpactRatingListOutput struct {
 type ImpactRatingParent struct {
 	ItemDefinitionID string `path:"item_definition_id" format:"uuid"`
 	DamageScenarioID string `path:"damage_scenario_id" format:"uuid"`
+}
+
+type ListImpactRatingsInput struct {
+	ImpactRatingParent
+	Limit  int32 `query:"limit" default:"50" minimum:"1" maximum:"100"`
+	Offset int32 `query:"offset" default:"0" minimum:"0" maximum:"2147483647"`
 }
 
 type ImpactRatingIDInput struct {
@@ -123,7 +134,7 @@ func parseImpactRatingIDs(in *ImpactRatingIDInput) (ids impactRatingIDs, err err
 	return
 }
 
-func (h *ImpactRating) Create(ctx context.Context, in *CreateImpactRatingInput) (*ImpactRatingOutput, error) {
+func (h *ImpactRating) Create(ctx context.Context, in *CreateImpactRatingInput) (*CreateImpactRatingOutput, error) {
 	scenarioID, err := parseUUID(in.DamageScenarioID)
 	if err != nil {
 		return nil, err
@@ -144,10 +155,13 @@ func (h *ImpactRating) Create(ctx context.Context, in *CreateImpactRatingInput) 
 	if err != nil {
 		return nil, mapImpactRatingError(err)
 	}
-	return toImpactRatingOutput(r), nil
+	return &CreateImpactRatingOutput{
+		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/damage-scenarios/" + in.DamageScenarioID + "/impact-ratings/" + r.ID.String(),
+		Body:     toImpactRatingBody(r),
+	}, nil
 }
 
-func (h *ImpactRating) List(ctx context.Context, in *ImpactRatingParent) (*ImpactRatingListOutput, error) {
+func (h *ImpactRating) List(ctx context.Context, in *ListImpactRatingsInput) (*ImpactRatingListOutput, error) {
 	scenarioID, err := parseUUID(in.DamageScenarioID)
 	if err != nil {
 		return nil, err
@@ -156,7 +170,7 @@ func (h *ImpactRating) List(ctx context.Context, in *ImpactRatingParent) (*Impac
 	if err != nil {
 		return nil, err
 	}
-	ratings, err := h.store.ListImpactRatings(ctx, db.ListImpactRatingsParams{DamageScenarioID: scenarioID, ItemDefinitionID: itemID})
+	ratings, err := h.store.ListImpactRatings(ctx, db.ListImpactRatingsParams{DamageScenarioID: scenarioID, ItemDefinitionID: itemID, PageLimit: in.Limit, PageOffset: in.Offset})
 	if err != nil {
 		return nil, err
 	}

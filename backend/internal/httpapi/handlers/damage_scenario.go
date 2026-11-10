@@ -21,11 +21,12 @@ type DamageScenarioStore interface {
 }
 
 type DamageScenario struct {
-	store DamageScenarioStore
+	store  DamageScenarioStore
+	access ProjectAccessStore
 }
 
-func NewDamageScenario(store DamageScenarioStore) *DamageScenario {
-	return &DamageScenario{store: store}
+func NewDamageScenario(store DamageScenarioStore, access ProjectAccessStore) *DamageScenario {
+	return &DamageScenario{store: store, access: access}
 }
 
 func (h *DamageScenario) Register(api huma.API) {
@@ -34,20 +35,19 @@ func (h *DamageScenario) Register(api huma.API) {
 	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
 		Name: "Damage Scenario", Description: "Create, read, replace, update and delete damage scenarios of an item definition.",
 	})
-	op := func(id, method, path, summary string) huma.Operation {
+	op := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Damage Scenario"}, Security: []map[string][]string{{"bearer": {}}}}
+			Tags: []string{"Damage Scenario"}, Security: []map[string][]string{{"bearer": {}}},
+			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
-	huma.Register(api, op("list-damage-scenarios", http.MethodGet, collection, "List damage scenarios of an item definition (paginated)"), h.List)
-	create := op("create-damage-scenario", http.MethodPost, collection, "Create a damage scenario")
-	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	huma.Register(api, op("get-damage-scenario", http.MethodGet, member, "Get a damage scenario"), h.Get)
-	huma.Register(api, op("replace-damage-scenario", http.MethodPut, member, "Replace a damage scenario"), h.Replace)
-	huma.Register(api, op("update-damage-scenario", http.MethodPatch, member, "Partially update a damage scenario"), h.Update)
-	del := op("delete-damage-scenario", http.MethodDelete, member, "Delete a damage scenario with its impact ratings and links")
-	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("list-damage-scenarios", http.MethodGet, collection, "List damage scenarios of an item definition (paginated)", http.StatusOK), read, h.List)
+	Register(api, op("create-damage-scenario", http.MethodPost, collection, "Create a damage scenario", http.StatusCreated), edit, h.Create)
+	Register(api, op("get-damage-scenario", http.MethodGet, member, "Get a damage scenario", http.StatusOK), read, h.Get)
+	Register(api, op("replace-damage-scenario", http.MethodPut, member, "Replace a damage scenario", http.StatusOK), edit, h.Replace)
+	Register(api, op("update-damage-scenario", http.MethodPatch, member, "Partially update a damage scenario", http.StatusOK), edit, h.Update)
+	Register(api, op("delete-damage-scenario", http.MethodDelete, member, "Delete a damage scenario with its impact ratings and links", http.StatusNoContent), edit, h.Delete)
 }
 
 type DamageScenarioBody struct {
@@ -60,6 +60,11 @@ type DamageScenarioBody struct {
 
 type DamageScenarioOutput struct {
 	Body DamageScenarioBody
+}
+
+type CreateDamageScenarioOutput struct {
+	Location string `header:"Location"`
+	Body     DamageScenarioBody
 }
 
 type DamageScenarioListOutput struct {
@@ -106,7 +111,7 @@ type UpdateDamageScenarioInput struct {
 	}
 }
 
-func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInput) (*DamageScenarioOutput, error) {
+func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInput) (*CreateDamageScenarioOutput, error) {
 	itemID, err := parseUUID(in.ItemDefinitionID)
 	if err != nil {
 		return nil, err
@@ -123,7 +128,10 @@ func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInp
 	if err != nil {
 		return nil, err
 	}
-	return toDamageScenarioOutput(d), nil
+	return &CreateDamageScenarioOutput{
+		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/damage-scenarios/" + d.ID.String(),
+		Body:     toDamageScenarioBody(d),
+	}, nil
 }
 
 func (h *DamageScenario) List(ctx context.Context, in *ListDamageScenariosInput) (*DamageScenarioListOutput, error) {
