@@ -74,6 +74,16 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 		return rr.Body.Bytes()
 	}
 
+	// serve builds the API on q, so a request can also run on a savepoint.
+	serve := func(q db.DBTX, method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		httpapi.New(db.New(q), manager).ServeHTTP(rr, req)
+		return rr
+	}
+
 	// A failed statement aborts the transaction, so requests expected to hit a database error run in a savepoint.
 	callFailing := func(method, path, body string, want int) {
 		t.Helper()
@@ -86,12 +96,7 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 				t.Error(err)
 			}
 		}()
-		req := httptest.NewRequest(method, path, strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", bearer)
-		rr := httptest.NewRecorder()
-		httpapi.New(db.New(sp), manager).ServeHTTP(rr, req)
-		if rr.Code != want {
+		if rr := serve(sp, method, path, body); rr.Code != want {
 			t.Fatalf("%s %s: status = %d, want %d: %s", method, path, rr.Code, want, rr.Body.String())
 		}
 	}
