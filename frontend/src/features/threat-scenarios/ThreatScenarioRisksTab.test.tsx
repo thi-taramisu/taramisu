@@ -32,8 +32,8 @@ describe('threat scenario risks', () => {
     const block = await findDamageScenario(DS01)
     expect(block.getByText('Max')).toHaveTextContent('Max Risk 4')
     expect(block.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      expect.stringMatching(/^SafetySevere impact×Medium feasibilityRisk 4Highest/),
-      expect.stringMatching(/^OperationalModerate impact×Medium feasibilityRisk 2(?!Highest)/),
+      expect.stringMatching(/^SafetySevere impactMedium feasibilityRisk 4Highest/),
+      expect.stringMatching(/^OperationalModerate impactMedium feasibilityRisk 2(?!Highest)/),
       'FinancialNot rated',
     ])
     const privacy = block.getByText('Privacy')
@@ -57,7 +57,7 @@ describe('threat scenario risks', () => {
 
     await findDamageScenario(DS01)
     expect(damageScenario(DS01).getAllByText('Highest')).toHaveLength(1)
-    expect(damageScenario(`${ds.code} Glare`).getAllByRole('listitem')[0]).toHaveTextContent(/^FinancialSevere impact×Medium feasibilityRisk 4Highest/)
+    expect(damageScenario(`${ds.code} Glare`).getAllByRole('listitem')[0]).toHaveTextContent(/^FinancialSevere impactMedium feasibilityRisk 4Highest/)
   })
 
   it('shows the calculation with the risk matrix only on request', async () => {
@@ -98,7 +98,7 @@ describe('threat scenario risks', () => {
 
     await screen.findByRole('region', { name: 'Risk overview' })
     expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-01$/)
-    expect(damageScenario(DS01).getAllByRole('listitem')[0]).toHaveTextContent(/^SafetySevere impact×High feasibilityRisk 5/)
+    expect(damageScenario(DS01).getAllByRole('listitem')[0]).toHaveTextContent(/^SafetySevere impactHigh feasibilityRisk 5/)
   })
 
   it('separates several damage scenarios', async () => {
