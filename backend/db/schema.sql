@@ -3,7 +3,8 @@ CREATE TABLE service_status (
     message text NOT NULL
 );
 
-CREATE TYPE project_role AS ENUM ('OWNER', 'EDITOR', 'REVIEWER', 'VIEWER');
+-- Declared in rank order so that max() and ORDER BY return the highest role.
+CREATE TYPE project_role AS ENUM ('VIEWER', 'EDITOR', 'OWNER');
 CREATE TYPE scope_type AS ENUM ('ITEM', 'COMPONENT');
 CREATE TYPE identification_source AS ENUM (
     'ITEM_DEF', 'IMPACT_RATING', 'THREAT_DERIVED', 'CATALOGUE'
@@ -33,14 +34,6 @@ CREATE TABLE iam_group (
     external_iam_group_id text NOT NULL UNIQUE
 );
 
-CREATE TABLE iam_user_group_member (
-    user_id uuid NOT NULL REFERENCES iam_user (id) ON DELETE CASCADE,
-    group_id uuid NOT NULL REFERENCES iam_group (id) ON DELETE CASCADE,
-    PRIMARY KEY (user_id, group_id)
-);
-
-CREATE INDEX iam_user_group_member_group_id_idx ON iam_user_group_member (group_id);
-
 CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
@@ -58,8 +51,8 @@ CREATE TABLE project_role_assignment (
     CONSTRAINT project_role_assignment_one_principal CHECK (
         (user_id IS NOT NULL) <> (group_id IS NOT NULL)
     ),
-    UNIQUE (tara_project_id, user_id, project_role),
-    UNIQUE (tara_project_id, group_id, project_role)
+    CONSTRAINT project_role_assignment_one_user_role UNIQUE (tara_project_id, user_id),
+    CONSTRAINT project_role_assignment_one_group_role UNIQUE (tara_project_id, group_id)
 );
 
 CREATE INDEX project_role_assignment_user_id_idx ON project_role_assignment (user_id);
@@ -71,6 +64,9 @@ CREATE TABLE item_definition (
     name text NOT NULL,
     scope_type scope_type NOT NULL,
     lifecycle_phase text,
+    boundary text,
+    functions text,
+    operational_environment text,
     item_definition_wp_09_01 text,
     cybersecurity_specs_wp_10_01 text,
     architectural_design text,
@@ -81,7 +77,7 @@ CREATE INDEX item_definition_tara_project_id_idx ON item_definition (tara_projec
 
 CREATE TABLE asset (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     name text NOT NULL,
     description text,
     identification_source identification_source
@@ -99,7 +95,7 @@ CREATE TABLE asset_cybersecurity_property (
 
 CREATE TABLE damage_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     functionality_adverse_relation text,
     road_user_harm_description text
@@ -137,7 +133,7 @@ CREATE TABLE impact_rating (
 
 CREATE TABLE threat_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     cause_of_compromise text,
     elicitation_method elicitation_method,
@@ -169,7 +165,7 @@ CREATE INDEX threat_damage_link_damage_scenario_id_idx ON threat_damage_link (da
 
 CREATE TABLE attack_path (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id),
+    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
     title text NOT NULL,
     analysis_approach analysis_approach,
     is_partial_early_stage boolean NOT NULL DEFAULT true,

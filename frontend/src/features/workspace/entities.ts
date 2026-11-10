@@ -22,9 +22,14 @@ export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[]
   'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
 }
 
-/** Code and name as shown in the tree and headers, e.g. "A-01 Firmware". */
+/** Code and name for the hierarchy's accessible names, e.g. "A-01 Firmware"; the visible tree label shows the name only. */
 export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
   return code ? `${code} ${name}` : name
+}
+
+/** Element ID as shown in the detail view header: the number of the code with a hash, e.g. "A-01" → "#01". */
+export function formatEntityId(code: string) {
+  return `#${code.replace(/^[A-Z]+-/, '')}`
 }
 
 export function entityPath(projectId: string, type: EntityType, id: string) {
