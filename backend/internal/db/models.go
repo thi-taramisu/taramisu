@@ -506,6 +506,19 @@ type AssetCybersecurityProperty struct {
 	Description  *string
 }
 
+type Attachment struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	FileName      string
+	ContentType   string
+	SizeBytes     int64
+	Sha256        string
+	S3ObjectKey   pgtype.UUID
+	UploadedBy    pgtype.UUID
+	DeletePending bool
+	CreatedAt     pgtype.Timestamptz
+}
+
 type AttackFeasibilityRating struct {
 	ID                    pgtype.UUID
 	AttackPathID          pgtype.UUID

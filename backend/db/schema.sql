@@ -238,3 +238,18 @@ CREATE INDEX risk_treatment_decision_threat_scenario_id_idx
     ON risk_treatment_decision (threat_scenario_id);
 CREATE INDEX risk_treatment_decision_risk_value_id_idx
     ON risk_treatment_decision (risk_value_id, threat_scenario_id);
+
+CREATE TABLE attachment (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id uuid NOT NULL REFERENCES tara_project (id),
+    file_name text NOT NULL CHECK (length(file_name) BETWEEN 1 AND 255),
+    content_type text NOT NULL,
+    size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
+    sha256 text NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+    s3_object_key uuid NOT NULL UNIQUE,
+    uploaded_by uuid NOT NULL REFERENCES iam_user (id),
+    delete_pending boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX attachment_project_id_created_at_id_idx ON attachment (project_id, created_at, id);
+CREATE INDEX attachment_pending_deletion_idx ON attachment (id) WHERE delete_pending;

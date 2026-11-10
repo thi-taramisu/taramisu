@@ -26,12 +26,18 @@ type Queries interface {
 type Option func(*options)
 
 type options struct {
-	directory handlers.Directory
+	directory   handlers.Directory
+	attachments *Attachments
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
 func WithDirectory(directory handlers.Directory) Option {
 	return func(o *options) { o.directory = directory }
+}
+
+// WithAttachments enables attachment storage.
+func WithAttachments(files *Attachments) Option {
+	return func(o *options) { o.attachments = files }
 }
 
 func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
@@ -89,6 +95,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	registerAttachments(api, o.attachments, queries)
 	// Fail closed: an /api/ operation without an access declaration must not be served.
 	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
 		panic(err)
