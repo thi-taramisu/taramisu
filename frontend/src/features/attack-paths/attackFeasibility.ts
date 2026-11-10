@@ -81,3 +81,11 @@ export function summarize(scores: FactorScores) {
   const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
   return { open, total, feasibility: feasibilityOf(total) }
 }
+
+/** Labels and colour tokens of the feasibility levels. */
+export const FEASIBILITY: Record<AttackFeasibility, { label: string; classes: string }> = {
+  HIGH: { label: 'High', classes: 'border-feasibility-high-border bg-feasibility-high text-feasibility-high-foreground' },
+  MEDIUM: { label: 'Medium', classes: 'border-feasibility-medium-border bg-feasibility-medium text-feasibility-medium-foreground' },
+  LOW: { label: 'Low', classes: 'border-feasibility-low-border bg-feasibility-low text-feasibility-low-foreground' },
+  VERY_LOW: { label: 'Very low', classes: 'border-feasibility-very-low-border bg-feasibility-very-low text-feasibility-very-low-foreground' },
+}

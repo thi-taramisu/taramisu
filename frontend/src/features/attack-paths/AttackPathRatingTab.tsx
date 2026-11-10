@@ -6,16 +6,10 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { AttackFeasibility, AttackFeasibilityRating } from '../../api/models/attackPath'
+import type { AttackFeasibilityRating } from '../../api/models/attackPath'
 import { useAttackPathRating, useUpdateAttackPathRating } from '../../api/queries/items'
 import { FACTORS, summarize, type Factor, type FactorScores } from './attackFeasibility'
-
-const FEASIBILITY: Record<AttackFeasibility, { label: string; classes: string }> = {
-  HIGH: { label: 'High', classes: 'border-feasibility-high-border bg-feasibility-high text-feasibility-high-foreground' },
-  MEDIUM: { label: 'Medium', classes: 'border-feasibility-medium-border bg-feasibility-medium text-feasibility-medium-foreground' },
-  LOW: { label: 'Low', classes: 'border-feasibility-low-border bg-feasibility-low text-feasibility-low-foreground' },
-  VERY_LOW: { label: 'Very low', classes: 'border-feasibility-very-low-border bg-feasibility-very-low text-feasibility-very-low-foreground' },
-}
+import { FeasibilityBadge } from './FeasibilityBadge'
 
 // The backend supports attack potential only; further methods can be added to this list.
 const RATING_METHODS = [{ value: 'ATTACK_POTENTIAL', label: 'Attack Potential' }]
@@ -115,9 +109,7 @@ function RatingForm({ projectId, attackPathId, rating }: { projectId: string; at
             {feasibility && total !== null ? (
               <>
                 <span className="text-muted-foreground tabular-nums">{points(total)}</span>
-                <span className={`inline-flex h-6 items-center rounded-full border px-2.5 text-sm font-medium whitespace-nowrap ${FEASIBILITY[feasibility].classes}`}>
-                  {FEASIBILITY[feasibility].label} feasibility
-                </span>
+                <FeasibilityBadge value={feasibility} />
               </>
             ) : (
               <span className="text-muted-foreground">
