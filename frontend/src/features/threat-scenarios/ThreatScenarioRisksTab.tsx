@@ -10,7 +10,6 @@ import type { ThreatScenarioRiskInputs } from '../../api/models/threatScenario'
 import { useThreatScenarioRiskInputs } from '../../api/queries/items'
 import { FEASIBILITY } from '../attack-paths/attackFeasibility'
 import { FeasibilityBadge } from '../attack-paths/FeasibilityBadge'
-import { CIA_PROPERTIES } from '../assets/ciaProperties'
 import { categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
 import { RiskBadge } from '../items/RiskBadge'
 import { entityPath } from '../workspace/entities'
@@ -73,7 +72,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
         </h2>
         <dl className="grid divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
           <div className="grid gap-2 px-4 py-3">
-            <dt className="text-xs text-muted-foreground uppercase">Attack Feasibility</dt>
+            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Attack Feasibility</dt>
             <dd className="flex flex-wrap items-center gap-2 text-sm">
               <FeasibilityBadge value={feasibility.feasibility} withWord={false} />
               {decisive && (
@@ -84,7 +83,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
             </dd>
           </div>
           <div className="grid gap-2 px-4 py-3">
-            <dt className="text-xs text-muted-foreground uppercase">Highest Risk</dt>
+            <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Highest Risk</dt>
             <dd className="flex flex-wrap items-center gap-2 text-sm">
               {top ? (
                 <>
@@ -143,18 +142,6 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
           <h3 id={headingId} className="text-sm font-medium">
             <EntityLink projectId={projectId} type="damage-scenarios" entity={group.damageScenario} />
           </h3>
-          {/* The targeted asset properties are why the damage scenario belongs to this threat; they do not enter the risk value. */}
-          {group.targetedCauses.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              via{' '}
-              {group.targetedCauses.map((cause, index) => (
-                <span key={`${cause.asset.id}:${cause.property}`}>
-                  {index > 0 && ', '}
-                  <span className="font-mono">{cause.asset.code}</span> {cause.asset.name} · {CIA_PROPERTIES.find((p) => p.value === cause.property)?.label}
-                </span>
-              ))}
-            </p>
-          )}
         </div>
         {group.targetedCauses.length === 0 && (
           <Link to={entityPath(projectId, 'threat-scenarios', threatScenarioId)} title="None of the targets of this threat scenario leads to this damage scenario.">
@@ -169,7 +156,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
       </div>
       <>
           {/* Column labels for the rows: each one reads "impact × feasibility → risk". */}
-          <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-xs text-muted-foreground">
+          <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
             <span className="w-28">Category</span>
             <span className="w-28">Impact</span>
             <span className="w-28">Feasibility</span>
@@ -242,7 +229,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
       {/* Omitted categories are a justified decision [PM-15-07], so they only get a line at the end. */}
       {omitted.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
-          <span>Omitted</span>
+          <span>Omitted:</span>
           {omitted.map((row) => (
             <span key={row.key} title={row.rationale ?? undefined} className="inline-flex h-5 items-center rounded-full bg-muted px-2">
               {categoryLabel(row.category)}
