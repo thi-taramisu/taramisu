@@ -6,6 +6,9 @@ The architecture is designed around a **100% stateless backend tier** utilizing 
 Typical request flows (login, authenticated API calls, file upload/download, LLM requests) are visualized in
 [request-flows.md](./request-flows.md).
 
+For the current registration and approval implementation, see
+[Registration flow](iam/registration-flow.md).
+
 ---
 
 ## 1. System Architecture Diagram
@@ -147,7 +150,8 @@ flowchart LR
 * **Why:**
   * **Runtime Upstream Re-Resolution:** Since NGINX 1.28 (April 2025), the open-source version natively supports the `resolve` parameter in
     `upstream` blocks. Combined with Docker's internal DNS (`resolver 127.0.0.11`), NGINX dynamically picks up new container IPs when
-    backend replicas restart, crash, or scale (`docker compose up --scale api=3`) without requiring manual reloads.
+    backend replicas restart, crash, or scale (`docker compose up --scale api=3`) without requiring manual reloads
+    (verified via `make -C deploy test-stack`).
   * **Least Connections (`least_conn`):** Because the Go API handles a mix of fast JSON queries, multi-megabyte file streams, and
     long-lived Server-Sent Events (SSE) streams for LLM responses, `least_conn` ensures new requests are always routed to the replica with
     the fewest active in-flight connections.

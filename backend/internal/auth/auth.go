@@ -1,91 +1,115 @@
-// Package auth implements backend OIDC login and opaque browser sessions.
+// Package auth implements stateless OIDC Bearer JWT verification and in-memory IAM caching.
 package auth
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/danielgtaylor/huma/v2"
-	"golang.org/x/oauth2"
 )
 
-const sessionCookie = "taramisu_session"
-const loginCookie = "taramisu_login"
-const sessionLifetime = 8 * time.Hour
-
+// Config configures stateless OIDC Bearer JWT verification.
 type Config struct {
-	Issuer, ClientID, ClientSecret, AppURL string
+	Issuer      string
+	ClientID    string
+	JWKSURL     string
+	CacheTTL    time.Duration
+	JWKSTimeout time.Duration
 }
 
+// User represents the authenticated caller populated into the request context.
 type User struct {
 	ID      string `json:"id" format:"uuid"`
 	Issuer  string `json:"issuer"`
 	Subject string `json:"subject"`
+	Name    string `json:"name"`
+	Email   string `json:"email" format:"email"`
+	// Groups holds the caller's assignable Authentik group UUIDs from the taramisu_groups claim.
+	// It is used for project authorization only and is not part of the API response.
+	Groups []string `json:"-"`
 }
 
+// UserStore resolves an external IAM subject identifier (sub) to an internal iam_user UUID.
 type UserStore interface {
 	UpsertIAMUser(context.Context, string) (string, error)
 }
 
-type session struct {
-	User    User
-	Expires time.Time
-}
-
-type login struct {
-	Nonce, Verifier string
-	Expires         time.Time
-}
-
+// Manager validates incoming Bearer JWT access tokens statelessly using cached JWKS public keys.
 type Manager struct {
-	oauth          oauth2.Config
-	verifier       *oidc.IDTokenVerifier
-	issuer, origin string
-	secure         bool
-	users          UserStore
-	mu             sync.Mutex
-	sessions       map[string]session
-	logins         map[string]login
+	verifier  *oidc.IDTokenVerifier
+	issuer    string
+	users     UserStore
+	userCache *ttlCache[string, string]
 }
 
+// New constructs a stateless JWT authentication manager backed by an in-memory JWKS key set and subject-to-UUID TTL cache.
 func New(ctx context.Context, cfg Config, users UserStore) (*Manager, error) {
-	app, err := url.Parse(cfg.AppURL)
-	if err != nil || app.Host == "" || (app.Scheme != "http" && app.Scheme != "https") || app.Path != "" || app.RawQuery != "" || app.Fragment != "" || app.User != nil {
-		return nil, errors.New("APP_URL must be an http(s) origin without a trailing slash")
+	if err := validateEndpointURL(cfg.Issuer); err != nil {
+		return nil, errors.New("OIDC_ISSUER must be a valid http(s) URL without credentials or query parameters")
 	}
-	if cfg.Issuer == "" || cfg.ClientID == "" || cfg.ClientSecret == "" {
-		return nil, errors.New("OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required")
+	if strings.TrimSpace(cfg.ClientID) == "" {
+		return nil, errors.New("OIDC_CLIENT_ID is required")
+	}
+	jwksURL := cfg.JWKSURL
+	if jwksURL == "" {
+		jwksURL = strings.TrimRight(cfg.Issuer, "/") + "/jwks/"
+	}
+	if err := validateEndpointURL(jwksURL); err != nil {
+		return nil, errors.New("OIDC_JWKS_URL must be a valid http(s) URL without credentials or query parameters")
 	}
 	if users == nil {
 		return nil, errors.New("IAM user store is required")
 	}
+
 	// Key fetches share a background context and need their own timeout.
-	ctx = oidc.ClientContext(ctx, &http.Client{Timeout: 5 * time.Second})
-	provider, err := oidc.NewProvider(ctx, cfg.Issuer)
-	if err != nil {
-		return nil, err
+	jwksTimeout := cfg.JWKSTimeout
+	if jwksTimeout <= 0 {
+		jwksTimeout = 5 * time.Second
 	}
-	origin := app.Scheme + "://" + app.Host
+	ctx = oidc.ClientContext(ctx, &http.Client{Timeout: jwksTimeout})
+	keySet := oidc.NewRemoteKeySet(ctx, jwksURL)
+	verifier := oidc.NewVerifier(cfg.Issuer, keySet, &oidc.Config{
+		ClientID:             cfg.ClientID,
+		SupportedSigningAlgs: []string{oidc.RS256},
+	})
 	return &Manager{
-		oauth:    oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret, Endpoint: provider.Endpoint(), RedirectURL: origin + "/auth/callback", Scopes: []string{oidc.ScopeOpenID}},
-		verifier: provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}), issuer: cfg.Issuer, origin: origin, secure: app.Scheme == "https",
-		users:    users,
-		sessions: make(map[string]session), logins: make(map[string]login),
+		verifier:  verifier,
+		issuer:    cfg.Issuer,
+		users:     users,
+		userCache: newTTLCache[string, string](cfg.CacheTTL, defaultCacheMax),
 	}, nil
 }
 
-func (m *Manager) cookie(w http.ResponseWriter, name, value string, seconds int) {
-	// #nosec G124 -- Secure follows APP_URL: HTTPS enables it; local HTTP development requires it disabled.
-	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, Secure: m.secure, SameSite: http.SameSiteLaxMode, MaxAge: seconds})
+func validateEndpointURL(raw string) error {
+	if raw == "" {
+		return errors.New("empty URL")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+		return errors.New("invalid URL")
+	}
+	return nil
 }
+
+func bearerToken(header string) (string, bool) {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(header), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return "", false
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", false
+	}
+	return token, true
+}
+
 func fail(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -95,154 +119,80 @@ func fail(w http.ResponseWriter, code int, message string) {
 	}
 }
 
-func (m *Manager) pruneLocked() {
-	now := time.Now()
-	for id, s := range m.sessions {
-		if !now.Before(s.Expires) {
-			delete(m.sessions, id)
-		}
-	}
-	for id, l := range m.logins {
-		if !now.Before(l.Expires) {
-			delete(m.logins, id)
-		}
-	}
-}
-
-func (m *Manager) Login(w http.ResponseWriter, r *http.Request) {
-	state, nonce, verifier := rand.Text(), rand.Text(), oauth2.GenerateVerifier()
-	m.mu.Lock()
-	m.pruneLocked()
-	if old, err := r.Cookie(loginCookie); err == nil {
-		delete(m.logins, old.Value)
-	}
-	m.logins[state] = login{Nonce: nonce, Verifier: verifier, Expires: time.Now().Add(5 * time.Minute)}
-	m.mu.Unlock()
-	m.cookie(w, loginCookie, state, 300)
-	w.Header().Set("Cache-Control", "no-store")
-	http.Redirect(w, r, m.oauth.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusFound)
-}
-
-func (m *Manager) Callback(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	cookie, err := r.Cookie(loginCookie)
-	state := r.URL.Query().Get("state")
-	if err != nil || state == "" || cookie.Value != state {
-		fail(w, 400, "invalid login state")
-		return
-	}
-	m.cookie(w, loginCookie, "", -1)
-	m.mu.Lock()
-	attempt, ok := m.logins[state]
-	delete(m.logins, state)
-	m.mu.Unlock()
-	if !ok || !time.Now().Before(attempt.Expires) || r.URL.Query().Get("code") == "" {
-		fail(w, 400, "login expired or rejected")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	token, err := m.oauth.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(attempt.Verifier))
-	if err != nil {
-		var responseError *oauth2.RetrieveError
-		if errors.As(err, &responseError) {
-			slog.Warn("OIDC token exchange failed", "status", responseError.Response.StatusCode, "code", responseError.ErrorCode)
-		} else {
-			slog.Warn("OIDC token exchange failed", "error", err)
-		}
-		fail(w, 502, "login exchange failed")
-		return
-	}
-	raw, ok := token.Extra("id_token").(string)
-	if !ok {
-		slog.Warn("OIDC token response has no ID token")
-		fail(w, 502, "missing identity token")
-		return
-	}
-	identity, err := m.verifier.Verify(ctx, raw)
-	if err != nil {
-		slog.Warn("OIDC token verification failed", "error", err)
-		fail(w, 401, "invalid identity token")
-		return
-	}
-	if identity.Nonce != attempt.Nonce {
-		slog.Warn("OIDC nonce mismatch")
-		fail(w, 401, "invalid identity token")
-		return
-	}
-	if identity.Subject == "" {
-		slog.Warn("OIDC identity has no subject")
-		fail(w, 401, "invalid identity claims")
-		return
-	}
-	userID, err := m.users.UpsertIAMUser(ctx, identity.Subject)
-	if err != nil {
-		slog.Error("resolve IAM user", "error", err)
-		fail(w, 503, "user database unavailable")
-		return
-	}
-	user := User{ID: userID, Issuer: m.issuer, Subject: identity.Subject}
-	id := rand.Text()
-	m.mu.Lock()
-	m.pruneLocked()
-	if old, err := r.Cookie(sessionCookie); err == nil {
-		delete(m.sessions, old.Value)
-	}
-	m.sessions[id] = session{User: user, Expires: time.Now().Add(sessionLifetime)}
-	m.mu.Unlock()
-	m.cookie(w, sessionCookie, id, int(sessionLifetime.Seconds()))
-	http.Redirect(w, r, "/api/v1/me", http.StatusFound)
-}
-
-func (m *Manager) current(r *http.Request) (User, bool) {
-	cookie, err := r.Cookie(sessionCookie)
-	if err != nil {
-		return User{}, false
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	s, ok := m.sessions[cookie.Value]
-	if !ok || !time.Now().Before(s.Expires) {
-		delete(m.sessions, cookie.Value)
-		return User{}, false
-	}
-	return s.User, true
-}
-
 type userContextKey struct{}
 
+// UserFromContext returns the authenticated User stored in ctx, or a zero User if unauthenticated.
 func UserFromContext(ctx context.Context) User {
 	user, _ := ctx.Value(userContextKey{}).(User)
 	return user
 }
 
+// Require returns an HTTP middleware that validates Bearer JWTs and populates the authenticated User in the request context.
 func (m *Manager) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if m == nil {
-			fail(w, 503, "authentication is not configured")
+			fail(w, http.StatusServiceUnavailable, "authentication is not configured")
 			return
 		}
-		user, ok := m.current(r)
+		rawToken, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
-			fail(w, 401, "authentication required")
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			fail(w, http.StatusUnauthorized, "authentication required")
 			return
+		}
+
+		verifyCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		token, err := m.verifier.Verify(verifyCtx, rawToken)
+		if err != nil {
+			slog.Warn("JWT verification failed", "error", err)
+			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+			fail(w, http.StatusUnauthorized, "invalid or expired access token")
+			return
+		}
+
+		var claims struct {
+			Name   string   `json:"name"`
+			Email  string   `json:"email"`
+			Groups []string `json:"taramisu_groups"`
+		}
+		if err := token.Claims(&claims); err != nil {
+			slog.Warn("JWT claims decode failed", "error", err)
+			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+			fail(w, http.StatusUnauthorized, "invalid token claims")
+			return
+		}
+		if strings.TrimSpace(token.Subject) == "" || strings.TrimSpace(claims.Name) == "" || strings.TrimSpace(claims.Email) == "" {
+			slog.Warn("JWT missing required claims",
+				"has_sub", strings.TrimSpace(token.Subject) != "",
+				"has_name", strings.TrimSpace(claims.Name) != "",
+				"has_email", strings.TrimSpace(claims.Email) != "",
+			)
+			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+			fail(w, http.StatusUnauthorized, "missing required token claims")
+			return
+		}
+
+		userID, ok := m.userCache.get(token.Subject)
+		if !ok {
+			userID, err = m.users.UpsertIAMUser(r.Context(), token.Subject)
+			if err != nil {
+				slog.Error("resolve IAM user", "error", err)
+				fail(w, http.StatusServiceUnavailable, "user database unavailable")
+				return
+			}
+			m.userCache.set(token.Subject, userID)
+		}
+
+		user := User{
+			ID:      userID,
+			Issuer:  m.issuer,
+			Subject: token.Subject,
+			Name:    claims.Name,
+			Email:   claims.Email,
+			Groups:  claims.Groups,
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, user)))
 	})
-}
-
-func (m *Manager) Logout(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Origin") != m.origin {
-		fail(w, 403, "invalid origin")
-		return
-	}
-	if cookie, err := r.Cookie(sessionCookie); err == nil {
-		m.mu.Lock()
-		delete(m.sessions, cookie.Value)
-		m.mu.Unlock()
-	}
-	m.cookie(w, sessionCookie, "", -1)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusNoContent)
 }

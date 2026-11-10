@@ -30,5 +30,6 @@ Goal: Looking for less setup through the admin UI and more configuration in the 
 ## Thoughts
 
 - Leaning towards keeping Authentik for now. ZITADEL would be the next one to try.
-- Keep project roles (Read/Write/Manage/Owner) in our database and check them in Go.
+- Keep project roles (Read/Write/Manage/Owner) in our database and check them in Go. Superseded: the role set is defined in
+  [project roles](project-roles.md).
 - Still open: local accounts or university SSO?

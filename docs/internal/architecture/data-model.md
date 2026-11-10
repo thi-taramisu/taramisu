@@ -12,8 +12,6 @@ erDiagram
     %% ==========================================
     %% 1. IAM & PROJECT-BASED RBAC
     %% ==========================================
-    IAM_USER ||--o{ IAM_USER_GROUP_MEMBER : "belongs to"
-    IAM_GROUP ||--o{ IAM_USER_GROUP_MEMBER : "contains"
     TARA_PROJECT ||--o{ PROJECT_ROLE_ASSIGNMENT : "grants access via"
     IAM_USER ||--o{ PROJECT_ROLE_ASSIGNMENT : "assigned directly (0..N)"
     IAM_GROUP ||--o{ PROJECT_ROLE_ASSIGNMENT : "assigned as group (0..N)"
@@ -68,17 +66,12 @@ erDiagram
 
     IAM_USER {
         uuid id PK "Internal UUID"
-        string external_iam_sub UK "Keycloak 'sub' or ORY Kratos 'identity.id'"
+        string external_iam_sub UK "Authentik 'sub' claim"
     }
 
     IAM_GROUP {
         uuid id PK "Internal UUID"
-        string external_iam_group_id UK "Keycloak Group ID / Role or ORY Group"
-    }
-
-    IAM_USER_GROUP_MEMBER {
-        uuid user_id PK, FK
-        uuid group_id PK, FK
+        string external_iam_group_id UK "Authentik group UUID"
     }
 
     PROJECT_ROLE_ASSIGNMENT {
@@ -86,7 +79,7 @@ erDiagram
         uuid tara_project_id FK
         uuid user_id FK "Nullable: set if individual user is authorized"
         uuid group_id FK "Nullable: set if entire group is authorized"
-        enum project_role "OWNER | EDITOR | REVIEWER | VIEWER"
+        enum project_role "VIEWER | EDITOR | OWNER"
         timestamp assigned_at
     }
 
@@ -107,7 +100,10 @@ erDiagram
         string name "Item or Component Name"
         enum scope_type "ITEM | COMPONENT (15.1, 15.6.1.1)"
         string lifecycle_phase "e.g., Concept, Product Development (15.1)"
-        text item_definition_wp_09_01 "Prerequisite [WP-09-01] (15.3.1.1, 15.4.1.1)"
+        text boundary "Nullable: item boundary and external interfaces [WP-09-01]"
+        text functions "Nullable: vehicle-level item functions [WP-09-01]"
+        text operational_environment "Nullable: connectivity, updates and workshop access [WP-09-01]"
+        text item_definition_wp_09_01 "Nullable: legacy unstructured [WP-09-01] import"
         text cybersecurity_specs_wp_10_01 "Supporting Info [WP-10-01] (15.3.1.2, 15.6.1.1)"
         text architectural_design "Supporting Info (15.6.1.2, 15.7.1.2)"
         timestamp created_at
@@ -232,14 +228,21 @@ erDiagram
   project (e.g., a vehicle platform) and acts as the authorization boundary for Role-Based Access Control (RBAC). A
   `TARA_PROJECT` contains one or more `ITEM_DEFINITION` instances. According to **Clause 15.1**, TARA methods are
   generic modules invoked at any point in the lifecycle of an *Item* or *Component*. `ITEM_DEFINITION` represents this
-  specific assessment scope, holding the mandatory input prerequisites (`item_definition_wp_09_01` per **15.3.1.1** /
-  **15.4.1.1** and `cybersecurity_specs_wp_10_01` per **15.6.1.1 NOTE**).
+  specific assessment scope. Its nullable `boundary`, `functions`, and `operational_environment` fields hold
+  the item definition **[WP-09-01]** used by **15.3.1.1** / **15.4.1.1**; drafts can fill them in later.
+  `item_definition_wp_09_01` is retained for legacy unstructured imports and is not synchronized with
+  those fields. `cybersecurity_specs_wp_10_01` supplies supporting information per **15.6.1.1 NOTE**.
+  Deleting an item cascades through its assets, damage scenarios, threat scenarios, attack paths, and
+  their dependent properties, links, ratings, risk values, and treatment decisions.
 * **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
-  externally (e.g., via Keycloak or ORY Kratos). Following strict separation of concerns, no redundant user-specific
+  externally by Authentik. Following strict separation of concerns, no redundant user-specific
   metadata (such as emails or display names) is stored in the application database; it stores only immutable external
   references (`external_iam_sub`, `external_iam_group_id`).
-* **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`OWNER`, `EDITOR`, `REVIEWER`,
-  `VIEWER`) on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
+* **Resource-Level Authorization (`PROJECT_ROLE_ASSIGNMENT`):** Enables assigning roles (`VIEWER`, `EDITOR`, `OWNER`)
+  on a `TARA_PROJECT` either to an individual user (`user_id`) or to an entire group (`group_id`).
+* **Project role rules (#211 / #212):** The [project roles specification](iam/project-roles.md) defines
+  one role per user or group and project, with the enum ordered by rank (`VIEWER`, `EDITOR`, `OWNER`).
+  Group membership comes from the signed Authentik access token; no local membership table is stored.
 
 ### 2.2 Separation of Assets and Cybersecurity Properties (`[RQ-15-02]`, `[WP-15-02]`)
 
@@ -313,7 +316,7 @@ erDiagram
 
 | Entity (Table) | ISO/SAE 21434 Clause & Work Product | Purpose & Required Attributes Justification |
 | :--- | :--- | :--- |
-| **`IAM_USER`**, **`IAM_GROUP`**, **`IAM_USER_GROUP_MEMBER`**, **`PROJECT_ROLE_ASSIGNMENT`** | App Infrastructure (RBAC) | Maps external IAM technical IDs (`external_iam_sub`, `external_iam_group_id`) without redundant user metadata to `TARA_PROJECT` instances with specific roles (`OWNER`, `EDITOR`, `REVIEWER`, `VIEWER`). |
+| **`IAM_USER`**, **`IAM_GROUP`**, **`PROJECT_ROLE_ASSIGNMENT`** | App Infrastructure (RBAC) | Maps external IAM technical IDs (`external_iam_sub`, `external_iam_group_id`) without redundant user metadata to `TARA_PROJECT` instances with specific roles (`VIEWER`, `EDITOR`, `OWNER`). |
 | **`TARA_PROJECT`** | App Organizational Hierarchy | Top-level project container (e.g., vehicle platform) grouping multiple `ITEM_DEFINITION` scopes and serving as the RBAC authorization boundary. |
 | **`ITEM_DEFINITION`** | **15.1, 15.3.1, 15.4.1, 15.6.1, 15.9.1** (`[WP-09-01]`, `[WP-10-01]`) | Specific TARA scope under a `TARA_PROJECT`. Stores `scope_type` (`ITEM \| COMPONENT` per **15.6.1.1 NOTE**), `lifecycle_phase` (**15.1**), and prerequisite references. |
 | **`ASSET`** | **15.3** (`[RQ-15-02]`, **15.3.2 NOTE 2**) | Represents system assets within an `ITEM_DEFINITION`. Tracks `identification_source` (*Item Definition, Impact Rating, Threat Derived, Catalogue*). |

@@ -1,5 +1,5 @@
 # Compose targets use iam/.env.
-ifeq ($(filter init up down db reset pgadmin migrate migrate-diff migrate-validate,$(MAKECMDGOALS)),)
+ifeq ($(filter init up down db reset pgadmin migrate migrate-diff migrate-validate check-networks,$(MAKECMDGOALS)),)
 -include .env
 export
 endif
@@ -7,8 +7,8 @@ endif
 OPENAPI := openapi.json
 
 .DEFAULT_GOAL := test
-.PHONY: init up down reset db pgadmin run test migrate migrate-diff migrate-validate sqlc sqlc-diff openapi lint fmt
-init up down reset db pgadmin migrate migrate-diff migrate-validate:
+.PHONY: init up down reset db pgadmin check-networks run test migrate migrate-diff migrate-validate sqlc sqlc-diff openapi lint fmt
+init up down reset db pgadmin migrate migrate-diff migrate-validate check-networks:
 	$(MAKE) -C ../deploy $@
 run:
 	go run ./cmd/api

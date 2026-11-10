@@ -1,45 +1,25 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 )
 
-type testUsers struct{}
-
-func (testUsers) UpsertIAMUser(context.Context, string) (string, error) {
-	return "", errors.New("unexpected user lookup")
-}
-
 func TestAuthRoutes(t *testing.T) {
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]string{
-			"issuer":                 "http://" + r.Host,
-			"authorization_endpoint": "http://" + r.Host + "/authorize",
-		}); err != nil {
-			t.Error(err)
-		}
-	}))
-	defer provider.Close()
-	manager, err := auth.New(context.Background(), auth.Config{
-		Issuer: provider.URL, ClientID: "taramisu", ClientSecret: "secret", AppURL: "http://localhost:8080",
-	}, testUsers{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	manager, bearerToken := authtest.NewManagerAndToken(t)
 	handler := New(nil, manager)
+
 	for path, want := range map[string]int{
-		"/health/live": 200, "/openapi.json": 200,
-		"/api/v1/me": 401, "/api/v1/unknown": 401,
-		"/auth/login": 302, "/auth/callback": 400, "/auth/logout": 405,
+		"/health/live":  http.StatusOK,
+		"/openapi.json": http.StatusOK,
+		"/api/v1/me":    http.StatusUnauthorized,
+		"/api/v1/other": http.StatusUnauthorized,
 	} {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, http.NoBody))
@@ -58,31 +38,61 @@ func TestAuthRoutes(t *testing.T) {
 			}
 		}
 	}
-	for origin, want := range map[string]int{"": 403, "http://localhost:8080": 204} {
-		r := httptest.NewRequest(http.MethodPost, "/auth/logout", http.NoBody)
-		r.Header.Set("Origin", origin)
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, r)
-		if w.Code != want {
-			t.Fatalf("POST /auth/logout with origin %q: got %d, want %d", origin, w.Code, want)
-		}
-	}
-	if op := OpenAPI().Paths["/api/v1/me"].Get; len(op.Security) == 0 {
-		t.Fatal("OpenAPI does not document session authentication")
-	}
+
+	// Authenticated request with valid Bearer JWT returns the caller identity.
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody)
+	req.Header.Set("Authorization", bearerToken)
 	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("authenticated GET /api/v1/me: got %d, want 200 (%s)", w.Code, w.Body.String())
+	}
+	var currentUser auth.User
+	if err := json.Unmarshal(w.Body.Bytes(), &currentUser); err != nil {
+		t.Fatal(err)
+	}
+	if currentUser.ID != authtest.UserID || currentUser.Subject != authtest.Subject || currentUser.Name != authtest.Name || currentUser.Email != authtest.Email {
+		t.Fatalf("unexpected current user: %+v", currentUser)
+	}
+
+	spec := OpenAPI()
+	if op := spec.Paths["/api/v1/me"].Get; len(op.Security) == 0 || op.Security[0]["bearer"] == nil {
+		t.Fatal("OpenAPI does not document bearer JWT authentication on /api/v1/me")
+	}
+	scheme := spec.Components.SecuritySchemes["bearer"]
+	if scheme == nil || scheme.Type != "http" || scheme.Scheme != "bearer" || scheme.BearerFormat != "JWT" {
+		t.Fatalf("unexpected OpenAPI bearer security scheme: %+v", scheme)
+	}
+
+	w = httptest.NewRecorder()
 	New(nil, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody))
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("missing auth configuration: %d", w.Code)
 	}
 }
 
-func TestAuthOpenAPI(t *testing.T) {
+func TestProjectMemberRoutesRequireBearer(t *testing.T) {
+	manager, _ := authtest.NewManagerAndToken(t)
+	handler := New(nil, manager, WithDirectory(nil))
+	const members = "/api/v1/projects/00000000-0000-4000-8000-000000000001/members"
+	const member = members + "/00000000-0000-4000-8000-000000000002"
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, members},
+		{http.MethodPost, members},
+		{http.MethodPatch, member},
+		{http.MethodDelete, member},
+		{http.MethodGet, "/api/v1/groups"},
+	} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(route.method, route.path, http.NoBody))
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s without token: got %d, want 401", route.method, route.path, w.Code)
+		}
+	}
 	spec := OpenAPI()
-	for _, path := range []string{"/auth/login", "/auth/callback", "/auth/logout"} {
-		item := spec.Paths[path]
-		if item == nil || (path == "/auth/logout" && item.Post == nil) || (path != "/auth/logout" && item.Get == nil) {
-			t.Errorf("missing auth operation: %s", path)
+	for path, item := range map[string]*huma.PathItem{members: spec.Paths["/api/v1/projects/{id}/members"], "/api/v1/groups": spec.Paths["/api/v1/groups"]} {
+		if item == nil || item.Get == nil || item.Get.Security[0]["bearer"] == nil {
+			t.Fatalf("OpenAPI does not document bearer security on %s", path)
 		}
 	}
 }

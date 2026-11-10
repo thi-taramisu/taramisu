@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix=PROJECT) as directory:
     envfile = work / 'storage/.env'
     base = ['docker', 'compose', '--env-file', str(work / 'iam/.env'), '--env-file', str(envfile), '-f', str(work / 'deploy/compose.yaml')]
     files = []
-    probe_networks = [PROJECT + '_default', PROJECT + '_taramisu-proxy']
+    probe_networks = [PROJECT + '_edge', PROJECT + '_proxy']
     restore_volume = PROJECT + '-restored_data'
 
     def compose(*args, check=True):
@@ -117,7 +117,7 @@ for port in (8333, 18333, 9333, 19333, 8888, 18888, 8080, 18080):
     except OSError:
         pass
 ''')
-        print('PASS: bucket permissions, anonymous denial, private listeners and both proxy networks', flush=True)
+        print('PASS: bucket permissions, anonymous denial, private listeners and edge and proxy networks', flush=True)
 
         compose('stop', 'storage')
         old = dict(line.split('=', 1) for line in envfile.read_text().splitlines() if line.startswith('S3_'))
