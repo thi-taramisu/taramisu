@@ -9,8 +9,9 @@ RETURNING *;
 SELECT l.* FROM threat_attack_path_link l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN attack_path a ON a.id = l.attack_path_id
-WHERE t.item_definition_id = $1 AND a.item_definition_id = $1
-ORDER BY l.id;
+WHERE t.item_definition_id = sqlc.arg(item_definition_id) AND a.item_definition_id = sqlc.arg(item_definition_id)
+ORDER BY l.id
+LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: DeleteThreatAttackPathLink :execrows
 DELETE FROM threat_attack_path_link l

@@ -24,23 +24,50 @@ const (
 	linksPath    = "/api/v1/item-definitions/" + itemDefID + "/threat-attack-path-links"
 )
 
-func testUUID(s string) pgtype.UUID {
+func attackUUID(s string) pgtype.UUID {
 	var id pgtype.UUID
 	_ = id.Scan(s)
 	return id
 }
 
+// fakeAttackAccess answers the project access checks: the caller holds role in the project.
+// An empty role means the caller is not a member.
+type fakeAttackAccess struct {
+	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
+	role db.ProjectRole
+}
+
+func editor() fakeAttackAccess { return fakeAttackAccess{role: db.ProjectRoleEDITOR} }
+
+func (f fakeAttackAccess) GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error) {
+	if f.role == "" {
+		return "", pgx.ErrNoRows
+	}
+	return f.role, nil
+}
+func (fakeAttackAccess) ProjectIDForItemDefinition(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	return attackUUID("77777777-7777-7777-7777-777777777777"), nil
+}
+func (fakeAttackAccess) ProjectIDForThreatScenario(context.Context, pgtype.UUID) (pgtype.UUID, error) {
+	return attackUUID("77777777-7777-7777-7777-777777777777"), nil
+}
+
 type fakeAttackPaths struct {
+	fakeAttackAccess
 	handlers.TaraProjectStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	statusReaderFunc
-	found bool
+	found  bool
+	update db.UpdateAttackPathParams
 }
 
 func (f *fakeAttackPaths) path() db.AttackPath {
 	return db.AttackPath{
-		ID: testUUID(attackPathID), ItemDefinitionID: testUUID(itemDefID),
+		ID: attackUUID(attackPathID), ItemDefinitionID: attackUUID(itemDefID),
 		Title: "AP", IsPartialEarlyStage: true,
 	}
 }
@@ -54,7 +81,7 @@ func (f *fakeAttackPaths) GetAttackPath(context.Context, db.GetAttackPathParams)
 	}
 	return f.path(), nil
 }
-func (f *fakeAttackPaths) ListAttackPaths(context.Context, pgtype.UUID) ([]db.AttackPath, error) {
+func (f *fakeAttackPaths) ListAttackPaths(context.Context, db.ListAttackPathsParams) ([]db.AttackPath, error) {
 	return []db.AttackPath{f.path()}, nil
 }
 func (f *fakeAttackPaths) ReplaceAttackPath(context.Context, db.ReplaceAttackPathParams) (db.AttackPath, error) {
@@ -63,7 +90,8 @@ func (f *fakeAttackPaths) ReplaceAttackPath(context.Context, db.ReplaceAttackPat
 	}
 	return f.path(), nil
 }
-func (f *fakeAttackPaths) UpdateAttackPath(context.Context, db.UpdateAttackPathParams) (db.AttackPath, error) {
+func (f *fakeAttackPaths) UpdateAttackPath(_ context.Context, p db.UpdateAttackPathParams) (db.AttackPath, error) {
+	f.update = p
 	if !f.found {
 		return db.AttackPath{}, pgx.ErrNoRows
 	}
@@ -77,18 +105,20 @@ func (f *fakeAttackPaths) DeleteAttackPath(context.Context, db.DeleteAttackPathP
 }
 
 type fakeRatings struct {
+	fakeAttackAccess
 	handlers.TaraProjectStore
 	handlers.AttackPathStore
 	handlers.ThreatAttackPathLinkStore
 	statusReaderFunc
 	belongs, found bool
 	writeErr       error
+	update         db.UpdateAttackFeasibilityRatingParams
 }
 
 func (f *fakeRatings) rating() db.AttackFeasibilityRating {
 	high := db.AttackFeasibilityHIGH
 	return db.AttackFeasibilityRating{
-		ID: testUUID(attackPathID), AttackPathID: testUUID(attackPathID),
+		ID: attackUUID(attackPathID), AttackPathID: attackUUID(attackPathID),
 		FeasibilityRating: &high,
 	}
 }
@@ -108,7 +138,8 @@ func (f *fakeRatings) UpsertAttackFeasibilityRating(context.Context, db.UpsertAt
 	}
 	return f.rating(), nil
 }
-func (f *fakeRatings) UpdateAttackFeasibilityRating(context.Context, db.UpdateAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error) {
+func (f *fakeRatings) UpdateAttackFeasibilityRating(_ context.Context, p db.UpdateAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error) {
+	f.update = p
 	if !f.found {
 		return db.AttackFeasibilityRating{}, pgx.ErrNoRows
 	}
@@ -122,6 +153,7 @@ func (f *fakeRatings) DeleteAttackFeasibilityRating(context.Context, pgtype.UUID
 }
 
 type fakeLinks struct {
+	fakeAttackAccess
 	handlers.TaraProjectStore
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
@@ -131,7 +163,7 @@ type fakeLinks struct {
 
 func (f *fakeLinks) link() db.ThreatAttackPathLink {
 	return db.ThreatAttackPathLink{
-		ID: testUUID(attackPathID), ThreatScenarioID: testUUID(itemDefID), AttackPathID: testUUID(attackPathID),
+		ID: attackUUID(attackPathID), ThreatScenarioID: attackUUID(itemDefID), AttackPathID: attackUUID(attackPathID),
 	}
 }
 
@@ -144,7 +176,7 @@ func (f *fakeLinks) CreateThreatAttackPathLink(context.Context, db.CreateThreatA
 	}
 	return f.link(), nil
 }
-func (f *fakeLinks) ListThreatAttackPathLinks(context.Context, pgtype.UUID) ([]db.ThreatAttackPathLink, error) {
+func (f *fakeLinks) ListThreatAttackPathLinks(context.Context, db.ListThreatAttackPathLinksParams) ([]db.ThreatAttackPathLink, error) {
 	return []db.ThreatAttackPathLink{f.link()}, nil
 }
 func (f *fakeLinks) DeleteThreatAttackPathLink(context.Context, db.DeleteThreatAttackPathLinkParams) (int64, error) {
@@ -170,6 +202,9 @@ func TestAttackPathRoutes(t *testing.T) {
 		{"create bad approach", true, http.MethodPost, attackPaths, `{"title":"AP","analysis_approach":"SIDEWAYS"}`, http.StatusUnprocessableEntity},
 		{"create with steps", true, http.MethodPost, attackPaths, `{"title":"AP","attack_steps_and_weaknesses":{"a":[1,2]}}`, http.StatusCreated},
 		{"list", true, http.MethodGet, attackPaths, "", http.StatusOK},
+		{"list paged", true, http.MethodGet, attackPaths + "?limit=100&offset=2147483647", "", http.StatusOK},
+		{"list limit too large", true, http.MethodGet, attackPaths + "?limit=101", "", http.StatusUnprocessableEntity},
+		{"list negative offset", true, http.MethodGet, attackPaths + "?offset=-1", "", http.StatusUnprocessableEntity},
 		{"get", true, http.MethodGet, member, "", http.StatusOK},
 		{"get missing", false, http.MethodGet, member, "", http.StatusNotFound},
 		{"get bad item id", true, http.MethodGet, "/api/v1/item-definitions/nope/attack-paths", "", http.StatusUnprocessableEntity},
@@ -182,7 +217,7 @@ func TestAttackPathRoutes(t *testing.T) {
 		{"delete missing", false, http.MethodDelete, member, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(&fakeAttackPaths{found: tc.found}, manager)
+			h := httpapi.New(&fakeAttackPaths{fakeAttackAccess: editor(), found: tc.found}, manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", bearer)
@@ -218,7 +253,7 @@ func TestAttackFeasibilityRatingRoutes(t *testing.T) {
 		{"delete missing", true, false, http.MethodDelete, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(&fakeRatings{belongs: tc.belongs, found: tc.found}, manager)
+			h := httpapi.New(&fakeRatings{fakeAttackAccess: editor(), belongs: tc.belongs, found: tc.found}, manager)
 			req := httptest.NewRequest(tc.method, ratingPath, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", bearer)
@@ -243,6 +278,8 @@ func TestThreatAttackPathLinkRoutes(t *testing.T) {
 		code   int
 	}{
 		{"list", "", http.MethodGet, linksPath, "", http.StatusOK},
+		{"list paged", "", http.MethodGet, linksPath + "?limit=1&offset=0", "", http.StatusOK},
+		{"list limit too small", "", http.MethodGet, linksPath + "?limit=0", "", http.StatusUnprocessableEntity},
 		{"create", "", http.MethodPost, linksPath, body, http.StatusCreated},
 		{"create missing parent", "noparent", http.MethodPost, linksPath, body, http.StatusUnprocessableEntity},
 		{"create duplicate", "dup", http.MethodPost, linksPath, body, http.StatusConflict},
@@ -251,7 +288,7 @@ func TestThreatAttackPathLinkRoutes(t *testing.T) {
 		{"delete missing", "missing", http.MethodDelete, linksPath + "/" + attackPathID, "", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := httpapi.New(&fakeLinks{mode: tc.mode}, manager)
+			h := httpapi.New(&fakeLinks{fakeAttackAccess: editor(), mode: tc.mode}, manager)
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", bearer)
@@ -266,7 +303,7 @@ func TestThreatAttackPathLinkRoutes(t *testing.T) {
 
 func TestAttackPathRoutesRequireAuthentication(t *testing.T) {
 	manager, _ := authtest.NewManagerAndToken(t)
-	h := httpapi.New(&fakeAttackPaths{found: true}, manager)
+	h := httpapi.New(&fakeAttackPaths{fakeAttackAccess: editor(), found: true}, manager)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, attackPaths, http.NoBody))
 	if rr.Code != http.StatusUnauthorized {
@@ -276,7 +313,7 @@ func TestAttackPathRoutesRequireAuthentication(t *testing.T) {
 
 func TestAttackFeasibilityRatingCheckViolationIs422(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
-	h := httpapi.New(&fakeRatings{belongs: true, found: true, writeErr: &pgconn.PgError{Code: "23514"}}, manager)
+	h := httpapi.New(&fakeRatings{fakeAttackAccess: editor(), belongs: true, found: true, writeErr: &pgconn.PgError{Code: "23514"}}, manager)
 	req := httptest.NewRequest(http.MethodPut, ratingPath, strings.NewReader(`{"ap_total_score":7}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", bearer)
@@ -284,5 +321,116 @@ func TestAttackFeasibilityRatingCheckViolationIs422(t *testing.T) {
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want %d: %s", rr.Code, http.StatusUnprocessableEntity, rr.Body.String())
+	}
+}
+
+func attackRequest(h http.Handler, bearer, method, path, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", bearer)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	return rr
+}
+
+func TestAttackPathRoutesProjectRoles(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	member := attackPaths + "/" + attackPathID
+	const link = `{"threat_scenario_id":"` + itemDefID + `","attack_path_id":"` + attackPathID + `"}`
+	for _, tc := range []struct {
+		name, method, path, body string
+		write                    bool
+	}{
+		{"list attack paths", http.MethodGet, attackPaths, "", false},
+		{"create attack path", http.MethodPost, attackPaths, `{"title":"AP"}`, true},
+		{"get attack path", http.MethodGet, member, "", false},
+		{"replace attack path", http.MethodPut, member, `{"title":"B"}`, true},
+		{"update attack path", http.MethodPatch, member, `{"title":"C"}`, true},
+		{"delete attack path", http.MethodDelete, member, "", true},
+		{"get rating", http.MethodGet, ratingPath, "", false},
+		{"replace rating", http.MethodPut, ratingPath, `{"rationale":"r"}`, true},
+		{"update rating", http.MethodPatch, ratingPath, `{"rationale":"r"}`, true},
+		{"delete rating", http.MethodDelete, ratingPath, "", true},
+		{"list links", http.MethodGet, linksPath, "", false},
+		{"create link", http.MethodPost, linksPath, link, true},
+		{"delete link", http.MethodDelete, linksPath + "/" + attackPathID, "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			status := func(role db.ProjectRole) int {
+				access := fakeAttackAccess{role: role}
+				var store httpapi.Queries = &fakeAttackPaths{fakeAttackAccess: access, found: true}
+				switch {
+				case tc.path == ratingPath:
+					store = &fakeRatings{fakeAttackAccess: access, belongs: true, found: true}
+				case strings.HasPrefix(tc.path, linksPath):
+					store = &fakeLinks{fakeAttackAccess: access}
+				}
+				return attackRequest(httpapi.New(store, manager), bearer, tc.method, tc.path, tc.body).Code
+			}
+			if got := status(""); got != http.StatusNotFound {
+				t.Fatalf("non-member: status = %d, want 404", got)
+			}
+			viewer := status(db.ProjectRoleVIEWER)
+			if tc.write && viewer != http.StatusForbidden {
+				t.Fatalf("viewer: status = %d, want 403", viewer)
+			}
+			if !tc.write && viewer >= 400 {
+				t.Fatalf("viewer: status = %d, want success", viewer)
+			}
+			if got := status(db.ProjectRoleEDITOR); got >= 400 {
+				t.Fatalf("editor: status = %d, want success", got)
+			}
+		})
+	}
+}
+
+func TestAttackCreateSetsLocation(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	const link = `{"threat_scenario_id":"` + itemDefID + `","attack_path_id":"` + attackPathID + `"}`
+	for _, tc := range []struct {
+		store      httpapi.Queries
+		path, body string
+	}{
+		{&fakeAttackPaths{fakeAttackAccess: editor(), found: true}, attackPaths, `{"title":"AP"}`},
+		{&fakeLinks{fakeAttackAccess: editor()}, linksPath, link},
+	} {
+		rr := attackRequest(httpapi.New(tc.store, manager), bearer, http.MethodPost, tc.path, tc.body)
+		if want := tc.path + "/" + attackPathID; rr.Code != http.StatusCreated || rr.Header().Get("Location") != want {
+			t.Fatalf("POST %s: status = %d, Location = %q, want %q", tc.path, rr.Code, rr.Header().Get("Location"), want)
+		}
+	}
+}
+
+func TestAttackPatchDistinguishesOmittedFromNull(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+
+	paths := &fakeAttackPaths{fakeAttackAccess: editor(), found: true}
+	h := httpapi.New(paths, manager)
+	if rr := attackRequest(h, bearer, http.MethodPatch, attackPaths+"/"+attackPathID, `{"title":"x"}`); rr.Code != http.StatusOK {
+		t.Fatal(rr.Body.String())
+	}
+	if paths.update.SetAnalysisApproach || paths.update.SetAttackStepsAndWeaknesses {
+		t.Fatalf("omitted fields must stay unchanged: %+v", paths.update)
+	}
+	if rr := attackRequest(h, bearer, http.MethodPatch, attackPaths+"/"+attackPathID, `{"analysis_approach":null,"attack_steps_and_weaknesses":null}`); rr.Code != http.StatusOK {
+		t.Fatal(rr.Body.String())
+	}
+	if !paths.update.SetAnalysisApproach || paths.update.AnalysisApproach != nil || !paths.update.SetAttackStepsAndWeaknesses || paths.update.AttackStepsAndWeaknesses != nil {
+		t.Fatalf("null must clear the fields: %+v", paths.update)
+	}
+	if rr := attackRequest(h, bearer, http.MethodPatch, attackPaths+"/"+attackPathID, `{"analysis_approach":"TOP_DOWN","attack_steps_and_weaknesses":{"a":1}}`); rr.Code != http.StatusOK {
+		t.Fatal(rr.Body.String())
+	}
+	if !paths.update.SetAnalysisApproach || *paths.update.AnalysisApproach != db.AnalysisApproachTOPDOWN || string(paths.update.AttackStepsAndWeaknesses) != `{"a":1}` {
+		t.Fatalf("values must be set: %+v", paths.update)
+	}
+
+	ratings := &fakeRatings{fakeAttackAccess: editor(), belongs: true, found: true}
+	h = httpapi.New(ratings, manager)
+	if rr := attackRequest(h, bearer, http.MethodPatch, ratingPath, `{"rationale":null}`); rr.Code != http.StatusOK {
+		t.Fatal(rr.Body.String())
+	}
+	if !ratings.update.SetRationale || ratings.update.Rationale != nil || ratings.update.SetApTotalScore || ratings.update.SetFeasibilityRating {
+		t.Fatalf("only the null field may be cleared: %+v", ratings.update)
 	}
 }

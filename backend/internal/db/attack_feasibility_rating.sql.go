@@ -63,39 +63,55 @@ func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID p
 
 const updateAttackFeasibilityRating = `-- name: UpdateAttackFeasibilityRating :one
 UPDATE attack_feasibility_rating
-SET ap_elapsed_time = COALESCE($1, ap_elapsed_time),
-    ap_specialist_expertise = COALESCE($2, ap_specialist_expertise),
-    ap_knowledge_of_item = COALESCE($3, ap_knowledge_of_item),
-    ap_window_of_opportunity = COALESCE($4, ap_window_of_opportunity),
-    ap_equipment = COALESCE($5, ap_equipment),
-    ap_total_score = COALESCE($6, ap_total_score),
-    feasibility_rating = COALESCE($7, feasibility_rating),
-    rationale = COALESCE($8, rationale)
-WHERE attack_path_id = $9
+SET ap_elapsed_time = CASE WHEN $1::boolean THEN $2::integer ELSE ap_elapsed_time END,
+    ap_specialist_expertise = CASE WHEN $3::boolean THEN $4::integer ELSE ap_specialist_expertise END,
+    ap_knowledge_of_item = CASE WHEN $5::boolean THEN $6::integer ELSE ap_knowledge_of_item END,
+    ap_window_of_opportunity = CASE WHEN $7::boolean THEN $8::integer ELSE ap_window_of_opportunity END,
+    ap_equipment = CASE WHEN $9::boolean THEN $10::integer ELSE ap_equipment END,
+    ap_total_score = CASE WHEN $11::boolean THEN $12::integer ELSE ap_total_score END,
+    feasibility_rating = CASE WHEN $13::boolean THEN $14::attack_feasibility ELSE feasibility_rating END,
+    rationale = CASE WHEN $15::boolean THEN $16::text ELSE rationale END
+WHERE attack_path_id = $17
 RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
 `
 
 type UpdateAttackFeasibilityRatingParams struct {
-	ApElapsedTime         *int32
-	ApSpecialistExpertise *int32
-	ApKnowledgeOfItem     *int32
-	ApWindowOfOpportunity *int32
-	ApEquipment           *int32
-	ApTotalScore          *int32
-	FeasibilityRating     *AttackFeasibility
-	Rationale             *string
-	AttackPathID          pgtype.UUID
+	SetApElapsedTime         bool
+	ApElapsedTime            *int32
+	SetApSpecialistExpertise bool
+	ApSpecialistExpertise    *int32
+	SetApKnowledgeOfItem     bool
+	ApKnowledgeOfItem        *int32
+	SetApWindowOfOpportunity bool
+	ApWindowOfOpportunity    *int32
+	SetApEquipment           bool
+	ApEquipment              *int32
+	SetApTotalScore          bool
+	ApTotalScore             *int32
+	SetFeasibilityRating     bool
+	FeasibilityRating        *AttackFeasibility
+	SetRationale             bool
+	Rationale                *string
+	AttackPathID             pgtype.UUID
 }
 
 func (q *Queries) UpdateAttackFeasibilityRating(ctx context.Context, arg UpdateAttackFeasibilityRatingParams) (AttackFeasibilityRating, error) {
 	row := q.db.QueryRow(ctx, updateAttackFeasibilityRating,
+		arg.SetApElapsedTime,
 		arg.ApElapsedTime,
+		arg.SetApSpecialistExpertise,
 		arg.ApSpecialistExpertise,
+		arg.SetApKnowledgeOfItem,
 		arg.ApKnowledgeOfItem,
+		arg.SetApWindowOfOpportunity,
 		arg.ApWindowOfOpportunity,
+		arg.SetApEquipment,
 		arg.ApEquipment,
+		arg.SetApTotalScore,
 		arg.ApTotalScore,
+		arg.SetFeasibilityRating,
 		arg.FeasibilityRating,
+		arg.SetRationale,
 		arg.Rationale,
 		arg.AttackPathID,
 	)

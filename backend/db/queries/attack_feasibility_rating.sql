@@ -20,14 +20,14 @@ RETURNING *;
 
 -- name: UpdateAttackFeasibilityRating :one
 UPDATE attack_feasibility_rating
-SET ap_elapsed_time = COALESCE(sqlc.narg('ap_elapsed_time'), ap_elapsed_time),
-    ap_specialist_expertise = COALESCE(sqlc.narg('ap_specialist_expertise'), ap_specialist_expertise),
-    ap_knowledge_of_item = COALESCE(sqlc.narg('ap_knowledge_of_item'), ap_knowledge_of_item),
-    ap_window_of_opportunity = COALESCE(sqlc.narg('ap_window_of_opportunity'), ap_window_of_opportunity),
-    ap_equipment = COALESCE(sqlc.narg('ap_equipment'), ap_equipment),
-    ap_total_score = COALESCE(sqlc.narg('ap_total_score'), ap_total_score),
-    feasibility_rating = COALESCE(sqlc.narg('feasibility_rating'), feasibility_rating),
-    rationale = COALESCE(sqlc.narg('rationale'), rationale)
+SET ap_elapsed_time = CASE WHEN sqlc.arg('set_ap_elapsed_time')::boolean THEN sqlc.narg('ap_elapsed_time')::integer ELSE ap_elapsed_time END,
+    ap_specialist_expertise = CASE WHEN sqlc.arg('set_ap_specialist_expertise')::boolean THEN sqlc.narg('ap_specialist_expertise')::integer ELSE ap_specialist_expertise END,
+    ap_knowledge_of_item = CASE WHEN sqlc.arg('set_ap_knowledge_of_item')::boolean THEN sqlc.narg('ap_knowledge_of_item')::integer ELSE ap_knowledge_of_item END,
+    ap_window_of_opportunity = CASE WHEN sqlc.arg('set_ap_window_of_opportunity')::boolean THEN sqlc.narg('ap_window_of_opportunity')::integer ELSE ap_window_of_opportunity END,
+    ap_equipment = CASE WHEN sqlc.arg('set_ap_equipment')::boolean THEN sqlc.narg('ap_equipment')::integer ELSE ap_equipment END,
+    ap_total_score = CASE WHEN sqlc.arg('set_ap_total_score')::boolean THEN sqlc.narg('ap_total_score')::integer ELSE ap_total_score END,
+    feasibility_rating = CASE WHEN sqlc.arg('set_feasibility_rating')::boolean THEN sqlc.narg('feasibility_rating')::attack_feasibility ELSE feasibility_rating END,
+    rationale = CASE WHEN sqlc.arg('set_rationale')::boolean THEN sqlc.narg('rationale')::text ELSE rationale END
 WHERE attack_path_id = @attack_path_id
 RETURNING *;
 

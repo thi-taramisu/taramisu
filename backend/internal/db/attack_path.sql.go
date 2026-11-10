@@ -85,11 +85,20 @@ func (q *Queries) GetAttackPath(ctx context.Context, arg GetAttackPathParams) (A
 }
 
 const listAttackPaths = `-- name: ListAttackPaths :many
-SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE item_definition_id = $1 ORDER BY title, id
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path
+WHERE item_definition_id = $1
+ORDER BY title, id
+LIMIT $3 OFFSET $2
 `
 
-func (q *Queries) ListAttackPaths(ctx context.Context, itemDefinitionID pgtype.UUID) ([]AttackPath, error) {
-	rows, err := q.db.Query(ctx, listAttackPaths, itemDefinitionID)
+type ListAttackPathsParams struct {
+	ItemDefinitionID pgtype.UUID
+	PageOffset       int32
+	PageLimit        int32
+}
+
+func (q *Queries) ListAttackPaths(ctx context.Context, arg ListAttackPathsParams) ([]AttackPath, error) {
+	rows, err := q.db.Query(ctx, listAttackPaths, arg.ItemDefinitionID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -155,27 +164,31 @@ func (q *Queries) ReplaceAttackPath(ctx context.Context, arg ReplaceAttackPathPa
 const updateAttackPath = `-- name: UpdateAttackPath :one
 UPDATE attack_path
 SET title = COALESCE($1, title),
-    analysis_approach = COALESCE($2, analysis_approach),
-    is_partial_early_stage = COALESCE($3, is_partial_early_stage),
-    attack_steps_and_weaknesses = COALESCE($4, attack_steps_and_weaknesses)
-WHERE id = $5 AND item_definition_id = $6
+    analysis_approach = CASE WHEN $2::boolean THEN $3::analysis_approach ELSE analysis_approach END,
+    is_partial_early_stage = COALESCE($4, is_partial_early_stage),
+    attack_steps_and_weaknesses = CASE WHEN $5::boolean THEN $6::jsonb ELSE attack_steps_and_weaknesses END
+WHERE id = $7 AND item_definition_id = $8
 RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
 `
 
 type UpdateAttackPathParams struct {
-	Title                    *string
-	AnalysisApproach         *AnalysisApproach
-	IsPartialEarlyStage      *bool
-	AttackStepsAndWeaknesses []byte
-	ID                       pgtype.UUID
-	ItemDefinitionID         pgtype.UUID
+	Title                       *string
+	SetAnalysisApproach         bool
+	AnalysisApproach            *AnalysisApproach
+	IsPartialEarlyStage         *bool
+	SetAttackStepsAndWeaknesses bool
+	AttackStepsAndWeaknesses    []byte
+	ID                          pgtype.UUID
+	ItemDefinitionID            pgtype.UUID
 }
 
 func (q *Queries) UpdateAttackPath(ctx context.Context, arg UpdateAttackPathParams) (AttackPath, error) {
 	row := q.db.QueryRow(ctx, updateAttackPath,
 		arg.Title,
+		arg.SetAnalysisApproach,
 		arg.AnalysisApproach,
 		arg.IsPartialEarlyStage,
+		arg.SetAttackStepsAndWeaknesses,
 		arg.AttackStepsAndWeaknesses,
 		arg.ID,
 		arg.ItemDefinitionID,

@@ -51,7 +51,15 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	seed(&otherItemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'b', 'ITEM') RETURNING id::text`, projectID)
 	seed(&threatID, `INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 't') RETURNING id::text`, itemID)
 
-	manager, bearer := authtest.NewManagerAndToken(t)
+	fixture := authtest.NewFixture(t, db.New(tx))
+	manager, bearer := fixture.Manager, "Bearer "+fixture.Token(t, nil)
+	userID, err := db.New(tx).UpsertIAMUser(ctx, authtest.Subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO project_role_assignment (tara_project_id, user_id, project_role) VALUES ($1, $2, 'EDITOR')`, projectID, userID); err != nil {
+		t.Fatal(err)
+	}
 	handler := httpapi.New(db.New(tx), manager)
 	call := func(method, path, body string, want int) []byte {
 		t.Helper()
@@ -106,6 +114,13 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 		t.Fatalf("omitted fields must be kept: %+v", got)
 	}
 	got = handlers.AttackPathBody{}
+	if err := json.Unmarshal(call(http.MethodPatch, member, `{"analysis_approach":null}`, http.StatusOK), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Remote" || got.AnalysisApproach != nil {
+		t.Fatalf("null must clear the field and keep the others: %+v", got)
+	}
+	got = handlers.AttackPathBody{}
 	if err := json.Unmarshal(call(http.MethodPut, member, `{"title":"Replaced"}`, http.StatusOK), &got); err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +149,13 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	}
 	if r.Rationale == nil || *r.Rationale != "new" || r.ApTotalScore == nil || *r.ApTotalScore != 7 {
 		t.Fatalf("patch must keep omitted fields: %+v", r)
+	}
+	r = handlers.AttackFeasibilityRatingBody{}
+	if err := json.Unmarshal(call(http.MethodPatch, rating, `{"rationale":null}`, http.StatusOK), &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.Rationale != nil || r.ApTotalScore == nil || *r.ApTotalScore != 7 {
+		t.Fatalf("null must clear the rationale and keep the others: %+v", r)
 	}
 
 	links := "/api/v1/item-definitions/" + itemID + "/threat-attack-path-links"

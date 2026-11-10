@@ -8,38 +8,37 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
 type ThreatAttackPathLinkStore interface {
 	CreateThreatAttackPathLink(context.Context, db.CreateThreatAttackPathLinkParams) (db.ThreatAttackPathLink, error)
-	ListThreatAttackPathLinks(context.Context, pgtype.UUID) ([]db.ThreatAttackPathLink, error)
+	ListThreatAttackPathLinks(context.Context, db.ListThreatAttackPathLinksParams) ([]db.ThreatAttackPathLink, error)
 	DeleteThreatAttackPathLink(context.Context, db.DeleteThreatAttackPathLinkParams) (int64, error)
 }
 
 type ThreatAttackPathLink struct {
-	store ThreatAttackPathLinkStore
+	store  ThreatAttackPathLinkStore
+	access ProjectAccessStore
 }
 
-func NewThreatAttackPathLink(store ThreatAttackPathLinkStore) *ThreatAttackPathLink {
-	return &ThreatAttackPathLink{store: store}
+func NewThreatAttackPathLink(store ThreatAttackPathLinkStore, access ProjectAccessStore) *ThreatAttackPathLink {
+	return &ThreatAttackPathLink{store: store, access: access}
 }
 
 func (h *ThreatAttackPathLink) Register(api huma.API) {
 	const collection = itemPath + "/threat-attack-path-links"
 	const member = collection + "/{id}"
-	op := func(id, method, path, summary string) huma.Operation {
+	op := func(id, method, path, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}}}
+			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}},
+			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
-	huma.Register(api, op("list-threat-attack-path-links", http.MethodGet, collection, "List threat scenario to attack path links of an item"), h.List)
-	create := op("create-threat-attack-path-link", http.MethodPost, collection, "Link a threat scenario to an attack path")
-	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	del := op("delete-threat-attack-path-link", http.MethodDelete, member, "Remove a threat scenario to attack path link")
-	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("list-threat-attack-path-links", http.MethodGet, collection, "List threat scenario to attack path links of an item (paginated)", http.StatusOK), read, h.List)
+	Register(api, op("create-threat-attack-path-link", http.MethodPost, collection, "Link a threat scenario to an attack path", http.StatusCreated), edit, h.Create)
+	Register(api, op("delete-threat-attack-path-link", http.MethodDelete, member, "Remove a threat scenario to attack path link", http.StatusNoContent), edit, h.Delete)
 }
 
 type ThreatAttackPathLinkBody struct {
@@ -48,12 +47,19 @@ type ThreatAttackPathLinkBody struct {
 	AttackPathID     string `json:"attack_path_id" format:"uuid"`
 }
 
-type ThreatAttackPathLinkOutput struct {
-	Body ThreatAttackPathLinkBody
+type CreateThreatAttackPathLinkOutput struct {
+	Location string `header:"Location"`
+	Body     ThreatAttackPathLinkBody
 }
 
 type ThreatAttackPathLinkListOutput struct {
 	Body []ThreatAttackPathLinkBody
+}
+
+type ListThreatAttackPathLinksInput struct {
+	AttackPathParentPath
+	Limit  int32 `query:"limit" default:"50" minimum:"1" maximum:"100"`
+	Offset int32 `query:"offset" default:"0" minimum:"0" maximum:"2147483647"`
 }
 
 type ThreatAttackPathLinkIDInput struct {
@@ -69,7 +75,7 @@ type CreateThreatAttackPathLinkInput struct {
 	}
 }
 
-func (h *ThreatAttackPathLink) Create(ctx context.Context, in *CreateThreatAttackPathLinkInput) (*ThreatAttackPathLinkOutput, error) {
+func (h *ThreatAttackPathLink) Create(ctx context.Context, in *CreateThreatAttackPathLinkInput) (*CreateThreatAttackPathLinkOutput, error) {
 	itemID, err := parseUUID(in.ItemDefinitionID)
 	if err != nil {
 		return nil, err
@@ -95,15 +101,18 @@ func (h *ThreatAttackPathLink) Create(ctx context.Context, in *CreateThreatAttac
 		}
 		return nil, err
 	}
-	return &ThreatAttackPathLinkOutput{Body: toThreatAttackPathLinkBody(l)}, nil
+	return &CreateThreatAttackPathLinkOutput{
+		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/threat-attack-path-links/" + l.ID.String(),
+		Body:     toThreatAttackPathLinkBody(l),
+	}, nil
 }
 
-func (h *ThreatAttackPathLink) List(ctx context.Context, in *AttackPathParentPath) (*ThreatAttackPathLinkListOutput, error) {
+func (h *ThreatAttackPathLink) List(ctx context.Context, in *ListThreatAttackPathLinksInput) (*ThreatAttackPathLinkListOutput, error) {
 	itemID, err := parseUUID(in.ItemDefinitionID)
 	if err != nil {
 		return nil, err
 	}
-	links, err := h.store.ListThreatAttackPathLinks(ctx, itemID)
+	links, err := h.store.ListThreatAttackPathLinks(ctx, db.ListThreatAttackPathLinksParams{ItemDefinitionID: itemID, PageLimit: in.Limit, PageOffset: in.Offset})
 	if err != nil {
 		return nil, err
 	}

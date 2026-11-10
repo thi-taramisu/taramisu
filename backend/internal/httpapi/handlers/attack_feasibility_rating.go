@@ -21,27 +21,29 @@ type AttackFeasibilityRatingStore interface {
 }
 
 type AttackFeasibilityRating struct {
-	store AttackFeasibilityRatingStore
+	store  AttackFeasibilityRatingStore
+	access ProjectAccessStore
 }
 
-func NewAttackFeasibilityRating(store AttackFeasibilityRatingStore) *AttackFeasibilityRating {
-	return &AttackFeasibilityRating{store: store}
+func NewAttackFeasibilityRating(store AttackFeasibilityRatingStore, access ProjectAccessStore) *AttackFeasibilityRating {
+	return &AttackFeasibilityRating{store: store, access: access}
 }
 
 func (h *AttackFeasibilityRating) Register(api huma.API) {
 	const path = itemPath + "/attack-paths/{attack_path_id}/feasibility-rating"
-	op := func(id, method, summary string) huma.Operation {
+	op := func(id, method, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}}}
+			Tags: []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}},
+			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
-	huma.Register(api, op("get-attack-feasibility-rating", http.MethodGet, "Get the attack feasibility rating of an attack path"), h.Get)
-	huma.Register(api, op("replace-attack-feasibility-rating", http.MethodPut, "Create or replace the attack feasibility rating of an attack path"), h.Upsert)
-	patch := op("update-attack-feasibility-rating", http.MethodPatch, "Partially update the attack feasibility rating of an attack path")
-	patch.Description = "Omitted fields remain unchanged. Nullable fields cannot be cleared with PATCH; use PUT."
-	huma.Register(api, patch, h.Update)
-	del := op("delete-attack-feasibility-rating", http.MethodDelete, "Delete the attack feasibility rating of an attack path")
-	del.DefaultStatus = http.StatusNoContent
-	huma.Register(api, del, h.Delete)
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("get-attack-feasibility-rating", http.MethodGet, "Get the attack feasibility rating of an attack path", http.StatusOK), read, h.Get)
+	Register(api, op("replace-attack-feasibility-rating", http.MethodPut, "Create or replace the attack feasibility rating of an attack path", http.StatusOK), edit, h.Upsert)
+	patch := op("update-attack-feasibility-rating", http.MethodPatch, "Partially update the attack feasibility rating of an attack path", http.StatusOK)
+	patch.Description = "Omitted fields remain unchanged. Every field can be cleared with null."
+	Register(api, patch, edit, h.Update)
+	Register(api, op("delete-attack-feasibility-rating", http.MethodDelete, "Delete the attack feasibility rating of an attack path", http.StatusNoContent), edit, h.Delete)
 }
 
 type AttackFeasibilityRatingBody struct {
@@ -64,6 +66,20 @@ type AttackFeasibilityRatingOutput struct {
 type FeasibilityRatingPath struct {
 	AttackPathParentPath
 	AttackPathID string `path:"attack_path_id" format:"uuid"`
+}
+
+type FeasibilityRatingUpdateInput struct {
+	FeasibilityRatingPath
+	Body struct {
+		ApElapsedTime         Optional[int32]                `json:"ap_elapsed_time,omitempty" minimum:"0"`
+		ApSpecialistExpertise Optional[int32]                `json:"ap_specialist_expertise,omitempty" minimum:"0"`
+		ApKnowledgeOfItem     Optional[int32]                `json:"ap_knowledge_of_item,omitempty" minimum:"0"`
+		ApWindowOfOpportunity Optional[int32]                `json:"ap_window_of_opportunity,omitempty" minimum:"0"`
+		ApEquipment           Optional[int32]                `json:"ap_equipment,omitempty" minimum:"0"`
+		ApTotalScore          Optional[int32]                `json:"ap_total_score,omitempty" minimum:"0"`
+		FeasibilityRating     Optional[db.AttackFeasibility] `json:"feasibility_rating,omitempty" enum:"HIGH,MEDIUM,LOW,VERY_LOW"`
+		Rationale             Optional[string]               `json:"rationale,omitempty"`
+	}
 }
 
 type FeasibilityRatingInput struct {
@@ -133,21 +149,30 @@ func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRat
 	return toRatingOutput(r), nil
 }
 
-func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRatingInput) (*AttackFeasibilityRatingOutput, error) {
+func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRatingUpdateInput) (*AttackFeasibilityRatingOutput, error) {
 	id, _, err := h.ratingPath(ctx, &in.FeasibilityRatingPath)
 	if err != nil {
 		return nil, err
 	}
+	b := in.Body
 	r, err := h.store.UpdateAttackFeasibilityRating(ctx, db.UpdateAttackFeasibilityRatingParams{
-		AttackPathID:          id,
-		ApElapsedTime:         in.Body.ApElapsedTime,
-		ApSpecialistExpertise: in.Body.ApSpecialistExpertise,
-		ApKnowledgeOfItem:     in.Body.ApKnowledgeOfItem,
-		ApWindowOfOpportunity: in.Body.ApWindowOfOpportunity,
-		ApEquipment:           in.Body.ApEquipment,
-		ApTotalScore:          in.Body.ApTotalScore,
-		FeasibilityRating:     in.Body.FeasibilityRating,
-		Rationale:             in.Body.Rationale,
+		AttackPathID:             id,
+		SetApElapsedTime:         b.ApElapsedTime.Set,
+		ApElapsedTime:            b.ApElapsedTime.Value,
+		SetApSpecialistExpertise: b.ApSpecialistExpertise.Set,
+		ApSpecialistExpertise:    b.ApSpecialistExpertise.Value,
+		SetApKnowledgeOfItem:     b.ApKnowledgeOfItem.Set,
+		ApKnowledgeOfItem:        b.ApKnowledgeOfItem.Value,
+		SetApWindowOfOpportunity: b.ApWindowOfOpportunity.Set,
+		ApWindowOfOpportunity:    b.ApWindowOfOpportunity.Value,
+		SetApEquipment:           b.ApEquipment.Set,
+		ApEquipment:              b.ApEquipment.Value,
+		SetApTotalScore:          b.ApTotalScore.Set,
+		ApTotalScore:             b.ApTotalScore.Value,
+		SetFeasibilityRating:     b.FeasibilityRating.Set,
+		FeasibilityRating:        b.FeasibilityRating.Value,
+		SetRationale:             b.Rationale.Set,
+		Rationale:                b.Rationale.Value,
 	})
 	if err != nil {
 		return nil, mapRatingError(err)

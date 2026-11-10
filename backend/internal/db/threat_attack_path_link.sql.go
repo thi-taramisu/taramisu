@@ -58,10 +58,17 @@ JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN attack_path a ON a.id = l.attack_path_id
 WHERE t.item_definition_id = $1 AND a.item_definition_id = $1
 ORDER BY l.id
+LIMIT $3 OFFSET $2
 `
 
-func (q *Queries) ListThreatAttackPathLinks(ctx context.Context, itemDefinitionID pgtype.UUID) ([]ThreatAttackPathLink, error) {
-	rows, err := q.db.Query(ctx, listThreatAttackPathLinks, itemDefinitionID)
+type ListThreatAttackPathLinksParams struct {
+	ItemDefinitionID pgtype.UUID
+	PageOffset       int32
+	PageLimit        int32
+}
+
+func (q *Queries) ListThreatAttackPathLinks(ctx context.Context, arg ListThreatAttackPathLinksParams) ([]ThreatAttackPathLink, error) {
+	rows, err := q.db.Query(ctx, listThreatAttackPathLinks, arg.ItemDefinitionID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
