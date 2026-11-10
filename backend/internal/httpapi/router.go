@@ -19,6 +19,9 @@ type Queries interface {
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
@@ -86,6 +89,9 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewAttackPath(queries, queries).Register(api)
 	handlers.NewAttackFeasibilityRating(queries, queries).Register(api)
 	handlers.NewThreatAttackPathLink(queries, queries).Register(api)
+	handlers.NewDamageScenario(queries, queries).Register(api)
+	handlers.NewImpactRating(queries, queries).Register(api)
+	handlers.NewThreatDamageLink(queries, queries).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
