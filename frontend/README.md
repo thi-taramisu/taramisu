@@ -47,8 +47,8 @@ The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/fr
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
 entity independently expandable, highlights the active entity on its subpages, and preserves URL query parameters (including graph view).
-Entries show the element name only; the code (e.g. `A-01`) stays in the element's page header and in the accessible names of tree links
-and toggles, so screen readers can tell same-named elements apart.
+Entries show the element name only; the code (e.g. `A-01`) stays in the accessible names of tree links and toggles, so screen readers
+can tell same-named elements apart. The element's page header shows its ID as `#` plus the number (e.g. `A-01` → `#01`) next to the type.
 Branches start expanded; navigating to a hidden descendant reveals its ancestors. Use Tab to reach links and disclosure buttons, Enter to
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
