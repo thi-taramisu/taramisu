@@ -5,17 +5,36 @@ metadata:
   labels:
     blueprints.goauthentik.io/instantiate: "false"
 entries:
+  # Adds the user's assignable groups to the token for project roles (docs/internal/architecture/iam/project-roles.md).
+  # Bound to the profile scope, which the SPA always requests. Only direct memberships count.
+  - model: authentik_providers_oauth2.scopemapping
+    id: taramisu-groups-scope
+    identifiers:
+      name: "Taramisu: assignable groups"
+    attrs:
+      scope_name: profile
+      expression: |
+        return {
+            "taramisu_groups": [
+                str(group.pk)
+                for group in request.user.groups.all()
+                if group.attributes.get("taramisu_assignable") is True
+            ]
+        }
   - model: authentik_providers_oauth2.oauth2provider
     id: taramisu-provider
     identifiers:
       name: Taramisu
     attrs:
-      client_type: confidential
+      client_type: public
       client_id: !Env OIDC_CLIENT_ID
-      client_secret: !Env OIDC_CLIENT_SECRET
       grant_types:
         - authorization_code
+        - refresh_token
       issuer_mode: per_provider
+      sub_mode: hashed_user_id
+      access_token_validity: minutes=10
+      refresh_token_validity: days=7
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
@@ -23,14 +42,40 @@ entries:
       redirect_uris:
         - matching_mode: strict
           url: !Env OIDC_REDIRECT_URI
+        - matching_mode: strict
+          url: http://localhost:5173/auth/callback
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-offline_access]]
+        - !KeyOf taramisu-groups-scope
   - model: authentik_core.application
+    id: taramisu-app
     identifiers:
       slug: taramisu
     attrs:
       name: Taramisu
       provider: !KeyOf taramisu-provider
+  - model: authentik_policies_expression.expressionpolicy
+    id: pkce-policy
+    identifiers:
+      name: taramisu-enforce-pkce
+    attrs:
+      expression: |
+        # Enforce PKCE (RFC 7636) with SHA-256 for all OAuth2 authorization requests.
+        if "oauth_response_type" in request.context or "oauth_grant_type" in request.context:
+            challenge = request.context.get("oauth_code_challenge")
+            method = request.context.get("oauth_code_challenge_method")
+            if not challenge or method != "S256":
+                ak_message("PKCE code_challenge with code_challenge_method=S256 is required.")
+                return False
+        return True
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf taramisu-app
+      policy: !KeyOf pkce-policy
+      order: 0
   - model: authentik_core.user
     identifiers:
       username: dev
@@ -39,3 +84,31 @@ entries:
       email: dev@taramisu.localhost
       is_active: true
       password: !Env DEV_PASSWORD
+  # Service account the API uses to read users and groups for the members API (#186).
+  - model: authentik_rbac.role
+    id: taramisu-directory-reader
+    identifiers:
+      name: taramisu-directory-reader
+    attrs:
+      permissions:
+        - authentik_core.view_user
+        - authentik_core.view_group
+  - model: authentik_core.user
+    id: taramisu-api-user
+    identifiers:
+      username: taramisu-api
+    attrs:
+      name: Taramisu API (directory reader)
+      type: service_account
+      path: taramisu/service-accounts
+      roles:
+        - !KeyOf taramisu-directory-reader
+  - model: authentik_core.token
+    identifiers:
+      identifier: taramisu-api-directory
+    attrs:
+      user: !KeyOf taramisu-api-user
+      intent: api
+      expiring: false
+      key: !Env AUTHENTIK_API_TOKEN
+      description: Read access to users and groups for the Taramisu API.

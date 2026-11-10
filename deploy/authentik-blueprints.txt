@@ -1,0 +1,10 @@
+# Authentik blueprints applied in this order by dev.sh and taramisu-ctl.sh (paths inside the worker container).
+/blueprints/system/providers-oauth2.yaml
+/blueprints/default/flow-password-change.yaml
+/blueprints/default/flow-default-authentication-flow.yaml
+/blueprints/default/flow-default-user-settings-flow.yaml
+/blueprints/default/flow-default-provider-authorization-implicit-consent.yaml
+/blueprints/default/flow-default-provider-invalidation.yaml
+/blueprints/custom/taramisu.yaml
+/blueprints/custom/enrollment.yaml
+/blueprints/custom/branding.yaml

@@ -323,10 +323,9 @@ func (ns NullImpactRatingValue) Value() (driver.Value, error) {
 type ProjectRole string
 
 const (
-	ProjectRoleOWNER    ProjectRole = "OWNER"
-	ProjectRoleEDITOR   ProjectRole = "EDITOR"
-	ProjectRoleREVIEWER ProjectRole = "REVIEWER"
-	ProjectRoleVIEWER   ProjectRole = "VIEWER"
+	ProjectRoleVIEWER ProjectRole = "VIEWER"
+	ProjectRoleEDITOR ProjectRole = "EDITOR"
+	ProjectRoleOWNER  ProjectRole = "OWNER"
 )
 
 func (e *ProjectRole) Scan(src interface{}) error {
@@ -567,11 +566,6 @@ type IamUser struct {
 	ExternalIamSub string
 }
 
-type IamUserGroupMember struct {
-	UserID  pgtype.UUID
-	GroupID pgtype.UUID
-}
-
 type ImpactRating struct {
 	ID                         pgtype.UUID
 	DamageScenarioID           pgtype.UUID
@@ -588,6 +582,9 @@ type ItemDefinition struct {
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
+	Boundary                 *string
+	Functions                *string
+	OperationalEnvironment   *string
 	ItemDefinitionWp0901     *string
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string

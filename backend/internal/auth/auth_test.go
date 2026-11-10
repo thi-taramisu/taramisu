@@ -1,19 +1,19 @@
 package auth
 
 import (
-	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"log/slog"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,121 +21,108 @@ import (
 	"github.com/go-jose/go-jose/v4"
 )
 
-const localUserID = "018f5031-7016-750a-a08b-20c2a25b1819"
+const (
+	localUserID = "018f5031-7016-750a-a08b-20c2a25b1819"
+	aliceSub    = "6b5a9e1a-3b6e-4c9a-8a1e-1d2c3b4a5f6e"
+)
 
 type testUsers struct {
+	mu    sync.Mutex
 	calls int
 	err   error
+	bySub map[string]string
 }
 
 func (s *testUsers) UpsertIAMUser(_ context.Context, subject string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.calls++
-	if subject != "alice" {
-		return "", errors.New("unexpected subject")
+	if s.err != nil {
+		return "", s.err
 	}
-	return localUserID, s.err
+	if s.bySub != nil {
+		if id, ok := s.bySub[subject]; ok {
+			return id, nil
+		}
+	}
+	if subject == aliceSub {
+		return localUserID, nil
+	}
+	return "", fmt.Errorf("unexpected subject %q", subject)
+}
+
+func (s *testUsers) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
 }
 
 type authFixture struct {
-	handler          http.Handler
-	users            testUsers
-	issuer           string
-	nonce, challenge string
-	claims           map[string]any
-	beforeKeys       func(*http.Request)
+	manager    *Manager
+	handler    http.Handler
+	users      testUsers
+	issuer     string
+	jwksURL    string
+	signer     jose.Signer
+	beforeKeys func(*http.Request)
 }
 
 func newAuthFixture(t *testing.T) *authFixture {
 	t.Helper()
-	f := &authFixture{}
+	f := &authFixture{
+		issuer: "http://localhost/auth/application/o/taramisu/",
+	}
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, nil)
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "key-1"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			if err := json.NewEncoder(w).Encode(map[string]any{
-				"issuer": f.issuer, "authorization_endpoint": f.issuer + "/authorize",
-				"token_endpoint": f.issuer + "/token", "jwks_uri": f.issuer + "/keys",
-				"id_token_signing_alg_values_supported": []string{"RS256"},
-			}); err != nil {
-				t.Error(err)
-			}
-		case "/keys":
-			if f.beforeKeys != nil {
-				f.beforeKeys(r)
-			}
-			if r.Context().Err() != nil {
-				return
-			}
-			if err := json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, Algorithm: "RS256", Use: "sig"}}}); err != nil {
-				t.Error(err)
-			}
-		case "/token":
-			if err := r.ParseForm(); err != nil {
-				t.Error(err)
-			}
-			hash := sha256.Sum256([]byte(r.Form.Get("code_verifier")))
-			if base64.RawURLEncoding.EncodeToString(hash[:]) != f.challenge {
-				t.Error("PKCE verifier does not match login challenge")
-			}
-			if r.Form.Get("redirect_uri") != "http://localhost:8080/auth/callback" {
-				t.Error("unexpected callback URI")
-			}
-			if r.Form.Get("code") == "rejected" {
-				w.WriteHeader(http.StatusBadRequest)
-				// #nosec G101 -- Synthetic token sentinel verifies that provider credentials never reach logs.
-				if err := json.NewEncoder(w).Encode(map[string]string{
-					"error": "invalid_grant", "error_description": "do-not-log-provider-details",
-					"access_token": "do-not-log-token",
-				}); err != nil {
-					t.Error(err)
-				}
-				return
-			}
-			claims := map[string]any{
-				"iss": f.issuer, "sub": "alice", "aud": "taramisu", "nonce": f.nonce,
-				"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
-			}
-			for k, v := range f.claims {
-				claims[k] = v
-			}
-			payload, _ := json.Marshal(claims)
-			signed, err := signer.Sign(payload)
-			if err != nil {
-				t.Error(err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			raw, _ := signed.CompactSerialize()
-			if r.Form.Get("code") == "bad-signature" {
-				raw = raw[:len(raw)-8] + "tampered"
-			}
-			if err := json.NewEncoder(w).Encode(map[string]string{"access_token": "unused", "token_type": "Bearer", "id_token": raw}); err != nil {
-				t.Error(err)
-			}
-		default:
+	f.signer = signer
+
+	jwksServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/application/o/taramisu/jwks/" {
 			http.NotFound(w, r)
+			return
+		}
+		if f.beforeKeys != nil {
+			f.beforeKeys(r)
+		}
+		if r.Context().Err() != nil {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{{
+				Key:       &key.PublicKey,
+				KeyID:     "key-1",
+				Algorithm: "RS256",
+				Use:       "sig",
+			}},
+		}); err != nil {
+			t.Error(err)
 		}
 	}))
-	t.Cleanup(provider.Close)
-	f.issuer = provider.URL
+	t.Cleanup(jwksServer.Close)
+	f.jwksURL = jwksServer.URL + "/auth/application/o/taramisu/jwks/"
+
 	manager, err := New(context.Background(), Config{
-		Issuer: f.issuer, ClientID: "taramisu", ClientSecret: "secret", AppURL: "http://localhost:8080",
+		Issuer:      f.issuer,
+		ClientID:    "taramisu",
+		JWKSURL:     f.jwksURL,
+		JWKSTimeout: 100 * time.Millisecond,
 	}, &f.users)
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.manager = manager
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /auth/login", manager.Login)
-	mux.HandleFunc("GET /auth/callback", manager.Callback)
-	mux.HandleFunc("POST /auth/logout", manager.Logout)
 	mux.Handle("GET /api/v1/me", manager.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewEncoder(w).Encode(UserFromContext(r.Context())); err != nil {
 			t.Error(err)
@@ -145,111 +132,144 @@ func newAuthFixture(t *testing.T) *authFixture {
 	return f
 }
 
-func (f *authFixture) request(method, target string, cookies ...*http.Cookie) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, target, http.NoBody)
-	for _, cookie := range cookies {
-		r.AddCookie(cookie)
+func (f *authFixture) signToken(t *testing.T, overrides map[string]any) string {
+	t.Helper()
+	now := time.Now()
+	claims := map[string]any{
+		"iss":   f.issuer,
+		"sub":   aliceSub,
+		"aud":   "taramisu",
+		"name":  "Alice Example",
+		"email": "alice@example.com",
+		"iat":   now.Unix(),
+		"exp":   now.Add(10 * time.Minute).Unix(),
+	}
+	for k, v := range overrides {
+		if v == nil {
+			delete(claims, k)
+		} else {
+			claims[k] = v
+		}
+	}
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := f.signer.Sign(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := signed.CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func (f *authFixture) requestWithAuth(authHeader string) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody)
+	if authHeader != "" {
+		r.Header.Set("Authorization", authHeader)
 	}
 	w := httptest.NewRecorder()
 	f.handler.ServeHTTP(w, r)
 	return w
 }
 
-func responseCookie(w *httptest.ResponseRecorder, name string) *http.Cookie {
-	for _, cookie := range w.Result().Cookies() {
-		if cookie.Name == name {
-			return cookie
-		}
-	}
-	return nil
-}
-
-func (f *authFixture) login(t *testing.T) (string, *http.Cookie) {
-	t.Helper()
-	w := f.request(http.MethodGet, "/auth/login")
-	redirect, err := url.Parse(w.Header().Get("Location"))
-	if err != nil || w.Code != http.StatusFound || redirect.Scheme+"://"+redirect.Host != f.issuer {
-		t.Fatalf("login redirect: %d %s", w.Code, w.Header().Get("Location"))
-	}
-	q := redirect.Query()
-	f.nonce, f.challenge = q.Get("nonce"), q.Get("code_challenge")
-	cookie := responseCookie(w, "taramisu_login")
-	if q.Get("state") == "" || f.nonce == "" || f.challenge == "" || q.Get("code_challenge_method") != "S256" || cookie == nil {
-		t.Fatal("missing state, nonce, PKCE, or login cookie")
-	}
-	return "/auth/callback?state=" + url.QueryEscape(q.Get("state")), cookie
-}
-
-func TestLoginAndLogout(t *testing.T) {
+func TestStatelessJWTAuthenticationAndSubjectCache(t *testing.T) {
 	f := newAuthFixture(t)
-	if w := f.request(http.MethodGet, "/api/v1/me"); w.Code != http.StatusUnauthorized {
-		t.Fatalf("unauthenticated request: %d", w.Code)
+	token := f.signToken(t, nil)
+
+	// First request verifies JWT via JWKS, upserts IAM user, and caches sub->UUID.
+	w := f.requestWithAuth("Bearer " + token)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", w.Code, w.Body.String())
 	}
-	callback, loginCookie := f.login(t)
-	w := f.request(http.MethodGet, callback+"&code=ok", loginCookie)
-	session := responseCookie(w, "taramisu_session")
-	if w.Code != 302 || w.Header().Get("Location") != "/api/v1/me" || session == nil {
-		t.Fatalf("callback failed: %d %s", w.Code, w.Body.String())
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", w.Header().Get("Cache-Control"))
 	}
-	if !session.HttpOnly || session.SameSite != http.SameSiteLaxMode || session.MaxAge <= 0 {
-		t.Fatal("missing session cookie protections")
-	}
-	w = f.request(http.MethodGet, "/api/v1/me", session)
 	var user User
 	if err := json.Unmarshal(w.Body.Bytes(), &user); err != nil {
 		t.Fatal(err)
 	}
-	if w.Code != 200 || user.ID != localUserID || user.Subject != "alice" || user.Issuer != f.issuer || f.users.calls != 1 {
-		t.Fatalf("unexpected authenticated user: %d %+v", w.Code, user)
+	if user.ID != localUserID || user.Subject != aliceSub || user.Issuer != f.issuer || user.Name != "Alice Example" || user.Email != "alice@example.com" {
+		t.Fatalf("unexpected authenticated user: %+v", user)
 	}
-	if w.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("authenticated response must not be cached")
+	if f.users.callCount() != 1 {
+		t.Fatalf("expected 1 database upsert call, got %d", f.users.callCount())
 	}
-	if w := f.request(http.MethodGet, callback+"&code=ok", loginCookie); w.Code != 400 {
-		t.Fatal("callback replay accepted")
-	}
-	if w := f.request(http.MethodPost, "/auth/logout", session); w.Code != 403 {
-		t.Fatal("logout without same-origin protection accepted")
-	}
-	r := httptest.NewRequest(http.MethodPost, "/auth/logout", http.NoBody)
-	r.Header.Set("Origin", "http://localhost:8080")
-	r.AddCookie(session)
-	w = httptest.NewRecorder()
-	f.handler.ServeHTTP(w, r)
-	if cookie := responseCookie(w, "taramisu_session"); w.Code != 204 || cookie == nil || cookie.MaxAge >= 0 {
-		t.Fatal("logout did not clear the session cookie")
-	}
-	if w := f.request(http.MethodGet, "/api/v1/me", session); w.Code != 401 {
-		t.Fatal("session survived logout")
+
+	// Second request with valid JWT resolves UserID from the per-replica TTL cache without hitting the database again.
+	w = f.requestWithAuth("bearer " + token)
+	if w.Code != http.StatusOK || f.users.callCount() != 1 {
+		t.Fatalf("expected cached user resolution (calls=1), got status=%d calls=%d", w.Code, f.users.callCount())
 	}
 }
 
-func TestCookieSecurityFollowsAppURL(t *testing.T) {
+func TestRejectMissingInvalidOrMalformedTokens(t *testing.T) {
 	f := newAuthFixture(t)
-	for _, origin := range []string{"http://localhost", "https://app.example"} {
-		t.Run(origin, func(t *testing.T) {
-			m, err := New(context.Background(), Config{
-				Issuer: f.issuer, ClientID: "taramisu", ClientSecret: "secret", AppURL: origin,
-			}, &f.users)
-			if err != nil {
-				t.Fatal(err)
+	validToken := f.signToken(t, nil)
+	tampered := validToken[:len(validToken)-8] + "tampered"
+
+	// Create an HS256 token to verify algorithm allowlist enforcement (only RS256 is permitted).
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(
+		`{"iss":%q,"sub":%q,"aud":"taramisu","name":"Alice","email":"alice@example.com","exp":%d}`,
+		f.issuer, aliceSub, time.Now().Add(time.Hour).Unix(),
+	)))
+	mac := hmac.New(sha256.New, []byte("secret"))
+	mac.Write([]byte(header + "." + payload))
+	hs256Token := header + "." + payload + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{"missing header", ""},
+		{"basic auth scheme", "Basic dXNlcjpwYXNz"},
+		{"empty bearer token", "Bearer    "},
+		{"malformed jwt", "Bearer not-a-jwt"},
+		{"tampered signature", "Bearer " + tampered},
+		{"disallowed algorithm HS256", "Bearer " + hs256Token},
+		{"wrong issuer", "Bearer " + f.signToken(t, map[string]any{"iss": "https://other.example"})},
+		{"wrong audience", "Bearer " + f.signToken(t, map[string]any{"aud": "other-client"})},
+		{"expired token", "Bearer " + f.signToken(t, map[string]any{"exp": time.Now().Add(-time.Minute).Unix()})},
+		{"missing sub", "Bearer " + f.signToken(t, map[string]any{"sub": ""})},
+		{"blank sub", "Bearer " + f.signToken(t, map[string]any{"sub": "   "})},
+		{"missing name", "Bearer " + f.signToken(t, map[string]any{"name": nil})},
+		{"blank name", "Bearer " + f.signToken(t, map[string]any{"name": "   "})},
+		{"missing email", "Bearer " + f.signToken(t, map[string]any{"email": nil})},
+		{"blank email", "Bearer " + f.signToken(t, map[string]any{"email": "   "})},
+		{"non-string claim type", "Bearer " + f.signToken(t, map[string]any{"name": 12345})},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := f.requestWithAuth(tt.header)
+			if w.Code != http.StatusUnauthorized {
+				t.Fatalf("got status %d, want 401 (%s)", w.Code, w.Body.String())
 			}
-			for _, name := range []string{loginCookie, sessionCookie} {
-				for _, maxAge := range []int{300, -1} {
-					w := httptest.NewRecorder()
-					m.cookie(w, name, "test-value", maxAge)
-					cookie := responseCookie(w, name)
-					if cookie == nil || cookie.Secure != strings.HasPrefix(origin, "https://") ||
-						!cookie.HttpOnly || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != maxAge {
-						t.Fatalf("incorrect cookie protections for %s (MaxAge %d)", name, maxAge)
-					}
-				}
+			if !strings.HasPrefix(w.Header().Get("WWW-Authenticate"), "Bearer") {
+				t.Fatalf("missing WWW-Authenticate Bearer header: %q", w.Header().Get("WWW-Authenticate"))
+			}
+			if f.users.callCount() != 0 {
+				t.Fatalf("invalid token must not query database, got %d calls", f.users.callCount())
 			}
 		})
 	}
 }
 
-func TestJWKSFetchTimeoutAndRecovery(t *testing.T) {
+func TestDatabaseFailureReturnsServiceUnavailable(t *testing.T) {
+	f := newAuthFixture(t)
+	f.users.err = errors.New("database down")
+
+	w := f.requestWithAuth("Bearer " + f.signToken(t, nil))
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when database fails, got %d", w.Code)
+	}
+}
+
+func TestJWKSFetchCancellationAndRecovery(t *testing.T) {
 	f := newAuthFixture(t)
 	var requests atomic.Int32
 	canceled, release := make(chan struct{}), make(chan struct{})
@@ -264,161 +284,100 @@ func TestJWKSFetchTimeoutAndRecovery(t *testing.T) {
 		}
 	}
 
-	callback, cookie := f.login(t)
-	w := f.request(http.MethodGet, callback+"&code=ok", cookie)
-	if w.Code != http.StatusUnauthorized || responseCookie(w, sessionCookie) != nil || f.users.calls != 0 || requests.Load() != 1 {
-		t.Fatalf("stalled key fetch did not reject login: %d %s", w.Code, w.Body.String())
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	r := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/me", http.NoBody)
+	r.Header.Set("Authorization", "Bearer "+f.signToken(t, nil))
+	w := httptest.NewRecorder()
+	f.handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized || f.users.callCount() != 0 || requests.Load() != 1 {
+		t.Fatalf("stalled JWKS fetch did not reject request: %d %s", w.Code, w.Body.String())
 	}
 	select {
 	case <-canceled:
-	case <-time.After(5 * time.Second):
-		t.Fatal("key fetch remained active after the callback returned")
+	case <-time.After(2 * time.Second):
+		t.Fatal("JWKS request remained active after request context cancellation")
 	}
 
-	callback, cookie = f.login(t)
-	w = f.request(http.MethodGet, callback+"&code=ok", cookie)
-	if w.Code != http.StatusFound || responseCookie(w, sessionCookie) == nil || f.users.calls != 1 || requests.Load() != 2 {
-		t.Fatalf("login did not recover with a new key fetch: %d %s", w.Code, w.Body.String())
+	// Subsequent request recovers and succeeds.
+	w = f.requestWithAuth("Bearer " + f.signToken(t, nil))
+	if w.Code != http.StatusOK || f.users.callCount() != 1 || requests.Load() != 2 {
+		t.Fatalf("expected recovery on second request, got status=%d calls=%d jwks=%d", w.Code, f.users.callCount(), requests.Load())
 	}
 }
 
-func TestCallbackRejectsInvalidIdentity(t *testing.T) {
+func TestConcurrentRequestsIsolateUserContext(t *testing.T) {
 	f := newAuthFixture(t)
-	for _, tt := range []struct {
-		name   string
-		claims map[string]any
-		code   string
-		want   int
+	f.users.bySub = map[string]string{
+		"sub-1": "00000000-0000-0000-0000-000000000001",
+		"sub-2": "00000000-0000-0000-0000-000000000002",
+		"sub-3": "00000000-0000-0000-0000-000000000003",
+	}
+
+	type principal struct {
+		sub, id, name, email, token string
+	}
+	principals := []principal{
+		{sub: "sub-1", id: "00000000-0000-0000-0000-000000000001", name: "User One", email: "one@example.com"},
+		{sub: "sub-2", id: "00000000-0000-0000-0000-000000000002", name: "User Two", email: "two@example.com"},
+		{sub: "sub-3", id: "00000000-0000-0000-0000-000000000003", name: "User Three", email: "three@example.com"},
+	}
+	for i := range principals {
+		p := &principals[i]
+		p.token = f.signToken(t, map[string]any{"sub": p.sub, "name": p.name, "email": p.email})
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 30; i++ {
+		p := principals[i%len(principals)]
+		wg.Add(1)
+		go func(p principal) {
+			defer wg.Done()
+			w := f.requestWithAuth("Bearer " + p.token)
+			if w.Code != http.StatusOK {
+				t.Errorf("unexpected status %d", w.Code)
+				return
+			}
+			var got User
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Errorf("decode user: %v", err)
+				return
+			}
+			if got.ID != p.id || got.Subject != p.sub || got.Name != p.name || got.Email != p.email {
+				t.Errorf("context bleed: got %+v, want %+v", got, p)
+			}
+		}(p)
+	}
+	wg.Wait()
+}
+
+func TestNewConfigValidation(t *testing.T) {
+	users := &testUsers{}
+	for _, tc := range []struct {
+		name  string
+		cfg   Config
+		store UserStore
 	}{
-		{"issuer", map[string]any{"iss": "https://other.example"}, "ok", 401},
-		{"audience", map[string]any{"aud": "other-client"}, "ok", 401},
-		{"expiry", map[string]any{"exp": time.Now().Add(-time.Hour).Unix()}, "ok", 401},
-		{"nonce", map[string]any{"nonce": "wrong"}, "ok", 401},
-		{"subject", map[string]any{"sub": ""}, "ok", 401},
-		{"signature", nil, "bad-signature", 401},
-		{"exchange", nil, "rejected", 502},
+		{"empty issuer", Config{ClientID: "taramisu"}, users},
+		{"invalid issuer scheme", Config{Issuer: "ftp://localhost/auth", ClientID: "taramisu"}, users},
+		{"issuer with query", Config{Issuer: "http://localhost/auth?a=1", ClientID: "taramisu"}, users},
+		{"missing client ID", Config{Issuer: "http://localhost/auth", ClientID: "   "}, users},
+		{"invalid JWKS URL", Config{Issuer: "http://localhost/auth", ClientID: "taramisu", JWKSURL: "://bad"}, users},
+		{"nil user store", Config{Issuer: "http://localhost/auth", ClientID: "taramisu"}, nil},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
-			f.claims = tt.claims
-			callback, cookie := f.login(t)
-			w := f.request(http.MethodGet, callback+"&code="+tt.code, cookie)
-			if w.Code != tt.want || responseCookie(w, "taramisu_session") != nil || f.users.calls != 0 {
-				t.Fatalf("invalid identity reached session/database: %d %s", w.Code, w.Body.String())
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := New(context.Background(), tc.cfg, tc.store); err == nil {
+				t.Fatalf("expected error for %s", tc.name)
 			}
 		})
 	}
-}
 
-func TestCallbackStateAndDatabaseFailure(t *testing.T) {
-	f := newAuthFixture(t)
-	callback, cookie := f.login(t)
-	for _, cookieHeader := range []string{"", loginCookie + "=wrong"} {
-		r := httptest.NewRequest(http.MethodGet, callback+"&code=ok", http.NoBody)
-		r.Header.Set("Cookie", cookieHeader)
-		w := httptest.NewRecorder()
-		f.handler.ServeHTTP(w, r)
-		if w.Code != 400 || f.users.calls != 0 {
-			t.Fatal("callback accepted without matching login state")
-		}
-	}
-	f.users.err = errors.New("database unavailable")
-	w := f.request(http.MethodGet, callback+"&code=ok", cookie)
-	if w.Code != 503 || responseCookie(w, "taramisu_session") != nil || f.users.calls != 1 {
-		t.Fatalf("database failure created a session: %d", w.Code)
-	}
-}
-
-func TestExchangeFailureLogsSafeDiagnostics(t *testing.T) {
-	var logs bytes.Buffer
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	f := newAuthFixture(t)
-	callback, cookie := f.login(t)
-	w := f.request(http.MethodGet, callback+"&code=rejected", cookie)
-	if w.Code != 502 || !strings.Contains(logs.String(), "invalid_grant") || !strings.Contains(logs.String(), "status=400") {
-		t.Fatal("missing exchange failure diagnostics")
-	}
-	if strings.Contains(logs.String(), "do-not-log") || strings.Contains(w.Body.String(), "invalid_grant") {
-		t.Fatal("provider response details leaked to logs or the client")
-	}
-}
-
-func TestRejectAppURLWithPath(t *testing.T) {
-	for _, origin := range []string{"http://localhost:8080/", "http://localhost:8080/app"} {
-		_, err := New(context.Background(), Config{AppURL: origin}, nil)
-		if err == nil || !strings.Contains(err.Error(), "APP_URL") {
-			t.Fatalf("accepted non-origin APP_URL %q", origin)
-		}
-	}
-}
-
-func TestExpiredCredentials(t *testing.T) {
-	m := &Manager{
-		sessions: map[string]session{"expired": {Expires: time.Now().Add(-time.Second)}},
-		logins:   map[string]login{"expired": {Expires: time.Now().Add(-time.Second)}},
-	}
-	for _, value := range []string{"expired", "forged"} {
-		r := httptest.NewRequest(http.MethodGet, "/api/v1/me", http.NoBody)
-		r.Header.Set("Cookie", sessionCookie+"="+value)
-		w := httptest.NewRecorder()
-		m.Require(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-			t.Error("invalid session reached handler")
-		})).ServeHTTP(w, r)
-		if w.Code != 401 {
-			t.Fatalf("invalid session: %d", w.Code)
-		}
-	}
-	r := httptest.NewRequest(http.MethodGet, "/auth/callback?state=expired&code=ok", http.NoBody)
-	r.Header.Set("Cookie", loginCookie+"=expired")
-	w := httptest.NewRecorder()
-	m.Callback(w, r)
-	if w.Code != 400 {
-		t.Fatalf("expired login: %d", w.Code)
-	}
-}
-
-func TestRequireWriteOrigin(t *testing.T) {
-	m := &Manager{origin: "http://localhost:8080", sessions: map[string]session{
-		"test": {User: User{ID: localUserID}, Expires: time.Now().Add(time.Hour)},
-	}}
-	for _, method := range []struct {
-		name   string
-		writes bool
-	}{
-		{http.MethodGet, false}, {http.MethodHead, false}, {http.MethodOptions, false},
-		{http.MethodPost, true}, {http.MethodPut, true}, {http.MethodPatch, true}, {http.MethodDelete, true},
-	} {
-		for _, origin := range []string{"", "null", "https://untrusted.example", "http://localhost:8081", "http://localhost:8080.attacker.example", m.origin} {
-			for _, authenticated := range []bool{false, true} {
-				called := false
-				h := m.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					called = true
-					if UserFromContext(r.Context()).ID != localUserID {
-						t.Error("authenticated user missing from handler context")
-					}
-					w.WriteHeader(http.StatusNoContent)
-				}))
-				r := httptest.NewRequest(method.name, "/api/v1/resource", http.NoBody)
-				if authenticated {
-					r.AddCookie(&http.Cookie{Name: sessionCookie, Value: "test", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
-				}
-				r.Header.Set("Origin", origin)
-				w := httptest.NewRecorder()
-				h.ServeHTTP(w, r)
-				want := http.StatusNoContent
-				if !authenticated {
-					want = http.StatusUnauthorized
-				} else if method.writes && origin != m.origin {
-					want = http.StatusForbidden
-				}
-				if w.Code != want || called != (want == http.StatusNoContent) {
-					t.Fatalf("%s origin %q authenticated=%v: status=%d handler called=%v; want status=%d", method.name, origin, authenticated, w.Code, called, want)
-				}
-				if w.Header().Get("Cache-Control") != "no-store" {
-					t.Fatal("authentication response can be cached")
-				}
-			}
-		}
+	// Default JWKS URL derivation succeeds without network access during New().
+	if _, err := New(context.Background(), Config{
+		Issuer:   "http://localhost/auth/application/o/taramisu/",
+		ClientID: "taramisu",
+	}, users); err != nil {
+		t.Fatalf("unexpected error with default JWKS URL: %v", err)
 	}
 }

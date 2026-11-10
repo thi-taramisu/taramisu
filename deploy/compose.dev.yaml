@@ -1,0 +1,24 @@
+# Local development only: publishes the ports that the segmented stack keeps closed.
+# Containers only in internal networks cannot publish ports, so these services also join a non-internal dev network:
+# "dev-app" for the application side and "dev-iam" for Authentik, so the two sides stay separated locally too.
+# dev.sh and the Makefile always load this file; without it only the proxy publishes a port.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks: [dev-app]
+
+  pgadmin:
+    ports:
+      - "127.0.0.1:5050:80"
+    networks: [dev-app]
+
+  # An API started on the host (make -C backend run) fetches JWKS from localhost:9000.
+  authentik-server:
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks: [dev-iam]
+
+networks:
+  dev-app:
+  dev-iam:

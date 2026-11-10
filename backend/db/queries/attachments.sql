@@ -1,13 +1,3 @@
--- name: CanAccessAttachments :one
-SELECT EXISTS (
-    SELECT 1 FROM project_role_assignment r
-    WHERE r.tara_project_id = sqlc.arg(project_id)
-      AND (r.user_id = sqlc.arg(user_id) OR r.group_id IN (
-          SELECT group_id FROM iam_user_group_member WHERE user_id = sqlc.arg(user_id)
-      ))
-      AND (NOT sqlc.arg(write_access)::boolean OR r.project_role IN ('OWNER', 'EDITOR'))
-);
-
 -- name: CreateAttachment :one
 INSERT INTO attachment (project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;

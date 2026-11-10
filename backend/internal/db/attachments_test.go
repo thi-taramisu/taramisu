@@ -49,29 +49,6 @@ func TestAttachmentPersistence(t *testing.T) {
 	user := id("INSERT INTO iam_user(external_iam_sub) VALUES($1) RETURNING id", rand.Text())
 	project := id("INSERT INTO tara_project(name) VALUES('attachments test') RETURNING id")
 	otherProject := id("INSERT INTO tara_project(name) VALUES('other project') RETURNING id")
-	group := id("INSERT INTO iam_group(external_iam_group_id) VALUES($1) RETURNING id", rand.Text())
-	access := func(projectID pgtype.UUID, write, want bool) {
-		t.Helper()
-		got, e := queries.CanAccessAttachments(ctx, db.CanAccessAttachmentsParams{ProjectID: projectID, UserID: user, WriteAccess: write})
-		if e != nil || got != want {
-			t.Fatalf("access(write=%v)=%v, want %v: %v", write, got, want, e)
-		}
-	}
-	access(project, false, false)
-	for _, role := range []db.ProjectRole{db.ProjectRoleVIEWER, db.ProjectRoleREVIEWER, db.ProjectRoleEDITOR, db.ProjectRoleOWNER} {
-		exec("DELETE FROM project_role_assignment WHERE tara_project_id=$1", project)
-		exec("INSERT INTO project_role_assignment(tara_project_id,user_id,project_role) VALUES($1,$2,$3)", project, user, role)
-		access(project, false, true)
-		access(project, true, role == db.ProjectRoleEDITOR || role == db.ProjectRoleOWNER)
-		access(otherProject, false, false)
-	}
-	exec("UPDATE project_role_assignment SET project_role='VIEWER' WHERE tara_project_id=$1", project)
-	exec("INSERT INTO iam_user_group_member(user_id,group_id) VALUES($1,$2)", user, group)
-	exec("INSERT INTO project_role_assignment(tara_project_id,group_id,project_role) VALUES($1,$2,'EDITOR')", project, group)
-	access(project, true, true)
-	exec("DELETE FROM iam_user_group_member WHERE user_id=$1", user)
-	access(project, true, false)
-	access(project, false, true)
 
 	input := db.CreateAttachmentParams{ProjectID: project, UploadedBy: user, FileName: "report.txt", ContentType: "text/plain", SizeBytes: 10 << 20, Sha256: strings.Repeat("a", 64), S3ObjectKey: id("SELECT gen_random_uuid()")}
 	attachment, err := queries.CreateAttachment(ctx, input)

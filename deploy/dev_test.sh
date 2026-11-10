@@ -13,7 +13,7 @@ cp ../backend/Makefile "$scratch/backend/"
 cp ../proxy/nginx.conf "$scratch/proxy/"
 mkdir "$scratch/storage"
 cp ../storage/*.py ../storage/*.toml ../storage/Dockerfile ../storage/.env.example "$scratch/storage/"
-cp dev.sh compose*.yaml Makefile "$scratch/deploy/"
+cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
 #!/bin/sh
@@ -31,8 +31,8 @@ case "$1" in
 esac
 # Every operation must use the same entry point and explicit environment file.
 case "$*" in
-    'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml '*) ;;
-    'compose --env-file ../iam/.env -f compose.yaml --profile tools down') ;;
+    'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml '*) ;;
+    'compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml --profile tools down') ;;
     *) exit 1 ;;
 esac
 echo "$*" >> "$COMMAND_LOG"
@@ -47,7 +47,7 @@ case " $* " in
     *" up "*|*" run --rm migrate "*|*" down "*)
         storage_env=../storage/.env
         if [ ! -f "$storage_env" ]; then storage_env=/dev/null; fi
-        "$REAL_DOCKER" compose --env-file ../iam/.env --env-file "$storage_env" -f compose.yaml config --quiet
+        "$REAL_DOCKER" compose --env-file ../iam/.env --env-file "$storage_env" -f compose.yaml -f compose.dev.yaml config --quiet
         case " $* " in
             *" authentik-db "*) exit "${DB_FAIL:-0}" ;;
             *" authentik-server authentik-worker "*) exit "${IAM_FAIL:-0}" ;;
@@ -65,8 +65,8 @@ STUB
 chmod +x "$scratch/bin/docker" "$scratch/bin/curl"
 export PATH="$scratch/bin:$PATH"
 unset S3_DEV_PORT S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY S3_ROOT_ACCESS_KEY S3_ROOT_SECRET_KEY
-unset APP_URL OIDC_ISSUER OIDC_CLIENT_ID OIDC_CLIENT_SECRET PG_PASS
-unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD
+unset APP_URL OIDC_ISSUER OIDC_JWKS_URL OIDC_CLIENT_ID PG_PASS
+unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD AUTHENTIK_API_TOKEN
 unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES
 unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
 unset PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL
@@ -105,12 +105,14 @@ awk '
     /up .*authentik-server authentik-worker/ { iam = NR }
     /ak apply_blueprint/ { provision = NR }
     /up .* api$/ { api = NR }
-    /^readiness$/ { ready = NR }
     /up .*frontend proxy/ { web = NR }
     /proxy nginx -t$/ { validate = NR }
     /proxy nginx -s reload$/ { reload = NR }
-    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < ready && ready < web && web < validate && validate < reload) }
+    /^readiness$/ { ready = NR }
+    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < web && web < validate && validate < reload && reload < ready) }
 ' "$COMMAND_LOG"
+grep -q '/blueprints/custom/enrollment.yaml' "$COMMAND_LOG"
+grep -q '/blueprints/default/flow-default-user-settings-flow.yaml' "$COMMAND_LOG"
 grep -q '^Login:' "$scratch/output"
 test ! -e "$scratch/iam/.blueprint.log"
 run
@@ -156,7 +158,6 @@ cat > "$scratch/backend/.env" <<'ENV'
 APP_URL=http://host-only.invalid:8080
 OIDC_ISSUER=http://localhost:9000/application/o/host-only/
 OIDC_CLIENT_ID=host-only
-OIDC_CLIENT_SECRET=
 COMPOSE_PROJECT_NAME=host-only
 ENV
 make -C "$scratch/backend" up > "$scratch/output" 2>&1
@@ -164,18 +165,18 @@ grep -q '^Login:' "$scratch/output"
 for directory in backend deploy; do
     : > "$COMMAND_LOG"
     make -C "$scratch/$directory" down > "$scratch/output" 2>&1
-    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml --profile tools down'
+    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml --profile tools down'
     : > "$COMMAND_LOG"
     make -C "$scratch/$directory" reset > "$scratch/output" 2>&1
-    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml --profile tools down -v'
+    test "$(cat "$COMMAND_LOG")" = 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml --profile tools down -v'
 done
 : > "$COMMAND_LOG"
 make -C "$scratch/backend" db pgadmin migrate migrate-diff name=test-change > "$scratch/output" 2>&1
-grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml up -d --wait db' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml up -d pgadmin' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml run --rm migrate' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml up -d --wait dev-db' "$COMMAND_LOG"
-grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml run --rm migrate migrate diff test-change --env local' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml up -d --wait db' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml up -d pgadmin' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml run --rm migrate' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml up -d --wait dev-db' "$COMMAND_LOG"
+grep -Fxq 'compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml -f compose.dev.yaml run --rm migrate migrate diff test-change --env local' "$COMMAND_LOG"
 ! grep -q ' up .*authentik-server' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$original"
 
@@ -186,6 +187,17 @@ partial=$(cksum "$scratch/iam/.env")
 expect_failure
 ! grep -q ' up ' "$COMMAND_LOG"
 test "$(cksum "$scratch/iam/.env")" = "$partial"
+cp "$scratch/valid.env" "$scratch/iam/.env"
+
+# iam/.env files from before the API token get it appended; other secrets stay unchanged.
+grep -v -e '^AUTHENTIK_API_TOKEN=' -e '^# Token of the taramisu-api' "$scratch/valid.env" > "$scratch/iam/.env"
+cp "$scratch/iam/.env" "$scratch/old.env"
+run --init
+grep -q 'Added AUTHENTIK_API_TOKEN' "$scratch/output"
+grep -Eq '^AUTHENTIK_API_TOKEN=[0-9a-f]{64}$' "$scratch/iam/.env"
+test "$(grep -v -e '^AUTHENTIK_API_TOKEN=' -e '^# Token of the taramisu-api' "$scratch/iam/.env" | sed '/^$/d')" = "$(sed '/^$/d' "$scratch/old.env")"
+run --init
+! grep -q 'Added AUTHENTIK_API_TOKEN' "$scratch/output"
 cp "$scratch/valid.env" "$scratch/iam/.env"
 
 export DB_FAIL=1
@@ -217,7 +229,7 @@ for failure in API_FAIL READY_FAIL WEB_FAIL PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL;
     : > "$COMMAND_LOG"
     expect_failure
     unset "$failure"
-    if [ "$failure" = API_FAIL ] || [ "$failure" = READY_FAIL ]; then
+    if [ "$failure" = API_FAIL ]; then
         ! grep -q ' up .*frontend proxy' "$COMMAND_LOG"
     fi
     if [ "$failure" = PROXY_CONFIG_FAIL ]; then
@@ -229,6 +241,8 @@ done
 APP_URL=http://127.0.0.1:8080 OIDC_CLIENT_ID=review-client \
     "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" --env-file "$scratch/storage/.env" \
     -f "$scratch/deploy/compose.yaml" --profile tools config --format json > "$scratch/model.json"
+"$REAL_DOCKER" compose --env-file "$scratch/iam/.env" --env-file "$scratch/storage/.env" \
+    -f "$scratch/deploy/compose.yaml" -f "$scratch/deploy/compose.dev.yaml" --profile tools config --format json > "$scratch/dev.json"
 "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" --env-file "$scratch/storage/.env" \
     -p isolated-check -f "$scratch/deploy/compose.yaml" config --format json > "$scratch/isolated.json"
 "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" --env-file "$scratch/storage/.env" \
@@ -246,17 +260,16 @@ assert model['name'] == 'taramisu'
 assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
                          'authentik-server', 'authentik-worker', 'authentik-db', 'storage', 'storage-config', 'storage-init'}
 expected_networks = {
-    'api': {'default', 'backend', 'auth', 'taramisu-storage'},
+    'api': {'proxy', 'app-db', 'taramisu-storage'},
+    'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
+    'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
+    'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
+    'docs': {'proxy'},
     'storage': {'taramisu-storage'}, 'storage-config': {'taramisu-storage'}, 'storage-init': {'taramisu-storage'},
-    'db': {'backend'}, 'dev-db': {'backend'}, 'migrate': {'backend'}, 'pgadmin': {'backend'},
-    'frontend': {'default'}, 'proxy': {'default', 'taramisu-proxy'},
-    'docs': {'taramisu-proxy'},
-    'authentik-server': {'auth', 'iam'}, 'authentik-worker': {'iam'}, 'authentik-db': {'iam'},
 }
 for service, networks in expected_networks.items():
     assert set(services[service]['networks']) == networks, service
 assert not any(network.get('external') for network in model['networks'].values())
-assert 'authentik.localhost' in services['authentik-server']['networks']['auth']['aliases']
 assert model['networks']['taramisu-storage']['internal']
 assert not services['storage'].get('ports')
 assert any(v['source'] == 'storage_data' and v['target'] == '/data' for v in services['storage']['volumes'])
@@ -270,15 +283,37 @@ assert services['api']['depends_on']['storage-init']['condition'] == 'service_co
 assert services['api']['environment']['S3_ENDPOINT'] == 'http://storage:8333'
 assert 'S3_ROOT_SECRET_KEY' not in services['api']['environment']
 assert services['api']['environment']['S3_ACCESS_KEY'] != services['storage-init']['environment']['S3_ROOT_ACCESS_KEY']
+assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
+    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'taramisu-storage': True}
+assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
+# Without the dev override only the proxy publishes a port.
+assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}
+dev = json.loads((root / 'dev.json').read_text())
+assert not any(dev['networks'][network].get('internal') for network in ('dev-app', 'dev-iam'))
+expected_ports = {'proxy': '80', 'db': '5432', 'pgadmin': '5050', 'authentik-server': '9000'}
+# Separate dev networks, so the published ports do not connect the application and the Authentik side.
+dev_networks = {'db': {'dev-app'}, 'pgadmin': {'dev-app'}, 'authentik-server': {'dev-iam'}}
+for name, service in dev['services'].items():
+    published = {port['published'] for port in service.get('ports', [])}
+    assert published == ({expected_ports[name]} if name in expected_ports else set()), name
+    assert set(service['networks']) == expected_networks[name] | dev_networks.get(name, set()), name
+assert all(port['host_ip'] == '127.0.0.1' for service in dev['services'].values() for port in service.get('ports', []))
 api = services['api']
 worker = services['authentik-worker']
+server = services['authentik-server']
+assert server['environment']['AUTHENTIK_WEB__PATH'] == '/auth/'
+assert worker['environment']['AUTHENTIK_WEB__PATH'] == '/auth/'
 assert api['environment']['APP_URL'] == 'http://127.0.0.1:8080'
 assert worker['environment']['OIDC_REDIRECT_URI'] == 'http://127.0.0.1:8080/auth/callback'
 assert api['environment']['OIDC_CLIENT_ID'] == worker['environment']['OIDC_CLIENT_ID'] == 'review-client'
-assert api['environment']['OIDC_CLIENT_SECRET'] == worker['environment']['OIDC_CLIENT_SECRET']
-assert api['environment']['OIDC_ISSUER'] == 'http://authentik.localhost:9000/application/o/taramisu/'
+assert 'OIDC_CLIENT_SECRET' not in api['environment']
+assert api['environment']['AUTHENTIK_API_URL'] == 'http://authentik-server:9000/auth'
+assert api['environment']['AUTHENTIK_API_TOKEN'] == worker['environment']['AUTHENTIK_API_TOKEN'] != ''
+assert 'OIDC_CLIENT_SECRET' not in worker['environment']
+assert api['environment']['OIDC_ISSUER'] == 'http://127.0.0.1:8080/auth/application/o/taramisu/'
+assert api['environment']['OIDC_JWKS_URL'] == 'http://authentik-server:9000/auth/application/o/taramisu/jwks/'
 assert api['depends_on']['migrate']['condition'] == 'service_completed_successfully'
-assert api['depends_on']['authentik-server']['condition'] == 'service_healthy'
+assert 'authentik-server' not in api['depends_on']
 assert services['pgadmin']['profiles'] == ['tools']
 probe = services['authentik-db']['healthcheck']['test']
 assert probe[0] == 'CMD-SHELL'
@@ -289,6 +324,10 @@ assert Path(services['frontend']['build']['context']).resolve() == root / 'front
 assert Path(services['docs']['build']['context']).resolve() == root
 assert 'docs' in services['proxy']['depends_on']
 assert not services['docs'].get('ports')
+assert not api.get('ports')
+blueprint_text = (root / 'iam/blueprints/taramisu.yaml').read_text()
+assert 'matching_mode: regex' not in blueprint_text
+assert 'url: http://localhost:5173/auth/callback' in blueprint_text
 for service, target, source in [
     ('storage', '/etc/seaweedfs/filer.toml', root / 'storage/filer.toml'),
     ('migrate', '/app', root / 'backend'),
@@ -311,8 +350,63 @@ assert {key: value['name'] for key, value in model['volumes'].items()} == expect
 isolated = json.loads((root / 'isolated.json').read_text())
 assert isolated['name'] == 'isolated-check'
 assert isolated['services']['api']['environment']['APP_URL'] == 'http://localhost'
+assert isolated['services']['api']['environment']['OIDC_ISSUER'] == 'http://localhost/auth/application/o/taramisu/'
 assert isolated['services']['authentik-worker']['environment']['OIDC_REDIRECT_URI'] == 'http://localhost/auth/callback'
 assert all(v['name'].startswith('isolated-check-') for v in isolated['volumes'].values())
 assert all(n['name'].startswith('isolated-check_') for n in isolated['networks'].values())
 PY
-echo 'PASS: unified Compose model, isolated networks/volumes, startup order, commands, secrets, and failures.'
+
+# Verify NGINX starts without Authentik present and recovers dynamically when Authentik starts.
+if [ -n "$REAL_DOCKER" ] && "$REAL_DOCKER" info >/dev/null 2>&1; then
+    TEST_NET="taramisu-test-proxy-$$-net"
+    "$REAL_DOCKER" network create "$TEST_NET" >/dev/null
+    cleanup_proxy_test() {
+        "$REAL_DOCKER" rm -f "proxy-$$" "frontend-$$" "docs-$$" "authentik-$$" >/dev/null 2>&1 || true
+        "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1 || true
+        rm -rf "$scratch"
+    }
+    trap cleanup_proxy_test EXIT HUP INT TERM
+
+    "$REAL_DOCKER" run -d --name "frontend-$$" --network "$TEST_NET" --network-alias frontend nginx:1.28-alpine >/dev/null
+    "$REAL_DOCKER" run -d --name "docs-$$" --network "$TEST_NET" --network-alias docs nginx:1.28-alpine >/dev/null
+    "$REAL_DOCKER" run -d --name "proxy-$$" --network "$TEST_NET" -v "$scratch/proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.28-alpine >/dev/null
+
+    sleep 2
+    test "$("$REAL_DOCKER" inspect -f '{{.State.Running}}' "proxy-$$")" = "true"
+    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/" | grep -q '<title>Welcome to nginx!</title>'
+    "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine sh -c "wget -O - 'http://proxy-$$/auth/' 2>&1 | grep -q '502 Bad Gateway'"
+
+    "$REAL_DOCKER" run -d --name "authentik-$$" --network "$TEST_NET" --network-alias authentik-server nginx:1.28-alpine sh -c "cat > /etc/nginx/conf.d/default.conf << 'EOF'
+server {
+  listen 9000;
+  location /auth/ {
+    return 200 'authentik-ok';
+  }
+}
+EOF
+nginx -g 'daemon off;'
+" >/dev/null
+
+    # Poll until NGINX re-resolves the upstream after its resolver TTL and forwards to authentik-server.
+    recovered=0
+    for _ in $(seq 1 15); do
+        if "$REAL_DOCKER" run --rm --network "$TEST_NET" nginx:1.28-alpine wget -q -O - "http://proxy-$$/auth/" 2>/dev/null | grep -q 'authentik-ok'; then
+            recovered=1
+            break
+        fi
+        sleep 1
+    done
+    test "$recovered" = 1
+
+    "$REAL_DOCKER" rm -f "proxy-$$" "frontend-$$" "docs-$$" "authentik-$$" >/dev/null 2>&1
+    "$REAL_DOCKER" network rm "$TEST_NET" >/dev/null 2>&1
+fi
+
+# The project role specification accepts that group and account changes take up to 10 minutes,
+# the access token lifetime (docs/internal/architecture/iam/project-roles.md). Update both together.
+grep -q '^ *access_token_validity: minutes=10$' ../iam/blueprints/taramisu.yaml
+
+python3 -I stack_test.py --self-check >/dev/null
+make -n test-stack >/dev/null
+
+echo 'PASS: unified Compose model, access token lifetime, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'

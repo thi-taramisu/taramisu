@@ -19,11 +19,11 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/storage"
@@ -69,6 +69,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 	objects := storage.New(cfg)
 	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch"} {
 		t.Run(scenario, func(t *testing.T) {
+			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
 			if e != nil {
 				t.Fatal(e)
@@ -87,6 +88,9 @@ func TestAttachmentsIntegration(t *testing.T) {
 			tracked := &trackedObjects{ObjectStore: objects}
 			database := &deleteFailureDB{DBTX: tx}
 			h := NewAttachments(db.New(database), tracked)
+			fixture := authtest.NewFixture(t, db.New(database))
+			mux := New(db.New(database), fixture.Manager, WithAttachments(h))
+			var groups []string
 			if scenario == "cleanup-batch" {
 				exec(`INSERT INTO attachment(id,project_id,file_name,content_type,size_bytes,sha256,s3_object_key,uploaded_by,delete_pending)
                       SELECT lpad(to_hex(n),32,'0')::uuid,$1,'pending','text/plain',1,repeat('a',64),gen_random_uuid(),$2,true
@@ -143,9 +147,10 @@ func TestAttachmentsIntegration(t *testing.T) {
 				r := httptest.NewRequestWithContext(requestCtx, method, target, body)
 				r.Header.Set("Content-Type", contentType)
 				r.Header.Set("If-None-Match", etag)
-				mux := chi.NewRouter()
-				mux.HandleFunc("/api/v1/projects/{project_id}/attachments", func(w http.ResponseWriter, r *http.Request) { h.serve(w, r, who) })
-				mux.HandleFunc("/api/v1/projects/{project_id}/attachments/{attachment_id}", func(w http.ResponseWriter, r *http.Request) { h.serve(w, r, who) })
+				if who != "" {
+					r.Header.Set("Authorization", "Bearer "+fixture.Token(t, map[string]any{"sub": who, "taramisu_groups": groups}))
+				}
+
 				w := httptest.NewRecorder()
 				mux.ServeHTTP(w, r)
 				return w
@@ -178,7 +183,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 			check(request("GET", base+"?limit=101", user, nil, ""), 400)
 			check(request("GET", base+"?offset=-1", user, nil, ""), 400)
 			check(request("GET", base+"?limit=abc", user, nil, ""), 400)
-			check(request("GET", "/api/v1/projects/not-a-uuid/attachments", user, nil, ""), 400)
+			check(request("GET", "/api/v1/projects/not-a-uuid/attachments", user, nil, ""), 422)
 			check(request("GET", base+"/not-a-uuid", user, nil, ""), 400)
 			check(request("GET", base+"/"+uuid.NewString(), user, nil, ""), 404)
 			check(request("POST", base, user, []byte{}, ""), 400)
@@ -320,13 +325,13 @@ func TestAttachmentsIntegration(t *testing.T) {
 				check(request("GET", location, user, nil, etag), 404)
 				return
 			}
-			for _, role := range []string{"VIEWER", "REVIEWER", "EDITOR", "OWNER"} {
+			for _, role := range []string{"VIEWER", "EDITOR", "OWNER"} {
 				exec("UPDATE project_role_assignment SET project_role=$1 WHERE tara_project_id=$2", role, project)
 				check(request("GET", location, user, nil, ""), 200)
 				check(request("GET", base, user, nil, ""), 200)
-				if role == "VIEWER" || role == "REVIEWER" {
-					check(request("POST", base, user, data, ""), 404)
-					check(request("DELETE", location, user, nil, ""), 404)
+				if role == "VIEWER" {
+					check(request("POST", base, user, data, ""), 403)
+					check(request("DELETE", location, user, nil, ""), 403)
 				} else {
 					created := request("POST", base, user, data, "")
 					check(created, 201)
@@ -336,9 +341,12 @@ func TestAttachmentsIntegration(t *testing.T) {
 			exec("DELETE FROM project_role_assignment WHERE tara_project_id=$1", project)
 			check(request("GET", location, user, nil, etag), 404)
 			exec("INSERT INTO iam_group(id,external_iam_group_id) VALUES($1,$1::uuid::text)", group)
-			exec("INSERT INTO iam_user_group_member(user_id,group_id) VALUES($1,$2)", user, group)
+			groups = []string{group}
 			exec("INSERT INTO project_role_assignment(tara_project_id,group_id,project_role) VALUES($1,$2,'EDITOR')", project, group)
 			check(request("GET", location, user, nil, ""), 200)
+			groups = nil
+			check(request("GET", location, user, nil, etag), 404)
+			groups = []string{group}
 			// Storage failure keeps a durable marker and hides the attachment until retry.
 			tracked.failDelete = true
 			check(request("DELETE", location, user, nil, ""), 202)

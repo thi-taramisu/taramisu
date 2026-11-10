@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { Link, MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Filetree } from './Filetree'
-import type { TreeNode } from './entities'
+import type { TreeNode } from '../../api/models/tree'
 
 const project = '/projects/test-project'
 const nodes: TreeNode[] = [
@@ -35,6 +35,46 @@ function renderTree(path = project, tree = nodes) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Filetree', () => {
+  it('hides element IDs visually but keeps them in accessible names', () => {
+    const allTypes: TreeNode[] = [{
+      type: 'items', id: 'i-10', code: 'I-10', name: 'Gateway', children: [{
+        type: 'assets', id: 'a-12', code: 'A-12', name: 'CAN bus', children: [{
+          type: 'damage-scenarios', id: 'ds-11', code: 'DS-11', name: 'Bus flooding', children: [{
+            type: 'threat-scenarios', id: 'ts-14', code: 'TS-14', name: 'Spoofed frames', children: [
+              { type: 'attack-paths', id: 'ap-15', code: 'AP-15', name: 'Compromised ECU' },
+            ],
+          }],
+        }],
+      }],
+    }]
+    renderTree(project, allTypes)
+
+    const tree = screen.getByRole('navigation', { name: 'Project elements' })
+    const anyCode = /\b[A-Z]{1,2}-\d+\b/
+    // Codes appear only in screen-reader text; the visible labels and tooltips show names only.
+    const codes = within(tree).getAllByText(anyCode)
+    expect(codes.map((code) => code.textContent?.trim())).toEqual(['I-10', 'A-12', 'DS-11', 'TS-14', 'AP-15'])
+    for (const code of codes) expect(code).toHaveClass('sr-only')
+    const links = within(tree).getAllByRole('link')
+    for (const link of links) expect(link.title).not.toMatch(anyCode)
+    expect(links).toHaveLength(5)
+    expect(within(tree).getByRole('link', { name: 'A-12 CAN bus' })).toHaveAttribute('title', 'Asset: CAN bus')
+    expect(within(tree).getByRole('button', { name: 'Collapse TS-14 Spoofed frames' })).toBeInTheDocument()
+  })
+
+  it('keeps elements with the same name distinguishable for assistive technology', () => {
+    const twins: TreeNode[] = [
+      { type: 'damage-scenarios', id: 'ds-01', code: 'DS-01', name: 'Loss of light', children: [{ type: 'threat-scenarios', id: 'ts-01', code: 'TS-01', name: 'Spoofing' }] },
+      { type: 'damage-scenarios', id: 'ds-02', code: 'DS-02', name: 'Loss of light', children: [{ type: 'threat-scenarios', id: 'ts-02', code: 'TS-02', name: 'Spoofing' }] },
+    ]
+    renderTree(project, twins)
+
+    expect(screen.getByRole('link', { name: 'DS-01 Loss of light' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01`)
+    expect(screen.getByRole('link', { name: 'DS-02 Loss of light' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-02`)
+    expect(screen.getByRole('button', { name: 'Collapse DS-01 Loss of light' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse DS-02 Loss of light' })).toBeInTheDocument()
+  })
+
   it('uses the supplied project and keeps the active entity on its tabs and in graph view', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01/risks?view=graph&filter=open`)
@@ -62,7 +102,7 @@ describe('Filetree', () => {
     const rootToggle = screen.getByRole('button', { name: 'Expand I-01 Headlamp' })
     expect(rootToggle).toHaveAttribute('aria-expanded', 'false')
     expect(content).not.toBeVisible()
-    expect(screen.queryByRole('link', { name: /A-01/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'A-01 Long asset name' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'I-01 Headlamp' })).not.toHaveAttribute('aria-current')
 
     await user.keyboard('{Enter}')
@@ -70,8 +110,8 @@ describe('Filetree', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse I-01 Headlamp' }))
     await user.click(screen.getByRole('button', { name: 'Expand I-01 Headlamp' }))
     expect(screen.getByRole('button', { name: 'Expand A-01 Long asset name' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: /DS-01/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /A-02/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'DS-01 Loss of light' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'A-02 Firmware' })).toBeVisible()
   })
 
   it('moves between visible entries with arrows, Home and End', async () => {
@@ -207,6 +247,6 @@ describe('Filetree', () => {
 
     await user.hover(link)
     expect(animate).not.toHaveBeenCalled()
-    expect(link).toHaveAttribute('title', 'Asset: A-01 Long asset name')
+    expect(link).toHaveAttribute('title', 'Asset: Long asset name')
   })
 })

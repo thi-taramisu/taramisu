@@ -11,30 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const canAccessAttachments = `-- name: CanAccessAttachments :one
-SELECT EXISTS (
-    SELECT 1 FROM project_role_assignment r
-    WHERE r.tara_project_id = $1
-      AND (r.user_id = $2 OR r.group_id IN (
-          SELECT group_id FROM iam_user_group_member WHERE user_id = $2
-      ))
-      AND (NOT $3::boolean OR r.project_role IN ('OWNER', 'EDITOR'))
-)
-`
-
-type CanAccessAttachmentsParams struct {
-	ProjectID   pgtype.UUID
-	UserID      pgtype.UUID
-	WriteAccess bool
-}
-
-func (q *Queries) CanAccessAttachments(ctx context.Context, arg CanAccessAttachmentsParams) (bool, error) {
-	row := q.db.QueryRow(ctx, canAccessAttachments, arg.ProjectID, arg.UserID, arg.WriteAccess)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const createAttachment = `-- name: CreateAttachment :one
 INSERT INTO attachment (project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at

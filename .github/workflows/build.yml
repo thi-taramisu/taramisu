@@ -33,6 +33,7 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      stack: ${{ steps.filter.outputs.stack }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -46,9 +47,22 @@ jobs:
           filters: |
             frontend:
               - 'frontend/**'
+              # The frontend types are generated from it, so an API change is checked against them.
+              - 'backend/openapi.json'
               - '.github/workflows/build.yml'
             backend:
               - 'backend/**'
+              - '.github/workflows/build.yml'
+            stack:
+              # /api/v1/me depends on routing, config, persistence, and migrations, not only on auth.
+              - 'backend/**'
+              - 'deploy/**'
+              - 'iam/**'
+              - 'proxy/**'
+              # deploy/dev.sh also builds and waits for the frontend and docs images.
+              - 'frontend/**'
+              - 'docs/docusaurus/**'
+              - 'docs/external/**'
               - '.github/workflows/build.yml'
 
   frontend:
@@ -77,6 +91,14 @@ jobs:
       - name: Install dependencies
         id: install
         run: npm ci
+
+      - name: Regenerate API types from backend/openapi.json
+        run: npm run generate:api
+
+      - name: Verify committed API types are up to date
+        id: api_types
+        working-directory: ${{ github.workspace }}
+        run: git diff --exit-code -- frontend/src/api/schema.d.ts
 
       - name: Typecheck
         run: npm run typecheck
@@ -281,6 +303,42 @@ jobs:
           | **OpenAPI Spec Freshness** | ${{ steps.openapi.outcome == 'success' && '✅ In Sync' || (steps.openapi.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `make openapi` & `git diff` |
           EOF
 
+  stack:
+    name: Stack integration
+    needs: changes
+    if: needs.changes.outputs.stack == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # deploy/dev.sh alone may wait up to about 11 minutes (its --wait-timeout values) after cold image builds.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Fails in seconds if proxy/nginx.conf no longer matches what the runner parses, before the stack is built.
+      - name: Check proxy config against the test runner
+        run: python3 deploy/stack_test.py --self-check
+
+      - name: Start stack
+        run: ./deploy/dev.sh
+
+      - name: Multi-replica & failover test
+        run: make -C deploy test-stack
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose --env-file iam/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml logs --no-color > stack-logs.txt
+
+      - name: Upload stack logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stack-logs
+          path: stack-logs.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
   result:
     name: Build result
     if: always()
@@ -288,6 +346,7 @@ jobs:
       - changes
       - frontend
       - backend
+      - stack
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -299,8 +358,9 @@ jobs:
           | Component | Status | Details |
           | :--- | :---: | :--- |
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
-          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
+          | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | API types drift check, Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
           | **Backend** | ${{ needs.backend.result == 'success' && '✅ Passed' || (needs.backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Go Module Verify, Build, Atlas & sqlc Drift Check, PostgreSQL Integration, Race Tests, Coverage (80%) & OpenAPI Spec |
+          | **Stack Integration** | ${{ needs.stack.result == 'success' && '✅ Passed' || (needs.stack.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Live Multi-Replica & Failover Verification (`--scale api=2`) |
           EOF
 
       - name: Check job results

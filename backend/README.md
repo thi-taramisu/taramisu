@@ -18,7 +18,7 @@ Go HTTP API for Taramisu.
 
 ## Commands
 
-Run from `backend/`. The full stack uses ports 80, 5432, 8080 and 9000; optional pgAdmin uses 5050.
+Run from `backend/`. The full stack uses ports 80, 5432, and 9000; optional pgAdmin uses 5050.
 
 ```bash
 make up
@@ -39,46 +39,57 @@ make down
 API, backend database and migrations, Authentik, frontend, and proxy. Startup provisions Authentik before starting the API.
 See the [deployment README](../deploy/README.md) for setup, networking, and migration from the former two-project layout.
 
-Container commands use `iam/.env`; `make init` generates it without starting services.
+Container commands use `iam/.env` and `storage/.env`; `make init` generates them without starting services.
 `make db` starts only the backend database, and `make migrate` applies its migrations.
 These commands initialize the configuration automatically if needed.
 
 `make pgadmin` starts [pgAdmin](https://www.pgadmin.org/) at <http://localhost:5050> (no login),
 connected to the backend database. It remains opt-in through the `tools` profile.
 
-To run the API on the host, copy `.env.example` to `.env` and copy the OIDC settings from `../iam/.env`.
-Set `APP_URL=http://localhost:8080` in both files, then run `make up` to update the Authentik callback.
-Then follow the [host storage setup](../deploy/README.md#seaweedfs-object-storage) before running Go locally.
+To run the API directly on the host, copy `.env.example` to `.env`, stop the API container with
+`docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml stop api`, and follow
+the [host storage setup](../deploy/README.md#seaweedfs-object-storage) before running `make run`.
 `make run` and `make test` load the backend `.env`; bare `make` runs tests.
-Use port 8080 directly in this mode. To return to the full Compose stack, restore `APP_URL=http://localhost`
-in `../iam/.env` and run `make up`.
+The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to the full Compose stack, run `make up`.
 
 `make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
 
-> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
-> It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
+> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, Authentik, and storage data volumes.
+> It keeps `iam/.env` and `storage/.env`; `make up` provisions a fresh stack afterward.
 
 ## Authentication
 
-Open <http://localhost/auth/login> with user `dev` and `DEV_PASSWORD` from
-`../iam/.env`. Login returns `/api/v1/me` with the local user ID, issuer and subject.
-The Compose proxy forwards `/api/v1/` and `/auth/` to the backend without stripping their prefixes.
-`APP_URL` must be an origin without a trailing slash and determines the callback URL.
-`POST /auth/logout` ends the backend session and requires `Origin` to match `APP_URL`.
-Sessions last eight hours and are lost on API restart. Logout leaves the Authentik
-SSO session active. Group synchronization and project permissions are not implemented.
+The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)
+and sends `Authorization: Bearer <JWT>` on every `/api/v1/*` request.
+The Go API is 100% stateless across replicas: it verifies incoming `Bearer` JWTs (`RS256`, `iss`, `aud`, `exp`, and required `sub`, `name`,
+`email` claims) against Authentik's JWKS keys (`OIDC_JWKS_URL`, cached in memory per replica) and resolves `sub` (`hashed_user_id`) to the local
+`iam_user.id` UUID via an in-memory TTL cache backed by `UpsertIAMUser`.
+`GET /api/v1/me` returns the authenticated caller's internal `id`, `issuer`, `subject`, `name`, and `email`.
+
+## Authorization
+
+Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specified in
+[project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
+`internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
+`handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
+`/api/v1/projects/{id}/members`; member and project changes are written as `audit` log entries.
+
+Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
+The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
+host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
+omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
 
 ## Checks
 
 ```sh
-curl -f http://localhost:8080/health/ready
+curl -f http://localhost/health/ready
 make -C ../deploy test
 make test
 TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=disable' make test
 ```
 
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
-API logs: `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml logs api`.
+API logs: `docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml logs api`.
 
 ## Database migrations and sqlc drift detection
 
@@ -175,11 +186,69 @@ internal/httpapi/handlers/     HTTP handlers
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
 
+## Item definitions
+
+All routes below require an Authentik-issued Bearer JWT and are under `/api/v1/projects/{project_id}/item-definitions`.
+
+| Method | Path suffix | Result |
+| --- | --- | --- |
+| GET | (none) | List items, with `limit` (default 50, maximum 100) and `offset` (default 0) |
+| POST | (none) | Create an item; return 201 and a `Location` header |
+| GET | `/{item_id}` | Read an item |
+| PUT | `/{item_id}` | Replace an existing item; omitted optional fields become null |
+| PATCH | `/{item_id}` | Update supplied fields; omitted fields stay unchanged |
+| DELETE | `/{item_id}` | Delete an item; return 204 |
+
+Create and replace require a nonblank `name` (up to 255 characters) and `scope_type`
+(`ITEM` or `COMPONENT`). Optional text fields are `lifecycle_phase`,
+`boundary`, `functions`, `operational_environment`, `item_definition_wp_09_01`,
+`cybersecurity_specs_wp_10_01`, and `architectural_design`.
+The three definition fields can be filled in independently after creating a draft item. The legacy
+`item_definition_wp_09_01` remains available for unstructured imported definitions; it is not synchronized
+with the three structured fields.
+PATCH accepts explicit `null` to clear optional fields; `name` and `scope_type` cannot be null.
+The database supplies `id` and `created_at`, which updates preserve.
+
+Use Swagger UI at `/api/docs` and authorize with a Bearer JWT to try the routes. Example
+request body for POST:
+
+```json
+{
+  "name": "Headlamp",
+  "scope_type": "ITEM",
+  "lifecycle_phase": "development"
+}
+```
+
+Access uses the [shared project authorization](../docs/internal/architecture/iam/project-roles.md):
+Viewers can read; Editors and Owners can create, replace, update, or delete. Direct assignments and
+assignable Authentik groups from the signed `taramisu_groups` token claim are supported.
+
+Invalid inputs return 422. Missing or inaccessible projects and items return 404; members whose role
+is too low receive 403. Deleting an item also deletes its assets, damage scenarios, threat scenarios,
+attack paths, and their dependent properties, links, ratings, risk values, and treatment decisions.
+The frontend must ask for confirmation before deletion. Responses use the existing problem JSON
+error format without database details.
+
+Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
+for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
+for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
+roll back their fixtures and do not require a live Authentik instance.
+
+## Risk values and treatment decisions
+
+The risk API provides authenticated CRUD under `/api/v1/threat-scenarios/{threat_scenario_id}/risk-values`
+and `/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions`.
+It uses the existing schema and shared project authorization: Viewers can read; Editors and Owners can write.
+Non-members receive 404; members with insufficient roles receive 403. Related records and treatment claims are validated.
+See the [frontend API handoff](../docs/internal/dev-workflow/risk-api.md) for methods, fields, pagination, and errors.
+
 ## OpenAPI contract
 
-With the API running (default `:8080`, overridable via `HTTP_ADDR`): OpenAPI 3.1 at
-[http://localhost:8080/openapi.json](http://localhost:8080/openapi.json), UI at [/docs](http://localhost:8080/docs).
-Example: `curl -fsS "http://localhost:8080/openapi.json" -o openapi.json`.
+With the Compose stack running: OpenAPI 3.1 at [http://localhost/openapi.json](http://localhost/openapi.json), Swagger UI at
+[/api/docs](http://localhost/api/docs) (or `http://localhost:8080/openapi.json` and `http://localhost:8080/docs` when running standalone
+on the host via `make run`, default `HTTP_ADDR=:8080`).
+Example: `curl -fsS "http://localhost/openapi.json" -o openapi.json`.
 
 For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `make openapi` (or
 `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).

@@ -27,6 +27,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
 )
 
 const maxAttachmentSize = 10 << 20
@@ -61,7 +62,7 @@ func metadata(a db.Attachment) attachmentMetadata {
 	return attachmentMetadata{uuid.UUID(a.ID.Bytes).String(), uuid.UUID(a.ProjectID.Bytes).String(), a.FileName, a.ContentType, a.SizeBytes, a.Sha256, uuid.UUID(a.UploadedBy.Bytes).String(), a.CreatedAt.Time}
 }
 
-func registerAttachments(api huma.API, h *Attachments) {
+func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAccessStore) {
 	base := "/api/v1/projects/{project_id}/attachments"
 	for _, route := range []struct{ method, path, id, summary string }{
 		{http.MethodPost, base, "upload-attachment", "Upload one multipart file (field file), up to 10 MiB; PDF, PNG, JPEG, GIF, WebP or plain text"},
@@ -69,9 +70,9 @@ func registerAttachments(api huma.API, h *Attachments) {
 		{http.MethodGet, base + "/{attachment_id}", "download-attachment", "Download an attachment"},
 		{http.MethodDelete, base + "/{attachment_id}", "delete-attachment", "Delete an attachment"},
 	} {
-		op := huma.Operation{Method: route.method, Path: route.path, OperationID: route.id, Summary: route.summary, Security: []map[string][]string{{"session": {}}},
+		op := huma.Operation{Method: route.method, Path: route.path, OperationID: route.id, Summary: route.summary, Security: []map[string][]string{{"bearer": {}}},
 			Parameters: []*huma.Param{{Name: "project_id", In: "path", Required: true, Schema: &huma.Schema{Type: "string", Format: "uuid"}}},
-			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "404": {Description: "Not found or insufficient project role"}, "503": {Description: "Database or storage unavailable"}},
+			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "422": {Description: "Invalid project ID"}, "404": {Description: "Not found"}, "503": {Description: "Database or storage unavailable"}},
 		}
 		schema := api.OpenAPI().Components.Schemas.Schema(reflect.TypeOf(attachmentMetadata{}), true, "Attachment")
 		if strings.Contains(route.path, "{attachment_id}") {
@@ -94,12 +95,12 @@ func registerAttachments(api huma.API, h *Attachments) {
 			op.Responses["204"] = &huma.Response{Description: "Deleted"}
 			op.Responses["202"] = &huma.Response{Description: "Deletion accepted; attachment is hidden and cleanup will retry automatically"}
 		}
+		permission := handlers.PermRead
 		if route.method == http.MethodPost || route.method == http.MethodDelete {
-			op.Parameters = append(op.Parameters, &huma.Param{Name: "Origin", In: "header", Required: true, Schema: &huma.Schema{Type: "string"}})
-			op.Responses["403"] = &huma.Response{Description: "Invalid origin"}
+			permission = handlers.PermEdit
 		}
-		api.OpenAPI().AddOperation(&op)
-		api.Adapter().Handle(&op, func(ctx huma.Context) {
+		op.Responses["403"] = &huma.Response{Description: "Insufficient project role"}
+		handlers.RegisterRaw(api, op, handlers.InProject(access, handlers.ScopeProject("project_id"), permission), func(ctx huma.Context) {
 			r, w := humachi.Unwrap(ctx)
 			h.serve(w, r, auth.UserFromContext(r.Context()).ID)
 		})
@@ -143,15 +144,6 @@ func (h *Attachments) serve(w http.ResponseWriter, r *http.Request, userID strin
 	user, err := parseUUID(userID)
 	if err != nil {
 		attachmentError(w, 401, "authentication required")
-		return
-	}
-	allowed, err := h.queries.CanAccessAttachments(ctx, db.CanAccessAttachmentsParams{ProjectID: project, UserID: user, WriteAccess: r.Method == http.MethodPost || r.Method == http.MethodDelete})
-	if err != nil {
-		attachmentError(w, 503, "database unavailable")
-		return
-	}
-	if !allowed {
-		attachmentError(w, 404, "not found")
 		return
 	}
 	if r.Method == http.MethodPost {
@@ -228,7 +220,7 @@ func (h *Attachments) serve(w http.ResponseWriter, r *http.Request, userID strin
 	etag := `"` + a.Sha256 + `"`
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "private, no-cache")
-	w.Header().Set("Vary", "Cookie")
+	w.Header().Set("Vary", "Authorization")
 	for _, tag := range strings.Split(r.Header.Get("If-None-Match"), ",") {
 		tag = strings.TrimSpace(tag)
 		if tag == "*" || strings.TrimPrefix(tag, "W/") == etag {
