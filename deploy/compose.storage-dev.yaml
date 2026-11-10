@@ -1,0 +1,9 @@
+services:
+  storage:
+    ports:
+      - "127.0.0.1:${S3_DEV_PORT:-8333}:8333"
+
+# Port publishing requires a non-internal network.
+networks:
+  taramisu-storage:
+    internal: false
