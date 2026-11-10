@@ -22,9 +22,14 @@ type AssetStore interface {
 	DeleteAsset(context.Context, db.DeleteAssetParams) (pgtype.UUID, error)
 }
 
-type Assets struct{ queries AssetStore }
+type Assets struct {
+	queries AssetStore
+	access  ProjectAccessStore
+}
 
-func NewAssets(queries AssetStore) *Assets { return &Assets{queries: queries} }
+func NewAssets(queries AssetStore, access ProjectAccessStore) *Assets {
+	return &Assets{queries: queries, access: access}
+}
 
 func (h *Assets) Register(api huma.API) {
 	const collection = "/api/v1/item-definitions/{item_definition_id}/assets"
@@ -32,20 +37,22 @@ func (h *Assets) Register(api huma.API) {
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
 			Tags: []string{"Assets"}, Security: []map[string][]string{{"bearer": {}}},
-			Errors: []int{401, 404, 422, 503}}
+			Errors: []int{401, 404, 422, 500}}
 	}
-	huma.Register(api, op("list-assets", http.MethodGet, collection, "List assets"), h.List)
-	huma.Register(api, op("get-asset", http.MethodGet, member, "Get an asset"), h.Get)
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
+	Register(api, op("list-assets", http.MethodGet, collection, "List assets"), read, h.List)
+	Register(api, op("get-asset", http.MethodGet, member, "Get an asset"), read, h.Get)
 	create := op("create-asset", http.MethodPost, collection, "Create an asset")
 	create.DefaultStatus = http.StatusCreated
-	huma.Register(api, create, h.Create)
-	huma.Register(api, op("replace-asset", http.MethodPut, member, "Replace an asset"), h.Replace)
+	Register(api, create, edit, h.Create)
+	Register(api, op("replace-asset", http.MethodPut, member, "Replace an asset"), edit, h.Replace)
 	patch := op("update-asset", http.MethodPatch, member, "Partially update an asset")
 	patch.Description = "Omitted fields remain unchanged. Set description or identification_source to null to clear them."
-	huma.Register(api, patch, h.Update)
+	Register(api, patch, edit, h.Update)
 	del := op("delete-asset", http.MethodDelete, member, "Delete an asset")
 	del.Description = "Also deletes the asset's cybersecurity properties and their scenario links."
-	huma.Register(api, del, h.Delete)
+	Register(api, del, edit, h.Delete)
 }
 
 type AssetBody struct {
@@ -141,7 +148,7 @@ func assetError(err error) error {
 		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
 	}
 	slog.Warn("asset database operation failed", "error", err)
-	return huma.Error503ServiceUnavailable("database unavailable")
+	return huma.Error500InternalServerError("internal server error")
 }
 func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAssetOutput, error) {
 	a, err := h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),

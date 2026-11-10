@@ -35,19 +35,28 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	var project, item, otherItem string
-	if err := tx.QueryRow(ctx, "INSERT INTO tara_project (name) VALUES ('asset API test') RETURNING id").Scan(&project); err != nil {
-		t.Fatal(err)
-	}
-	for _, dest := range []*string{&item, &otherItem} {
-		if err := tx.QueryRow(ctx, "INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project).Scan(dest); err != nil {
-			t.Fatal(err)
-		}
-	}
-	manager, bearer := authtest.NewManagerAndToken(t)
-	h := httpapi.New(db.New(tx), manager)
+	queries := db.New(tx)
+	fixture := authtest.NewFixture(t, queries)
+	bearer := "Bearer " + fixture.Token(t, nil)
+	h := httpapi.New(queries, fixture.Manager)
 	request := func(method, path string, body any) *httptest.ResponseRecorder {
 		return assetRequest(t, h, bearer, method, path, body)
+	}
+	createdProject := request("POST", "/api/v1/projects", map[string]any{"name": "asset API test"})
+	if createdProject.Code != 201 {
+		t.Fatalf("create project: %d %s", createdProject.Code, createdProject.Body)
+	}
+	var project struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(createdProject.Body.Bytes(), &project); err != nil {
+		t.Fatal(err)
+	}
+	var item, otherItem string
+	for _, dest := range []*string{&item, &otherItem} {
+		if err := tx.QueryRow(ctx, "INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project.ID).Scan(dest); err != nil {
+			t.Fatal(err)
+		}
 	}
 	collection := "/api/v1/item-definitions/" + item + "/assets"
 	otherCollection := "/api/v1/item-definitions/" + otherItem + "/assets"
