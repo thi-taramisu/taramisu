@@ -34,9 +34,11 @@ describe('threat scenario risks', () => {
     expect(block.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       expect.stringMatching(/^SafetySevere impact×Medium feasibilityRisk 4Highest/),
       expect.stringMatching(/^OperationalModerate impact×Medium feasibilityRisk 2(?!Highest)/),
-      'FinancialNot ratedRate it on the Impact tab to get a risk value.',
-      'PrivacyOmittedNo personal data is involved.',
+      'FinancialNot rated',
     ])
+    const privacy = block.getByText('Privacy')
+    expect(privacy).toHaveAttribute('title', 'No personal data is involved.')
+    expect(privacy.parentElement).toHaveTextContent(/^OmittedPrivacy/)
     expect(block.getAllByRole('link', { name: 'Severe impact' })[0]).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
     expect(block.getAllByRole('link', { name: 'Medium feasibility' })[0]).toHaveAttribute('href', `${project}/attack-paths/ap-02/rating`)
     expect(block.getByText(/^via/)).toHaveTextContent('via A-01 Headlamp on/off command · Integrity')

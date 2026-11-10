@@ -168,11 +168,11 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
             return (
             <Collapsible key={row.key} asChild open={openKey === row.key} onOpenChange={(open) => onOpenChange(row.key, open)}>
               <li
-                className={cn('px-4 py-2', isHighest && 'bg-muted/40')}
+                className={cn('px-4', isHighest && 'bg-muted/40')}
                 // An accent in the colour of the risk value marks the row that decides the risk of the threat scenario.
                 style={isHighest ? { boxShadow: `inset 3px 0 0 var(--risk-${row.risk}-border)` } : undefined}
               >
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <div className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                   <span className="w-28 font-medium">{categoryLabel(row.category)}</span>
                   {/* The inputs link to where they are rated and differ in shape from the result. */}
                   <Link
@@ -209,41 +209,39 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                     </Button>
                   </CollapsibleTrigger>
                 </div>
-                <CollapsibleContent className="pt-2">
+                <CollapsibleContent className="pb-2">
                   <RiskCalculationDetails projectId={projectId} row={row} feasibility={feasibility} />
                 </CollapsibleContent>
               </li>
             </Collapsible>
             )
           })}
-          {/* Categories without a risk value stay in their place, so nothing open is hidden. */}
-          {[...notRated, ...omitted].map((row) => (
-            <li key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/20 px-4 py-1.5 text-sm text-muted-foreground">
+          {/* Unrated categories stay in their place, so nothing open is hidden. */}
+          {notRated.map((row) => (
+            <li key={row.key} className="flex min-h-11 flex-wrap items-center gap-x-4 px-4 text-sm text-muted-foreground">
               <span className="w-28">{categoryLabel(row.category)}</span>
-              {row.state === 'NOT_RATED' ? (
-                <>
-                  <Link
-                    to={impactPath}
-                    className="inline-flex h-6 w-24 items-center justify-center rounded-md border border-dashed border-foreground/30 text-xs text-foreground hover:bg-muted"
-                  >
-                    Not rated
-                  </Link>
-                  <span className="text-xs">Rate it on the Impact tab to get a risk value.</span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex h-6 w-24 items-center justify-center rounded-md border border-impact-omitted-border bg-impact-omitted text-xs text-impact-omitted-foreground">
-                    Omitted
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-xs" title={row.rationale ?? undefined}>
-                    {row.rationale ?? 'No rationale given.'}
-                  </span>
-                </>
-              )}
+              <Link
+                to={impactPath}
+                className="inline-flex h-6 w-24 items-center justify-center rounded-md border border-dashed border-foreground/30 text-xs text-foreground hover:bg-muted"
+              >
+                Not rated
+              </Link>
             </li>
           ))}
         </ul>
       </>
+      {/* Omitted categories are a justified decision [PM-15-07], so they only get a line at the end. */}
+      {omitted.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+          <span>Omitted</span>
+          {omitted.map((row) => (
+            <span key={row.key} title={row.rationale ?? undefined} className="inline-flex h-5 items-center rounded-full bg-muted px-2">
+              {categoryLabel(row.category)}
+              {row.rationale && <span className="sr-only">: {row.rationale}</span>}
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
