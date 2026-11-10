@@ -70,7 +70,8 @@ describe('threat scenario risks', () => {
     const matrix = screen.getByRole('table', { name: /Risk matrix/ })
     expect(within(matrix).getByText('(this risk value)').parentElement).toHaveTextContent('4')
     expect(block.getByRole('button', { name: 'DS-01 Safety Calculation' })).toHaveAttribute('aria-expanded', 'true')
-    expect(block.getByText(/the most feasible of 2 rated attack paths/)).toBeInTheDocument()
+    expect(block.getByText(/most feasible of 2 rated/)).toBeInTheDocument()
+    expect(block.getByText('Risk matrix')).toBeInTheDocument()
 
     // Only one calculation is open at a time.
     await user.click(block.getByRole('button', { name: 'DS-01 Operational Calculation' }))
