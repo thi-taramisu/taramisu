@@ -34,6 +34,8 @@ type itemStore struct {
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 	handlers.StatusReader
 	role    db.ProjectRole
 	err     error

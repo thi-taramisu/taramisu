@@ -1,7 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { isNotFound } from '../../api/errors'
 import { useDamageScenario } from '../../api/queries/items'
-import { entityTitle } from '../workspace/entities'
 import { EntityPage } from '../workspace/EntityPage'
 
 /** Damage scenario page: header from the damage scenario API, tabs as child routes. */
@@ -31,7 +30,8 @@ export function DamageScenarioPage() {
   return (
     <EntityPage
       type="damage-scenarios"
-      title={entityTitle({ code: scenario.data.code, name: scenario.data.title })}
+      name={scenario.data.title}
+      code={scenario.data.code}
       actions={
         // A failed refetch keeps the loaded damage scenario, so unsaved edits in the tabs survive.
         scenario.isError && (

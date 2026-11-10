@@ -21,6 +21,8 @@ import (
 const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 	statusReaderFunc
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore

@@ -26,6 +26,8 @@ type healthQueries struct {
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {

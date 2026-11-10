@@ -21,6 +21,9 @@ import (
 
 // Embed unused interfaces to satisfy the router without replacing its registration.
 type propertyQueries struct {
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
+
 	resourceAccess
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore

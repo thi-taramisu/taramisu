@@ -22,6 +22,8 @@ type Queries interface {
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 }
 
 // Option configures optional dependencies of the API.
@@ -83,6 +85,8 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewAssetCybersecurityProperties(queries, queries).Register(api)
 	handlers.NewDamageScenarioAssetProperties(queries, queries).Register(api)
 	handlers.NewThreatScenarioAssetProperties(queries, queries).Register(api)
+	handlers.NewRiskValues(queries, queries).Register(api)
+	handlers.NewRiskTreatmentDecisions(queries, queries).Register(api)
 	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
