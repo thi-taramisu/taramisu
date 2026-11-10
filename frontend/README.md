@@ -54,6 +54,10 @@ follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End mov
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
 
+Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Segments display the element code, or its ID when no code exists, and name. Parent links preserve query parameters; long labels wrap
+without shortening. If the path cannot be loaded, the current ID remains visible with a "Path unavailable" fallback.
+
 ## API client
 
 The client is typed against the backend's spec `backend/openapi.json`; the reasoning behind the setup is in

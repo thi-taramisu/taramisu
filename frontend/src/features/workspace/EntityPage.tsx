@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES, findNode, formatEntityId } from './entities'
+import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
+import { EntityBreadcrumbs } from './EntityBreadcrumbs'
 import { Placeholder } from './Placeholder'
 
 interface EntityPageProps {
@@ -24,15 +25,19 @@ interface EntityPageProps {
 export function EntityPage({ type, name, code, actions, tabLabels = {} }: EntityPageProps) {
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
-  const { data: tree } = useProjectTree(projectId)
+  const { data: tree, isPending } = useProjectTree(projectId)
   const { label, tabs } = ENTITY_TYPES[type]
-  const node = tree && findNode(type, entityId, tree)
+  const path = tree && findNodePath(type, entityId, tree)
+  const node = path?.at(-1)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
   const displayCode = code || node?.code
   const typeAndId = displayCode ? `${label} ${formatEntityId(displayCode)}` : label
 
   return (
     <div className="flex h-full flex-col gap-4">
+      <EntityBreadcrumbs projectId={projectId} path={path ?? [{
+        type, id: entityId, name: isPending ? 'Loading…' : 'Path unavailable',
+      }]} />
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tabular-nums text-muted-foreground">{typeAndId}</p>
