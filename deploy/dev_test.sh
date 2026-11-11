@@ -208,19 +208,20 @@ model = json.loads((root / 'model.json').read_text())
 services = model['services']
 assert model['name'] == 'taramisu'
 assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
-                         'authentik-server', 'authentik-worker', 'authentik-db'}
+                         'authentik-server', 'authentik-worker', 'authentik-db', 'llm'}
 expected_networks = {
-    'api': {'proxy', 'app-db'},
+    'api': {'proxy', 'app-db', 'llm'},
     'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
     'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
     'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
     'docs': {'proxy'},
+    'llm': {'llm', 'llm-egress'},
 }
 for service, networks in expected_networks.items():
     assert set(services[service]['networks']) == networks, service
 assert not any(network.get('external') for network in model['networks'].values())
 assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
-    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True}
+    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'llm': True, 'llm-egress': False}
 assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
 # Without the dev override only the proxy publishes a port.
 assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}

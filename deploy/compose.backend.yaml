@@ -58,7 +58,7 @@ services:
         condition: service_healthy
 
   api:
-    networks: [proxy, app-db]
+    networks: [proxy, app-db, llm]
     image: ghcr.io/thi-taramisu/taramisu-api:${TARAMISU_VERSION:-latest}
     build:
       context: ../backend

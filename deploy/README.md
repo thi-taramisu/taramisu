@@ -77,6 +77,8 @@ with the project name (for example `taramisu_proxy`); no externally created netw
 | `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests (incl. `/auth/` to Authentik); API fetches JWKS from `authentik-server:9000` |
 | `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
 | `iam-db` | yes | Authentik server, worker, and database | IAM database |
+| `llm` | yes | API, LLM service | API sends model requests to the LLM service |
+| `llm-egress` | no | LLM service | internet access to the model API (SAIA); separate from `edge`, so the proxy cannot reach the service that holds the key |
 | `dev-app` | no | db, pgAdmin | only from `compose.dev.yaml`, so these services can publish ports locally |
 | `dev-iam` | no | Authentik server | only from `compose.dev.yaml`, separate from `dev-app` so Authentik cannot reach the application database |
 
