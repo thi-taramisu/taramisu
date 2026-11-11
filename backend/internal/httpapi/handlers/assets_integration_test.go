@@ -35,7 +35,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	bearer := "Bearer " + fixture.Token(t, nil)
 	h := httpapi.New(queries, fixture.Manager)

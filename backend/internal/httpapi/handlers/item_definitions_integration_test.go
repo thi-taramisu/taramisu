@@ -45,7 +45,7 @@ func TestItemDefinitionPostgresCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	handler, token := authenticatedAPI(t, queries, newItemStore())
 	call := func(method, path, body string, want int) *handlers.ItemDefinition {
 		t.Helper()

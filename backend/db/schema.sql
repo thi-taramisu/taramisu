@@ -58,6 +58,28 @@ CREATE TABLE project_role_assignment (
 CREATE INDEX project_role_assignment_user_id_idx ON project_role_assignment (user_id);
 CREATE INDEX project_role_assignment_group_id_idx ON project_role_assignment (group_id);
 
+-- Audit history: one row per successful change, written in the transaction of the change
+-- (docs/internal/architecture/audit.md). No foreign keys, so events outlive the project, assignment,
+-- and user they describe. IDs only, never names or email addresses.
+-- occurred_at uses clock_timestamp(), not now(): now() is the start of the transaction, so several
+-- events written in one transaction would share it and lose their order.
+CREATE TABLE audit_event (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    occurred_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    tara_project_id uuid NOT NULL,
+    actor_user_id uuid NOT NULL,
+    event text NOT NULL,
+    target_type text NOT NULL,
+    target_id uuid NOT NULL,
+    before jsonb,
+    after jsonb,
+    request_id text
+);
+
+CREATE INDEX audit_event_project_time_idx ON audit_event (tara_project_id, occurred_at DESC);
+-- Finds the projects whose deletion is older than the retention period.
+CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE event = 'project.deleted';
+
 CREATE TABLE item_definition (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tara_project_id uuid NOT NULL REFERENCES tara_project (id),

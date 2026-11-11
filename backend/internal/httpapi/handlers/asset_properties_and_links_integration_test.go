@@ -59,7 +59,7 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		}
 		return id
 	}
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	api := &routeAPI{t: t, handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
 	f := propertyFixture{tx: tx, api: api, authFixture: fixture}

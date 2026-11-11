@@ -2,28 +2,17 @@ package handlers
 
 import (
 	"context"
-	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
-// audit writes one structured log entry for a change listed in the specification's "Audit" section.
-// It records IDs only, never names or email addresses.
-func audit(ctx context.Context, event string, attrs ...any) {
-	args := make([]any, 0, 4+len(attrs))
-	args = append(args, "event", event, "actor", auth.UserFromContext(ctx).ID)
-	slog.InfoContext(ctx, "audit", append(args, attrs...)...)
-}
-
-// memberAttrs describes the member a change applies to, followed by extra key-value pairs.
-func memberAttrs(projectID pgtype.UUID, m ProjectMember, extra ...any) []any {
-	attrs := []any{"project", projectID.String(), "member", m.ID, "member_type", m.Type}
-	if m.UserID != nil {
-		attrs = append(attrs, "user", *m.UserID)
+// auditActor returns who makes the change in ctx, for the audit history. The store records the event
+// and writes the "audit" log line (see db.Store).
+func auditActor(ctx context.Context) (db.Actor, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return db.Actor{}, err
 	}
-	if m.GroupID != nil {
-		attrs = append(attrs, "group", *m.GroupID)
-	}
-	return append(attrs, extra...)
+	return db.Actor{UserID: userID, RequestID: logging.RequestID(ctx)}, nil
 }

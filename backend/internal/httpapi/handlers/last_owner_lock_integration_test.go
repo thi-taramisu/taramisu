@@ -26,7 +26,7 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	t.Cleanup(pool.Close) // registered first, so it runs after the cleanups below that use the pool
 	store := db.NewStore(pool)
 
 	userID := func() pgtype.UUID {
@@ -48,7 +48,12 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, "DELETE FROM tara_project WHERE id = $1", project.ID) })
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM item_definition WHERE tara_project_id = $1", project.ID)
+		_, _ = pool.Exec(ctx, "DELETE FROM tara_project WHERE id = $1", project.ID)
+		_, _ = pool.Exec(ctx, "DELETE FROM audit_event WHERE tara_project_id = $1", project.ID)
+	})
+	actor := db.Actor{UserID: alice}
 	bobOwner, err := store.CreateUserMember(ctx, db.CreateUserMemberParams{ProjectID: project.ID, UserID: bob, Role: db.ProjectRoleOWNER})
 	if err != nil {
 		t.Fatal(err)
@@ -70,16 +75,23 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = first.Rollback(ctx) }()
-	if _, err := db.NewStore(first).UpdateProjectMemberRole(ctx, db.UpdateProjectMemberRoleParams{
+	if _, err := db.NewStore(first).UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{
 		ProjectID: project.ID, ID: aliceOwner, Role: db.ProjectRoleVIEWER,
 	}); err != nil {
 		t.Fatalf("first downgrade: %v", err)
 	}
 
+	// The lock serializes membership changes only: content of the project can still be written.
+	contentCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if _, err := pool.Exec(contentCtx, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'Item', 'ITEM')`, project.ID); err != nil {
+		t.Fatalf("content write while a membership change holds the lock: %v", err)
+	}
+
 	// Second change at the same moment: bob steps down too. It must wait for the first one.
 	second := make(chan error, 1)
 	go func() {
-		_, err := store.UpdateProjectMemberRole(ctx, db.UpdateProjectMemberRoleParams{
+		_, err := store.UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{
 			ProjectID: project.ID, ID: bobOwner, Role: db.ProjectRoleVIEWER,
 		})
 		second <- err
@@ -102,7 +114,7 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	}
 
 	// The same lock protects removal.
-	if _, err := store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: project.ID, ID: bobOwner}); !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: project.ID, ID: bobOwner}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("remove last Owner: %v, want pgx.ErrNoRows", err)
 	}
 }

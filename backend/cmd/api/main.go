@@ -52,6 +52,10 @@ func run(logLevel *slog.LevelVar) error {
 	}
 	defer closePool(pool, poolCloseTimeout)
 	queries := db.NewStore(pool)
+	// Deferred after closePool, so the cleanup is cancelled before the pool closes, also when run returns early.
+	purgeCtx, stopPurge := context.WithCancel(ctx)
+	defer stopPurge()
+	go purgeAuditEvents(purgeCtx, queries, cfg.AuditRetentionAfterDelete, auditCleanupInterval, auditCleanupRetry)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,
