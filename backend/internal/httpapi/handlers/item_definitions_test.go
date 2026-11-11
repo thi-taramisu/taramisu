@@ -33,6 +33,12 @@ type itemStore struct {
 	handlers.ProjectMemberStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	handlers.StatusReader
 	role    db.ProjectRole
 	err     error
