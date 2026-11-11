@@ -85,7 +85,7 @@ func TestAssetValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.method+tc.path+tc.body, func(t *testing.T) {
-			s := &assetStore{}
+			s := &assetStore{resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(tc.body))
 			if r.Code != 422 || s.calls != 0 {
@@ -103,12 +103,12 @@ func TestAssetErrors(t *testing.T) {
 		want               int
 	}{
 		{"missing", "GET", assetPath, pgx.ErrNoRows, 404},
-		{"unavailable", "GET", assetPath, errors.New("private database details"), 503},
+		{"unexpected error", "GET", assetPath, errors.New("private database details"), 500},
 		{"unknown parent", "POST", assetCollection, &pgconn.PgError{Code: "23503"}, 422},
 		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := &assetStore{err: tc.err}
+			s := &assetStore{err: tc.err, resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(assetJSON))
 			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
@@ -149,4 +149,47 @@ func (s *assetStore) ReplaceAsset(context.Context, db.ReplaceAssetParams) (db.As
 func (s *assetStore) UpdateAsset(context.Context, db.UpdateAssetParams) (db.Asset, error) {
 	s.calls++
 	return db.Asset{}, s.err
+}
+
+func TestAssetAuthorization(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	for _, route := range []struct {
+		method, path string
+		status       int
+	}{
+		{"GET", assetCollection, 200}, {"GET", assetPath, 200},
+		{"POST", assetCollection, 201}, {"PUT", assetPath, 200},
+		{"PATCH", assetPath, 200}, {"DELETE", assetPath, 204},
+	} {
+		for _, access := range []struct {
+			name   string
+			role   db.ProjectRole
+			token  string
+			status int
+		}{
+			{"anonymous", db.ProjectRoleEDITOR, "", 401},
+			{"non-member", "", bearer, 404},
+			{"viewer", db.ProjectRoleVIEWER, bearer, 0},
+			{"editor", db.ProjectRoleEDITOR, bearer, 0},
+		} {
+			t.Run(route.method+route.path+"/"+access.name, func(t *testing.T) {
+				s := &assetStore{resourceAccess: resourceAccess{role: access.role, nonMember: access.role == ""}}
+				want := access.status
+				if want == 0 {
+					want = route.status
+					if access.role == db.ProjectRoleVIEWER && route.method != "GET" {
+						want = 403
+					}
+				}
+				r := assetRequest(t, httpapi.New(s, manager), access.token, route.method, route.path, strings.NewReader(assetJSON))
+				calls := 0
+				if want < 400 {
+					calls = 1
+				}
+				if r.Code != want || s.calls != calls {
+					t.Fatalf("got %d, want %d; calls %d, want %d: %s", r.Code, want, s.calls, calls, r.Body)
+				}
+			})
+		}
+	}
 }

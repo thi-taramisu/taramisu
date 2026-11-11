@@ -35,13 +35,13 @@ func riskTestUUID(value string) pgtype.UUID {
 }
 
 type riskFake struct {
-	handlers.AssetStore
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
 
 	handlers.StatusReader
 	handlers.TaraProjectStore
+	handlers.AssetStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore

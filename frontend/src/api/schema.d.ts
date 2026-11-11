@@ -1226,15 +1226,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
         };
     };
     "create-asset": {
@@ -1300,15 +1291,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1918,15 +1900,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
         };
     };
     "replace-asset": {
@@ -1992,15 +1965,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2074,15 +2038,6 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
         };
     };
     "update-asset": {
@@ -2148,15 +2103,6 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -34,13 +34,13 @@ func NewAssets(queries AssetStore, access ProjectAccessStore) *Assets {
 func (h *Assets) Register(api huma.API) {
 	const collection = "/api/v1/item-definitions/{item_definition_id}/assets"
 	const member = collection + "/{id}"
-	read := InProject(h.access, ScopeItemDefinition, PermRead)
-	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
 	op := func(id, method, path, summary string) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
 			Tags: []string{"Assets"}, Security: []map[string][]string{{"bearer": {}}},
-			Errors: []int{401, 404, 422, 503}}
+			Errors: []int{401, 404, 422, 500}}
 	}
+	read := InProject(h.access, ScopeItemDefinition, PermRead)
+	edit := InProject(h.access, ScopeItemDefinition, PermEdit)
 	Register(api, op("list-assets", http.MethodGet, collection, "List assets"), read, h.List)
 	Register(api, op("get-asset", http.MethodGet, member, "Get an asset"), read, h.Get)
 	create := op("create-asset", http.MethodPost, collection, "Create an asset")
@@ -148,7 +148,7 @@ func assetError(err error) error {
 		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
 	}
 	slog.Warn("asset database operation failed", "error", err)
-	return huma.Error503ServiceUnavailable("database unavailable")
+	return huma.Error500InternalServerError("internal server error")
 }
 func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAssetOutput, error) {
 	a, err := h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
