@@ -1,0 +1,139 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiProvider } from '../../api/ApiProvider'
+import { createApiClient } from '../../api/client'
+import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { AssistantPanel } from './AssistantPanel'
+
+const baseUrl = 'http://api.test'
+const projectA = { id: '11111111-1111-4111-8111-111111111111', name: 'Demo ECU', role: 'OWNER', created_at: '2026-11-11T00:00:00Z' }
+const projectB = { id: '22222222-2222-4222-8222-222222222222', name: 'Gateway', role: 'VIEWER', created_at: '2026-11-11T00:00:00Z' }
+const server = setupServer()
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeEach(() => {
+  localStorage.clear()
+  server.use(http.get(`${baseUrl}/api/v1/projects`, () => HttpResponse.json([projectA, projectB])))
+})
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+function renderPanel(onClose = () => {}) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ApiProvider api={{ client: createApiClient({ baseUrl }), ...createMockItemApi() }}>
+        <AssistantPanel open onClose={onClose} />
+      </ApiProvider>
+    </QueryClientProvider>,
+  )
+  return userEvent.setup()
+}
+
+describe('AssistantPanel', () => {
+  it('asks the assistant about the chosen project and shows the answer with the tools used', async () => {
+    const requests: { projectId: string; body: unknown }[] = []
+    server.use(
+      http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, async ({ params, request }) => {
+        requests.push({ projectId: String(params.projectId), body: await request.json() })
+        return HttpResponse.json({ answer: 'Demo ECU has one item.', tools_used: ['list_item_definitions'] })
+      }),
+    )
+    const user = renderPanel()
+
+    await screen.findByRole('option', { name: 'Demo ECU' })
+    await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Which items?{Enter}')
+
+    expect(await screen.findByText('Demo ECU has one item.')).toBeInTheDocument()
+    expect(screen.getByText('Read: list_item_definitions')).toBeInTheDocument()
+    expect(screen.getByText('Which items?')).toBeInTheDocument()
+    expect(requests).toEqual([{ projectId: projectA.id, body: { messages: [{ role: 'user', content: 'Which items?' }] } }])
+  })
+
+  it('sends the conversation so far with a follow-up question', async () => {
+    const bodies: unknown[] = []
+    server.use(
+      http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, async ({ request }) => {
+        bodies.push(await request.json())
+        return HttpResponse.json({ answer: `Answer ${bodies.length}`, tools_used: [] })
+      }),
+    )
+    const user = renderPanel()
+    const input = await screen.findByRole('textbox', { name: 'Message to the assistant' })
+    await screen.findByRole('option', { name: 'Demo ECU' })
+
+    await user.type(input, 'First{Enter}')
+    await screen.findByText('Answer 1')
+    await user.type(input, 'Second{Enter}')
+    await screen.findByText('Answer 2')
+
+    expect(bodies[1]).toEqual({
+      messages: [
+        { role: 'user', content: 'First' },
+        { role: 'assistant', content: 'Answer 1' },
+        { role: 'user', content: 'Second' },
+      ],
+    })
+  })
+
+  it('switches the project, remembers it and starts a new conversation', async () => {
+    const projectIds: string[] = []
+    server.use(
+      http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, ({ params }) => {
+        projectIds.push(String(params.projectId))
+        return HttpResponse.json({ answer: 'ok', tools_used: [] })
+      }),
+    )
+    const user = renderPanel()
+    await screen.findByRole('option', { name: 'Gateway' })
+
+    await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
+    await screen.findByText('ok')
+    await user.selectOptions(screen.getByLabelText('Project (from the database)'), projectB.id)
+
+    expect(screen.queryByText('ok')).not.toBeInTheDocument()
+    expect(localStorage.getItem('taramisu.assistant.project')).toBe(projectB.id)
+    await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
+    await screen.findByText('ok')
+    expect(projectIds).toEqual([projectA.id, projectB.id])
+  })
+
+  it.each([
+    [503, 'The assistant is not available. Is LLM_API_KEY set for the LLM service?'],
+    [429, 'The assistant is busy. Try again in a few seconds.'],
+  ])('explains a %i response', async (status, text) => {
+    server.use(
+      http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, () =>
+        HttpResponse.json({ title: 'Error', status, detail: 'from server' }, { status }),
+      ),
+    )
+    const user = renderPanel()
+    await screen.findByRole('option', { name: 'Demo ECU' })
+
+    await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(text)
+  })
+
+  it('cannot send without a project', async () => {
+    server.use(http.get(`${baseUrl}/api/v1/projects`, () => HttpResponse.json([])))
+    renderPanel()
+
+    expect(await screen.findByText('You have no projects in the database yet.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Message to the assistant' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('closes', async () => {
+    const onClose = vi.fn<() => void>()
+    const user = renderPanel(onClose)
+
+    await user.click(screen.getByRole('button', { name: 'Close assistant' }))
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+})

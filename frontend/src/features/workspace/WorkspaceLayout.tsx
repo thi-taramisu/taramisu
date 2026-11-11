@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { Outlet, useParams, useSearchParams } from 'react-router-dom'
+import { Bot } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { NotFoundPage } from '../../pages/NotFoundPage'
+import { AssistantPanel } from '../assistant/AssistantPanel'
 import { exampleProject } from '../../api/mocks/data/headlamp'
 import { useProjectTree } from '../../api/queries/items'
 import { Filetree } from './Filetree'
@@ -9,12 +13,32 @@ import { NewElementMenu } from './NewElementMenu'
 import { ProjectHeader } from './ProjectHeader'
 import { ResizableSidebar } from './ResizableSidebar'
 
-/** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content. */
+const ASSISTANT_KEY = 'taramisu.assistant.open'
+
+function loadAssistantOpen(): boolean {
+  try {
+    return localStorage.getItem(ASSISTANT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content, assistant. */
 export function WorkspaceLayout() {
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const graphView = searchParams.get('view') === 'graph'
   const tree = useProjectTree(projectId, { enabled: projectId === exampleProject.id })
+  const [assistantOpen, setAssistantOpenState] = useState(loadAssistantOpen)
+
+  function setAssistantOpen(open: boolean) {
+    setAssistantOpenState(open)
+    try {
+      localStorage.setItem(ASSISTANT_KEY, open ? '1' : '0')
+    } catch {
+      // Storage unavailable: the panel state is just not remembered.
+    }
+  }
 
   if (projectId !== exampleProject.id) return <NotFoundPage />
 
@@ -27,6 +51,10 @@ export function WorkspaceLayout() {
           onCheckedChange={(checked) => setSearchParams(checked ? { view: 'graph' } : {})}
         />
         <Label htmlFor="graph-view">Graph</Label>
+        <Button size="sm" variant={assistantOpen ? 'secondary' : 'ghost'} aria-pressed={assistantOpen}
+          onClick={() => setAssistantOpen(!assistantOpen)}>
+          <Bot /> Assistant
+        </Button>
       </ProjectHeader>
       <div className="flex min-h-0 flex-1">
         <ResizableSidebar label="Project elements" className="bg-sidebar p-2 text-sidebar-foreground">
@@ -44,6 +72,7 @@ export function WorkspaceLayout() {
         <main className="relative min-w-0 flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
+        <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       </div>
     </div>
   )
