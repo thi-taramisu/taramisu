@@ -17,6 +17,8 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("AUTHENTIK_API_TOKEN", "")
 	t.Setenv("IAM_USER_CACHE_TTL", "")
 	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
+	t.Setenv("LLM_URL", "")
+	t.Setenv("LLM_MODEL", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -257,6 +259,48 @@ func TestLoadFailures(t *testing.T) {
 			}
 			if got := err.Error(); !strings.Contains(got, tt.wantError) {
 				t.Errorf("Load() error = %q, want it to contain %q", got, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestLoadLLMDisabledByDefault(t *testing.T) {
+	clearOIDCEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.LLMURL != "" || cfg.LLMModel != defaultLLMModel {
+		t.Errorf("LLM config = %q, %q; want disabled with model %q", cfg.LLMURL, cfg.LLMModel, defaultLLMModel)
+	}
+}
+
+func TestLoadLLMEnvironment(t *testing.T) {
+	clearOIDCEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+	t.Setenv("LLM_URL", "http://llm:8080")
+	t.Setenv("LLM_MODEL", "glm-5.3")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.LLMURL != "http://llm:8080" || cfg.LLMModel != "glm-5.3" {
+		t.Errorf("LLM config = %q, %q; want http://llm:8080, glm-5.3", cfg.LLMURL, cfg.LLMModel)
+	}
+}
+
+func TestLoadInvalidLLMURL(t *testing.T) {
+	for _, raw := range []string{"llm:8080", "ftp://llm", "http://user:key@llm:8080"} {
+		t.Run(raw, func(t *testing.T) {
+			clearOIDCEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+			t.Setenv("LLM_URL", raw)
+
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), "invalid LLM_URL") {
+				t.Errorf("Load() error = %v, want invalid LLM_URL", err)
 			}
 		})
 	}

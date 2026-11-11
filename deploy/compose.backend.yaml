@@ -70,6 +70,9 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
       AUTHENTIK_API_URL: http://authentik-server:9000/auth
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}
+      # LLM service (compose.llm.yaml); it holds the model API key, the API never sees it.
+      LLM_URL: http://llm:8080
+      LLM_MODEL: ${LLM_MODEL:-qwen3-30b-a3b-instruct-2507}
     depends_on:
       migrate:
         condition: service_completed_successfully
