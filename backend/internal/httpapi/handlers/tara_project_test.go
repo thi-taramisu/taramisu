@@ -40,6 +40,7 @@ type fakeProjects struct {
 	project   db.TaraProject
 	found     bool
 	deleteErr error
+	audit     auditRecorder
 	deletedBy db.Actor
 	// role is the caller's role returned by GetProjectRole; empty means no role.
 	role       db.ProjectRole
@@ -76,6 +77,10 @@ func (f *fakeProjects) CreateTaraProject(_ context.Context, a db.CreateTaraProje
 	f.createdFor = a.OwnerID
 	p := f.project
 	return db.CreateTaraProjectRow{ID: p.ID, Name: a.Name, Description: a.Description, CreatedAt: p.CreatedAt}, nil
+}
+
+func (f *fakeProjects) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+	return f.GetTaraProject(ctx, id)
 }
 
 func (f *fakeProjects) GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
@@ -325,5 +330,49 @@ func TestTaraProjectDeletePassesTheCaller(t *testing.T) {
 	httpapi.New(store, manager).ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent || store.deletedBy.UserID != testUUIDValue(t, authtest.UserID) {
 		t.Fatalf("delete: %d, actor %v; want 204 by %s", rr.Code, store.deletedBy.UserID, authtest.UserID)
+	}
+}
+
+// TestTaraProjectChangesAreAudited checks which change each operation hands to the store; the stored
+// events are covered against PostgreSQL in TestAuditContentPostgres.
+func TestTaraProjectChangesAreAudited(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	store := newFakeProjects(true)
+	h := httpapi.New(store, manager)
+	for _, c := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{http.MethodPost, "/api/v1/projects", `{"name":"new"}`, http.StatusCreated},
+		{http.MethodPatch, "/api/v1/projects/" + projectID, `{"name":"proj"}`, http.StatusOK}, // unchanged
+		{http.MethodPatch, "/api/v1/projects/" + projectID, `{"name":"renamed"}`, http.StatusOK},
+		{http.MethodPut, "/api/v1/projects/" + projectID, `{"name":"proj","description":"other"}`, http.StatusOK},
+	} {
+		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != c.want {
+			t.Fatalf("%s %s: %d, want %d: %s", c.method, c.path, rr.Code, c.want, rr.Body.String())
+		}
+	}
+	got := store.audit.changes
+	want := []string{"project.created", "project.updated", "project.updated"}
+	if len(got) != len(want) {
+		t.Fatalf("changes = %+v, want %v", got, want)
+	}
+	for i, event := range want {
+		if got[i].Event != event {
+			t.Errorf("change %d = %s, want %s", i, got[i].Event, event)
+		}
+	}
+	if got[0].After == nil || got[1].Before == nil || got[2].After == nil {
+		t.Errorf("changes = %+v, want after for created and before/after for updated", got)
+	}
+	for _, actor := range store.audit.actors {
+		if actor.UserID != testUUIDValue(t, authtest.UserID) {
+			t.Errorf("actor = %v, want the caller %s", actor.UserID, authtest.UserID)
+		}
 	}
 }

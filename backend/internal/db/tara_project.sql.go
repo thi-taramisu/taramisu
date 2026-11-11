@@ -84,6 +84,23 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 	return i, err
 }
 
+const getTaraProjectForUpdate = `-- name: GetTaraProjectForUpdate :one
+SELECT id, name, description, created_at FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
+`
+
+// The project before a settings change, locked until the transaction ends (see LockTaraProject).
+func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
+	row := q.db.QueryRow(ctx, getTaraProjectForUpdate, id)
+	var i TaraProject
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listTaraProjects = `-- name: ListTaraProjects :many
 SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
