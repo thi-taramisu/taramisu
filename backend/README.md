@@ -234,6 +234,13 @@ for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrat
 for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
 roll back their fixtures and do not require a live Authentik instance.
 
+## Asset cybersecurity properties and scenario links
+
+[API contract and request examples](../docs/internal/dev-workflow/asset-properties-api.md)
+cover assets, cybersecurity properties, and damage/threat scenario links. All routes require a
+Bearer JWT and a project role: Viewers can read; Editors and Owners can write. The shared
+project check runs before the handler, and SQL restricts records and references to the URL item.
+
 ## Risk values and treatment decisions
 
 The risk API provides authenticated CRUD under `/api/v1/threat-scenarios/{threat_scenario_id}/risk-values`

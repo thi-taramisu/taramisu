@@ -33,15 +33,19 @@ type assetStore struct {
 	handlers.DamageScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
+
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
+
 	handlers.AssetStore
 	handlers.TaraProjectStore
 	handlers.StatusReader
-	handlers.ProjectAccessStore
+	resourceAccess
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
-	handlers.RiskValueStore
-	handlers.RiskTreatmentDecisionStore
-	role  db.ProjectRole
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	err   error
 	calls int
 }
@@ -81,7 +85,7 @@ func TestAssetValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.method+tc.path+tc.body, func(t *testing.T) {
-			s := &assetStore{role: db.ProjectRoleEDITOR}
+			s := &assetStore{resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(tc.body))
 			if r.Code != 422 || s.calls != 0 {
@@ -104,7 +108,7 @@ func TestAssetErrors(t *testing.T) {
 		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := &assetStore{err: tc.err, role: db.ProjectRoleEDITOR}
+			s := &assetStore{err: tc.err, resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(assetJSON))
 			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
@@ -134,20 +138,6 @@ func assetRequest(t testing.TB, h http.Handler, bearer string, method, path stri
 	return rr
 }
 
-func (s *assetStore) GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error) {
-	if s.role == "" {
-		return "", pgx.ErrNoRows
-	}
-	return s.role, nil
-}
-func (s *assetStore) ProjectIDForItemDefinition(_ context.Context, id pgtype.UUID) (pgtype.UUID, error) {
-	if id.String() != assetItemID {
-		return pgtype.UUID{}, pgx.ErrNoRows
-	}
-	var project pgtype.UUID
-	_ = project.Scan(projectID)
-	return project, nil
-}
 func (s *assetStore) ListAssets(context.Context, db.ListAssetsParams) ([]db.Asset, error) {
 	s.calls++
 	return nil, s.err
@@ -183,7 +173,7 @@ func TestAssetAuthorization(t *testing.T) {
 			{"editor", db.ProjectRoleEDITOR, bearer, 0},
 		} {
 			t.Run(route.method+route.path+"/"+access.name, func(t *testing.T) {
-				s := &assetStore{role: access.role}
+				s := &assetStore{resourceAccess: resourceAccess{role: access.role, nonMember: access.role == ""}}
 				want := access.status
 				if want == 0 {
 					want = route.status

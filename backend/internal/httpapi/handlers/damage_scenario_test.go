@@ -37,6 +37,10 @@ func dmgUUID(s string) pgtype.UUID {
 // lookups succeed; err is returned by every write that reaches the database.
 type fakeDamage struct {
 	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
+
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore

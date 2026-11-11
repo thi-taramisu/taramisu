@@ -18,7 +18,6 @@ func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) 
 
 type healthQueries struct {
 	statusReaderFunc
-	handlers.AssetStore
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
 	handlers.AttackPathStore
@@ -29,6 +28,10 @@ type healthQueries struct {
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 }

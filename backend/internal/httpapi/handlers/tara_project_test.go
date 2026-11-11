@@ -21,7 +21,6 @@ import (
 const projectID = "11111111-1111-1111-1111-111111111111"
 
 type fakeProjects struct {
-	handlers.AssetStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 	statusReaderFunc
@@ -34,6 +33,10 @@ type fakeProjects struct {
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	project   db.TaraProject
 	found     bool
 	deleteErr error

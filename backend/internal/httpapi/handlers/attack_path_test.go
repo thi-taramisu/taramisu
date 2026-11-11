@@ -34,6 +34,10 @@ func attackUUID(s string) pgtype.UUID {
 // An empty role means the caller is not a member.
 type fakeAttackAccess struct {
 	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
+
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
