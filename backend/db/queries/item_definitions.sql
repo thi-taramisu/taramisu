@@ -48,3 +48,17 @@ RETURNING *;
 -- name: DeleteItemDefinition :execrows
 DELETE FROM item_definition
 WHERE tara_project_id = sqlc.arg(project_id) AND id = sqlc.arg(id);
+
+-- The item definition before a change, locked until the transaction ends, so that the audit history
+-- records the state the change replaced.
+-- name: GetItemDefinitionForUpdate :one
+SELECT * FROM item_definition
+WHERE tara_project_id = sqlc.arg(project_id) AND id = sqlc.arg(id)
+FOR NO KEY UPDATE;
+
+-- The item definition before its deletion, locked with FOR UPDATE at once, so the deletion waits for
+-- concurrent inserts of dependent records instead of deadlocking with them.
+-- name: GetItemDefinitionForDelete :one
+SELECT * FROM item_definition
+WHERE tara_project_id = sqlc.arg(project_id) AND id = sqlc.arg(id)
+FOR UPDATE;

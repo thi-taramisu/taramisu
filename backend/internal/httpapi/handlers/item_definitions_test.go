@@ -51,6 +51,7 @@ type itemStore struct {
 	replace db.ReplaceItemDefinitionParams
 	row     db.ItemDefinition
 	count   int64
+	audit   auditRecorder
 }
 
 func newItemStore() *itemStore {
@@ -81,6 +82,15 @@ func (s *itemStore) GetItemDefinition(_ context.Context, p db.GetItemDefinitionP
 		return db.ItemDefinition{}, pgx.ErrNoRows
 	}
 	return s.row, s.err
+}
+func (s *itemStore) GetItemDefinitionForUpdate(_ context.Context, p db.GetItemDefinitionForUpdateParams) (db.ItemDefinition, error) {
+	if p.ProjectID != s.row.TaraProjectID || p.ID != s.row.ID {
+		return db.ItemDefinition{}, pgx.ErrNoRows
+	}
+	return s.row, nil
+}
+func (s *itemStore) GetItemDefinitionForDelete(ctx context.Context, p db.GetItemDefinitionForDeleteParams) (db.ItemDefinition, error) {
+	return s.GetItemDefinitionForUpdate(ctx, db.GetItemDefinitionForUpdateParams(p))
 }
 func (s *itemStore) CreateItemDefinition(_ context.Context, p db.CreateItemDefinitionParams) (db.ItemDefinition, error) {
 	s.calls++
@@ -303,6 +313,37 @@ func TestItemDefinitionPermissions(t *testing.T) {
 			if want >= 400 && store.calls != before {
 				t.Fatal("denied request reached storage")
 			}
+		}
+	}
+}
+
+// TestItemDefinitionChangesAreAudited checks which change each operation hands to the store; the
+// stored events are covered against PostgreSQL in TestAuditContentPostgres.
+func TestItemDefinitionChangesAreAudited(t *testing.T) {
+	store := newItemStore()
+	handler, token := authenticatedAPI(t, store, store)
+	for _, c := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{http.MethodPost, itemCollection, `{"name":"Headlamp","scope_type":"ITEM"}`, http.StatusCreated},
+		{http.MethodPatch, itemMember, `{"name":"Headlamp"}`, http.StatusOK}, // the fake returns the same row: no change
+		{http.MethodDelete, itemMember, "", http.StatusNoContent},
+	} {
+		if w := request(handler, c.method, c.path, c.body, token); w.Code != c.want {
+			t.Fatalf("%s %s: %d, want %d: %s", c.method, c.path, w.Code, c.want, w.Body.String())
+		}
+	}
+	got := store.audit.changes
+	if len(got) != 2 || got[0].Event != "item_definition.created" || got[1].Event != "item_definition.deleted" {
+		t.Fatalf("changes = %+v, want item_definition.created and item_definition.deleted", got)
+	}
+	if got[0].After == nil || got[0].Before != nil || got[1].Before == nil || got[1].After != nil {
+		t.Errorf("changes = %+v, want after for created and before for deleted", got)
+	}
+	for _, actor := range store.audit.actors {
+		if actor.UserID.String() != itemUserID {
+			t.Errorf("actor = %s, want the caller %s", actor.UserID.String(), itemUserID)
 		}
 	}
 }

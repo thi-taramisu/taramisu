@@ -186,7 +186,8 @@ nothing.
 
 Actor, user, and group are internal IDs, never names or email addresses. Events are kept for the project's lifetime and one
 year after its deletion; at first only operators read them. Each event is also written as an `audit` log line with IDs and
-roles only. The table, retention, readers, and further events are described in [Audit and logging](../audit.md).
+roles only. The table, retention, readers, and further events (such as `project.created`, which records the first Owner) are
+described in [Audit and logging](../audit.md).
 
 ## User interface
 

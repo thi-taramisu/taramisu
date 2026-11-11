@@ -2,8 +2,8 @@
 
 Status: proposal for [#218](https://github.com/thi-taramisu/taramisu/issues/218), under team review; the rollout is
 tracked in [#265](https://github.com/thi-taramisu/taramisu/issues/265). Implementation follows in separate PRs (see
-[Rollout](#rollout)). Implemented so far: the security and operations log, and the stored membership and deletion events
-listed in [project roles](iam/project-roles.md#audit).
+[Rollout](#rollout)). Implemented so far: the security and operations log, project and membership events, and item
+definition events (see the status column in [Events](#events)).
 
 ## TL;DR
 
@@ -67,15 +67,16 @@ project.
 
 | Area | Event | Before and after | Status |
 | --- | --- | --- | --- |
-| Project | `project.created` | After: name, first Owner | Planned |
-| Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Planned |
+| Project | `project.created` | After: name, first Owner | Stored |
+| Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
 | Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
 | Project | `project.archived`, `project.restored` | – | With archiving |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
 | Members | `member.added` | After: role, user or group | Stored |
 | Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Stored |
 | Members | `member.removed`, including leaving | Before: role, user or group. The actor equals the user when someone left | Stored |
-| Analysis content | `<record>.created`, `<record>.updated`, `<record>.deleted` | API representation before and after | Planned |
+| Item definitions | `item_definition.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Other analysis content | `<record>.created`, `<record>.updated`, `<record>.deleted` | API representation before and after | Planned |
 | AI assistant | `ai_suggestion.applied` | Target record, applied fields, model | With the AI assistant |
 | Review | `review.requested`, `review.approved`, `review.rejected` | Reviewed state | With the review workflow |
 
@@ -106,18 +107,34 @@ CREATE INDEX audit_event_project_time_idx ON audit_event (tara_project_id, occur
 CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE event = 'project.deleted';
 ```
 
-- `event` is text, not an enum: the list grows with every record type, and the event names are defined once as Go constants.
+- `event` is text, not an enum: the list grows with every record type. Target types and membership events are Go constants
+  in `internal/db/audit.go`; record events are derived from the target type (`item_definition.updated`).
 - `occurred_at` uses `clock_timestamp()`: `now()` is the start of the transaction, so events written in one transaction would
   share it and lose their order.
 - Every event has a user as actor. Changes made by the system itself (retention cleanup, changes by SQL) are not recorded;
   a system actor can be added when a feature needs one.
 
-In the backend, one store helper (`audited` in `internal/db/store.go`) opens the transaction, locks the project row, runs the
-change, inserts the event, and writes the `audit` log line after the commit. Handlers pass only the actor. The lock
-(`FOR NO KEY UPDATE`) serializes membership changes but does not block writes to the project's content. Project deletion
-locks with `FOR UPDATE` at once, so it waits for content writes in progress instead of deadlocking with them.
-The first PR with content events adds one generic entry point for content changes, so that each record type does not need its
-own store method.
+In the backend, `Store.Audit` (`internal/db/store.go`) opens a transaction and passes it on in the context, so every store
+query called with that context takes part. It runs the change, inserts the event, and writes the `audit` log line after the
+commit. Membership and settings changes lock the project row with `FOR NO KEY UPDATE`, which serializes them but does not
+block writes to the project's content. Project deletion locks with `FOR UPDATE` at once, so it waits for content writes in
+progress instead of deadlocking with them.
+
+To record the changes of another record type:
+
+1. Add a `…ForUpdate` query (`FOR NO KEY UPDATE`) and a `…ForDelete` query (`FOR UPDATE`) that read the record before an
+   update or delete.
+2. Embed `Auditor` in the handler's store interface and add the two queries to it and to the handler's test fake. In the
+   handler, run the change inside `audit(ctx, h.store, …)` and return `db.Created`, `db.Updated`, or `db.Deleted` with the
+   record as the API returns it; `db.Updated` records nothing if the record did not change. Inside the function, use only
+   the context it receives and call nothing outside the database: a query with another context runs outside the
+   transaction (a locking read then fails with `ErrLockOutsideTransaction`). `Audit` cannot be nested. A dedicated `Store`
+   method, as for membership changes and project deletion, is only needed when a change must lock the project without
+   reading it, or summarise records deleted by cascade.
+3. Add the target type to `internal/db/audit.go` and move the operations from `notAuditedYet` to `auditedOperations`
+   (`audit_coverage_test.go`); a new mutating operation must be in one of the lists. Test fakes that embed several store
+   interfaces need an `Audit` method (`audit_fake_test.go`). Set the status above and extend `TestAuditContentPostgres`,
+   including its rollback list; the test fails for an audited operation without a rollback case.
 
 ## Retention
 
@@ -161,6 +178,7 @@ Events of deleted projects stay readable for operators only.
 - The stored history and the logs can show who changed what and when, even without a user interface. Where Taramisu is used
   by employees in Germany, such data can require works council co-determination (§ 87 (1) no. 6 BetrVG). Its use must stay
   within the purpose stated above.
+- Free text in content events (for example an item definition's functions) can contain personal data that users typed in.
 - How an erasure request is handled for audit events is not decided yet, see [Open questions](#open-questions).
 
 ## Rollout

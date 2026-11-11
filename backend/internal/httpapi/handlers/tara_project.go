@@ -13,9 +13,12 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
+// TaraProjectStore is implemented by db.Store. Changes run inside Audit.
 type TaraProjectStore interface {
+	Auditor
 	CreateTaraProject(context.Context, db.CreateTaraProjectParams) (db.CreateTaraProjectRow, error)
 	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
+	GetTaraProjectForUpdate(context.Context, pgtype.UUID) (db.TaraProject, error)
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
@@ -101,14 +104,24 @@ type UpdateTaraProjectInput struct {
 
 // Create stores the project and makes the caller its first Owner. Every active user may create projects.
 func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*TaraProjectOutput, error) {
-	ownerID, err := callerID(ctx)
+	actor, err := auditActor(ctx)
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
-		OwnerID:     ownerID,
+	ownerID := actor.UserID
+	var p db.CreateTaraProjectRow
+	// Calls Audit directly instead of audit(...), because the actor is also the first Owner.
+	err = h.store.Audit(ctx, actor, func(ctx context.Context) (db.Change, error) {
+		var err error
+		p, err = h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
+			Name:        in.Body.Name,
+			Description: in.Body.Description,
+			OwnerID:     ownerID,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetProject, p.ID, p.ID, projectSettings{Name: p.Name, FirstOwner: ownerID}), nil
 	})
 	if err != nil {
 		return nil, err
@@ -144,23 +157,36 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 }
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
-	p, err := h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{
-		ID:          projectIDFromContext(ctx),
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
+	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+		return h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{ID: id, Name: in.Body.Name, Description: in.Body.Description})
 	})
-	if err != nil {
-		return nil, mapTaraProjectError(err)
-	}
-	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
-	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:             projectIDFromContext(ctx),
-		Name:           in.Body.Name,
-		SetDescription: in.Body.Description.Set,
-		Description:    in.Body.Description.Value,
+	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+		return h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
+			ID:             id,
+			Name:           in.Body.Name,
+			SetDescription: in.Body.Description.Set,
+			Description:    in.Body.Description.Value,
+		})
+	})
+}
+
+// changeSettings runs update and records project.updated, unless nothing changed.
+func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Context, pgtype.UUID) (db.TaraProject, error)) (*TaraProjectOutput, error) {
+	id := projectIDFromContext(ctx)
+	var p db.TaraProject
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetTaraProjectForUpdate(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		if p, err = update(ctx, id); err != nil {
+			return db.Change{}, err
+		}
+		after := projectSettings{Name: p.Name, DescriptionChanged: !sameText(before.Description, p.Description)}
+		return db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name}, after), nil
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -211,4 +237,12 @@ func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
 
 func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole) *TaraProjectOutput {
 	return &TaraProjectOutput{Body: toTaraProjectBody(p, role)}
+}
+
+// sameText reports whether two optional texts are equal; nil equals only nil.
+func sameText(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
