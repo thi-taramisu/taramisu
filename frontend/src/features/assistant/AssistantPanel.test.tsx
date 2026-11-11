@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { ApiProvider } from '../../api/ApiProvider'
 import { createApiClient } from '../../api/client'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { AuthContext, defaultAuthContext, type AuthContextValue } from '../../auth/useAuth'
 import { AssistantPanel } from './AssistantPanel'
 
 const baseUrl = 'http://api.test'
@@ -22,13 +24,19 @@ beforeEach(() => {
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-function renderPanel(onClose = () => {}) {
+const signedIn: AuthContextValue = { ...defaultAuthContext, status: 'authenticated', accessToken: 'token' }
+
+function renderPanel(onClose = () => {}, auth = signedIn) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
-      <ApiProvider api={{ client: createApiClient({ baseUrl }), ...createMockItemApi() }}>
-        <AssistantPanel open onClose={onClose} />
-      </ApiProvider>
+      <AuthContext.Provider value={auth}>
+        <ApiProvider api={{ client: createApiClient({ baseUrl }), ...createMockItemApi() }}>
+          <MemoryRouter initialEntries={['/projects/headlamp']}>
+            <AssistantPanel open onClose={onClose} />
+          </MemoryRouter>
+        </ApiProvider>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
   return userEvent.setup()
@@ -126,6 +134,19 @@ describe('AssistantPanel', () => {
     expect(await screen.findByText('You have no projects in the database yet.')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Message to the assistant' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('asks to sign in instead of loading projects when signed out', async () => {
+    let projectRequests = 0
+    server.use(http.get(`${baseUrl}/api/v1/projects`, () => { projectRequests++; return HttpResponse.json([]) }))
+    const signIn = vi.fn<AuthContextValue['signIn']>(async () => {})
+    const user = renderPanel(() => {}, { ...defaultAuthContext, signIn })
+
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(signIn).toHaveBeenCalledWith('/projects/headlamp')
+    expect(screen.getByRole('textbox', { name: 'Message to the assistant' })).toBeDisabled()
+    expect(projectRequests).toBe(0)
   })
 
   it('closes', async () => {

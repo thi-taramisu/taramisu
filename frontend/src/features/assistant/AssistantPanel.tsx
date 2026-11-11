@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Bot, Loader2, Plus, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/auth/useAuth'
 import { AssistantError, useAskAssistant, useRealProjects, type AssistantMessage } from '../../api/queries/assistant'
 
 const PROJECT_KEY = 'taramisu.assistant.project'
@@ -42,7 +44,10 @@ function errorText(error: Error): string {
  * asks about a real project chosen here. The conversation lives only in this component; the server stores nothing.
  */
 export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const projects = useRealProjects(open)
+  const { status, signIn } = useAuth()
+  const { pathname } = useLocation()
+  const signedIn = status === 'authenticated'
+  const projects = useRealProjects(open && signedIn)
   const ask = useAskAssistant()
   const [projectId, setProjectIdState] = useState(loadProjectId)
   const [messages, setMessages] = useState<ChatEntry[]>([])
@@ -104,6 +109,12 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
         </Button>
       </div>
 
+      {!signedIn && (
+        <div className="space-y-2 border-b px-3 py-3 text-sm">
+          <p className="text-muted-foreground">Sign in to ask the assistant about your projects.</p>
+          <Button size="sm" variant="outline" onClick={() => void signIn(pathname)}>Sign in</Button>
+        </div>
+      )}
       <div className="border-b px-3 py-2">
         <label htmlFor="assistant-project" className="mb-1 block text-xs text-muted-foreground">
           Project (from the database)
