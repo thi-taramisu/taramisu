@@ -46,6 +46,7 @@ type fakeMembers struct {
 	members    []db.GetProjectMemberRow
 	upserted   string
 	createErr  error
+	actors     []db.Actor // actor of every change, in call order
 }
 
 func newFakeMembers(callerRole db.ProjectRole) *fakeMembers {
@@ -66,15 +67,6 @@ func (f *fakeMembers) GetProjectRole(context.Context, db.GetProjectRoleParams) (
 		return "", pgx.ErrNoRows
 	}
 	return f.callerRole, nil
-}
-
-func (f *fakeMembers) UpsertIAMUser(_ context.Context, sub string) (string, error) {
-	f.upserted = sub
-	return newUserID, nil
-}
-
-func (f *fakeMembers) UpsertIAMGroup(context.Context, string) (pgtype.UUID, error) {
-	return mustUUID(teamGroupID), nil
 }
 
 func (f *fakeMembers) ListProjectMembers(context.Context, pgtype.UUID) ([]db.ListProjectMembersRow, error) {
@@ -110,14 +102,19 @@ func (f *fakeMembers) add(row db.GetProjectMemberRow) (pgtype.UUID, error) {
 	return row.ID, nil
 }
 
-func (f *fakeMembers) CreateUserMember(_ context.Context, a db.CreateUserMemberParams) (pgtype.UUID, error) {
-	sub := f.upserted
-	return f.add(db.GetProjectMemberRow{ProjectRole: a.Role, UserID: a.UserID, ExternalIamSub: &sub})
-}
-
-func (f *fakeMembers) CreateGroupMember(_ context.Context, a db.CreateGroupMemberParams) (pgtype.UUID, error) {
-	group := teamGroupID
-	return f.add(db.GetProjectMemberRow{ProjectRole: a.Role, ExternalIamGroupID: &group})
+// AddProjectMember stores a new user as newUserID and any group as teamGroupID.
+func (f *fakeMembers) AddProjectMember(_ context.Context, actor db.Actor, a db.AddProjectMemberParams) (pgtype.UUID, error) {
+	f.actors = append(f.actors, actor)
+	row := db.GetProjectMemberRow{ProjectRole: a.Role}
+	if a.UserSubject != "" {
+		f.upserted = a.UserSubject
+		sub := a.UserSubject
+		row.UserID, row.ExternalIamSub = mustUUID(newUserID), &sub
+	} else {
+		group := teamGroupID
+		row.ExternalIamGroupID = &group
+	}
+	return f.add(row)
 }
 
 // protectsLastOwner mirrors the SQL guard: the last user Owner cannot lose the role.
@@ -134,7 +131,8 @@ func (f *fakeMembers) protectsLastOwner(i int) bool {
 	return true
 }
 
-func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, a db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error) {
+func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, actor db.Actor, a db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error) {
+	f.actors = append(f.actors, actor)
 	i := f.find(a.ID)
 	if i < 0 || (a.Role != db.ProjectRoleOWNER && f.protectsLastOwner(i)) {
 		return db.UpdateProjectMemberRoleRow{}, pgx.ErrNoRows
@@ -144,7 +142,8 @@ func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, a db.UpdateProj
 	return db.UpdateProjectMemberRoleRow{ID: a.ID, PreviousRole: previous}, nil
 }
 
-func (f *fakeMembers) DeleteProjectMember(_ context.Context, a db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error) {
+func (f *fakeMembers) DeleteProjectMember(_ context.Context, actor db.Actor, a db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error) {
+	f.actors = append(f.actors, actor)
 	i := f.find(a.ID)
 	if i < 0 || f.protectsLastOwner(i) {
 		return db.DeleteProjectMemberRow{}, pgx.ErrNoRows
@@ -399,12 +398,6 @@ func TestPermissionMatrix(t *testing.T) {
 	}
 }
 
-// captureAudit collects the "audit" log entries written while fn runs.
-func captureAudit(t *testing.T, fn func()) []map[string]any {
-	t.Helper()
-	return captureLog(t, "audit", fn)
-}
-
 // captureLog collects the log entries with message msg written while fn runs.
 func captureLog(t *testing.T, msg string, fn func()) []map[string]any {
 	t.Helper()
@@ -423,40 +416,29 @@ func captureLog(t *testing.T, msg string, fn func()) []map[string]any {
 	return entries
 }
 
-func TestProjectMemberAuditLog(t *testing.T) {
-	api := newMemberAPI(t, newFakeMembers(db.ProjectRoleOWNER), &fakeDirectory{})
-	entries := captureAudit(t, func() {
-		api.call(http.MethodPost, membersPath, `{"email":"new@example.com","role":"VIEWER"}`)
-		api.call(http.MethodPatch, membersPath+"/"+otherMemberID, `{"role":"EDITOR"}`)
-		api.call(http.MethodDelete, membersPath+"/"+groupMemberID, "")
-		api.call(http.MethodPatch, membersPath+"/"+ownerMemberID, `{"role":"VIEWER"}`) // last Owner: 409, no entry
-	})
-	want := []map[string]any{
-		{"event": "member.added", "member_type": "user", "role": "VIEWER"},
-		{"event": "member.role_changed", "member": otherMemberID, "user": otherUserID, "before": "OWNER", "after": "EDITOR"},
-		{"event": "member.removed", "member": groupMemberID, "group": teamGroupID, "before": "EDITOR", "self": false},
-	}
-	if len(entries) != len(want) {
-		t.Fatalf("audit entries = %v, want %d", entries, len(want))
-	}
-	for i, fields := range want {
-		if entries[i]["actor"] != authtest.UserID || entries[i]["project"] != projectID {
-			t.Fatalf("entry %d has actor %v, project %v", i, entries[i]["actor"], entries[i]["project"])
-		}
-		for key, value := range fields {
-			if entries[i][key] != value {
-				t.Fatalf("entry %d: %s = %v, want %v (%v)", i, key, entries[i][key], value, entries[i])
-			}
-		}
-		if _, ok := entries[i]["email"]; ok {
-			t.Fatalf("entry %d contains an email address: %v", i, entries[i])
+// TestProjectMemberChangesPassTheCaller checks that every change hands the caller to the store, which
+// records it in the audit history (covered against PostgreSQL in TestAuditHistoryPostgres).
+func TestProjectMemberChangesPassTheCaller(t *testing.T) {
+	store := newFakeMembers(db.ProjectRoleOWNER)
+	api := newMemberAPI(t, store, &fakeDirectory{})
+	for _, c := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{http.MethodPost, membersPath, `{"email":"new@example.com","role":"VIEWER"}`, http.StatusCreated},
+		{http.MethodPatch, membersPath + "/" + otherMemberID, `{"role":"EDITOR"}`, http.StatusOK},
+		{http.MethodDelete, membersPath + "/" + groupMemberID, "", http.StatusNoContent},
+	} {
+		if rr := api.call(c.method, c.path, c.body); rr.Code != c.want {
+			t.Fatalf("%s %s: %d, want %d: %s", c.method, c.path, rr.Code, c.want, rr.Body.String())
 		}
 	}
-
-	// A Viewer leaving is recorded as removing themselves.
-	viewer := newMemberAPI(t, newFakeMembers(db.ProjectRoleVIEWER), &fakeDirectory{})
-	entries = captureAudit(t, func() { viewer.call(http.MethodDelete, membersPath+"/"+ownerMemberID, "") })
-	if len(entries) != 1 || entries[0]["event"] != "member.removed" || entries[0]["self"] != true || entries[0]["before"] != "VIEWER" {
-		t.Fatalf("leave audit = %v", entries)
+	if len(store.actors) != 3 {
+		t.Fatalf("store got %d changes, want 3", len(store.actors))
+	}
+	for i, actor := range store.actors {
+		if actor.UserID != mustUUID(authtest.UserID) {
+			t.Fatalf("change %d: actor = %v, want the caller %s", i, actor.UserID, authtest.UserID)
+		}
 	}
 }

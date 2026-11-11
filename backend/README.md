@@ -71,7 +71,7 @@ Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specifi
 [project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
 `internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
 `handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
-`/api/v1/projects/{id}/members`; member and project changes are written as `audit` log entries.
+`/api/v1/projects/{id}/members`; member changes and project deletion are stored in the audit history (`audit_event`).
 
 Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
 The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
@@ -95,6 +95,8 @@ The API writes JSON log lines to stderr; `LOG_LEVEL` sets the minimum level (`de
 - In the Compose stack, set `LOG_LEVEL` in `iam/.env`.
 
 What is logged and what is stored as audit history is described in [Audit and logging](../docs/internal/architecture/audit.md).
+At start and once a day, the API deletes the audit history of a deleted project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`,
+one year); in the Compose stack, set it in `iam/.env`.
 
 ## Checks
 

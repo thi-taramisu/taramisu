@@ -19,6 +19,7 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("IAM_USER_CACHE_TTL", "")
 	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("AUDIT_RETENTION_AFTER_DELETE", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -294,6 +295,41 @@ func TestLoadLogLevel(t *testing.T) {
 			}
 			if cfg.LogLevel != tt.want {
 				t.Errorf("LogLevel = %v, want %v", cfg.LogLevel, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadAuditRetention(t *testing.T) {
+	tests := []struct {
+		raw       string
+		want      time.Duration
+		wantError bool
+	}{
+		{raw: "", want: 8760 * time.Hour},
+		{raw: "720h", want: 720 * time.Hour},
+		{raw: "0s", wantError: true},
+		{raw: "-1h", wantError: true},
+		{raw: "one year", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			clearOIDCEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+			t.Setenv("AUDIT_RETENTION_AFTER_DELETE", tt.raw)
+
+			cfg, err := Load()
+			if tt.wantError {
+				if err == nil || !strings.Contains(err.Error(), "invalid AUDIT_RETENTION_AFTER_DELETE") {
+					t.Fatalf("Load() error = %v, want invalid AUDIT_RETENTION_AFTER_DELETE", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.AuditRetentionAfterDelete != tt.want {
+				t.Errorf("AuditRetentionAfterDelete = %v, want %v", cfg.AuditRetentionAfterDelete, tt.want)
 			}
 		})
 	}

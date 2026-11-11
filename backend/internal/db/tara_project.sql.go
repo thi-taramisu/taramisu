@@ -50,16 +50,22 @@ func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectPa
 	return i, err
 }
 
-const deleteTaraProject = `-- name: DeleteTaraProject :execrows
+const deleteTaraProject = `-- name: DeleteTaraProject :one
 DELETE FROM tara_project WHERE id = $1
+RETURNING id, name
 `
 
-func (q *Queries) DeleteTaraProject(ctx context.Context, id pgtype.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteTaraProject, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type DeleteTaraProjectRow struct {
+	ID   pgtype.UUID
+	Name string
+}
+
+// Returns the deleted project's settings for the audit history; no row if it does not exist.
+func (q *Queries) DeleteTaraProject(ctx context.Context, id pgtype.UUID) (DeleteTaraProjectRow, error) {
+	row := q.db.QueryRow(ctx, deleteTaraProject, id)
+	var i DeleteTaraProjectRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
 const getTaraProject = `-- name: GetTaraProject :one

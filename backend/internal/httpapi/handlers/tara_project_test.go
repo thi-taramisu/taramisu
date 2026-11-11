@@ -40,6 +40,7 @@ type fakeProjects struct {
 	project   db.TaraProject
 	found     bool
 	deleteErr error
+	deletedBy db.Actor
 	// role is the caller's role returned by GetProjectRole; empty means no role.
 	role       db.ProjectRole
 	roleQuery  db.GetProjectRoleParams
@@ -116,14 +117,15 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 	return p, nil
 }
 
-func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, error) {
+func (f *fakeProjects) DeleteTaraProject(_ context.Context, actor db.Actor, _ pgtype.UUID) error {
+	f.deletedBy = actor
 	if f.deleteErr != nil {
-		return 0, f.deleteErr
+		return f.deleteErr
 	}
 	if !f.found {
-		return 0, nil
+		return db.ErrProjectNotFound
 	}
-	return 1, nil
+	return nil
 }
 
 func TestTaraProjectRoutes(t *testing.T) {
@@ -312,19 +314,16 @@ func TestTaraProjectListUsesCallerAndGroups(t *testing.T) {
 	}
 }
 
-func TestTaraProjectDeleteIsAudited(t *testing.T) {
+// TestTaraProjectDeletePassesTheCaller checks that the deletion hands the caller to the store, which
+// records it in the audit history (covered against PostgreSQL in TestAuditHistoryPostgres).
+func TestTaraProjectDeletePassesTheCaller(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
-	h := httpapi.New(newFakeProjects(true), manager)
-	entries := captureAudit(t, func() {
-		req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
-		req.Header.Set("Authorization", bearer)
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, req)
-		if rr.Code != http.StatusNoContent {
-			t.Fatalf("delete: %d %s", rr.Code, rr.Body.String())
-		}
-	})
-	if len(entries) != 1 || entries[0]["event"] != "project.deleted" || entries[0]["project"] != projectID || entries[0]["actor"] != authtest.UserID {
-		t.Fatalf("delete audit = %v", entries)
+	store := newFakeProjects(true)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+	req.Header.Set("Authorization", bearer)
+	rr := httptest.NewRecorder()
+	httpapi.New(store, manager).ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent || store.deletedBy.UserID != testUUIDValue(t, authtest.UserID) {
+		t.Fatalf("delete: %d, actor %v; want 204 by %s", rr.Code, store.deletedBy.UserID, authtest.UserID)
 	}
 }
