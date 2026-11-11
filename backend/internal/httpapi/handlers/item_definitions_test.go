@@ -28,6 +28,7 @@ const itemMember = itemCollection + "/" + itemDefinitionID
 
 type itemStore struct {
 	handlers.TaraProjectStore
+	handlers.AssetStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.RiskValueStore

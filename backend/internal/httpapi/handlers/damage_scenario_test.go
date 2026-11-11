@@ -36,6 +36,7 @@ func dmgUUID(s string) pgtype.UUID {
 // fakeDamage implements the damage scenario, impact rating and link stores. found controls whether
 // lookups succeed; err is returned by every write that reaches the database.
 type fakeDamage struct {
+	handlers.AssetStore
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
