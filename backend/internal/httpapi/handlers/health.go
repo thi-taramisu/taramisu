@@ -41,7 +41,7 @@ func (h *Health) Live(ctx context.Context, input *struct{}) (*StatusOutput, erro
 func (h *Health) Ready(ctx context.Context, input *struct{}) (*ReadyOutput, error) {
 	message, err := h.queries.GetServiceStatus(ctx)
 	if err != nil {
-		slog.Warn("database readiness check failed", "error", err)
+		slog.WarnContext(ctx, "database readiness check failed", "error", err)
 		return nil, huma.Error503ServiceUnavailable("database unavailable")
 	}
 	out := &ReadyOutput{}

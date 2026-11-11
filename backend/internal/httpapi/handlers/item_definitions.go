@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -120,8 +119,7 @@ func itemDefinitionError(err error) error {
 	if errors.As(err, &postgres) && postgres.Code == "23503" {
 		return huma.Error409Conflict("item definition has dependent records or its project no longer exists")
 	}
-	slog.Error("item definition database operation failed", "error", err)
-	return huma.Error500InternalServerError("could not process item definition")
+	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 
 func (h *ItemDefinitions) List(ctx context.Context, in *ListItemDefinitionsInput) (*ListItemDefinitionsOutput, error) {

@@ -25,6 +25,9 @@ type Directory interface {
 	ListAssignableGroups(ctx context.Context) ([]auth.GroupMetadata, error)
 }
 
+// opRemoveProjectMember is also logged when the handler itself denies the request.
+const opRemoveProjectMember = "remove-project-member"
+
 // ProjectMemberStore is implemented by the sqlc-generated queries.
 type ProjectMemberStore interface {
 	UpsertIAMUser(context.Context, string) (string, error)
@@ -70,7 +73,7 @@ func (h *ProjectMembers) Register(api huma.API) {
 	Register(api, create, project(PermManage), h.Create)
 	Register(api, op("update-project-member", http.MethodPatch, member, "Change a member's role",
 		"Owner only. Returns 409 if this would remove the last user Owner."), project(PermManage), h.Update)
-	del := op("remove-project-member", http.MethodDelete, member, "Remove a project member",
+	del := op(opRemoveProjectMember, http.MethodDelete, member, "Remove a project member",
 		"Owners can remove anyone; every member can remove their own user assignment (leave). Returns 409 for the last user Owner.")
 	del.DefaultStatus = http.StatusNoContent
 	// Read is enough to reach the handler; it lets non-Owners remove only their own assignment.
@@ -192,7 +195,7 @@ func (h *ProjectMembers) addUser(ctx context.Context, projectID pgtype.UUID, ema
 		return pgtype.UUID{}, huma.Error409Conflict("several active users share this email address; an administrator must fix this in Authentik")
 	}
 	if err != nil {
-		slog.Error("find Authentik user", "error", err)
+		slog.ErrorContext(ctx, "find Authentik user", "error", err)
 		return pgtype.UUID{}, huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
 	}
 	// Users who never signed in have no iam_user row yet; create it from their token subject.
@@ -214,7 +217,7 @@ func (h *ProjectMembers) addGroup(ctx context.Context, projectID pgtype.UUID, gr
 		return pgtype.UUID{}, huma.Error422UnprocessableEntity("this group cannot be given a project role")
 	}
 	if err != nil {
-		slog.Error("resolve Authentik group", "error", err)
+		slog.ErrorContext(ctx, "resolve Authentik group", "error", err)
 		return pgtype.UUID{}, huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
 	}
 	internalID, err := h.store.UpsertIAMGroup(ctx, group.GroupID)
@@ -266,7 +269,9 @@ func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*st
 	}
 	// Owners may remove anyone; other members may only remove their own user assignment.
 	if !Allows(RoleFromContext(ctx), PermManage) && row.UserID != self {
-		return nil, huma.Error403Forbidden("only Owners can remove other members")
+		err := huma.Error403Forbidden("only Owners can remove other members")
+		logDenied(ctx, opRemoveProjectMember, err)
+		return nil, err
 	}
 	removed, err := h.store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -286,7 +291,7 @@ func (h *ProjectMembers) ListGroups(ctx context.Context, _ *struct{}) (*Assignab
 	}
 	groups, err := h.directory.ListAssignableGroups(ctx)
 	if err != nil {
-		slog.Error("list Authentik groups", "error", err)
+		slog.ErrorContext(ctx, "list Authentik groups", "error", err)
 		return nil, huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
 	}
 	out := &AssignableGroupListOutput{Body: make([]AssignableGroup, 0, len(groups))}
@@ -347,7 +352,7 @@ func (n *nameResolver) member(ctx context.Context, row db.GetProjectMemberRow) P
 	case row.UserID.Valid:
 		if row.ExternalIamSub != nil && !n.down {
 			user, err := n.directory.ResolveUser(ctx, *row.ExternalIamSub)
-			n.note(err)
+			n.note(ctx, err)
 			if err == nil {
 				m.Name, m.Email = nonEmpty(user.Name), nonEmpty(user.Email)
 			}
@@ -355,7 +360,7 @@ func (n *nameResolver) member(ctx context.Context, row db.GetProjectMemberRow) P
 	default:
 		if row.ExternalIamGroupID != nil && !n.down {
 			group, err := n.directory.ResolveGroup(ctx, *row.ExternalIamGroupID)
-			n.note(err)
+			n.note(ctx, err)
 			if err == nil {
 				m.Name = nonEmpty(group.Name)
 			}
@@ -364,9 +369,9 @@ func (n *nameResolver) member(ctx context.Context, row db.GetProjectMemberRow) P
 	return m
 }
 
-func (n *nameResolver) note(err error) {
+func (n *nameResolver) note(ctx context.Context, err error) {
 	if err != nil && !errors.Is(err, auth.ErrPrincipalNotFound) {
-		slog.Warn("resolve member display name", "error", err)
+		slog.WarnContext(ctx, "resolve member display name", "error", err)
 		n.down = true
 	}
 }
