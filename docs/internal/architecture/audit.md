@@ -1,8 +1,9 @@
 # Audit and logging
 
-Status: proposal for [#218](https://github.com/thi-taramisu/taramisu/issues/218), under team review. Implementation follows in
-separate PRs (see [Rollout](#rollout)). Today only the four membership and deletion events in
-[project roles](iam/project-roles.md#audit) are written, and only as log lines.
+Status: proposal for [#218](https://github.com/thi-taramisu/taramisu/issues/218), under team review; the rollout is
+tracked in [#265](https://github.com/thi-taramisu/taramisu/issues/265). Implementation follows in separate PRs (see
+[Rollout](#rollout)). Today only the four membership and deletion events in [project roles](iam/project-roles.md#audit)
+are written, and only as log lines.
 
 ## TL;DR
 
@@ -41,23 +42,26 @@ project.
 2. **Same transaction.** The event is written in the transaction that makes the change. A change is never stored without its
    event, and a rolled-back change (for example the `409` for the last Owner) leaves no event. A change that changes nothing,
    such as setting a role to the role a member already has, records no event.
-3. **Append-only.** The application never updates or deletes audit rows, except for the retention cleanup. A separate database
+3. **Every change, through one entry point.** Every mutating API operation records its change through one generic entry
+   point in the backend, which all record types use. A test fails for a mutating operation that is declared neither as
+   audited nor as not audited yet, so a new operation cannot bypass the history by accident.
+4. **Append-only.** The application never updates or deletes audit rows, except for the retention cleanup. A separate database
    role with only `INSERT` and `SELECT` can enforce this later; the cleanup then needs its own role with `DELETE`. Database
    triggers are not used because Atlas manages triggers only in its paid edition.
-4. **No foreign keys.** Events must outlive the project, the role assignment, and the user they describe.
-5. **People only as IDs.** Actor, user, and group are internal IDs (`iam_user.id`, `iam_group.id`). Names and email addresses
+5. **No foreign keys.** Events must outlive the project, the role assignment, and the user they describe.
+6. **People only as IDs.** Actor, user, and group are internal IDs (`iam_user.id`, `iam_group.id`). Names and email addresses
    are resolved through Authentik when the history is shown, like in the member list. Project events keep only the project
    name, so that operators can tell which project an event belongs to, not the free-text description. Content events keep
    the record as the API returns it, including free text, because that is the work product whose history is traced.
-6. **One event per API operation.** Membership and project events describe what happened (`member.role_changed`). Content
+7. **One event per API operation.** Membership and project events describe what happened (`member.role_changed`). Content
    events store the record as the API returns it, before and after. `project.deleted` also lists the role assignments it
    removes, so it stays visible who had access. Content records deleted by cascade get no event of their own; the deletion
    event of their parent ends their history.
-7. **Reads are not audit events**, except export, because export moves project data out of Taramisu. The operations log
+8. **Reads are not audit events**, except export, because export moves project data out of Taramisu. The operations log
    still records which user requested which path.
-8. **The log line carries no project data.** Each event is also written as an `audit` log line with IDs and roles only,
+9. **The log line carries no project data.** Each event is also written as an `audit` log line with IDs and roles only,
    because logs are read by a wider group and kept under different rules than the database.
-9. **No tamper evidence in the prototype.** Hash chains or write-once storage can be added for production use.
+10. **No tamper evidence in the prototype.** Hash chains or write-once storage can be added for production use.
 
 ## Events
 
@@ -162,8 +166,11 @@ Events of deleted projects stay readable for operators only.
 2. Logging foundation: JSON logging, request IDs and request log, logging of denied requests and unhandled errors.
 3. Audit storage: table `audit_event`, store helper, retention cleanup, and the four membership and deletion events stored with
    PostgreSQL tests.
-4. Further events, one small PR per area: project created and updated, then analysis content with the generic entry point.
-5. Events that belong to future features (archiving, import and export, AI assistant, review) are added with those features.
+4. Generic entry point for all record types, with project settings and item definitions as its first users
+   ([#267](https://github.com/thi-taramisu/taramisu/issues/267)).
+5. Remaining analysis content, one PR per area ([#268](https://github.com/thi-taramisu/taramisu/issues/268) to
+   [#271](https://github.com/thi-taramisu/taramisu/issues/271)).
+6. Events that belong to future features (archiving, import and export, AI assistant, review) are added with those features.
 
 ## Open questions
 
