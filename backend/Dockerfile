@@ -8,5 +8,6 @@ ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /server ./cmd/api
 
 FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=busybox:stable-musl /bin/busybox /busybox
 COPY --from=build /server /server
 ENTRYPOINT ["/server"]
