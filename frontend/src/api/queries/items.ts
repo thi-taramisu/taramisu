@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
-import type { CiaProperty, NewAsset } from '../models/asset'
+import type { CiaProperty, NewAsset, PatchAssetBody } from '../models/asset'
 import type { AttackFeasibilityRatingBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
@@ -17,6 +17,8 @@ const keys = {
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
   threatScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'threat-scenarios'] as const,
+  asset: (projectId: string, id: string) => ['projects', projectId, 'assets', id] as const,
+  assetRelations: (projectId: string, id: string) => ['projects', projectId, 'assets', id, 'relations'] as const,
   damageScenario: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id] as const,
   impactRatings: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'impact'] as const,
   damageScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'relations'] as const,
@@ -120,6 +122,35 @@ export function useAddAsset(projectId: string, itemId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({ mutationFn: (asset: NewAsset) => api.content.addAsset(projectId, itemId, asset), onSuccess: invalidate })
+}
+
+export function useAsset(projectId: string, assetId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.asset(projectId, assetId), queryFn: () => api.assets.get(projectId, assetId) })
+}
+
+export function useUpdateAsset(projectId: string, assetId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: PatchAssetBody) => api.assets.update(projectId, assetId, body), onSuccess: invalidate })
+}
+
+export function useAssetRelations(projectId: string, assetId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.assetRelations(projectId, assetId), queryFn: () => api.assets.relations(projectId, assetId) })
+}
+
+/** Links a damage scenario with the given properties of the asset or changes them; no properties remove the link. */
+export function useSetAssetDamageLink(projectId: string, assetId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: ({ damageScenarioId, properties }: { damageScenarioId: string; properties: CiaProperty[] }) =>
+      properties.length > 0
+        ? api.damageScenarios.linkAsset(projectId, damageScenarioId, assetId, properties)
+        : api.damageScenarios.unlinkAsset(projectId, damageScenarioId, assetId),
+    onSuccess: invalidate,
+  })
 }
 
 export function useDamageScenario(projectId: string, damageScenarioId: string) {
@@ -253,6 +284,17 @@ export function useThreatScenarioRiskInputs(projectId: string, threatScenarioId:
   return useQuery({
     queryKey: keys.threatScenarioRiskInputs(projectId, threatScenarioId),
     queryFn: () => api.threatScenarios.riskInputs(projectId, threatScenarioId),
+  })
+}
+
+/** Risk inputs of several threat scenarios, e.g. all that reach an asset; shares the cache with the threat scenario's Risks tab. */
+export function useThreatScenariosRiskInputs(projectId: string, threatScenarioIds: string[]) {
+  const api = useApi()
+  return useQueries({
+    queries: threatScenarioIds.map((id) => ({
+      queryKey: keys.threatScenarioRiskInputs(projectId, id),
+      queryFn: () => api.threatScenarios.riskInputs(projectId, id),
+    })),
   })
 }
 

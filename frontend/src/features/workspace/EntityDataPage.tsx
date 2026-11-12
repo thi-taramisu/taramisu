@@ -8,7 +8,8 @@ import { EntityPage } from './EntityPage'
 interface EntityDataPageProps {
   type: EntityType
   projectId: string
-  entity: UseQueryResult<{ code: string; title: string }>
+  /** Scenarios and attack paths have a title, assets a name. */
+  entity: UseQueryResult<{ code: string } & ({ title: string } | { name: string })>
   tabCounts?: Record<string, number>
 }
 
@@ -39,7 +40,7 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
   return (
     <EntityPage
       type={type}
-      title={entityTitle({ code: entity.data.code, name: entity.data.title })}
+      title={entityTitle({ code: entity.data.code, name: 'title' in entity.data ? entity.data.title : entity.data.name })}
       tabCounts={tabCounts}
       actions={
         // A failed refetch keeps the loaded element, so unsaved edits in the tabs survive.

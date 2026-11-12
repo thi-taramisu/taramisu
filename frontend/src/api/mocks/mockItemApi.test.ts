@@ -374,3 +374,56 @@ describe('retryUnlessNotFound', () => {
     expect(retryUnlessNotFound(3, new Error('network'))).toBe(false)
   })
 })
+
+describe('mock asset service', () => {
+  it('returns the asset with its declared properties in C / I / A order', async () => {
+    const api = createMockItemApi()
+
+    expect(await api.assets.get(project, 'a-04')).toEqual({
+      id: 'a-04',
+      item_definition_id: 'i-01',
+      code: 'A-04',
+      name: 'Diagnostic session key',
+      description: null,
+      identification_source: 'CATALOGUE',
+      properties: [
+        { property: 'C', description: null },
+        { property: 'I', description: null },
+      ],
+    })
+    await expect(api.assets.get('other', 'a-04')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('trims the name and rejects blank names and duplicate properties with 422', async () => {
+    const api = createMockItemApi()
+
+    expect(await api.assets.update(project, 'a-02', { name: '  BCM firmware ' })).toMatchObject({ name: 'BCM firmware' })
+    await expect(api.assets.update(project, 'a-02', { name: '  ' })).rejects.toMatchObject({ status: 422 })
+    await expect(
+      api.assets.update(project, 'a-02', { properties: [{ property: 'I', description: null }, { property: 'I', description: 'x' }] }),
+    ).rejects.toMatchObject({ status: 422 })
+  })
+
+  it('rejects removing a property that leads to a damage scenario with 409 and changes nothing', async () => {
+    const api = createMockItemApi()
+
+    await expect(api.assets.update(project, 'a-01', { name: 'Renamed', properties: [{ property: 'I', description: null }] })).rejects.toMatchObject({
+      status: 409,
+    })
+    expect(await api.assets.get(project, 'a-01')).toMatchObject({ name: 'Headlamp on/off command', properties: [{ property: 'I' }, { property: 'A' }] })
+  })
+
+  it('derives the relations from the damage scenario links and the threat targets', async () => {
+    const api = createMockItemApi()
+    await api.threatScenarios.linkDamageScenario(project, 'ts-02', 'ds-01')
+
+    expect(await api.assets.relations(project, 'a-01')).toEqual({
+      damageScenarios: [{ id: 'ds-01', code: 'DS-01', name: 'Headlamp turns off while driving at night', linkedProperties: ['I', 'A'] }],
+      threatScenarios: [
+        { id: 'ts-01', code: 'TS-01', name: 'Spoofed headlamp command on the CAN bus', targetedProperties: ['I'], damageScenarioIds: ['ds-01'] },
+        { id: 'ts-02', code: 'TS-02', name: 'Replayed headlamp command on the CAN bus', targetedProperties: [], damageScenarioIds: ['ds-01'] },
+      ],
+    })
+    expect(await api.assets.relations(project, 'a-02')).toEqual({ damageScenarios: [], threatScenarios: [] })
+  })
+})
