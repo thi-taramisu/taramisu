@@ -1,6 +1,7 @@
 import { LogIn, LogOut, Menu, UserCircle } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
+import { AppearanceControls } from '@/features/theme/AppearanceControls'
 
 type AppHeaderProps = {
   collapsed: boolean
@@ -24,6 +25,7 @@ export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
       </Button>
       <span className="text-xl font-semibold">TARAmisu</span>
       <div className="ml-auto flex items-center gap-3">
+        <AppearanceControls />
         {status === 'authenticated' && user ? (
           <>
             <span className="flex items-center gap-1.5 text-sm text-muted-foreground" title={user.email}>

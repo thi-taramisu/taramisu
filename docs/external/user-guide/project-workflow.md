@@ -26,6 +26,14 @@ The sidebar can be expanded or collapsed.
 
 The Search entry is currently a placeholder.
 
+## Display mode
+
+Use **Light** / **Dark** in the header to switch the display immediately. Your choice is saved in
+this browser and restored on your next visit. Choose **Neutral**, **Ocean** or **Iris** from the adjacent
+color-scheme menu to apply that palette throughout the app. Both choices are saved independently.
+The default is light mode with Neutral. The toggle also works
+with Tab followed by Space or Enter.
+
 ## Creating a project
 
 1. Open the Projects page.
