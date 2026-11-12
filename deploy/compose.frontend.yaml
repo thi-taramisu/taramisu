@@ -7,3 +7,9 @@ services:
     expose:
       - 80
     networks: [proxy]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
