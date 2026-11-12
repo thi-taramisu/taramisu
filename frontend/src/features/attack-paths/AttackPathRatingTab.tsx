@@ -181,7 +181,12 @@ function FactorChoice({ factor, score, onChange }: FactorChoiceProps) {
         onChange={(event) => onChange(event.target.value === '' ? null : Number(event.target.value))}
         className={cn('w-full @2xl:hidden', score === null && 'text-muted-foreground')}
       >
-        <NativeSelectOption value="">Select…</NativeSelectOption>
+        {/* Only a placeholder: once chosen, a value is changed, not emptied again. */}
+        {score === null && (
+          <NativeSelectOption value="" disabled>
+            Select…
+          </NativeSelectOption>
+        )}
         {factor.options.map((option) => (
           <NativeSelectOption key={option.score} value={option.score}>
             {option.label} · {points(option.score)}

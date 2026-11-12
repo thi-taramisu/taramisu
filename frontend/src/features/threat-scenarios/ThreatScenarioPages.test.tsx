@@ -81,7 +81,7 @@ describe('threat scenario definition', () => {
     await user.clear(name)
     await user.type(name, ' Forged low beam command ')
     await user.clear(screen.getByLabelText('Cause of Compromise'))
-    await user.selectOptions(screen.getByLabelText('Elicitation'), 'Select…')
+    await user.selectOptions(screen.getByLabelText('Elicitation'), 'EVITA')
     await user.clear(screen.getByLabelText('Technical Notes'))
     await user.type(screen.getByLabelText('Technical Notes'), 'Attacker with OBD access')
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -89,7 +89,14 @@ describe('threat scenario definition', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'TS-01 Forged low beam command' })).toBeInTheDocument()
     expect(await within(tree()).findByRole('link', { name: /TS-01 Forged low beam command/ })).toBeInTheDocument()
-    expect(await api.threatScenarios.get('headlamp', 'ts-01')).toMatchObject({ title: 'Forged low beam command', cause_of_compromise: null, elicitation_method: null, technical_notes: 'Attacker with OBD access' })
+    expect(await api.threatScenarios.get('headlamp', 'ts-01')).toMatchObject({ title: 'Forged low beam command', cause_of_compromise: null, elicitation_method: 'EVITA', technical_notes: 'Attacker with OBD access' })
+  })
+
+  it('offers no empty elicitation method once one is chosen', async () => {
+    renderApp(page)
+
+    const elicitation = await screen.findByLabelText('Elicitation')
+    expect(within(elicitation).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument()
   })
 
   it('does not save a definition without a name', async () => {

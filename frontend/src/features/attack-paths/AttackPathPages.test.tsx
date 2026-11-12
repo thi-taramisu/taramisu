@@ -48,6 +48,8 @@ describe('attack path definition', () => {
 
     expect(await screen.findByLabelText(/Name/)).toHaveDisplayValue('Compromised navigation ECU via cellular')
     expect(screen.getByLabelText('Analysis Approach')).toHaveDisplayValue('Top-Down')
+    // The empty choice is only a placeholder, so a chosen approach cannot be emptied again.
+    expect(within(screen.getByLabelText('Analysis Approach')).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /Partial Attack Path/ })).not.toBeChecked()
     expect(stepTexts()).toEqual([
       'Compromise the navigation ECU via its cellular connection.',

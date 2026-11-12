@@ -1,21 +1,39 @@
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
-import { useAddAsset, useItemAssets } from '../../api/queries/items'
+import { exampleProject } from '../../api/mocks/data/headlamp'
+import { useItemAssets } from '../../api/queries/items'
 import { entityPath } from '../workspace/entities'
-import { AddAssetDialog } from './AddAssetDialog'
+import { CreateAssetDialog } from './CreateAssetDialog'
 
 /** Assets tab of an item (interactive wireframe): table of the item's assets and "Add Asset". */
 export function ItemAssetsTab() {
   const { projectId = '', entityId = '' } = useParams()
   const { data: assets, isError } = useItemAssets(projectId, entityId)
-  const addAsset = useAddAsset(projectId, entityId)
+  // A new key per opening, so the dialog starts empty.
+  const [dialog, setDialog] = useState({ open: false, key: 0 })
+  const [addButton, setAddButton] = useState<HTMLButtonElement | null>(null)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">Assets belong to this item. Their links are edited on each asset's Relations tab.</p>
-        <AddAssetDialog onAdd={(asset) => addAsset.mutateAsync(asset)} />
+        <Button ref={setAddButton} onClick={() => setDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+          <Plus aria-hidden="true" />
+          Add Asset
+        </Button>
+        <CreateAssetDialog
+          key={dialog.key}
+          projectId={projectId}
+          projectName={exampleProject.name}
+          lockedItemId={entityId}
+          open={dialog.open}
+          onOpenChange={(open) => setDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={addButton}
+        />
       </div>
       {isError && (
         <p role="alert" className="text-sm text-destructive">
