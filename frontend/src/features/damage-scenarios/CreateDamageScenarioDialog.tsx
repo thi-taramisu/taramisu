@@ -1,17 +1,17 @@
 import { useId, useState } from 'react'
 import { X } from 'lucide-react'
-import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty, ItemAsset } from '../../api/models/asset'
 import type { DamageScenario } from '../../api/models/damageScenario'
-import type { EntityType, TreeNode } from '../../api/models/tree'
+import type { TreeNode } from '../../api/models/tree'
 import { useCreateDamageScenario, useItemAssets, useProjectTree } from '../../api/queries/items'
 import { AddAssetMenu } from '../assets/AddAssetMenu'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
-import { entityPath, findNode } from '../workspace/entities'
+import { entityPath } from '../workspace/entities'
+import { usePageContext } from '../workspace/usePageContext'
 
 interface AssetLink {
   assetId: string
@@ -21,12 +21,8 @@ interface AssetLink {
 
 /** Item and asset of the page the dialog is opened on, used as the defaults. */
 function useContextDefaults(items: TreeNode[]): { itemId: string; links: AssetLink[] } {
-  const { pathname } = useLocation()
-  const match = matchPath('/projects/:projectId/:type/:entityId/*', pathname)
-  const type = match?.params.type as EntityType | undefined
-  const entityId = match?.params.entityId ?? ''
-  const item = (type && items.find((node) => findNode(type, entityId, [node]))) || items[0]
-  return { itemId: item?.id ?? '', links: type === 'assets' && item ? [{ assetId: entityId }] : [] }
+  const { itemId, type, entityId } = usePageContext(items)
+  return { itemId, links: type === 'assets' && itemId ? [{ assetId: entityId }] : [] }
 }
 
 interface CreateDamageScenarioDialogProps {

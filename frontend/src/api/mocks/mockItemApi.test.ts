@@ -427,3 +427,12 @@ describe('mock asset service', () => {
     expect(await api.assets.relations(project, 'a-02')).toEqual({ damageScenarios: [], threatScenarios: [] })
   })
 })
+
+describe('mock asset creation', () => {
+  it('trims the name and rejects a blank one with 422', async () => {
+    const api = createMockItemApi()
+
+    expect(await api.content.addAsset(project, 'i-01', { name: '  Relay ', component: '', properties: [] })).toMatchObject({ code: 'A-05', name: 'Relay' })
+    await expect(api.content.addAsset(project, 'i-01', { name: '  ', component: '', properties: [] })).rejects.toMatchObject({ status: 422 })
+  })
+})

@@ -82,6 +82,10 @@ only via damage, both read-only), all on the mock API. The fields follow the dat
 so it is left out. A property that leads to a damage scenario can only be removed after its links are removed. The Risks tab has no
 treatment column yet, as treatment decisions are still a placeholder.
 
+Assets are created in the "New Asset" dialog ("+ New → Asset", or "Add Asset" on the item's Assets tab with the item fixed): only the name
+is required; item, component / interface and C / I / A properties are optional, and a similar existing asset of the item is pointed out.
+"Create & open" opens the new asset's Definition tab.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:

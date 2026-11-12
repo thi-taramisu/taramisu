@@ -27,14 +27,15 @@ describe('sidebar tree', () => {
 })
 
 describe('create item', () => {
-  it('offers only Item and Damage Scenario in the "+ New" menu for now', async () => {
+  it('offers only Item, Asset and Damage Scenario in the "+ New" menu for now', async () => {
     const { user } = renderApp(project)
 
     await user.click(await within(tree()).findByRole('button', { name: 'New' }))
 
     expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
+    expect(screen.getByRole('menuitem', { name: 'Asset' })).not.toHaveAttribute('aria-disabled')
     expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
+    for (const name of ['Threat Scenario', 'Attack Path']) {
       expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
     }
   })
@@ -324,11 +325,11 @@ describe('review findings', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Add Asset' }))
     const dialog = screen.getByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name'), 'LED driver')
-    await user.type(within(dialog).getByLabelText('Component'), 'Lamp ECU')
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await user.type(within(dialog).getByLabelText(/Name/), 'LED driver')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be added')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be created')
+    expect(within(dialog).getByLabelText(/Name/)).toHaveDisplayValue('LED driver')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
