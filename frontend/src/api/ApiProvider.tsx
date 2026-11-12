@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { createApiClient, type ApiClient } from './client'
 import { createMockItemApi } from './mocks/mockItemApi'
 import { createMockProjectApi } from './mocks/mockProjectApi'
+import type { AssetService } from './services/assets'
 import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
@@ -18,6 +19,7 @@ export interface Api {
   projects: ProjectService
   items: ItemService
   content: ItemContentService
+  assets: AssetService
   damageScenarios: DamageScenarioService
   threatScenarios: ThreatScenarioService
   attackPaths: AttackPathService
@@ -54,11 +56,13 @@ export function ApiProvider({
       projects: api?.projects ?? defaultProjects,
       items: api?.items ?? defaultMocks.items,
       content: api?.content ?? defaultMocks.content,
+      assets: api?.assets ?? defaultMocks.assets,
       damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
       threatScenarios: api?.threatScenarios ?? defaultMocks.threatScenarios,
       attackPaths: api?.attackPaths ?? defaultMocks.attackPaths,
     }),
     [
+      api?.assets,
       api?.attackPaths,
       api?.content,
       api?.damageScenarios,
