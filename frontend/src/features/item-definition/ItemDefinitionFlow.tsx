@@ -13,6 +13,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { useTheme } from '../theme/theme'
 import { headlampEdges, headlampNodes } from './headlampExample'
 
 type AreaData = { label: string; variant: 'environment' | 'boundary' }
@@ -26,8 +27,9 @@ function AreaNode({ data }: NodeProps<Node<AreaData>>) {
         width: '100%',
         height: '100%',
         boxSizing: 'border-box',
-        border: isBoundary ? '2px dashed #d33' : '1px dashed #888',
-        background: isBoundary ? 'rgba(221, 51, 51, 0.05)' : 'rgba(128, 128, 128, 0.08)',
+        border: isBoundary ? '2px dashed var(--entity-item-border)' : '1px dashed var(--border)',
+        background: isBoundary ? 'var(--entity-item)' : 'var(--muted)',
+        color: isBoundary ? 'var(--entity-item-foreground)' : 'var(--foreground)',
         borderRadius: 4,
       }}
     >
@@ -52,9 +54,10 @@ function ComponentNode({ data }: NodeProps<Node<{ label: string }>>) {
     <div
       style={{
         padding: '10px 16px',
-        border: '1px solid #222',
+        border: '1px solid var(--border)',
         borderRadius: 4,
-        background: '#fff',
+        background: 'var(--card)',
+        color: 'var(--card-foreground)',
         fontSize: 13,
         textAlign: 'center',
       }}
@@ -70,11 +73,13 @@ function ComponentNode({ data }: NodeProps<Node<{ label: string }>>) {
 const nodeTypes: NodeTypes = { area: AreaNode, component: ComponentNode }
 
 export function ItemDefinitionFlow() {
+  const theme = useTheme()
   const [nodes, , onNodesChange] = useNodesState(headlampNodes)
   const [edges, , onEdgesChange] = useEdgesState(headlampEdges)
 
   return (
     <ReactFlow
+      colorMode={theme}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}

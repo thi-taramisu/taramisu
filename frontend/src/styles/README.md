@@ -82,4 +82,13 @@ entity. Generic `chart-1`–`chart-5` tokens are categorical UI colours and must
 - A rating's colour does not change between UI palettes. An unassessed scenario is not automatically low risk.
 - Check real controls, hover/focus states, colour-blindness simulations and grayscale as part of
   [#88](https://github.com/thi-taramisu/taramisu/issues/88). Token contrast checks do not complete that review.
-- Keep the default Neutral until the team chooses a scheme. No theme preference storage or product settings UI is introduced here.
+- Neutral is the default palette. The header lets users choose Neutral, Ocean or Iris independently of light/dark mode.
+
+## Light and dark mode (#188)
+
+The project-list and workspace/settings headers expose the same accessible mode toggle and color-scheme selector. The current mode is
+shown as Light or Dark and saved as `taramisu.theme` in local storage. The selected Neutral, Ocean or Iris palette
+is applied to the document root and saved independently as `taramisu.colorScheme`. Missing or invalid preferences
+default to light and Neutral, regardless of the OS preference. The blocking `public/theme-init.js` script applies
+the saved mode before the app and styles load; `features/theme/` keeps mounted controls and tabs in sync.
+If storage is unavailable, switching still works for the current page.
