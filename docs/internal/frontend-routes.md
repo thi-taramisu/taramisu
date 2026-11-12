@@ -75,6 +75,13 @@ risk matrix from the impact of the linked damage scenarios and the most feasible
 The attack path page (#195) has the Definition tab (name, analysis approach, partial flag, steps), the Rating tab (attack potential with
 the five factors, total and feasibility) and the Relations tab (threat scenarios), all on the mock API.
 
+The asset page (#196) has the Definition tab (name, identification source, description and the C / I / A properties with their
+description), the Risks tab (one row per damage scenario × threat scenario of the asset, with the risk calculated as on the threat
+scenario's Risks tab) and the Relations tab (damage scenarios with their properties; threat scenarios that target the asset or reach it
+only via damage, both read-only), all on the mock API. The fields follow the data model: the wireframe's "Group" is not in the data model,
+so it is left out. A property that leads to a damage scenario can only be removed after its links are removed. The Risks tab has no
+treatment column yet, as treatment decisions are still a placeholder.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:
