@@ -115,7 +115,12 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
           onChange={(event) => change({ analysis_approach: event.target.value as FormValues['analysis_approach'] })}
           className={cn('w-full', !values.analysis_approach && 'text-muted-foreground')}
         >
-          <NativeSelectOption value="">Select…</NativeSelectOption>
+          {/* Only a placeholder: once chosen, a value is changed, not emptied again. */}
+          {!values.analysis_approach && (
+            <NativeSelectOption value="" disabled>
+              Select…
+            </NativeSelectOption>
+          )}
           {APPROACHES.map((approach) => (
             <NativeSelectOption key={approach.value} value={approach.value}>
               {approach.label}

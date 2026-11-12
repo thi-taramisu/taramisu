@@ -146,7 +146,12 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
           className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
         >
-          <NativeSelectOption value="">Select…</NativeSelectOption>
+          {/* Only a placeholder: once chosen, a value is changed, not emptied again. */}
+          {!values.elicitation_method && (
+            <NativeSelectOption value="" disabled>
+              Select…
+            </NativeSelectOption>
+          )}
           {ELICITATION_METHODS.map((method) => (
             <NativeSelectOption key={method.value} value={method.value}>
               {method.label}
