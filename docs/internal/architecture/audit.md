@@ -120,9 +120,9 @@ store method.
 ## Retention
 
 - Events are kept as long as their project exists, because they document how the project's work products came about.
-- Content events hold copies of the analysis content, which can be confidential. Deleting a project therefore removes its
-  content from the history only when the retention period ends. Clearing `before` and `after` of content events when the
-  project is deleted would avoid that, see [Open questions](#open-questions).
+- Content events hold copies of the analysis content, which can be confidential. Deleting a project removes its
+  content from the history only when the retention period ends, so that an unwanted deletion can still be investigated and
+  the deleted content traced.
 - One year after `project.deleted`, all events of that project are deleted. One year leaves time to notice and investigate an
   unwanted deletion, for example at the next periodic review, without keeping data about people indefinitely. The API runs
   this cleanup once a day; the period is configurable (`AUDIT_RETENTION_AFTER_DELETE`, default `8760h`).
@@ -179,7 +179,5 @@ Events of deleted projects stay readable for operators only.
   [Personal data](#personal-data). The team decides once a concrete use case exists.
 - **Log retention.** journald on the VM rotates by size by default. A fixed period (for example `MaxRetentionSec=90day`) has
   to be agreed with the team that runs the VM ([#272](https://github.com/thi-taramisu/taramisu/issues/272)).
-- **Content after project deletion.** Whether content events keep the analysis content until retention ends, as now, or
-  lose `before` and `after` when the project is deleted and keep only who changed what and when ([#273](https://github.com/thi-taramisu/taramisu/issues/273)).
 - **Erasure requests.** Whether audit events of a person are kept (as pseudonymous records for incident investigation) or
   anonymised on request ([#274](https://github.com/thi-taramisu/taramisu/issues/274)).
