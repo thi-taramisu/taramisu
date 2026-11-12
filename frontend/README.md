@@ -31,6 +31,7 @@ src/
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health/live on the real backend
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
+  features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition and Impact tabs

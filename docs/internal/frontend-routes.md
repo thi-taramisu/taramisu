@@ -60,7 +60,9 @@ Auth values: public means no login, user means logged in, and read, write and ma
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
-Everything else renders a placeholder. Items come from the item API in `frontend/src/api/`, an in-memory mock
+The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
+`&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.
+Items come from the item API in `frontend/src/api/`, an in-memory mock
 (`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
 item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
@@ -89,3 +91,30 @@ These were the open questions in the first draft of this page. The wireframes an
 4. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
 5. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
    They still get the same flat URLs, so no extra route is needed.
+
+## Local graph prototype (#184)
+
+The graph is centered on the entity in the route. Selecting a node opens its details with **Edit**,
+**Jump to**, and links to its other neighbors. Jumping changes the route and preserves the graph mode;
+Edit opens the normal detail page (some entity editors are still placeholders). The tree also preserves
+the display mode. The normal and minimal variants share the same entities and relations.
+
+The graph reads current mock services via `useRelationGraph`, deduplicates shared tree occurrences, and
+merges relations from the risk rows. Attack paths point to threats, which point to damage scenarios.
+A threat view also includes the linked asset as context. New damage scenarios and saved names are
+reflected after the existing project-query invalidation. Failed requests show an error and Retry,
+rather than presenting incomplete data as a valid empty graph.
+
+Colors use the existing risk 1–5 tokens. Edges use the highest explicit risk row for that relation;
+node colors summarize their highest incident rated relation. An attack path receives a score only
+when its display code is explicitly referenced by a risk row. Unrated relations remain neutral and
+dashed. Impact and feasibility labels are not converted into invented risk scores. These are mock
+assessments, not a validated risk calculation. The sample data currently rates only AP-02 with risk 4.
+
+The first version starts with a neighborhood layout and supports dragging individual nodes, pan, zoom and Fit.
+Positions are kept in component state per focused element across normal/minimal mode changes; reloading resets them.
+**Reset layout** restores the default positions and fits the graph. Dragging does not open node details.
+The canvas handles pointer updates internally and saves positions when the drag ends. Connection ports
+are determined by the default relation layout and remain fixed when nodes move, including across a neighbor.
+Moving a node never changes the source/target entities, arrow direction, or risk of a relation.
+It does not edit relations, calculate risk, persist layout, or connect to a graph backend. It is a local prototype for wireframe review.

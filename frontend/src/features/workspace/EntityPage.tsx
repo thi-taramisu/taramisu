@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, findNode, formatEntityId } from './entities'
-import { Placeholder } from './Placeholder'
+
+const RelationGraphView = lazy(() => import('../graph/RelationGraphView').then((module) => ({ default: module.RelationGraphView })))
 
 interface EntityPageProps {
   type: EntityType
@@ -45,7 +46,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
         {actions}
       </div>
       {searchParams.get('view') === 'graph' ? (
-        <Placeholder title="Graph view" />
+        <Suspense fallback={<output>Loading graph…</output>}><RelationGraphView type={type} /></Suspense>
       ) : (
         <>
           <nav aria-label={`${label} tabs`} className="flex gap-4 border-b">
