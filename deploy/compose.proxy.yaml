@@ -11,6 +11,11 @@ services:
       - ../proxy/:/etc/ssl/private/
     # edge is the only network with published ports and internet access; proxy reaches frontend, api and Authentik.
     networks: [edge, proxy]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     depends_on:
       - api
       - frontend
