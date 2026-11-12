@@ -178,8 +178,8 @@ Events of deleted projects stay readable for operators only.
   per record for the review workflow. A history visible to colleagues makes monitoring individual work easier, see
   [Personal data](#personal-data). The team decides once a concrete use case exists.
 - **Log retention.** journald on the VM rotates by size by default. A fixed period (for example `MaxRetentionSec=90day`) has
-  to be agreed with the team that runs the VM.
+  to be agreed with the team that runs the VM ([#272](https://github.com/thi-taramisu/taramisu/issues/272)).
 - **Content after project deletion.** Whether content events keep the analysis content until retention ends, as now, or
-  lose `before` and `after` when the project is deleted and keep only who changed what and when.
+  lose `before` and `after` when the project is deleted and keep only who changed what and when ([#273](https://github.com/thi-taramisu/taramisu/issues/273)).
 - **Erasure requests.** Whether audit events of a person are kept (as pseudonymous records for incident investigation) or
-  anonymised on request.
+  anonymised on request ([#274](https://github.com/thi-taramisu/taramisu/issues/274)).
