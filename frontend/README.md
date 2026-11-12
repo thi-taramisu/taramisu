@@ -33,7 +33,7 @@ src/
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
   features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
-  features/assets/             # item assets tab (table, dialog) and asset pages: Definition with C / I / A, Risks and Relations tabs
+  features/assets/             # item assets tab, "New Asset" dialog and asset pages: Definition with C / I / A, Risks and Relations tabs
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
   features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
   features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs

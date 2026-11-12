@@ -118,10 +118,14 @@ export function useDeleteItem(projectId: string, itemId: string) {
   })
 }
 
-export function useAddAsset(projectId: string, itemId: string) {
+/** Creates an asset in the given item; the item is part of the call, so one dialog can create in any item. */
+export function useCreateAsset(projectId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
-  return useMutation({ mutationFn: (asset: NewAsset) => api.content.addAsset(projectId, itemId, asset), onSuccess: invalidate })
+  return useMutation({
+    mutationFn: ({ itemId, asset }: { itemId: string; asset: NewAsset }) => api.content.addAsset(projectId, itemId, asset),
+    onSuccess: invalidate,
+  })
 }
 
 export function useAsset(projectId: string, assetId: string) {
