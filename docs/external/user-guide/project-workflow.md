@@ -31,16 +31,23 @@ The Search entry is currently a placeholder.
 1. Open the Projects page.
 2. Select **Create Project** in the sidebar.
 3. Enter a project name.
-4. Select **Create** or press Enter.
+4. Optionally select **Upload image** and choose a PNG, JPEG or WebP file
+   up to 5 MB. Check the preview; select **Remove** to create without an image.
+5. Select **Create** or press Enter.
 
 A project name is required. Empty names and names containing only
 whitespace are rejected.
 
-The new project appears in the active project overview.
+The new project appears in the active project overview with a small image
+thumbnail. When added to Favorites, its image is shown as a larger cover.
+Images are cropped to fill the available space. Projects without an image
+show a folder icon. The image is also preserved when archiving and restoring
+the project.
 
 :::note Temporary data
 New projects are currently stored only in frontend state.
-They disappear when the page is reloaded.
+They disappear, together with their selected images, when the page is reloaded.
+Images are local previews and are not uploaded to a server yet.
 :::
 
 ## Managing favorites
