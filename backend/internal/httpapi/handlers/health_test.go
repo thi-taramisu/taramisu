@@ -18,7 +18,22 @@ func (f statusReaderFunc) GetServiceStatus(ctx context.Context) (string, error) 
 
 type healthQueries struct {
 	statusReaderFunc
+	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
+	handlers.ProjectMemberStore
+	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
+	handlers.RiskValueStore
+	handlers.RiskTreatmentDecisionStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {

@@ -103,3 +103,17 @@ Run the checks from the frontend directory:
 
 Backend integration and additional project management functionality
 are separate follow-up work and are not part of this initial Main Page PR.
+
+## Project images (#149)
+
+Project creation reuses `ProjectImageInput` and its PNG/JPEG/WebP and
+5 MB validation from the project settings. The selected file is passed to
+`ProjectListPage`, which owns a separate object URL for the project lifetime.
+The dialog preview URL can therefore be revoked when the dialog closes
+without breaking the project image. Project URLs are released on deletion
+and when the overview unmounts. Archiving and favoriting preserve the image.
+
+`ProjectImage` renders a cover on favorite cards and a compact thumbnail in
+the active and archived lists, with a folder fallback for projects without images.
+Images are decorative because the adjacent title identifies the project.
+No backend upload or persistence is implemented.

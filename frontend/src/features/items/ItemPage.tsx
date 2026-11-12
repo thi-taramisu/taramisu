@@ -32,7 +32,7 @@ export function ItemPage() {
   return (
     <EntityPage
       type="items"
-      title={item.data.name}
+      name={item.data.name}
       actions={
         <>
           {/* A failed refetch keeps the loaded item, so unsaved edits in the tabs survive. */}

@@ -7,4 +7,3 @@ export const riskClasses: Record<number, string> = {
 }
 export const riskText = (risk: number | null) => risk === null ? 'Not rated' : `Risk ${risk}`
 export const riskStroke = (risk: number | null) => risk === null ? 'var(--muted-foreground)' : `var(--risk-${risk}-border)`
-

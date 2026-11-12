@@ -11,11 +11,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ProjectImageInput } from '@/features/project-settings/ProjectImageInput'
 
 type CreateProjectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateProject: (name: string) => void
+  onCreateProject: (name: string, image?: File) => void
   returnFocusTo?: HTMLButtonElement | null
 }
 
@@ -34,7 +35,13 @@ export function CreateProjectDialog({
 
     if (!trimmedName) return
 
-    onCreateProject(trimmedName)
+    const imageInput = event.currentTarget.elements.namedItem('image') as HTMLInputElement | null
+    const image = imageInput?.files?.[0]
+    if (image) {
+      onCreateProject(trimmedName, image)
+    } else {
+      onCreateProject(trimmedName)
+    }
     setName('')
     onOpenChange(false)
   }
@@ -67,6 +74,11 @@ export function CreateProjectDialog({
               autoComplete="off"
             />
           </div>
+
+          <ProjectImageInput defaultValue={null} />
+          <p className="text-xs text-muted-foreground">
+            Optional. PNG, JPEG or WebP, up to 5 MB.
+          </p>
 
           <DialogFooter>
             <Button
