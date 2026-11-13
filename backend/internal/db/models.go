@@ -528,6 +528,19 @@ type AttackPath struct {
 	AttackStepsAndWeaknesses []byte
 }
 
+type AuditEvent struct {
+	ID            pgtype.UUID
+	OccurredAt    pgtype.Timestamptz
+	TaraProjectID pgtype.UUID
+	ActorUserID   pgtype.UUID
+	Event         string
+	TargetType    string
+	TargetID      pgtype.UUID
+	Before        []byte
+	After         []byte
+	RequestID     *string
+}
+
 type DamageScenario struct {
 	ID                           pgtype.UUID
 	ItemDefinitionID             pgtype.UUID

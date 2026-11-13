@@ -34,5 +34,7 @@ SET name = COALESCE(sqlc.narg('name'), name),
 WHERE id = @id
 RETURNING *;
 
--- name: DeleteTaraProject :execrows
-DELETE FROM tara_project WHERE id = $1;
+-- Returns the deleted project's settings for the audit history; no row if it does not exist.
+-- name: DeleteTaraProject :one
+DELETE FROM tara_project WHERE id = $1
+RETURNING id, name;

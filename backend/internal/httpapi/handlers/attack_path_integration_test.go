@@ -60,7 +60,7 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	if _, err := tx.Exec(ctx, `INSERT INTO project_role_assignment (tara_project_id, user_id, project_role) VALUES ($1, $2, 'EDITOR')`, projectID, userID); err != nil {
 		t.Fatal(err)
 	}
-	handler := httpapi.New(db.New(tx), manager)
+	handler := httpapi.New(db.NewStore(tx), manager)
 	call := func(method, path, body string, want int) []byte {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
@@ -75,12 +75,12 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	}
 
 	// serve builds the API on q, so a request can also run on a savepoint.
-	serve := func(q db.DBTX, method, path, body string) *httptest.ResponseRecorder {
+	serve := func(q db.TxStarter, method, path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", bearer)
 		rr := httptest.NewRecorder()
-		httpapi.New(db.New(q), manager).ServeHTTP(rr, req)
+		httpapi.New(db.NewStore(q), manager).ServeHTTP(rr, req)
 		return rr
 	}
 

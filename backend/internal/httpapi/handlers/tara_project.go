@@ -19,7 +19,8 @@ type TaraProjectStore interface {
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
-	DeleteTaraProject(context.Context, pgtype.UUID) (int64, error)
+	// DeleteTaraProject also records the audit event (see db.Store).
+	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
 }
 
 type TaraProject struct {
@@ -169,14 +170,13 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 
 func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
 	id := projectIDFromContext(ctx)
-	n, err := h.store.DeleteTaraProject(ctx, id)
+	actor, err := auditActor(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := h.store.DeleteTaraProject(ctx, actor, id); err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("project not found")
-	}
-	audit(ctx, "project.deleted", "project", id.String())
 	return nil, nil
 }
 
@@ -189,7 +189,7 @@ func parseUUID(s string) (pgtype.UUID, error) {
 }
 
 func mapTaraProjectError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, db.ErrProjectNotFound) {
 		return huma.Error404NotFound("project not found")
 	}
 	var pgErr *pgconn.PgError

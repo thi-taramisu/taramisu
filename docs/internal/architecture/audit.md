@@ -2,8 +2,8 @@
 
 Status: proposal for [#218](https://github.com/thi-taramisu/taramisu/issues/218), under team review; the rollout is
 tracked in [#265](https://github.com/thi-taramisu/taramisu/issues/265). Implementation follows in separate PRs (see
-[Rollout](#rollout)). Today only the four membership and deletion events in [project roles](iam/project-roles.md#audit)
-are written, and only as log lines.
+[Rollout](#rollout)). Implemented so far: the security and operations log, and the stored membership and deletion events
+listed in [project roles](iam/project-roles.md#audit).
 
 ## TL;DR
 
@@ -69,12 +69,12 @@ project.
 | --- | --- | --- | --- |
 | Project | `project.created` | After: name, first Owner | Planned |
 | Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Planned |
-| Project | `project.deleted` | Before: name and role assignments (role, user or group) | Log only |
+| Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
 | Project | `project.archived`, `project.restored` | – | With archiving |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
-| Members | `member.added` | After: role, user or group | Log only |
-| Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Log only |
-| Members | `member.removed`, including leaving | Before: role, user or group. The actor equals the user when someone left | Log only |
+| Members | `member.added` | After: role, user or group | Stored |
+| Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Stored |
+| Members | `member.removed`, including leaving | Before: role, user or group. The actor equals the user when someone left | Stored |
 | Analysis content | `<record>.created`, `<record>.updated`, `<record>.deleted` | API representation before and after | Planned |
 | AI assistant | `ai_suggestion.applied` | Target record, applied fields, model | With the AI assistant |
 | Review | `review.requested`, `review.approved`, `review.rejected` | Reviewed state | With the review workflow |
@@ -112,10 +112,12 @@ CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE 
 - Every event has a user as actor. Changes made by the system itself (retention cleanup, changes by SQL) are not recorded;
   a system actor can be added when a feature needs one.
 
-In the backend, one store helper opens the transaction, optionally locks the project row (as membership changes do today),
-runs the change, inserts the event, and writes the `audit` log line after the commit. Handlers pass only the actor. The first
-PR with content events adds one generic entry point for content changes, so that each record type does not need its own
-store method.
+In the backend, one store helper (`audited` in `internal/db/store.go`) opens the transaction, locks the project row, runs the
+change, inserts the event, and writes the `audit` log line after the commit. Handlers pass only the actor. The lock
+(`FOR NO KEY UPDATE`) serializes membership changes but does not block writes to the project's content. Project deletion
+locks with `FOR UPDATE` at once, so it waits for content writes in progress instead of deadlocking with them.
+The first PR with content events adds one generic entry point for content changes, so that each record type does not need its
+own store method.
 
 ## Retention
 
@@ -125,7 +127,8 @@ store method.
   the deleted content traced.
 - One year after `project.deleted`, all events of that project are deleted. One year leaves time to notice and investigate an
   unwanted deletion, for example at the next periodic review, without keeping data about people indefinitely. The API runs
-  this cleanup once a day; the period is configurable (`AUDIT_RETENTION_AFTER_DELETE`, default `8760h`).
+  this cleanup at start and once a day; the period is configurable (`AUDIT_RETENTION_AFTER_DELETE`, default `8760h`). With
+  several replicas, an advisory lock lets only one of them delete at a time.
 - The cleanup finds deleted projects by their `project.deleted` event. Projects deleted directly in the database have no such
   event, and their events are not removed.
 - Log retention depends on the journald configuration of the VM ([deployment guide](../../../deploy/README.md)) and is not

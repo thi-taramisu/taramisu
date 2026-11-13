@@ -28,16 +28,14 @@ type Directory interface {
 // opRemoveProjectMember is also logged when the handler itself denies the request.
 const opRemoveProjectMember = "remove-project-member"
 
-// ProjectMemberStore is implemented by the sqlc-generated queries.
+// ProjectMemberStore is implemented by db.Store.
 type ProjectMemberStore interface {
-	UpsertIAMUser(context.Context, string) (string, error)
-	UpsertIAMGroup(context.Context, string) (pgtype.UUID, error)
 	ListProjectMembers(context.Context, pgtype.UUID) ([]db.ListProjectMembersRow, error)
 	GetProjectMember(context.Context, db.GetProjectMemberParams) (db.GetProjectMemberRow, error)
-	CreateUserMember(context.Context, db.CreateUserMemberParams) (pgtype.UUID, error)
-	CreateGroupMember(context.Context, db.CreateGroupMemberParams) (pgtype.UUID, error)
-	UpdateProjectMemberRole(context.Context, db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error)
-	DeleteProjectMember(context.Context, db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error)
+	// The changes below also record their audit event (see db.Store).
+	AddProjectMember(context.Context, db.Actor, db.AddProjectMemberParams) (pgtype.UUID, error)
+	UpdateProjectMemberRole(context.Context, db.Actor, db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error)
+	DeleteProjectMember(context.Context, db.Actor, db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error)
 }
 
 // ProjectMembers manages project role assignments for users and Authentik groups.
@@ -165,67 +163,60 @@ func (h *ProjectMembers) Create(ctx context.Context, in *CreateProjectMemberInpu
 	if h.directory == nil {
 		return nil, huma.Error503ServiceUnavailable("the Authentik directory is not configured")
 	}
-	var memberID pgtype.UUID
-	var err error
+	actor, err := auditActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	params := db.AddProjectMemberParams{ProjectID: projectID, Role: body.Role}
 	if body.Email != nil {
-		memberID, err = h.addUser(ctx, projectID, *body.Email, body.Role)
+		params.UserSubject, err = h.findUser(ctx, *body.Email)
 	} else {
-		memberID, err = h.addGroup(ctx, projectID, *body.GroupID, body.Role)
+		params.GroupExternalID, err = h.findGroup(ctx, *body.GroupID)
 	}
 	if err != nil {
 		return nil, err
+	}
+	memberID, err := h.store.AddProjectMember(ctx, actor, params)
+	if err != nil {
+		return nil, mapMemberError(err)
 	}
 	member, err := h.get(ctx, projectID, memberID)
 	if err != nil {
 		return nil, err
 	}
-	audit(ctx, "member.added", memberAttrs(projectID, member, "role", member.Role)...)
 	return &CreateProjectMemberOutput{
 		Location: "/api/v1/projects/" + projectID.String() + "/members/" + member.ID,
 		Body:     member,
 	}, nil
 }
 
-func (h *ProjectMembers) addUser(ctx context.Context, projectID pgtype.UUID, email string, role db.ProjectRole) (pgtype.UUID, error) {
+// findUser returns the token subject of the active Authentik user with this email address.
+func (h *ProjectMembers) findUser(ctx context.Context, email string) (string, error) {
 	user, err := h.directory.FindActiveUserByEmail(ctx, email)
 	if errors.Is(err, auth.ErrPrincipalNotFound) {
-		return pgtype.UUID{}, huma.Error422UnprocessableEntity("no active user with this email address")
+		return "", huma.Error422UnprocessableEntity("no active user with this email address")
 	}
 	if errors.Is(err, auth.ErrAmbiguousEmail) {
-		return pgtype.UUID{}, huma.Error409Conflict("several active users share this email address; an administrator must fix this in Authentik")
+		return "", huma.Error409Conflict("several active users share this email address; an administrator must fix this in Authentik")
 	}
 	if err != nil {
 		slog.ErrorContext(ctx, "find Authentik user", "error", err)
-		return pgtype.UUID{}, huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
+		return "", huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
 	}
-	// Users who never signed in have no iam_user row yet; create it from their token subject.
-	rawUserID, err := h.store.UpsertIAMUser(ctx, user.Subject)
-	if err != nil {
-		return pgtype.UUID{}, err
-	}
-	userID, err := parseUUID(rawUserID)
-	if err != nil {
-		return pgtype.UUID{}, err
-	}
-	id, err := h.store.CreateUserMember(ctx, db.CreateUserMemberParams{ProjectID: projectID, UserID: userID, Role: role})
-	return id, mapMemberError(err)
+	return user.Subject, nil
 }
 
-func (h *ProjectMembers) addGroup(ctx context.Context, projectID pgtype.UUID, groupID string, role db.ProjectRole) (pgtype.UUID, error) {
+// findGroup returns the Authentik UUID of the group if it can be given a project role.
+func (h *ProjectMembers) findGroup(ctx context.Context, groupID string) (string, error) {
 	group, err := h.directory.ResolveGroup(ctx, groupID)
 	if errors.Is(err, auth.ErrPrincipalNotFound) || (err == nil && !group.Assignable) {
-		return pgtype.UUID{}, huma.Error422UnprocessableEntity("this group cannot be given a project role")
+		return "", huma.Error422UnprocessableEntity("this group cannot be given a project role")
 	}
 	if err != nil {
 		slog.ErrorContext(ctx, "resolve Authentik group", "error", err)
-		return pgtype.UUID{}, huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
+		return "", huma.Error503ServiceUnavailable("the Authentik directory is unavailable")
 	}
-	internalID, err := h.store.UpsertIAMGroup(ctx, group.GroupID)
-	if err != nil {
-		return pgtype.UUID{}, err
-	}
-	id, err := h.store.CreateGroupMember(ctx, db.CreateGroupMemberParams{ProjectID: projectID, GroupID: internalID, Role: role})
-	return id, mapMemberError(err)
+	return group.GroupID, nil
 }
 
 func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInput) (*ProjectMemberOutput, error) {
@@ -234,7 +225,11 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 	if err != nil {
 		return nil, err
 	}
-	updated, err := h.store.UpdateProjectMemberRole(ctx, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role})
+	actor, err := auditActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	_, err = h.store.UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role})
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No row is updated if the member does not exist or is the last user Owner.
 		if _, getErr := h.get(ctx, projectID, memberID); getErr != nil {
@@ -243,13 +238,12 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 		return nil, errLastOwner()
 	}
 	if err != nil {
-		return nil, err
+		return nil, mapMemberError(err)
 	}
 	member, err := h.get(ctx, projectID, memberID)
 	if err != nil {
 		return nil, err
 	}
-	audit(ctx, "member.role_changed", memberAttrs(projectID, member, "before", updated.PreviousRole, "after", member.Role)...)
 	return &ProjectMemberOutput{Body: member}, nil
 }
 
@@ -263,25 +257,27 @@ func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*st
 	if err != nil {
 		return nil, mapMemberError(err)
 	}
-	self, err := callerID(ctx)
+	actor, err := auditActor(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// Owners may remove anyone; other members may only remove their own user assignment.
-	if !Allows(RoleFromContext(ctx), PermManage) && row.UserID != self {
+	if !Allows(RoleFromContext(ctx), PermManage) && row.UserID != actor.UserID {
 		err := huma.Error403Forbidden("only Owners can remove other members")
 		logDenied(ctx, opRemoveProjectMember, err)
 		return nil, err
 	}
-	removed, err := h.store.DeleteProjectMember(ctx, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID})
+	_, err = h.store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID})
 	if errors.Is(err, pgx.ErrNoRows) {
+		// No row is deleted if the member was removed in the meantime or is the last user Owner.
+		if _, getErr := h.store.GetProjectMember(ctx, db.GetProjectMemberParams{ProjectID: projectID, ID: memberID}); getErr != nil {
+			return nil, mapMemberError(getErr)
+		}
 		return nil, errLastOwner()
 	}
 	if err != nil {
-		return nil, err
+		return nil, mapMemberError(err)
 	}
-	member := memberIdentity(row)
-	audit(ctx, "member.removed", memberAttrs(projectID, member, "before", removed.ProjectRole, "self", row.UserID == self)...)
 	return nil, nil
 }
 
@@ -314,6 +310,9 @@ func errLastOwner() error {
 }
 
 func mapMemberError(err error) error {
+	if errors.Is(err, db.ErrProjectNotFound) {
+		return huma.Error404NotFound("project not found")
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("member not found")
 	}
