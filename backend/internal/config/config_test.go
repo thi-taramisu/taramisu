@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("AUTHENTIK_API_TOKEN", "")
 	t.Setenv("IAM_USER_CACHE_TTL", "")
 	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
+	t.Setenv("LOG_LEVEL", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -257,6 +259,41 @@ func TestLoadFailures(t *testing.T) {
 			}
 			if got := err.Error(); !strings.Contains(got, tt.wantError) {
 				t.Errorf("Load() error = %q, want it to contain %q", got, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestLoadLogLevel(t *testing.T) {
+	tests := []struct {
+		raw       string
+		want      slog.Level
+		wantError bool
+	}{
+		{raw: "", want: slog.LevelInfo},
+		{raw: "debug", want: slog.LevelDebug},
+		{raw: "WARN", want: slog.LevelWarn},
+		{raw: "error", want: slog.LevelError},
+		{raw: "verbose", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			clearOIDCEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+			t.Setenv("LOG_LEVEL", tt.raw)
+
+			cfg, err := Load()
+			if tt.wantError {
+				if err == nil || !strings.Contains(err.Error(), "invalid LOG_LEVEL") {
+					t.Fatalf("Load() error = %v, want invalid LOG_LEVEL", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.LogLevel != tt.want {
+				t.Errorf("LogLevel = %v, want %v", cfg.LogLevel, tt.want)
 			}
 		})
 	}

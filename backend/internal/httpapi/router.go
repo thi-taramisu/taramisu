@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
 type Queries interface {
@@ -61,6 +62,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
+	mux.Use(logging.Middleware)
 	mux.Use(func(next http.Handler) http.Handler {
 		protected := manager.Require(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

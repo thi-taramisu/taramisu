@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -147,8 +146,7 @@ func assetError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
 		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
 	}
-	slog.Warn("asset database operation failed", "error", err)
-	return huma.Error500InternalServerError("internal server error")
+	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAssetOutput, error) {
 	a, err := h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),

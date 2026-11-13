@@ -13,6 +13,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
 // Config configures stateless OIDC Bearer JWT verification.
@@ -110,12 +111,12 @@ func bearerToken(header string) (string, bool) {
 	return token, true
 }
 
-func fail(w http.ResponseWriter, code int, message string) {
+func fail(r *http.Request, w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(huma.NewError(code, message)); err != nil {
-		slog.Warn("write authentication error response", "error", err)
+		slog.WarnContext(r.Context(), "write authentication error response", "error", err)
 	}
 }
 
@@ -132,13 +133,14 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if m == nil {
-			fail(w, http.StatusServiceUnavailable, "authentication is not configured")
+			fail(r, w, http.StatusServiceUnavailable, "authentication is not configured")
 			return
 		}
 		rawToken, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
+			slog.InfoContext(r.Context(), "authentication failed", "reason", "missing_token")
 			w.Header().Set("WWW-Authenticate", "Bearer")
-			fail(w, http.StatusUnauthorized, "authentication required")
+			fail(r, w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
@@ -146,9 +148,15 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 		defer cancel()
 		token, err := m.verifier.Verify(verifyCtx, rawToken)
 		if err != nil {
-			slog.Warn("JWT verification failed", "error", err)
+			// An expired token is routine (every session ends with one); other failures may be attacks.
+			var expired *oidc.TokenExpiredError
+			if errors.As(err, &expired) {
+				slog.InfoContext(r.Context(), "authentication failed", "reason", "expired_token")
+			} else {
+				slog.WarnContext(r.Context(), "authentication failed", "reason", "invalid_token", "error", err)
+			}
 			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
-			fail(w, http.StatusUnauthorized, "invalid or expired access token")
+			fail(r, w, http.StatusUnauthorized, "invalid or expired access token")
 			return
 		}
 
@@ -158,19 +166,19 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 			Groups []string `json:"taramisu_groups"`
 		}
 		if err := token.Claims(&claims); err != nil {
-			slog.Warn("JWT claims decode failed", "error", err)
+			slog.WarnContext(r.Context(), "authentication failed", "reason", "invalid_claims", "error", err)
 			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
-			fail(w, http.StatusUnauthorized, "invalid token claims")
+			fail(r, w, http.StatusUnauthorized, "invalid token claims")
 			return
 		}
 		if strings.TrimSpace(token.Subject) == "" || strings.TrimSpace(claims.Name) == "" || strings.TrimSpace(claims.Email) == "" {
-			slog.Warn("JWT missing required claims",
+			slog.WarnContext(r.Context(), "authentication failed", "reason", "missing_claims",
 				"has_sub", strings.TrimSpace(token.Subject) != "",
 				"has_name", strings.TrimSpace(claims.Name) != "",
 				"has_email", strings.TrimSpace(claims.Email) != "",
 			)
 			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
-			fail(w, http.StatusUnauthorized, "missing required token claims")
+			fail(r, w, http.StatusUnauthorized, "missing required token claims")
 			return
 		}
 
@@ -178,13 +186,18 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 		if !ok {
 			userID, err = m.users.UpsertIAMUser(r.Context(), token.Subject)
 			if err != nil {
-				slog.Error("resolve IAM user", "error", err)
-				fail(w, http.StatusServiceUnavailable, "user database unavailable")
+				if r.Context().Err() != nil {
+					slog.InfoContext(r.Context(), "request cancelled", "error", err)
+				} else {
+					slog.ErrorContext(r.Context(), "resolve IAM user", "error", err)
+				}
+				fail(r, w, http.StatusServiceUnavailable, "user database unavailable")
 				return
 			}
 			m.userCache.set(token.Subject, userID)
 		}
 
+		logging.SetActor(r.Context(), userID)
 		user := User{
 			ID:      userID,
 			Issuer:  m.issuer,

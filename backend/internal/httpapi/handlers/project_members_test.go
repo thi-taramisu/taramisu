@@ -402,6 +402,12 @@ func TestPermissionMatrix(t *testing.T) {
 // captureAudit collects the "audit" log entries written while fn runs.
 func captureAudit(t *testing.T, fn func()) []map[string]any {
 	t.Helper()
+	return captureLog(t, "audit", fn)
+}
+
+// captureLog collects the log entries with message msg written while fn runs.
+func captureLog(t *testing.T, msg string, fn func()) []map[string]any {
+	t.Helper()
 	var buf strings.Builder
 	previous := slog.Default()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
@@ -410,7 +416,7 @@ func captureAudit(t *testing.T, fn func()) []map[string]any {
 	var entries []map[string]any
 	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
 		var entry map[string]any
-		if json.Unmarshal([]byte(line), &entry) == nil && entry["msg"] == "audit" {
+		if json.Unmarshal([]byte(line), &entry) == nil && entry["msg"] == msg {
 			entries = append(entries, entry)
 		}
 	}
