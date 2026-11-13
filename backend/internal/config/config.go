@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ const defaultHTTPAddr = ":8080"
 
 // Config contains the runtime configuration for the API.
 type Config struct {
+	S3                        S3Config
 	HTTPAddr                  string
 	DatabaseURL               string
 	OIDCIssuer                string
@@ -24,6 +26,16 @@ type Config struct {
 	AuthentikToken            string
 	IAMUserCacheTTL           time.Duration
 	AuthentikMetadataCacheTTL time.Duration
+}
+
+// S3Config holds S3 settings.
+type S3Config struct {
+	Endpoint     string
+	Region       string
+	Bucket       string
+	AccessKey    string
+	SecretKey    string
+	UsePathStyle bool
 }
 
 // Load reads and validates the runtime configuration from the environment.
@@ -88,7 +100,12 @@ func Load() (Config, error) {
 		authentikMetadataCacheTTL = parsed
 	}
 
+	s3, err := loadS3()
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
+		S3:                        s3,
 		HTTPAddr:                  httpAddr,
 		DatabaseURL:               databaseURL,
 		OIDCIssuer:                oidcIssuer,
@@ -150,4 +167,26 @@ func validateHTTPURL(rawURL string) error {
 		return errors.New("must not contain credentials, query parameters, or fragments")
 	}
 	return nil
+}
+
+func loadS3() (S3Config, error) {
+	cfg := S3Config{Endpoint: os.Getenv("S3_ENDPOINT"), Region: os.Getenv("S3_REGION"), Bucket: os.Getenv("S3_BUCKET"), AccessKey: os.Getenv("S3_ACCESS_KEY"), SecretKey: os.Getenv("S3_SECRET_KEY"), UsePathStyle: true}
+	for _, field := range []struct{ name, value string }{
+		{"S3_ENDPOINT", cfg.Endpoint}, {"S3_BUCKET", cfg.Bucket}, {"S3_ACCESS_KEY", cfg.AccessKey}, {"S3_SECRET_KEY", cfg.SecretKey},
+	} {
+		if field.value == "" {
+			return S3Config{}, fmt.Errorf("%s is required", field.name)
+		}
+	}
+	endpoint, err := url.Parse(cfg.Endpoint)
+	if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Hostname() == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || (endpoint.Path != "" && endpoint.Path != "/") {
+		return S3Config{}, errors.New("invalid S3_ENDPOINT: must be an http(s) origin without credentials, query or fragment")
+	}
+	if !regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$`).MatchString(cfg.Bucket) {
+		return S3Config{}, errors.New("invalid S3_BUCKET: use 3-63 lowercase letters, numbers or hyphens")
+	}
+	if cfg.Region == "" {
+		cfg.Region = "us-east-1"
+	}
+	return cfg, nil
 }
