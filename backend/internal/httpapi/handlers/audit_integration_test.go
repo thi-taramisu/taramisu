@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -160,6 +161,7 @@ func TestAuditHistoryPostgres(t *testing.T) {
 		"members": []any{map[string]any{"id": aliceMember.ID, "role": "OWNER", "user_id": aliceID}},
 	}
 	want := []storedEvent{
+		{aliceID, "project.created", db.TargetProject, project.ID, nil, map[string]any{"name": projectName, "first_owner": aliceID}, "req-POST"},
 		{aliceID, db.EventMemberAdded, db.TargetProjectMember, bobMember.ID, nil, bobAs("VIEWER"), "req-POST"},
 		{aliceID, db.EventMemberAdded, db.TargetProjectMember, teamMember.ID, nil, map[string]any{"role": "EDITOR", "group_id": teamID}, "req-POST"},
 		{aliceID, db.EventMemberRoleChanged, db.TargetProjectMember, bobMember.ID, bobAs("VIEWER"), bobAs("OWNER"), "req-PATCH"},
@@ -185,8 +187,8 @@ func TestAuditHistoryPostgres(t *testing.T) {
 			t.Errorf("log line %d contains project data or an email address: %v", i, line)
 		}
 	}
-	if logLines[2]["before_role"] != "VIEWER" || logLines[2]["after_role"] != "OWNER" {
-		t.Errorf("role change log line = %v, want before_role VIEWER and after_role OWNER", logLines[2])
+	if logLines[3]["before_role"] != "VIEWER" || logLines[3]["after_role"] != "OWNER" {
+		t.Errorf("role change log line = %v, want before_role VIEWER and after_role OWNER", logLines[3])
 	}
 }
 
@@ -284,5 +286,217 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	}
 	if got := auditEvents(t, ctx, tx, kept.String()); len(got) != 1 {
 		t.Fatalf("history of the kept project after cleanup = %+v, want it unchanged", got)
+	}
+}
+
+// failAfterChange runs each audited change and then fails, as a later step of a request could. The
+// change must then be rolled back with its event; a query that escaped the transaction would persist.
+type failAfterChange struct{ *db.Store }
+
+var errInjected = errors.New("injected failure after the change")
+
+func (f failAfterChange) Audit(ctx context.Context, actor db.Actor, change func(context.Context) (db.Change, error)) error {
+	return f.Store.Audit(ctx, actor, func(ctx context.Context) (db.Change, error) {
+		if _, err := change(ctx); err != nil {
+			return db.Change{}, err
+		}
+		return db.Change{}, errInjected
+	})
+}
+
+// TestAuditContentPostgres checks the events written through the generic entry point (db.Store.Audit):
+// project settings and item definitions, and that every operation in auditedOperations writes an
+// event. It runs on the pool with committed transactions, as in production.
+func TestAuditContentPostgres(t *testing.T) {
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set TEST_DATABASE_URL to run against a migrated PostgreSQL database")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close) // registered first, so it runs after the cleanups below that use the pool
+	store := db.NewStore(pool)
+	fixture := authtest.NewFixture(t, store)
+	handler := httpapi.New(store, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
+	failing := httpapi.New(failAfterChange{store}, fixture.Manager)
+	subject := "audit-content-" + rand.Text()
+	rolledBackName := "Rolled back " + subject // unique per run, so a leaked row cannot fail later runs
+	token := "Bearer " + fixture.Token(t, map[string]any{"sub": subject})
+	var projectIDs []any
+	var groupExisted bool
+	if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM iam_group WHERE external_iam_group_id = $1)`, teamGroupID).Scan(&groupExisted); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		for _, id := range projectIDs {
+			_, _ = pool.Exec(bg, `DELETE FROM item_definition WHERE tara_project_id = $1`, id)
+			_, _ = pool.Exec(bg, `DELETE FROM tara_project WHERE id = $1`, id)
+			_, _ = pool.Exec(bg, `DELETE FROM audit_event WHERE tara_project_id = $1`, id)
+		}
+		_, _ = pool.Exec(bg, `DELETE FROM audit_event WHERE tara_project_id IN (SELECT id FROM tara_project WHERE name = $1)`, rolledBackName)
+		_, _ = pool.Exec(bg, `DELETE FROM item_definition WHERE name = $1`, rolledBackName)
+		_, _ = pool.Exec(bg, `DELETE FROM tara_project WHERE name = $1`, rolledBackName)
+		_, _ = pool.Exec(bg, `DELETE FROM iam_user WHERE external_iam_sub = $1`, subject)
+		if !groupExisted {
+			_, _ = pool.Exec(bg, `DELETE FROM iam_group WHERE external_iam_group_id = $1`, teamGroupID)
+		}
+	})
+	// serve sends a request whose request ID is the operation ID, so the stored events show which
+	// operation wrote them.
+	serve := func(h http.Handler, operation, method, path, body string, want int) map[string]any {
+		t.Helper()
+		req := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", token)
+		req.Header.Set(logging.RequestIDHeader, operation)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != want {
+			t.Fatalf("%s %s: status = %d, want %d: %s", method, path, rr.Code, want, rr.Body.String())
+		}
+		var out map[string]any
+		if rr.Body.Len() > 0 {
+			if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return out
+	}
+	call := func(operation, method, path, body string, want int) map[string]any {
+		t.Helper()
+		return serve(handler, operation, method, path, body, want)
+	}
+	newProject := func(name string) (map[string]any, string) {
+		t.Helper()
+		p := call("create-tara-project", http.MethodPost, "/api/v1/projects", `{"name":"`+name+`"}`, http.StatusCreated)
+		projectIDs = append(projectIDs, p["id"])
+		return p, "/api/v1/projects/" + p["id"].(string)
+	}
+
+	project, projectPath := newProject("Lamp")
+	call("update-tara-project", http.MethodPatch, projectPath, `{"name":"Headlamp"}`, http.StatusOK)
+	call("replace-tara-project", http.MethodPut, projectPath, `{"name":"Headlamp","description":"Contact: x@example.com"}`, http.StatusOK)
+	call("update-tara-project", http.MethodPatch, projectPath, `{"name":"Headlamp"}`, http.StatusOK) // unchanged
+
+	items := projectPath + "/item-definitions"
+	created := call("create-item-definition", http.MethodPost, items, `{"name":"Lamp ECU","scope_type":"ITEM","boundary":"CAN"}`, http.StatusCreated)
+	item := items + "/" + created["id"].(string)
+	replaced := call("replace-item-definition", http.MethodPut, item, `{"name":"Lamp ECU","scope_type":"COMPONENT"}`, http.StatusOK)
+	call("update-item-definition", http.MethodPatch, item, `{"scope_type":"COMPONENT"}`, http.StatusOK) // unchanged
+	patched := call("update-item-definition", http.MethodPatch, item, `{"functions":"Low beam"}`, http.StatusOK)
+	call("delete-item-definition", http.MethodDelete, item, "", http.StatusNoContent)
+	call("delete-item-definition", http.MethodDelete, item, "", http.StatusNotFound)
+
+	var userID string
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM iam_user WHERE external_iam_sub = $1`, subject).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	projectID := project["id"].(string)
+	want := []storedEvent{
+		{userID, "project.created", db.TargetProject, projectID, nil, map[string]any{"name": "Lamp", "first_owner": userID}, "create-tara-project"},
+		{userID, "project.updated", db.TargetProject, projectID, map[string]any{"name": "Lamp"}, map[string]any{"name": "Headlamp"}, "update-tara-project"},
+		{userID, "project.updated", db.TargetProject, projectID, map[string]any{"name": "Headlamp"}, map[string]any{"name": "Headlamp", "description_changed": true}, "replace-tara-project"},
+		{userID, "item_definition.created", db.TargetItemDefinition, created["id"].(string), nil, created, "create-item-definition"},
+		{userID, "item_definition.updated", db.TargetItemDefinition, created["id"].(string), created, replaced, "replace-item-definition"},
+		{userID, "item_definition.updated", db.TargetItemDefinition, created["id"].(string), replaced, patched, "update-item-definition"},
+		{userID, "item_definition.deleted", db.TargetItemDefinition, created["id"].(string), patched, nil, "delete-item-definition"},
+	}
+	if got := auditEvents(t, ctx, pool, projectID); !reflect.DeepEqual(got, want) {
+		t.Fatalf("audit history:\n got %+v\nwant %+v", got, want)
+	}
+
+	// Every operation declared as audited writes an event.
+	members := projectPath + "/members"
+	team := call("add-project-member", http.MethodPost, members, `{"group_id":"`+teamGroupID+`","role":"VIEWER"}`, http.StatusCreated)
+	call("update-project-member", http.MethodPatch, members+"/"+team["id"].(string), `{"role":"EDITOR"}`, http.StatusOK)
+	call("remove-project-member", http.MethodDelete, members+"/"+team["id"].(string), "", http.StatusNoContent)
+	call("delete-tara-project", http.MethodDelete, projectPath, "", http.StatusNoContent)
+	written := map[string]bool{}
+	for _, e := range auditEvents(t, ctx, pool, projectID) {
+		written[e.RequestID] = true
+		if strings.Contains(fmt.Sprint(e), "@") {
+			t.Errorf("event stores the project description: %+v", e)
+		}
+	}
+	for _, operation := range auditedOperations {
+		if !written[operation] {
+			t.Errorf("%s is listed in auditedOperations but wrote no event", operation)
+		}
+	}
+
+	// A change whose request fails afterwards is rolled back with its event. A query that escaped the
+	// transaction of Audit would persist and fail these checks.
+	other, otherPath := newProject("Other")
+	otherItem := call("create-item-definition", http.MethodPost, otherPath+"/item-definitions", `{"name":"Kept","scope_type":"ITEM"}`, http.StatusCreated)
+	otherItemPath := otherPath + "/item-definitions/" + otherItem["id"].(string)
+	before := auditEvents(t, ctx, pool, other["id"].(string))
+	name := `"name":"` + rolledBackName + `"`
+	rollbacks := []struct{ operation, method, path, body string }{
+		{"create-tara-project", http.MethodPost, "/api/v1/projects", `{` + name + `}`},
+		{"update-tara-project", http.MethodPatch, otherPath, `{` + name + `}`},
+		{"replace-tara-project", http.MethodPut, otherPath, `{` + name + `}`},
+		{"create-item-definition", http.MethodPost, otherPath + "/item-definitions", `{` + name + `,"scope_type":"ITEM"}`},
+		{"replace-item-definition", http.MethodPut, otherItemPath, `{` + name + `,"scope_type":"ITEM"}`},
+		{"update-item-definition", http.MethodPatch, otherItemPath, `{` + name + `}`},
+		{"delete-item-definition", http.MethodDelete, otherItemPath, ""},
+	}
+	// Membership changes and project deletion run in db.Store methods, not through handlers.Auditor,
+	// so the wrapper cannot reach them; TestAuditHistoryPostgres covers their rejected changes.
+	storeMethods := map[string]bool{"add-project-member": true, "update-project-member": true, "remove-project-member": true, "delete-tara-project": true}
+	covered := map[string]bool{}
+	for _, r := range rollbacks {
+		// The 500 must come from the injected failure after the change, not from an earlier error.
+		logged := captureLog(t, "unexpected error", func() {
+			serve(failing, r.operation, r.method, r.path, r.body, http.StatusInternalServerError)
+		})
+		if len(logged) != 1 || !strings.Contains(fmt.Sprint(logged[0]["error"]), errInjected.Error()) {
+			t.Errorf("%s: logged %v, want the injected failure", r.operation, logged)
+		}
+		covered[r.operation] = true
+	}
+	for _, operation := range auditedOperations {
+		if !storeMethods[operation] && !covered[operation] {
+			t.Errorf("%s is audited through handlers.Auditor but has no case in the rollback list", operation)
+		}
+	}
+	var projects, rolledBackItems int
+	var kept string
+	if err := pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM tara_project WHERE name = $2),
+		       (SELECT count(*) FROM item_definition WHERE name = $2),
+		       coalesce((SELECT name FROM item_definition WHERE id = $1), 'deleted')`, otherItem["id"], rolledBackName).Scan(&projects, &rolledBackItems, &kept); err != nil {
+		t.Fatal(err)
+	}
+	if projects != 0 || rolledBackItems != 0 || kept != "Kept" {
+		t.Errorf("after failed requests: %d projects and %d item definitions renamed, item is %q; want 0, 0, Kept", projects, rolledBackItems, kept)
+	}
+	if got := auditEvents(t, ctx, pool, other["id"].(string)); !reflect.DeepEqual(got, before) {
+		t.Errorf("failed requests changed the audit history: %+v", got)
+	}
+	if got := call("get-tara-project", http.MethodGet, otherPath, "", http.StatusOK); got["name"] != "Other" {
+		t.Errorf("project name after failed changes = %v, want Other", got["name"])
+	}
+
+	// A locking read outside Audit's transaction is refused: its lock would end with the statement.
+	if _, err := store.GetItemDefinitionForUpdate(ctx, db.GetItemDefinitionForUpdateParams{
+		ProjectID: mustUUID(other["id"].(string)), ID: mustUUID(otherItem["id"].(string)),
+	}); !errors.Is(err, db.ErrLockOutsideTransaction) {
+		t.Fatalf("locking read outside Audit = %v, want ErrLockOutsideTransaction", err)
+	}
+
+	// Audit cannot be nested: the inner event would be logged before the outer change is committed.
+	err = store.Audit(ctx, db.Actor{UserID: mustUUID(userID)}, func(ctx context.Context) (db.Change, error) {
+		_, err := store.AddProjectMember(ctx, db.Actor{UserID: mustUUID(userID)}, db.AddProjectMemberParams{
+			ProjectID: mustUUID(other["id"].(string)), GroupExternalID: teamGroupID, Role: db.ProjectRoleVIEWER,
+		})
+		return db.Change{}, err
+	})
+	if !errors.Is(err, db.ErrNestedAudit) {
+		t.Fatalf("nested Audit = %v, want ErrNestedAudit", err)
 	}
 }

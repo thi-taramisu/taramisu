@@ -114,6 +114,72 @@ func (q *Queries) GetItemDefinition(ctx context.Context, arg GetItemDefinitionPa
 	return i, err
 }
 
+const getItemDefinitionForDelete = `-- name: GetItemDefinitionForDelete :one
+SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+WHERE tara_project_id = $1 AND id = $2
+FOR UPDATE
+`
+
+type GetItemDefinitionForDeleteParams struct {
+	ProjectID pgtype.UUID
+	ID        pgtype.UUID
+}
+
+// The item definition before its deletion, locked with FOR UPDATE at once, so the deletion waits for
+// concurrent inserts of dependent records instead of deadlocking with them.
+func (q *Queries) GetItemDefinitionForDelete(ctx context.Context, arg GetItemDefinitionForDeleteParams) (ItemDefinition, error) {
+	row := q.db.QueryRow(ctx, getItemDefinitionForDelete, arg.ProjectID, arg.ID)
+	var i ItemDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.TaraProjectID,
+		&i.Name,
+		&i.ScopeType,
+		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
+		&i.ItemDefinitionWp0901,
+		&i.CybersecuritySpecsWp1001,
+		&i.ArchitecturalDesign,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getItemDefinitionForUpdate = `-- name: GetItemDefinitionForUpdate :one
+SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+WHERE tara_project_id = $1 AND id = $2
+FOR NO KEY UPDATE
+`
+
+type GetItemDefinitionForUpdateParams struct {
+	ProjectID pgtype.UUID
+	ID        pgtype.UUID
+}
+
+// The item definition before a change, locked until the transaction ends, so that the audit history
+// records the state the change replaced.
+func (q *Queries) GetItemDefinitionForUpdate(ctx context.Context, arg GetItemDefinitionForUpdateParams) (ItemDefinition, error) {
+	row := q.db.QueryRow(ctx, getItemDefinitionForUpdate, arg.ProjectID, arg.ID)
+	var i ItemDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.TaraProjectID,
+		&i.Name,
+		&i.ScopeType,
+		&i.LifecyclePhase,
+		&i.Boundary,
+		&i.Functions,
+		&i.OperationalEnvironment,
+		&i.ItemDefinitionWp0901,
+		&i.CybersecuritySpecsWp1001,
+		&i.ArchitecturalDesign,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listItemDefinitions = `-- name: ListItemDefinitions :many
 SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
 WHERE tara_project_id = $1
