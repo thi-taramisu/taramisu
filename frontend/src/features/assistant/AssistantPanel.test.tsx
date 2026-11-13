@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -42,8 +42,13 @@ function renderPanel(onClose = () => {}, auth = signedIn) {
   return userEvent.setup()
 }
 
+/** The panel is ready once the projects are loaded and a project is active. */
+async function waitUntilReady() {
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Message to the assistant' })).toBeEnabled())
+}
+
 describe('AssistantPanel', () => {
-  it('asks the assistant about the chosen project and shows the answer with the tools used', async () => {
+  it('asks the assistant about the first project and shows the answer with the tools used', async () => {
     const requests: { projectId: string; body: unknown }[] = []
     server.use(
       http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, async ({ params, request }) => {
@@ -53,7 +58,7 @@ describe('AssistantPanel', () => {
     )
     const user = renderPanel()
 
-    await screen.findByRole('option', { name: 'Demo ECU' })
+    await waitUntilReady()
     await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Which items?{Enter}')
 
     expect(await screen.findByText('Demo ECU has one item.')).toBeInTheDocument()
@@ -72,7 +77,7 @@ describe('AssistantPanel', () => {
     )
     const user = renderPanel()
     const input = await screen.findByRole('textbox', { name: 'Message to the assistant' })
-    await screen.findByRole('option', { name: 'Demo ECU' })
+    await waitUntilReady()
 
     await user.type(input, 'First{Enter}')
     await screen.findByText('Answer 1')
@@ -88,7 +93,8 @@ describe('AssistantPanel', () => {
     })
   })
 
-  it('switches the project, remembers it and starts a new conversation', async () => {
+  it('asks about the remembered project without a project picker', async () => {
+    localStorage.setItem('taramisu.assistant.project', projectB.id)
     const projectIds: string[] = []
     server.use(
       http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, ({ params }) => {
@@ -97,17 +103,12 @@ describe('AssistantPanel', () => {
       }),
     )
     const user = renderPanel()
-    await screen.findByRole('option', { name: 'Gateway' })
+    await waitUntilReady()
 
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
     await screen.findByText('ok')
-    await user.selectOptions(screen.getByLabelText('Project (from the database)'), projectB.id)
-
-    expect(screen.queryByText('ok')).not.toBeInTheDocument()
-    expect(localStorage.getItem('taramisu.assistant.project')).toBe(projectB.id)
-    await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
-    await screen.findByText('ok')
-    expect(projectIds).toEqual([projectA.id, projectB.id])
+    expect(projectIds).toEqual([projectB.id])
   })
 
   it.each([
@@ -120,7 +121,7 @@ describe('AssistantPanel', () => {
       ),
     )
     const user = renderPanel()
-    await screen.findByRole('option', { name: 'Demo ECU' })
+    await waitUntilReady()
 
     await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Hi{Enter}')
 

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { useLocation } from 'react-router-dom'
 import { Bot, Loader2, Plus, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/useAuth'
+import { AssistantMarkdown } from './AssistantMarkdown'
 import { AssistantError, useAskAssistant, useRealProjects, type AssistantMessage } from '../../api/queries/assistant'
 
 const PROJECT_KEY = 'taramisu.assistant.project'
@@ -23,14 +23,6 @@ function loadProjectId(): string {
   }
 }
 
-function saveProjectId(id: string) {
-  try {
-    localStorage.setItem(PROJECT_KEY, id)
-  } catch {
-    // Storage unavailable (private window): the choice is just not remembered.
-  }
-}
-
 function errorText(error: Error): string {
   if (error instanceof AssistantError) {
     if (error.status === 429) return 'The assistant is busy. Try again in a few seconds.'
@@ -40,8 +32,9 @@ function errorText(error: Error): string {
 }
 
 /**
- * Collapsible chat with the AI assistant (prototype, #229). The workspace still shows mock data, so the panel
- * asks about a real project chosen here. The conversation lives only in this component; the server stores nothing.
+ * Collapsible chat with the AI assistant (prototype, #229). The workspace still shows mock data, so the panel asks
+ * about a real project: the one remembered from earlier, otherwise the first. Once the workspace shows real projects,
+ * it passes its project instead. The conversation lives only in this component; the server stores nothing.
  */
 export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { status, signIn } = useAuth()
@@ -49,7 +42,7 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
   const signedIn = status === 'authenticated'
   const projects = useRealProjects(open && signedIn)
   const ask = useAskAssistant()
-  const [projectId, setProjectIdState] = useState(loadProjectId)
+  const [projectId] = useState(loadProjectId)
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -62,13 +55,6 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: 'end' })
   })
-
-  function selectProject(id: string) {
-    setProjectIdState(id)
-    saveProjectId(id)
-    setMessages([])
-    ask.reset()
-  }
 
   function submit(text: string) {
     const content = text.trim()
@@ -100,7 +86,6 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <Bot className="size-5 text-primary" aria-hidden />
         <span className="font-medium">Assistant</span>
-        <span className="rounded bg-muted px-1.5 text-xs text-muted-foreground">Prototype</span>
         <Button size="icon-sm" variant="ghost" className="ml-auto" aria-label="New conversation" onClick={() => { setMessages([]); ask.reset() }}>
           <Plus />
         </Button>
@@ -115,19 +100,11 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
           <Button size="sm" variant="outline" onClick={() => void signIn(pathname)}>Sign in</Button>
         </div>
       )}
-      <div className="border-b px-3 py-2">
-        <label htmlFor="assistant-project" className="mb-1 block text-xs text-muted-foreground">
-          Project (from the database)
-        </label>
-        <NativeSelect id="assistant-project" size="sm" className="w-full" value={activeProjectId}
-          onChange={(e) => selectProject(e.target.value)} disabled={!projectList.length}>
-          {projectList.map((p) => <NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}
-        </NativeSelect>
-        {projects.isError && <p className="mt-1 text-xs text-destructive">The projects could not be loaded.</p>}
-        {projects.isSuccess && !projectList.length && (
-          <p className="mt-1 text-xs text-muted-foreground">You have no projects in the database yet.</p>
-        )}
-      </div>
+      {(projects.isError || (projects.isSuccess && !projectList.length)) && (
+        <p className={cn('border-b px-3 py-2 text-xs', projects.isError ? 'text-destructive' : 'text-muted-foreground')}>
+          {projects.isError ? 'The projects could not be loaded.' : 'You have no projects in the database yet.'}
+        </p>
+      )}
 
       <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm" aria-live="polite">
         {ready && messages.length === 0 && (
@@ -164,9 +141,9 @@ function Bubble({ entry }: { entry: ChatEntry }) {
   const user = entry.role === 'user'
   return (
     <div className={cn('flex flex-col', user ? 'items-end' : 'items-start')}>
-      <div className={cn('max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap',
-        user ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>
-        {entry.content}
+      <div className={cn('max-w-[85%] rounded-2xl px-3 py-2',
+        user ? 'bg-primary text-primary-foreground whitespace-pre-wrap' : 'bg-muted text-foreground')}>
+        {user ? entry.content : <AssistantMarkdown>{entry.content}</AssistantMarkdown>}
       </div>
       {!!entry.toolsUsed?.length && (
         <p className="mt-0.5 text-xs text-muted-foreground">Read: {entry.toolsUsed.join(', ')}</p>
