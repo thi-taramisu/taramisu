@@ -12,8 +12,8 @@ x-authentik: &authentik
   image: ghcr.io/goauthentik/server:2026.8.3
   environment: *authentik-environment
   depends_on:
-    authentik-db:
-      condition: service_healthy
+    authentik-db-backup:
+      condition: service_completed_successfully
   volumes:
     - authentik_data:/data
     - ../iam/branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
@@ -42,10 +42,29 @@ services:
         - 'PGPASSWORD="$${POSTGRES_PASSWORD}" psql -h authentik-db -U authentik -d authentik -w -tAc "SELECT 1" > /dev/null'
       interval: 5s
       retries: 20
+
+  authentik-db-backup:
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/backup_restore.sh"]
+    networks: [iam-db]
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${PG_PASS:?Set PG_PASS in iam/.env; see iam/.env.example}
+      DB_HOST: authentik-db
+    volumes:
+      - ../backend/backup_restore.sh:/backup_restore.sh:ro
+      - ../backups:/backups
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+    restart: "no"
+
   authentik-server:
     <<: *authentik
     command: server
     networks: [iam-db, proxy]
+
   authentik-worker:
     <<: *authentik
     command: worker
