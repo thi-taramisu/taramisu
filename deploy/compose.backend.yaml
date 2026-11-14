@@ -62,7 +62,7 @@ services:
     restart: "no"
     
   migrate:
-    image: arigaio/atlas:1.3.0-alpine
+    image: arigaio/atlas:1.3.0
     networks: [app-db]
     working_dir: /app
     volumes:
