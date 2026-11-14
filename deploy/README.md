@@ -273,3 +273,36 @@ npm start
 
 Open <http://localhost:3001> for live preview at `/`.
 See the [tooling guide](../docs/docusaurus/README.md) for other build options.
+
+## Sentry reporting
+
+The Compose stack reads **`iam/.env`**. `backend/.env` only configures a backend started on the host, and
+`frontend/.env.local` only configures a frontend built/run directly with Vite. To enable the Compose stack:
+
+```dotenv
+SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/BACKEND_PROJECT_ID
+VITE_SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/FRONTEND_PROJECT_ID
+SENTRY_ENVIRONMENT=production
+```
+
+Use the actual DSNs from each Sentry project's client-key settings. Empty DSNs disable reporting. Optional
+`SENTRY_RELEASE` and `VITE_SENTRY_RELEASE` identify releases. Backend and frontend Compose settings share
+`SENTRY_ENVIRONMENT` and default to `production`. Rebuild the frontend after changes with `make -C deploy up`.
+
+For prebuilt GHCR images, set repository Actions variables `VITE_SENTRY_DSN` and optionally `SENTRY_ENVIRONMENT`
+before publishing. The latter defaults to `production`; configure the deployed backend with the same name.
+Frontend DSNs are public in browser JavaScript; Sentry auth tokens must never be used as build arguments.
+
+The API keeps its internal-only networks. Its Sentry HTTP transport routes envelopes to the dedicated ingest proxy's unpublished
+port 8081 while retaining the original DSN. The proxy accepts only POSTs for the configured backend project and
+forwards them to that DSN's Sentry SaaS HTTPS host with certificate verification. Other paths/projects/methods are
+rejected; incoming cookies and Authorization headers are removed. This is not a general outbound proxy, and the
+public port 80 listener exposes no ingest endpoint. With no backend DSN, the internal listener rejects all requests.
+The ingest configuration is generated on startup. The API depends on this service, so it starts first and remains
+available until the API has drained requests, closed its pool, and flushed reports during shutdown.
+
+`make -C deploy test` checks configuration and defaults. After starting the stack, run
+`python3 deploy/sentry_smoke_test.py` from the repository root (or pass `--api-image IMAGE`). It uses temporary
+isolated networks and a local TLS collector to verify actual SDK delivery, upstream verification, method/project
+restrictions, API network isolation, and the absence of a public ingest route. No test event reaches Sentry.
+The existing full-stack test continues to cover real OIDC logins, API replicas, and failover.

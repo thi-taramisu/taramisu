@@ -65,3 +65,9 @@ image serves the site at `/`. Changing the origin requires a rebuild.
 Frontend configuration is compiled into the static image by Vite. Runtime
 container environment variables do not change it. Additional frontend build
 settings must be exposed by its Dockerfile and passed through the workflow.
+
+For Sentry, set the repository Actions variable `VITE_SENTRY_DSN` to the frontend project's public DSN.
+`SENTRY_ENVIRONMENT` defaults to `production` and the workflow embeds the Git commit as `VITE_SENTRY_RELEASE`.
+Configure the deployed backend with the same environment name in `iam/.env`. These values are passed during
+frontend image builds; adding environment variables to an already built container cannot enable browser reporting.
+An empty DSN builds an image with reporting disabled. Sentry source-map uploads are not configured.

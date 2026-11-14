@@ -89,6 +89,25 @@ src/api/
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
 that has no service yet (project list, project settings, example project).
 
+## Sentry
+
+For the Vite dev server, copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the frontend Sentry project.
+An empty DSN disables reporting. `VITE_SENTRY_ENVIRONMENT` defaults to the Vite mode when unset or empty;
+`VITE_SENTRY_RELEASE` is optional. The SDK captures browser exceptions, unhandled rejections, and React render errors.
+Never put a Sentry auth token in a `VITE_` variable.
+
+For the full **Compose stack**, put `VITE_SENTRY_DSN` and the shared `SENTRY_ENVIRONMENT` in **`iam/.env`**,
+then rebuild with `make -C deploy up`. Compose does not read `frontend/.env.local` automatically. Backend and frontend
+Compose settings default to `production`; set `SENTRY_ENVIRONMENT=development` for a development stack.
+Vite embeds these values during the build; changing container runtime variables cannot update a built image.
+
+The **GHCR publishing workflow** passes the repository Actions variable `VITE_SENTRY_DSN` into the frontend build,
+uses `SENTRY_ENVIRONMENT` (default `production`), and records the Git commit as the frontend release.
+Configure those repository variables before publishing. A deployment using a prebuilt GHCR image must use the
+same environment name for its runtime backend; changing frontend settings requires publishing a new image.
+
+Source-map uploads are not configured; production stack traces may reference bundled code.
+
 ## UI components
 
 We use [shadcn/ui](https://ui.shadcn.com) (see [ADR 0002](../docs/internal/adr/0002-frontend-ui-library.md)). Add new components with the

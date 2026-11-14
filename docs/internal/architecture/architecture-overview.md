@@ -89,8 +89,9 @@ flowchart TB
 
 ## 2. Network Segmentation
 
-The container topology strictly separates ingress and persistence layers into dedicated Docker networks. NGINX is the sole service
-attached to the non-internal `edge` network to publish host ports (`:80`, `:443`). All internal application routing occurs across the
+The container topology strictly separates ingress and persistence layers into dedicated Docker networks. The web NGINX proxy is the
+only service publishing host ports (`:80`, `:443`). A separate NGINX Sentry ingest service joins `edge` for restricted outbound delivery
+without publishing a port. All internal application routing occurs across the
 `internal: true` `proxy` network, completely blocking outbound internet egress for the Go API and Frontend.
 
 Every stateful or internal backend component sits in its **own isolated `internal: true` Docker network** shared only with the services
@@ -99,8 +100,8 @@ cannot be reached from the edge.
 
 | Network | `internal` | Members | Purpose |
 | --- | --- | --- | --- |
-| `edge` | no | NGINX *(+ optional Authentik/LLM for egress)* | Ingress from host/internet (`ports:`) & outbound internet access (egress) |
-| `proxy` | yes | NGINX, Frontend, Go API, Authentik Server | Internal ingress routing from NGINX & Go API $\leftrightarrow$ Authentik (no internet egress) |
+| `edge` | no | Web NGINX, Sentry ingest *(+ optional Authentik/LLM for egress)* | Ingress from host/internet (`ports:`) & outbound internet access (egress) |
+| `proxy` | yes | Web NGINX, Sentry ingest, Frontend, Go API, Authentik Server | Internal ingress routing from NGINX & Go API $\leftrightarrow$ Authentik (no internet egress) |
 | `app-db` | yes | Go API, Atlas, `taramisu-db` | Application database access |
 | `iam-db` | yes | Authentik Server, Authentik Worker, `authentik-db` | IAM database access |
 | `storage` | yes | Go API, Object Storage | S3-compatible object storage access |
@@ -112,14 +113,18 @@ flowchart LR
 
     subgraph net_edge ["edge (internal: false — Host Ports & Optional Egress)"]
         Proxy
+        SentryIngest["NGINX Sentry ingest (no published ports)"]
     end
 
     subgraph net_proxy ["proxy (internal: true — NO Internet Egress)"]
         Proxy --- FE["Frontend"]
         Proxy --- API["Go API (1..N)"]
         Proxy --- AS["Authentik Server"]
+        API -->|"envelopes only"| SentryIngest
         API -.->|"JWKS & User Lookup<br/>(via internal proxy net)"| AS
     end
+
+    SentryIngest -->|"TLS, configured project only"| SentryCloud["Sentry SaaS"]
 
     API ---|app-db| AppDB[("taramisu-db")]
     Atlas["Atlas"] ---|app-db| AppDB
@@ -183,6 +188,11 @@ flowchart LR
 * **Why:** Minimizes the attack surface and enforces least privilege on the network level. Each service can only reach the backends it
   actually needs, and application containers (Go API, Frontend) cannot initiate outbound connections to the internet, preventing reverse
   shells and direct data exfiltration in the event of container compromise.
+
+Sentry reporting does not attach the Go API to `edge`. Its SDK uses the internal `sentry-ingest:8081` origin;
+the ingest service permits only POSTs to the configured Sentry SaaS project's envelope endpoint and verifies upstream TLS.
+The web listener exposes no ingest route. The API depends on healthy ingest so it starts first and stops after the API's final flush.
+See [deployment configuration](../../../deploy/README.md#sentry-reporting). Empty DSNs disable delivery.
 
 ### 5. Zero PII in Application Database (Authentik Integration)
 

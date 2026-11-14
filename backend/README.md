@@ -56,6 +56,23 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 > **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
 > It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
 
+## Sentry
+
+Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Info, Warn, and Error logs and
+HTTP panics are reported. Request bodies, headers, cookies, query parameters, and automatically collected user
+information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
+the Compose API stop timeout is 15 seconds to cover all three phases.
+
+For **host execution** (`make run`), set `SENTRY_DSN`, `SENTRY_ENVIRONMENT=development`, and optionally
+`SENTRY_RELEASE` in `backend/.env`. The host sends directly unless `SENTRY_TUNNEL_URL` is configured.
+
+For **Compose/server execution**, set the backend project's `SENTRY_DSN` in **`iam/.env`**. `backend/.env` is not
+read by Compose. Backend and frontend Compose builds share `SENTRY_ENVIRONMENT` (default `production`).
+The API remains on internal networks and sends through `http://sentry-ingest:8081`; the dedicated ingest proxy forwards only POSTs to
+that DSN's Sentry SaaS project envelope endpoint, with TLS verification. Port 8081 is not published and the
+public listener has no ingest route. The original DSN stays in SDK envelopes and authentication headers.
+See [deployment configuration](../deploy/README.md#sentry-reporting) for frontend build settings and verification.
+
 ## Authentication
 
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)

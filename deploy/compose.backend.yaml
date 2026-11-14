@@ -57,6 +57,19 @@ services:
       db:
         condition: service_healthy
 
+  sentry-ingest:
+    image: nginx:1.28-alpine
+    networks: [edge, proxy]
+    environment:
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - ../proxy/25-sentry-ingest.sh:/docker-entrypoint.d/25-sentry-ingest.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -S --spider http://127.0.0.1:8081/ 2>&1 | grep -q '404'"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
   api:
     networks: [proxy, app-db]
     image: ghcr.io/thi-taramisu/taramisu-api:${TARAMISU_VERSION:-latest}
@@ -64,6 +77,10 @@ services:
       context: ../backend
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      SENTRY_TUNNEL_URL: http://sentry-ingest:8081
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       APP_URL: ${APP_URL:-http://localhost}
       OIDC_ISSUER: ${OIDC_ISSUER:-${APP_URL:-http://localhost}/auth/application/o/taramisu/}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://authentik-server:9000/auth/application/o/taramisu/jwks/}
@@ -73,9 +90,11 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Docker's default, made explicit: the API drains for shutdownTimeout and closes its pool within
-    # poolCloseTimeout before this period ends (backend/cmd/api/main.go).
-    stop_grace_period: 10s
+      # Starts before the API and stops after its final flush. No host port is published.
+      sentry-ingest:
+        condition: service_healthy
+    # Allow HTTP draining (8s), pool closure (1s), and Sentry flushing (5s), plus a margin.
+    stop_grace_period: 15s
 
 configs:
   pgadmin_servers:
