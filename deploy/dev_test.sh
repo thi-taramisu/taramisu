@@ -339,6 +339,7 @@ fi
 grep -q '^ *access_token_validity: minutes=10$' ../iam/blueprints/taramisu.yaml
 
 python3 -I stack_test.py --self-check >/dev/null
+python3 -m unittest discover -s . -p 'test_stack_*.py'
 make -n test-stack >/dev/null
 
 echo 'PASS: unified Compose model, access token lifetime, segmented networks and ports, isolated networks/volumes, startup order, commands, secrets, and failures.'

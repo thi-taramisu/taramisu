@@ -212,10 +212,15 @@ In rolling-deploy order, it starts a replacement replica, stops an old one, and 
 and drops the old one, and that the new replica accepts the token with a cold cache.
 It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130; 2 if the restore fails);
 further signals are ignored while it restores.
+Cleanup verifies the restored replicas directly and reloads NGINX to clear stale upstream addresses
+and passive failure state. The failover tests themselves verify runtime recovery without a reload.
 `python3 deploy/stack_test.py --self-check`, run by `make -C deploy test`, checks offline that `proxy/nginx.conf`
 still matches the timings and log format the runner parses.
 To run single tests, pass their names, e.g. `python3 deploy/stack_test.py MultiReplicaFailoverTest.test_04_sigterm_stop_failover`.
 Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
+For HTTP URLs using `localhost`, the runner connects to `127.0.0.1` while preserving the original
+Host header, URLs, cookies, and OIDC issuer. Compose publishes the proxy on IPv4; avoiding a failed IPv6
+connection attempt keeps the load frequent enough to exercise the outage window on Windows too.
 
 Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:
 
