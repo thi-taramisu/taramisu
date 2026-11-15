@@ -38,15 +38,17 @@ interface CreateDamageScenarioDialogProps {
   initialName?: string
   /** Fixes the owning item, e.g. when the new damage scenario is linked to an element of that item. */
   lockedItemId?: string
-  /** Runs after creating, before the dialog goes on; rejecting shows the error of the dialog. */
+  /** Runs after creating, before the dialog goes on; rejecting keeps the dialog open, and trying again only repeats this step. */
   onCreated?: (scenario: DamageScenario) => Promise<unknown>
+  /** Shown when `onCreated` rejects. */
+  onCreatedError?: (scenario: DamageScenario) => string
 }
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
  * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
  */
-export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated }: CreateDamageScenarioDialogProps) {
+export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
@@ -58,6 +60,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const [linkError, setLinkError] = useState<string>()
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
+  // Created, but `onCreated` failed; trying again must not create a second one with the same name.
+  const [unfinished, setUnfinished] = useState<DamageScenario>()
 
   const linked = links.flatMap((link) => {
     const asset = assets?.find((a) => a.id === link.assetId)
@@ -70,7 +74,19 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     setLinkError(undefined)
   }
 
+  async function finish(scenario: DamageScenario) {
+    try {
+      await onCreated?.(scenario)
+    } catch (error) {
+      setUnfinished(scenario)
+      throw error
+    }
+    setUnfinished(undefined)
+    return { name: scenario.title, path: entityPath(projectId, 'damage-scenarios', scenario.id) }
+  }
+
   async function create(name: string) {
+    if (unfinished) return finish(unfinished)
     // The links only count once the assets are there, so "Link at least one asset" would be wrong.
     if (!assets) {
       setLinkError('The assets are still loading.')
@@ -90,8 +106,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       title: name,
       asset_properties: linked.flatMap(({ asset, properties }) => properties.map((property) => ({ asset_id: asset.id, property }))),
     })
-    await onCreated?.(scenario)
-    return { name: scenario.title, path: entityPath(projectId, 'damage-scenarios', scenario.id) }
+    return finish(scenario)
   }
 
   return (
@@ -104,9 +119,15 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       initialName={initialName}
       namePlaceholder="e.g. Loss of cell balancing"
       hint="Will appear in the tree below each linked asset."
-      errorMessage="The damage scenario could not be created. Please try again."
+      errorMessage={
+        unfinished
+          ? (onCreatedError?.(unfinished) ?? `${unfinished.code} was created, but the next step failed. Please try again.`)
+          : 'The damage scenario could not be created. Please try again.'
+      }
+      locked={Boolean(unfinished)}
       onCreate={create}
       onReset={() => {
+        setUnfinished(undefined)
         setChosenItemId(undefined)
         changeLinks(undefined)
       }}

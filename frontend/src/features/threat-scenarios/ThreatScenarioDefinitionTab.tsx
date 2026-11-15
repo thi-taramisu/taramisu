@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
-import { useSaveThreatDefinition, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
+import { useSetThreatTargets, useThreatScenario, useThreatScenarioRelations, useUpdateThreatScenario } from '../../api/queries/items'
 import { entityPath } from '../workspace/entities'
 import { hasSameTargets } from './targetSelection'
 import { ThreatTargetsField } from './ThreatTargetsField'
@@ -28,6 +28,9 @@ interface FormValues {
   elicitation_method: ElicitationMethod | ''
   technical_notes: string
 }
+
+/** "fields-failed" and "targets-failed" name the request that failed; the fields are saved first. */
+type SaveStatus = 'idle' | 'pending' | 'saved' | 'fields-failed' | 'targets-failed'
 
 function toValues(scenario: ThreatScenario): FormValues {
   return {
@@ -67,46 +70,69 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
   const isCause = (target: ThreatTarget) => causes.some((cause) => cause.asset.id === target.assetId && cause.property === target.property)
   const currentTargets = targets.filter(isCause)
   const [titleError, setTitleError] = useState<string>()
-  const save = useSaveThreatDefinition(projectId, scenario.id)
-  const dirty =
-    !hasSameTargets(currentTargets, savedTargets.filter(isCause)) ||
-    (Object.keys(values) as (keyof FormValues)[]).some((key) =>
-      // The title is saved trimmed, so surrounding spaces alone are no change.
-      key === 'title' ? values.title.trim() !== saved.title : values[key] !== saved[key],
-    )
+  const updateScenario = useUpdateThreatScenario(projectId, scenario.id)
+  const saveTargets = useSetThreatTargets(projectId, scenario.id)
+  const [status, setStatus] = useState<SaveStatus>('idle')
+  // Set once the fields are saved, so a failure of the targets after them does not say nothing was saved.
+  const [fieldsSaved, setFieldsSaved] = useState(false)
+  const targetsDirty = !hasSameTargets(currentTargets, savedTargets.filter(isCause))
+  const fieldsDirty = (Object.keys(values) as (keyof FormValues)[]).some((key) =>
+    // The title is saved trimmed, so surrounding spaces alone are no change.
+    key === 'title' ? values.title.trim() !== saved.title : values[key] !== saved[key],
+  )
+  const dirty = fieldsDirty || targetsDirty
+
+  // The form can start from cached targets; the refetch replaces them unless the user has changed the targets.
+  const [syncedTargets, setSyncedTargets] = useState(relations.targets)
+  if (relations.targets !== syncedTargets) {
+    setSyncedTargets(relations.targets)
+    setSavedTargets(relations.targets)
+    if (!targetsDirty) setTargets(relations.targets)
+  }
 
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    save.reset()
+    setStatus('idle')
     if ('title' in next) setTitleError(undefined)
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  // Sends only the changed parts, so an edit of the fields cannot fail on the targets and the other way round.
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const title = values.title.trim()
     if (!title) {
       setTitleError('Name is required.')
       return
     }
-    save.mutate(
-      {
-        body: {
+    setStatus('pending')
+    setFieldsSaved(false)
+    if (fieldsDirty) {
+      try {
+        const result = await updateScenario.mutateAsync({
           title,
           cause_of_compromise: values.cause_of_compromise || null,
           elicitation_method: values.elicitation_method || null,
           technical_notes: values.technical_notes || null,
-        },
-        targets: currentTargets,
-      },
-      {
-        onSuccess: (result) => {
-          setValues(toValues(result.scenario))
-          setSaved(toValues(result.scenario))
-          setTargets(result.relations.targets)
-          setSavedTargets(result.relations.targets)
-        },
-      },
-    )
+        })
+        setValues(toValues(result))
+        setSaved(toValues(result))
+        setFieldsSaved(true)
+      } catch {
+        setStatus('fields-failed')
+        return
+      }
+    }
+    if (targetsDirty) {
+      try {
+        const result = await saveTargets.mutateAsync(currentTargets)
+        setTargets(result.targets)
+        setSavedTargets(result.targets)
+      } catch {
+        setStatus('targets-failed')
+        return
+      }
+    }
+    setStatus('saved')
   }
 
   return (
@@ -167,20 +193,25 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
         value={currentTargets}
         onChange={(next) => {
           setTargets(next)
-          save.reset()
+          setStatus('idle')
         }}
         relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
       />
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || save.isPending}>
+        <Button type="submit" disabled={!dirty || status === 'pending'}>
           Save
         </Button>
         <output aria-live="polite" className="text-sm text-muted-foreground">
-          {save.isSuccess && !dirty && 'Saved.'}
+          {status === 'saved' && !dirty && 'Saved.'}
         </output>
-        {save.isError && (
+        {status === 'fields-failed' && (
           <p role="alert" className="text-sm text-destructive">
             The threat scenario could not be saved. Please try again.
+          </p>
+        )}
+        {status === 'targets-failed' && (
+          <p role="alert" className="text-sm text-destructive">
+            {fieldsSaved ? 'The fields were saved, but the targets could not be saved.' : 'The targets could not be saved.'} Please try again.
           </p>
         )}
       </div>

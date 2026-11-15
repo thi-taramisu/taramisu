@@ -40,6 +40,7 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
           projectName={exampleProject.name}
           lockedItemId={scenario.item_definition_id}
           onCreated={(created) => link.mutateAsync({ damageScenarioId: created.id, linked: true })}
+          onCreatedError={(created) => `${created.code} was created, but it could not be linked. Please try again to link it.`}
         />
       )}
     />

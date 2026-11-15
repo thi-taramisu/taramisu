@@ -234,6 +234,63 @@ describe('threat scenario definition', () => {
     expect(field.getByRole('checkbox', { name: /· Availability/ })).toBeChecked()
   })
 
+  it('saves only the changed parts, so a notes edit does not fail on the targets', async () => {
+    const api = createMockItemApi()
+    api.threatScenarios.setTargets = fail
+    const { user } = renderApp(page, api)
+    await user.type(await screen.findByLabelText('Technical Notes'), ' Needs a CAN adapter.')
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  })
+
+  it('keeps the saved fields when only the targets fail and retries only the targets', async () => {
+    const api = createMockItemApi()
+    const setTargets = api.threatScenarios.setTargets
+    api.threatScenarios.setTargets = fail
+    const { user } = renderApp(page, api)
+    const name = await screen.findByLabelText(/Name/)
+    await user.clear(name)
+    await user.type(name, 'Forged low beam command')
+    await user.click((await findTargets()).getByRole('checkbox', { name: /· Availability/ }))
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The fields were saved, but the targets could not be saved.')
+    expect(await screen.findByRole('heading', { name: 'Forged low beam command, Threat scenario #01' })).toBeInTheDocument()
+    expect(await within(tree()).findByRole('link', { name: /TS-01 Forged low beam command/ })).toBeInTheDocument()
+
+    api.threatScenarios.update = fail
+    api.threatScenarios.setTargets = setTargets
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).targets).toEqual([
+      { assetId: 'a-01', property: 'I' },
+      { assetId: 'a-01', property: 'A' },
+    ])
+  })
+
+  it('takes over targets the server dropped after the form started from cached ones', async () => {
+    const { user, api } = renderApp(page)
+    await findTargets()
+    // Unlinking and linking again on the damage scenario brings the cause back, but not the target.
+    await user.click(within(tree()).getByRole('link', { name: /DS-01/ }))
+    await user.click(await screen.findByRole('link', { name: /^Relations/ }))
+    await removeLink(user, 'Threat Scenarios', 'TS-01 Spoofed headlamp command on the CAN bus')
+    await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: 'Add Threat Scenario' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).getByRole('button', { name: /TS-01/ }))
+    await waitFor(async () => expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios).toHaveLength(1))
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).targets).toEqual([])
+
+    await user.click(within(tree()).getByRole('link', { name: /TS-01/ }))
+
+    const field = await findTargets()
+    await waitFor(() => expect(field.getByRole('checkbox', { name: /· Integrity/ })).not.toBeChecked())
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
   it('shows an error when the targets cannot be loaded', async () => {
     const api = createMockItemApi()
     api.threatScenarios.relations = fail
@@ -304,6 +361,33 @@ describe('threat scenario relations', () => {
 
     expect(await screen.findByRole('heading', { name: 'Headlamp flickers, Damage scenario #02' })).toBeInTheDocument()
     expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
+  })
+
+  it('only links on retry when linking a new damage scenario fails, so it is not created twice', async () => {
+    const api = createMockItemApi()
+    const linkDamageScenario = api.threatScenarios.linkDamageScenario
+    api.threatScenarios.linkDamageScenario = fail
+    const { user } = renderApp(relations, api)
+    await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: 'Add Damage Scenario' }))
+    const picker = within(await screen.findByRole('dialog', { name: 'Add Damage Scenario' }))
+    await user.type(picker.getByRole('textbox'), 'Headlamp flickers')
+    await user.click(picker.getByRole('button', { name: 'Create "Headlamp flickers" as new Damage Scenario…' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'New Damage Scenario' }))
+    await user.click(dialog.getByRole('button', { name: 'Add Asset' }))
+    await user.click(await screen.findByRole('menuitem', { name: /A-03 Camera image data/ }))
+
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent('DS-02 was created, but it could not be linked.')
+    expect(dialog.getByLabelText(/Name/)).toHaveAttribute('readonly')
+    expect(dialog.getByRole('button', { name: 'Add Asset' })).toBeDisabled()
+
+    api.threatScenarios.linkDamageScenario = linkDamageScenario
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+
+    expect(await screen.findByRole('heading', { name: 'Headlamp flickers, Damage scenario #02' })).toBeInTheDocument()
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
+    expect((await api.content.damageScenarios('headlamp', 'i-01')).map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
   })
 
   it('adds a damage scenario and offers its causes as targets on the Definition tab', async () => {

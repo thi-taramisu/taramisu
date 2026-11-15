@@ -26,6 +26,8 @@ interface CreateElementDialogProps {
   hint: string
   /** Shown when `onCreate` rejects. */
   errorMessage: string
+  /** Keeps the name and the other fields as they are, e.g. when the element exists and only a later step is retried. */
+  locked?: boolean
   /** Creates the element with the trimmed name; resolves to undefined if the other fields are invalid. */
   onCreate: (name: string, form: HTMLFormElement) => Promise<CreatedElement | undefined>
   /** Resets the other fields after "Create & add another" and on close. */
@@ -49,6 +51,7 @@ export function CreateElementDialog({
   nameMaxLength,
   hint,
   errorMessage,
+  locked = false,
   onCreate,
   onReset,
   children,
@@ -136,6 +139,7 @@ export function CreateElementDialog({
               value={name}
               required
               maxLength={nameMaxLength}
+              readOnly={locked}
               placeholder={namePlaceholder}
               onChange={(event) => {
                 setName(event.target.value)
@@ -151,7 +155,9 @@ export function CreateElementDialog({
               </p>
             )}
           </div>
-          {children}
+          <fieldset disabled={locked} className="contents">
+            {children}
+          </fieldset>
           <p className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
             <ListTree aria-hidden="true" className="size-3.5" />
             {hint}
