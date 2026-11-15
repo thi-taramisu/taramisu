@@ -14,7 +14,7 @@ function renderDialog(onConfirm = vi.fn<() => void>()) {
     />,
   )
   return {
-    dialog: screen.getByRole('dialog', { name: 'Delete Battery Security' }),
+    dialog: screen.getByRole('alertdialog', { name: 'Delete Battery Security' }),
     onConfirm,
   }
 }

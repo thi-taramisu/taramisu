@@ -123,7 +123,7 @@ describe('Main Page project management', () => {
       await screen.findByRole('menuitem', { name: 'Delete Project' }),
     )
 
-    const dialog = await screen.findByRole('dialog', {
+    const dialog = await screen.findByRole('alertdialog', {
       name: 'Delete Battery Security',
     })
 
@@ -139,7 +139,7 @@ describe('Main Page project management', () => {
       within(dialog).getByRole('button', { name: 'Cancel' }),
     )
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(within(allProjects).getByText('Battery Security')).toBeInTheDocument()
 
     // Reopening starts again at the first step with an empty field.
@@ -153,7 +153,7 @@ describe('Main Page project management', () => {
       await screen.findByRole('menuitem', { name: 'Delete Project' }),
     )
 
-    const confirmationDialog = await screen.findByRole('dialog', {
+    const confirmationDialog = await screen.findByRole('alertdialog', {
       name: 'Delete Battery Security',
     })
     expect(within(confirmationDialog).queryByRole('textbox')).not.toBeInTheDocument()
@@ -185,10 +185,8 @@ describe('Main Page project management', () => {
   it.each([
     ['Escape', false],
     ['Cancel', false],
-    ['Close', false],
     ['Escape', true],
     ['Cancel', true],
-    ['Close', true],
   ])(
     'returns focus to the same Actions button after %s (confirm step: %s)',
     async (dismissal, confirmStep) => {
@@ -202,7 +200,7 @@ describe('Main Page project management', () => {
       await user.keyboard('{Enter}')
       await user.keyboard('{End}{Enter}')
 
-      const dialog = await screen.findByRole('dialog', {
+      const dialog = await screen.findByRole('alertdialog', {
         name: 'Delete Battery Security',
       })
       if (confirmStep) {
@@ -217,7 +215,7 @@ describe('Main Page project management', () => {
       }
 
       await waitFor(() => expect(opener).toHaveFocus())
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
       expect(opener).toBeInTheDocument()
 
       // Continue keyboard navigation from the restored position.

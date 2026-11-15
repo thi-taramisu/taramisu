@@ -1,12 +1,13 @@
 ﻿import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,11 +31,11 @@ export function DeleteProjectDialog({
   const [step, setStep] = useState<Step>('acknowledge')
 
   return (
-    <Dialog
+    <AlertDialog
       open={projectName !== null}
       onOpenChange={onOpenChange}
     >
-      <DialogContent
+      <AlertDialogContent
         // The confirm step has no warning text, so the dialog has no description there.
         {...(step === 'confirm' && { 'aria-describedby': undefined })}
         onCloseAutoFocus={(event) => {
@@ -51,11 +52,10 @@ export function DeleteProjectDialog({
           projectName={projectName ?? ''}
           step={step}
           onContinue={() => setStep('confirm')}
-          onCancel={() => onOpenChange(false)}
           onConfirm={onConfirm}
         />
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -63,13 +63,11 @@ function DeleteProjectForm({
   projectName,
   step,
   onContinue,
-  onCancel,
   onConfirm,
 }: {
   projectName: string
   step: Step
   onContinue: () => void
-  onCancel: () => void
   onConfirm: () => void
 }) {
   const inputId = useId()
@@ -89,15 +87,15 @@ function DeleteProjectForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <DialogHeader>
-        <DialogTitle>Delete {projectName}</DialogTitle>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete {projectName}</AlertDialogTitle>
         {step === 'acknowledge' && (
-          <DialogDescription>
+          <AlertDialogDescription>
             This will permanently delete the project, including all of its items, their content, and its stored
             files. Everything will be permanently lost and cannot be restored.
-          </DialogDescription>
+          </AlertDialogDescription>
         )}
-      </DialogHeader>
+      </AlertDialogHeader>
 
       {step === 'confirm' && (
         <div className="space-y-2">
@@ -115,14 +113,8 @@ function DeleteProjectForm({
         </div>
       )}
 
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
+      <AlertDialogFooter>
+        <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
 
         {step === 'acknowledge' ? (
           <Button
@@ -141,7 +133,7 @@ function DeleteProjectForm({
             Delete Project
           </Button>
         )}
-      </DialogFooter>
+      </AlertDialogFooter>
     </form>
   )
 }
