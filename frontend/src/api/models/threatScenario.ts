@@ -64,7 +64,7 @@ export interface ThreatScenarioRiskInputs {
   damageScenarios: (EntityRef & {
     /** The threat's targets that lead to the damage scenario; empty if none does (RQ-15-03). */
     targetedCauses: ThreatCause[]
-    impactRatings: Pick<ImpactRating, 'impact_category' | 'rating_value' | 'omission_or_rating_rationale'>[]
+    impactRatings: Pick<ImpactRating, 'impact_category' | 'rating_value'>[]
   })[]
   attackPaths: (EntityRef & { feasibility: AttackFeasibility | null; isPartial: boolean })[]
 }

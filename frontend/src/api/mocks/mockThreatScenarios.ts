@@ -73,7 +73,7 @@ export function createMockThreatScenarioService(db: Map<string, StoredItem>): Th
             targetedCauses: causes.filter((cause) => targets.some((target) => target.assetId === cause.asset.id && target.property === cause.property)),
             impactRatings: entry.impactRatings
               .filter((rating) => rating.damage_scenario_id === id)
-              .map(({ impact_category, rating_value, omission_or_rating_rationale }) => ({ impact_category, rating_value, omission_or_rating_rationale })),
+              .map(({ impact_category, rating_value }) => ({ impact_category, rating_value })),
           })),
           attackPaths: attackPaths.map((path) => ({
             ...path,

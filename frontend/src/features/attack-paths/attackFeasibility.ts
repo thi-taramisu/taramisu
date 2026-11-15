@@ -89,3 +89,11 @@ export const FEASIBILITY: Record<AttackFeasibility, { label: string; classes: st
   LOW: { label: 'Low', classes: 'border-feasibility-low-border bg-feasibility-low text-feasibility-low-foreground' },
   VERY_LOW: { label: 'Very low', classes: 'border-feasibility-very-low-border bg-feasibility-very-low text-feasibility-very-low-foreground' },
 }
+
+/** Solid dot per feasibility level; always shown next to the level's label. */
+export const FEASIBILITY_DOT_CLASSES: Record<AttackFeasibility, string> = {
+  HIGH: 'bg-feasibility-high-border',
+  MEDIUM: 'bg-feasibility-medium-border',
+  LOW: 'bg-feasibility-low-border',
+  VERY_LOW: 'bg-feasibility-very-low-border',
+}

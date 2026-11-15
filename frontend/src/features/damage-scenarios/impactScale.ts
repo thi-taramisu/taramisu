@@ -26,3 +26,11 @@ export const IMPACT_CLASSES: Record<ImpactRatingValue, string> = {
   NEGLIGIBLE: 'border-impact-negligible-border bg-impact-negligible text-impact-negligible-foreground',
   OMITTED: 'border-impact-omitted-border bg-impact-omitted text-impact-omitted-foreground',
 }
+
+/** Solid dot per impact level; always shown next to the level's label. */
+export const IMPACT_DOT_CLASSES: Record<Exclude<ImpactRatingValue, 'OMITTED'>, string> = {
+  SEVERE: 'bg-impact-severe-border',
+  MAJOR: 'bg-impact-major-border',
+  MODERATE: 'bg-impact-moderate-border',
+  NEGLIGIBLE: 'bg-impact-negligible-border',
+}

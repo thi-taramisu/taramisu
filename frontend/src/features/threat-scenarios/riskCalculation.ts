@@ -30,12 +30,16 @@ export interface AggregatedFeasibility {
 
 export function aggregateFeasibility(attackPaths: AttackPathInput[]): AggregatedFeasibility {
   let decisive: AttackPathInput | null = null
+  let level: AttackFeasibility | null = null
   for (const path of attackPaths) {
     if (path.feasibility === null) continue
-    if (!decisive || FEASIBILITY_ORDER.indexOf(path.feasibility) > FEASIBILITY_ORDER.indexOf(decisive.feasibility!)) decisive = path
+    if (level === null || FEASIBILITY_ORDER.indexOf(path.feasibility) > FEASIBILITY_ORDER.indexOf(level)) {
+      decisive = path
+      level = path.feasibility
+    }
   }
   const unrated = attackPaths.filter((path) => path.feasibility === null)
-  return { feasibility: decisive?.feasibility ?? null, decisive, rated: attackPaths.length - unrated.length, unrated }
+  return { feasibility: level, decisive, rated: attackPaths.length - unrated.length, unrated }
 }
 
 /** Rated categories get a risk value; omitted ones are a justified decision [PM-15-07]; not rated ones are open work. */
@@ -47,7 +51,6 @@ export interface RiskRow {
   category: ImpactCategory
   state: CategoryState
   impact: RatedImpact | null
-  rationale: string | null
   risk: number | null
 }
 
@@ -59,6 +62,8 @@ export interface RiskGroup {
   damageScenario: EntityRef
   /** The threat's targets that lead to this damage scenario, which is why it belongs to the threat (RQ-15-03). */
   targetedCauses: ThreatCause[]
+  /** False while none of the targets leads to the damage scenario: its risk values are shown, but the link is in doubt, so they do not count for the threat scenario. */
+  counts: boolean
   rows: RiskRow[]
   max: number | null
 }
@@ -70,7 +75,7 @@ export type RatedFeasibility = AggregatedFeasibility & { feasibility: AttackFeas
 
 interface RiskValues {
   groups: RiskGroup[]
-  /** Highest risk value, the overall risk of the threat scenario [RQ-15-16]. */
+  /** Highest risk value of the damage scenarios that count, the overall risk of the threat scenario [RQ-15-16]. */
   max: number | null
 }
 
@@ -96,13 +101,12 @@ export function calculateRisks(inputs: ThreatScenarioRiskInputs): RiskResult {
         category,
         state: impact ? 'RATED' : value === 'OMITTED' ? 'OMITTED' : 'NOT_RATED',
         impact,
-        rationale: rating?.omission_or_rating_rationale ?? null,
         risk: impact && feasibility.feasibility ? RISK_MATRIX[impact][feasibility.feasibility] : null,
       }
     })
-    return { damageScenario, targetedCauses, rows, max: maxOf(rows.map((row) => row.risk)) }
+    return { damageScenario, targetedCauses, counts: targetedCauses.length > 0, rows, max: maxOf(rows.map((row) => row.risk)) }
   })
-  const max = maxOf(groups.map((group) => group.max))
+  const max = maxOf(groups.filter((group) => group.counts).map((group) => group.max))
   const { feasibility: level, decisive } = feasibility
   const missing: RiskBlocker[] = []
   if (inputs.damageScenarios.length === 0) missing.push('NO_DAMAGE_SCENARIO')

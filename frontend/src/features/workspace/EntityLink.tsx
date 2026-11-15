@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { EntityRef, EntityType } from '../../api/models/tree'
-import { entityPath } from '../workspace/entities'
+import { entityPath } from './entities'
 
 /** Code and name of an element as a link, optionally to one of its tabs. */
 export function EntityLink({ projectId, type, entity, tab = '' }: { projectId: string; type: EntityType; entity: EntityRef; tab?: string }) {
