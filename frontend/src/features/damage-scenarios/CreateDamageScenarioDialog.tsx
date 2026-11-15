@@ -40,7 +40,7 @@ interface CreateDamageScenarioDialogProps {
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
- * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
+ * Defaults to the item and asset of the current page; without assets it is created in "Unassigned" of the item.
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const { t } = useTranslation()
@@ -81,13 +81,14 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
 
   async function create(name: string) {
     if (unfinished) return finish(unfinished)
-    // The links only count once the assets are there, so "Link at least one asset" would be wrong.
-    if (!assets) {
-      setLinkError({ key: 'ui:assetsLoading' })
+    // Without links nothing waits for the assets anymore, but the owning item still has to be known.
+    if (!itemId) {
+      setLinkError({ key: 'ui:itemsLoading' })
       return undefined
     }
-    if (linked.length === 0) {
-      setLinkError({ key: 'ui:assetRequired' })
+    // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
+    if (links.length > 0 && !assets) {
+      setLinkError({ key: 'ui:assetsLoading' })
       return undefined
     }
     const empty = linked.find((link) => link.properties.length === 0)
@@ -112,7 +113,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder={t('ui:damageNamePlaceholder')}
-      hint={t('ui:damageTreeHint')}
+      // From the shown links, so the hint matches the asset chips; while the assets load, creating with links is blocked anyway.
+      hint={linked.length > 0 ? t('ui:damageTreeHint') : t('ui:damageUnassignedHint')}
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
