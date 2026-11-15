@@ -90,7 +90,7 @@ describe('delete item', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete item' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Delete "Headlamp system"?' })
-    expect(dialog).toHaveTextContent('4 assets and 4 elements below them')
+    expect(dialog).toHaveTextContent('4 assets and 7 other elements')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('delete item', () => {
 
     failing = false
     await user.click(within(dialog).getByRole('button', { name: 'Retry' }))
-    expect(await within(dialog).findByText(/4 assets and 4 elements below them/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/4 assets and 7 other elements/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled()
   })
 

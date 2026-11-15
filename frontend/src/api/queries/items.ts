@@ -14,6 +14,7 @@ const keys = {
   tree: (projectId: string) => ['projects', projectId, 'tree'] as const,
   item: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId] as const,
   children: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'children'] as const,
+  unassigned: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'unassigned'] as const,
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
   threatScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'threat-scenarios'] as const,
@@ -59,6 +60,16 @@ export function useItemChildren(projectId: string, itemId: string, { enabled = t
     enabled,
     queryKey: keys.children(projectId, itemId),
     queryFn: () => api.content.children(projectId, itemId),
+  })
+}
+
+/** The unassigned elements of one item. Unlike the tree, a failed request is an error and not an empty list. */
+export function useItemUnassigned(projectId: string, itemId: string, { enabled = true } = {}) {
+  const api = useApi()
+  return useQuery({
+    enabled,
+    queryKey: keys.unassigned(projectId, itemId),
+    queryFn: () => api.content.unassigned(projectId, itemId),
   })
 }
 
