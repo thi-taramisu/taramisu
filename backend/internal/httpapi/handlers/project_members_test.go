@@ -454,3 +454,7 @@ func TestProjectMemberAuditLog(t *testing.T) {
 		t.Fatalf("leave audit = %v", entries)
 	}
 }
+
+func (f *fakeMembers) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
+}

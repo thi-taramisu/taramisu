@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -14,6 +15,8 @@ import (
 )
 
 type TaraProjectStore interface {
+	ArchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
+	RestoreTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	CreateTaraProject(context.Context, db.CreateTaraProjectParams) (db.CreateTaraProjectRow, error)
 	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
@@ -49,16 +52,19 @@ func (h *TaraProject) Register(api huma.API) {
 	Register(api, op("get-tara-project", http.MethodGet, member, "Get a TARA project"), project(PermRead), h.Get)
 	Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), project(PermManage), h.Replace)
 	Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), project(PermManage), h.Update)
+	Register(api, op("archive-tara-project", http.MethodPost, member+"/archive", "Archive a TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Archive)
+	Register(api, op("restore-tara-project", http.MethodPost, member+"/restore", "Restore an archived TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Restore)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
-	Register(api, del, project(PermManage), h.Delete)
+	Register(api, del, project(PermManage).AllowArchived(), h.Delete)
 }
 
 type TaraProjectBody struct {
-	ID          string    `json:"id" format:"uuid"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	ArchivedAt  *time.Time `json:"archived_at" doc:"Archive timestamp; null for an active project"`
+	ID          string     `json:"id" format:"uuid"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 }
@@ -70,6 +76,22 @@ type TaraProjectOutput struct {
 type TaraProjectListOutput struct {
 	Body []TaraProjectBody
 }
+
+type ListTaraProjectsInput struct {
+	Archived OptionalBoolQuery `query:"archived" doc:"true: archived only; false: active only; omitted: both"`
+}
+
+// OptionalBoolQuery distinguishes an omitted query flag from explicit false.
+type OptionalBoolQuery struct {
+	Value bool
+	Set   bool
+}
+
+func (o OptionalBoolQuery) Schema(r huma.Registry) *huma.Schema {
+	return r.Schema(reflect.TypeFor[bool](), true, "")
+}
+func (o *OptionalBoolQuery) Receiver() reflect.Value    { return reflect.ValueOf(&o.Value).Elem() }
+func (o *OptionalBoolQuery) OnParamSet(set bool, _ any) { o.Set = set }
 
 type TaraProjectIDInput struct {
 	ID string `path:"id" format:"uuid"`
@@ -116,19 +138,23 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 }
 
 // List returns only projects the caller has a role in.
-func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOutput, error) {
+func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*TaraProjectListOutput, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{UserID: userID, GroupIds: callerGroups(ctx)})
+	var archived *bool
+	if in.Archived.Set {
+		archived = &in.Archived.Value
+	}
+	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{UserID: userID, GroupIds: callerGroups(ctx), Archived: archived})
 	if err != nil {
 		return nil, err
 	}
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, ArchivedAt: p.ArchivedAt,
 		}, p.Role))
 	}
 	return out, nil
@@ -200,13 +226,36 @@ func mapTaraProjectError(err error) error {
 }
 
 func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
+	var archivedAt *time.Time
+	if p.ArchivedAt.Valid {
+		archivedAt = &p.ArchivedAt.Time
+	}
 	return TaraProjectBody{
+		ArchivedAt:  archivedAt,
 		ID:          p.ID.String(),
 		Name:        p.Name,
 		Description: p.Description,
 		CreatedAt:   p.CreatedAt.Time,
 		Role:        role,
 	}
+}
+
+func (h *TaraProject) Archive(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	p, err := h.store.ArchiveTaraProject(ctx, projectIDFromContext(ctx))
+	if err != nil {
+		return nil, mapTaraProjectError(err)
+	}
+	audit(ctx, "project.archived", "project", p.ID.String())
+	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
+}
+
+func (h *TaraProject) Restore(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	p, err := h.store.RestoreTaraProject(ctx, projectIDFromContext(ctx))
+	if err != nil {
+		return nil, mapTaraProjectError(err)
+	}
+	audit(ctx, "project.restored", "project", p.ID.String())
+	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
 func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole) *TaraProjectOutput {

@@ -442,3 +442,7 @@ func TestAttackPatchDistinguishesOmittedFromNull(t *testing.T) {
 		t.Fatalf("only the null field may be cleared: %+v", ratings.update)
 	}
 }
+
+func (f fakeAttackAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
+}

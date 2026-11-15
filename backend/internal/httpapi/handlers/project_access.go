@@ -73,6 +73,7 @@ func Allows(role db.ProjectRole, permission Permission) bool {
 // ProjectAccessStore reads the caller's role and finds the project of a record. It is
 // implemented by the sqlc-generated queries.
 type ProjectAccessStore interface {
+	ProjectIsArchived(context.Context, pgtype.UUID) (bool, error)
 	GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error)
 	ProjectIDForItemDefinition(context.Context, pgtype.UUID) (pgtype.UUID, error)
 	ProjectIDForThreatScenario(context.Context, pgtype.UUID) (pgtype.UUID, error)
@@ -100,10 +101,18 @@ var (
 
 // Access is an operation's access declaration, created with InProject or WithoutProject.
 type Access struct {
-	store      ProjectAccessStore
-	scope      Scope
-	permission Permission
-	inProject  bool
+	store         ProjectAccessStore
+	scope         Scope
+	permission    Permission
+	inProject     bool
+	allowArchived bool
+}
+
+// AllowArchived explicitly permits a maintenance operation on archived projects.
+// Role checks still apply. Analysis writes must use the default InProject policy.
+func (a Access) AllowArchived() Access {
+	a.allowArchived = true
+	return a
 }
 
 // InProject declares that the operation needs permission in the project that scope leads to.
@@ -153,7 +162,11 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 			op.Extensions = map[string]any{}
 		}
 		op.Extensions["x-taramisu-permission"] = access.permission.String()
+		op.Extensions["x-taramisu-allow-archived"] = access.allowArchived
 		op.Errors = appendMissing(op.Errors, http.StatusForbidden, http.StatusNotFound)
+		if !access.allowArchived && isWrite(op.Method) {
+			op.Errors = appendMissing(op.Errors, http.StatusConflict)
+		}
 		op.Middlewares = append(op.Middlewares, access.middleware(api))
 	}
 	huma.Register(api, op, handler)
@@ -187,8 +200,25 @@ func (a Access) middleware(api huma.API) func(huma.Context, func(huma.Context)) 
 			writeAccessError(api, ctx, err)
 			return
 		}
+		if !a.allowArchived && isWrite(ctx.Method()) {
+			archived, err := a.store.ProjectIsArchived(ctx.Context(), access.projectID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				err = huma.Error404NotFound("project not found")
+			}
+			if err == nil && archived {
+				err = huma.Error409Conflict("project is archived; restore it before making changes")
+			}
+			if err != nil {
+				writeAccessError(api, ctx, err)
+				return
+			}
+		}
 		next(huma.WithValue(ctx, projectAccessKey{}, access))
 	}
+}
+
+func isWrite(method string) bool {
+	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
 }
 
 func (a Access) check(ctx context.Context, rawID string) (projectAccess, error) {

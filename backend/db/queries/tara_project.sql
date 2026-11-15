@@ -9,18 +9,19 @@ WITH project AS (
     INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
     SELECT id, sqlc.arg(owner_id), 'OWNER' FROM project
 )
-SELECT id, name, description, created_at FROM project;
+SELECT id, name, description, archived_at, created_at FROM project;
 
 -- name: GetTaraProject :one
 SELECT * FROM tara_project WHERE id = $1;
 
 -- List only projects the caller has a role in, with the caller's highest role.
 -- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
-WHERE a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[])
+WHERE (a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[]))
+AND (sqlc.narg('archived')::boolean IS NULL OR (p.archived_at IS NOT NULL) = sqlc.narg('archived')::boolean)
 GROUP BY p.id
 ORDER BY p.created_at DESC, p.id;
 
@@ -36,3 +37,9 @@ RETURNING *;
 
 -- name: DeleteTaraProject :execrows
 DELETE FROM tara_project WHERE id = $1;
+
+-- name: ArchiveTaraProject :one
+UPDATE tara_project SET archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING *;
+
+-- name: RestoreTaraProject :one
+UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING *;

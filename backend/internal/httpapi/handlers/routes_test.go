@@ -213,3 +213,7 @@ func TestResourceOpenAPIPermissions(t *testing.T) {
 		}
 	}
 }
+
+func (a resourceAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
+}

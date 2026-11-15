@@ -142,6 +142,10 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"create whitespace name", true, http.MethodPost, base, `{"name":"   "}`, http.StatusUnprocessableEntity},
 		{"list", true, http.MethodGet, base, "", http.StatusOK},
 		{"list empty", false, http.MethodGet, base, "", http.StatusOK},
+		{"archive", true, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusOK},
+		{"archive missing", false, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusNotFound},
+		{"restore", true, http.MethodPost, base + "/" + projectID + "/restore", "", http.StatusOK},
+		{"restore missing", false, http.MethodPost, base + "/" + projectID + "/restore", "", http.StatusNotFound},
 		{"get", true, http.MethodGet, base + "/" + projectID, "", http.StatusOK},
 		{"get missing", false, http.MethodGet, base + "/" + projectID, "", http.StatusNotFound},
 		{"get bad id", true, http.MethodGet, base + "/nope", "", http.StatusUnprocessableEntity},
@@ -327,4 +331,24 @@ func TestTaraProjectDeleteIsAudited(t *testing.T) {
 	if len(entries) != 1 || entries[0]["event"] != "project.deleted" || entries[0]["project"] != projectID || entries[0]["actor"] != authtest.UserID {
 		t.Fatalf("delete audit = %v", entries)
 	}
+}
+
+func (f *fakeProjects) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return f.project.ArchivedAt.Valid, nil
+}
+func (f *fakeProjects) ArchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
+	if !f.found {
+		return db.TaraProject{}, pgx.ErrNoRows
+	}
+	if !f.project.ArchivedAt.Valid {
+		f.project.ArchivedAt = pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
+	}
+	return f.project, nil
+}
+func (f *fakeProjects) RestoreTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
+	if !f.found {
+		return db.TaraProject{}, pgx.ErrNoRows
+	}
+	f.project.ArchivedAt = pgtype.Timestamptz{}
+	return f.project, nil
 }
