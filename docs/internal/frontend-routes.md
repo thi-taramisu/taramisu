@@ -67,8 +67,8 @@ Items come from the item API in `frontend/src/api/`, an in-memory mock
 item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 The damage scenario Relations tab (#185) links assets (with C / I / A) and threat scenarios of the owning item through the mock API. It is
-built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
-without a link are not in the tree until the "Unassigned" group exists; threat scenarios stay available in "+ Add Threat Scenario".
+built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Elements without a
+link upwards are listed in the "Unassigned" section of their item (#258) until they are linked.
 
 The threat scenario page (#194) has the Definition tab (name, cause, elicitation, technical notes, targets) and the Relations tab (damage
 scenarios, attack paths), both on the mock API. Its Risks tab calculates the risk values with the
@@ -93,6 +93,9 @@ These were the open questions in the first draft of this page. The wireframes an
 5. **Where do graphs live?** The "Graph" switch in the header turns the selected element's page into a graph of its relations (Graph
    Concept). This is a view mode, so it is a query parameter (`?view=graph`) and not a separate route. It stays on when you select another
    element in the tree. The item definition diagram (React Flow) is the Definition tab of an item.
+6. **Unassigned elements?** "Flexible Definition" in the wireframes adds an "Unassigned" section to each item in the tree for elements
+   without a link upwards (#258). They keep the same flat URLs, so no extra route is needed; "Unassigned" in the breadcrumbs follows once
+   the breadcrumbs (#226) are merged.
 
 ## Open questions
 
@@ -100,8 +103,6 @@ These were the open questions in the first draft of this page. The wireframes an
 2. **Language:** English only, or German as well?
 3. **Read-only sharing:** is a public read-only link per project wanted?
 4. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
-5. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
-   They still get the same flat URLs, so no extra route is needed.
 
 ## Local graph prototype (#184)
 
