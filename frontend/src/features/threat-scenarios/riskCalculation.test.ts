@@ -45,22 +45,24 @@ describe('calculateRisks', () => {
       ['PRIVACY', 'OMITTED', null],
     ])
     expect(result.groups[0].rows[3].rationale).toBe('No personal data')
-    expect(result).toMatchObject({ max: 4, blocker: null, groups: [{ max: 4, targetedCauses: [cause] }] })
+    expect(result).toMatchObject({ max: 4, missing: null, groups: [{ max: 4, targetedCauses: [cause] }] })
   })
 
   it('has no highest risk while no category is rated', () => {
     expect(calculateRisks({ damageScenarios: [ds([], false)], attackPaths: [ap('ap-01', 'HIGH')] })).toMatchObject({
       max: null,
-      blocker: null,
+      missing: null,
       groups: [{ max: null, targetedCauses: [] }],
     })
   })
 
   it.each([
-    [{ damageScenarios: [], attackPaths: [ap('ap-01', 'HIGH')] }, 'NO_DAMAGE_SCENARIO'],
-    [{ damageScenarios: [ds([rating('SAFETY', 'SEVERE')])], attackPaths: [] }, 'NO_ATTACK_PATH'],
-    [{ damageScenarios: [ds([rating('SAFETY', 'SEVERE')])], attackPaths: [ap('ap-01', null)] }, 'NO_RATED_ATTACK_PATH'],
-  ] as [ThreatScenarioRiskInputs, string][])('names what is missing for any risk value (%#)', (inputs, blocker) => {
-    expect(calculateRisks(inputs)).toMatchObject({ max: null, blocker })
+    [{ damageScenarios: [], attackPaths: [ap('ap-01', 'HIGH')] }, ['NO_DAMAGE_SCENARIO']],
+    [{ damageScenarios: [ds([rating('SAFETY', 'SEVERE')])], attackPaths: [] }, ['NO_ATTACK_PATH']],
+    [{ damageScenarios: [ds([rating('SAFETY', 'SEVERE')])], attackPaths: [ap('ap-01', null)] }, ['NO_RATED_ATTACK_PATH']],
+    [{ damageScenarios: [], attackPaths: [] }, ['NO_DAMAGE_SCENARIO', 'NO_ATTACK_PATH']],
+    [{ damageScenarios: [], attackPaths: [ap('ap-01', null)] }, ['NO_DAMAGE_SCENARIO', 'NO_RATED_ATTACK_PATH']],
+  ] as [ThreatScenarioRiskInputs, string[]][])('names everything that is missing for any risk value (%#)', (inputs, missing) => {
+    expect(calculateRisks(inputs)).toMatchObject({ max: null, missing })
   })
 })

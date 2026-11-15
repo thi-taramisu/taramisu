@@ -36,13 +36,11 @@ describe('threat scenario risks', () => {
       expect.stringMatching(/^OperationalModerate impactMedium feasibilityRisk 2(?!Highest)/),
       'FinancialNot rated',
     ])
-    const privacy = block.getByText('Privacy')
-    expect(privacy).toHaveAttribute('title', 'No personal data is involved.')
-    expect(privacy.parentElement).toHaveTextContent(/^Omitted:Privacy/)
+    expect(block.getByText('Privacy').parentElement).toHaveTextContent(/^Omitted:Privacy$/)
     expect(block.getAllByRole('link', { name: 'Severe impact' })[0]).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
     expect(block.getAllByRole('link', { name: 'Medium feasibility' })[0]).toHaveAttribute('href', `${project}/attack-paths/ap-02/rating`)
-    expect(block.getByRole('link', { name: 'Not rated' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
-    expect(block.queryByText('No target')).not.toBeInTheDocument()
+    expect(block.getByRole('link', { name: 'Financial impact not rated' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
+    expect(block.queryByText(/None of the targets/)).not.toBeInTheDocument()
   })
 
   it('marks every row with the highest risk of the threat scenario', async () => {
@@ -57,6 +55,24 @@ describe('threat scenario risks', () => {
     await findDamageScenario(DS01)
     expect(damageScenario(DS01).getAllByText('Highest')).toHaveLength(1)
     expect(damageScenario(`${ds.code} Glare`).getAllByRole('listitem')[0]).toHaveTextContent(/^FinancialSevere impactMedium feasibilityRisk 4Highest/)
+    expect(valueOf('Highest Risk')).toHaveTextContent(/^Risk 4\s*in DS-01 · Safety and 1 more$/)
+  })
+
+  it('marks no row as highest while all risk values are equal', async () => {
+    const api = createMockItemApi()
+    const ds = await api.damageScenarios.create('headlamp', { item_definition_id: 'i-01', title: 'Glare', asset_properties: [{ asset_id: 'a-03', property: 'I' }] })
+    await api.damageScenarios.updateImpactRatings('headlamp', ds.id, [
+      { impact_category: 'SAFETY', rating_value: 'MAJOR', is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+      { impact_category: 'FINANCIAL', rating_value: 'MAJOR', is_omitted_by_pm_15_07: false, omission_or_rating_rationale: null, reused_from_functional_safety: false },
+    ])
+    await api.threatScenarios.linkDamageScenario('headlamp', 'ts-02', ds.id)
+    await api.threatScenarios.linkAttackPath('headlamp', 'ts-02', 'ap-01')
+    renderApp(`${project}/threat-scenarios/ts-02/risks`, api)
+
+    const block = await findDamageScenario(`${ds.code} Glare`)
+    expect(block.getAllByRole('listitem').filter((item) => /Risk \d/.test(item.textContent ?? ''))).toHaveLength(2)
+    expect(block.queryByText('Highest')).not.toBeInTheDocument()
+    expect(valueOf('Highest Risk')).toHaveTextContent(/and 1 more$/)
   })
 
   it('shows the calculation with the risk matrix only on request', async () => {
@@ -109,8 +125,13 @@ describe('threat scenario risks', () => {
 
     await findDamageScenario(DS01)
     const second = damageScenario(`${ds.code} Glare`)
-    expect(second.getByText('No target')).toBeInTheDocument()
-    expect(second.getAllByRole('link', { name: 'Not rated' })).toHaveLength(4)
+    expect(second.getByText(/None of the targets of this threat scenario leads to this damage scenario/)).toBeInTheDocument()
+    expect(second.getAllByRole('link', { name: /impact not rated$/ }).map((link) => link.getAttribute('aria-label'))).toEqual([
+      'Safety impact not rated',
+      'Financial impact not rated',
+      'Operational impact not rated',
+      'Privacy impact not rated',
+    ])
   })
 
   it('flags unrated attack paths and a partial decisive path', async () => {
@@ -130,8 +151,8 @@ describe('threat scenario risks', () => {
     await api.threatScenarios.setTargets('headlamp', 'ts-01', [])
     renderApp(risks, api)
 
-    const badge = (await findDamageScenario(DS01)).getByText('No target')
-    expect(badge.closest('a')).toHaveAttribute('href', `${project}/threat-scenarios/ts-01`)
+    const block = await findDamageScenario(DS01)
+    expect(block.getByRole('link', { name: 'Check the targets' })).toHaveAttribute('href', `${project}/threat-scenarios/ts-01`)
   })
 
   it('has no highest risk while no impact is rated', async () => {
@@ -146,11 +167,12 @@ describe('threat scenario risks', () => {
     expect(screen.queryByRole('button', { name: /Calculation/ })).not.toBeInTheDocument()
   })
 
-  it('says that a damage scenario is missing and links to the Relations tab', async () => {
+  it('says that both a damage scenario and an attack path are missing and links to the Relations tab', async () => {
     renderApp(`${project}/threat-scenarios/ts-02/risks`)
 
-    expect(await screen.findByText('No damage scenario is linked yet.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Link it on the Relations tab' })).toHaveAttribute('href', `${project}/threat-scenarios/ts-02/relations`)
+    const missing = within(await screen.findByRole('list', { name: 'Missing for risk values' }))
+    expect(missing.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['No damage scenario is linked yet.', 'No attack path is linked yet.'])
+    expect(screen.getByRole('link', { name: 'Link them on the Relations tab' })).toHaveAttribute('href', `${project}/threat-scenarios/ts-02/relations`)
   })
 
   it('says that an attack path is missing', async () => {
@@ -159,6 +181,19 @@ describe('threat scenario risks', () => {
     renderApp(`${project}/threat-scenarios/ts-02/risks`, api)
 
     expect(await screen.findByText('No attack path is linked yet.')).toBeInTheDocument()
+    expect(screen.queryByText('No damage scenario is linked yet.')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Link it on the Relations tab' })).toBeInTheDocument()
+  })
+
+  it('asks for a damage scenario and a rating at the same time', async () => {
+    const api = createMockItemApi()
+    await api.threatScenarios.linkAttackPath('headlamp', 'ts-02', 'ap-03')
+    renderApp(`${project}/threat-scenarios/ts-02/risks`, api)
+
+    expect(await screen.findByText('No damage scenario is linked yet.')).toBeInTheDocument()
+    expect(screen.getByText('None of the linked attack paths is rated yet.')).toBeInTheDocument()
+    expect(main().getByRole('link', { name: /AP-03/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
+    expect(screen.getByRole('link', { name: 'Link it on the Relations tab' })).toBeInTheDocument()
   })
 
   it('links to the rating of unrated attack paths when none is rated', async () => {

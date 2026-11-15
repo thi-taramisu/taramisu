@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
 import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -14,7 +13,7 @@ import { categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
 import { RiskBadge } from '../items/RiskBadge'
 import { entityPath } from '../workspace/entities'
 import { RiskCalculationDetails } from './RiskCalculationDetails'
-import { calculateRisks, isRated, type RatedFeasibility, type RatedImpact, type RatedRiskRow, type RiskBlocker, type RiskResult } from './riskCalculation'
+import { calculateRisks, isRated, type RatedFeasibility, type RatedImpact, type RiskBlocker, type RiskResult } from './riskCalculation'
 import { EntityLink } from './EntityLink'
 
 /** Risks tab of a threat scenario ("TS Risks" wireframe): the risk values from impact and attack feasibility. */
@@ -30,10 +29,10 @@ export function ThreatScenarioRisksTab() {
     )
   }
   const result = calculateRisks(inputs.data)
-  return result.blocker === null ? (
+  return result.missing === null ? (
     <RiskValues projectId={projectId} threatScenarioId={entityId} result={result} />
   ) : (
-    <Blocked projectId={projectId} threatScenarioId={entityId} blocker={result.blocker} inputs={inputs.data} />
+    <Blocked projectId={projectId} threatScenarioId={entityId} missing={result.missing} inputs={inputs.data} />
   )
 }
 
@@ -51,13 +50,16 @@ const FEASIBILITY_DOTS: Record<AttackFeasibility, string> = {
   VERY_LOW: 'bg-feasibility-very-low-border',
 }
 
-type RiskValuesResult = Extract<RiskResult, { blocker: null }>
+type RiskValuesResult = Extract<RiskResult, { missing: null }>
 
 function RiskValues({ projectId, threatScenarioId, result }: { projectId: string; threatScenarioId: string; result: RiskValuesResult }) {
   const { feasibility } = result
   const { decisive } = feasibility
   const rated = result.groups.flatMap((group) => group.rows).filter(isRated)
-  const top = rated.reduce<RatedRiskRow | null>((best, row) => (!best || row.risk > best.risk ? row : best), null)
+  const tops = rated.filter((row) => row.risk === result.max)
+  const top = tops[0]
+  // The rows with the highest value are only marked while it stands out from lower ones.
+  const highest = rated.some((row) => row.risk !== result.max) ? result.max : null
   // One calculation at a time, so the page stays short and the open one is easy to find.
   const [openKey, setOpenKey] = useState<string | null>(null)
 
@@ -86,6 +88,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
                   <RiskBadge value={top.risk} size="lg" />
                   <span className="text-muted-foreground">
                     in {top.damageScenario.code} · {categoryLabel(top.category)}
+                    {tops.length > 1 && ` and ${tops.length - 1} more`}
                   </span>
                 </>
               ) : (
@@ -103,7 +106,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
           threatScenarioId={threatScenarioId}
           group={group}
           feasibility={feasibility}
-          highest={result.max}
+          highest={highest}
           openKey={openKey}
           onOpenChange={(key, open) => setOpenKey(open ? key : null)}
         />
@@ -117,7 +120,7 @@ interface DamageScenarioRisksProps {
   threatScenarioId: string
   group: RiskResult['groups'][number]
   feasibility: RatedFeasibility
-  /** Highest risk of the threat scenario, marked on its rows. */
+  /** Highest risk of the threat scenario, marked on its rows; null while all risk values are equal. */
   highest: number | null
   openKey: string | null
   onOpenChange: (key: string, open: boolean) => void
@@ -139,18 +142,25 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
             <EntityLink projectId={projectId} type="damage-scenarios" entity={group.damageScenario} />
           </h3>
         </div>
-        {group.targetedCauses.length === 0 && (
-          <Link to={entityPath(projectId, 'threat-scenarios', threatScenarioId)} title="None of the targets of this threat scenario leads to this damage scenario.">
-            <Badge variant="outline">No target</Badge>
-          </Link>
-        )}
         {group.max !== null && (
           <span className="flex items-center gap-2 text-sm text-muted-foreground">
             Max <RiskBadge value={group.max} />
           </span>
         )}
       </div>
-      {/* Column labels for the rows: each one reads "impact × feasibility → risk". */}
+      {/* Shown as text, not only on hover, so it can be read on touch screens too. */}
+      {group.targetedCauses.length === 0 && (
+        <p className="flex items-center gap-2 border-b bg-muted/30 px-4 py-2 text-sm text-muted-foreground">
+          <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0" />
+          <span>
+            None of the targets of this threat scenario leads to this damage scenario.{' '}
+            <Link to={entityPath(projectId, 'threat-scenarios', threatScenarioId)} className="underline">
+              Check the targets
+            </Link>
+          </span>
+        </p>
+      )}
+      {/* Column labels for the rows: each one reads "impact and feasibility → risk". */}
       <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
         <span className="w-28">Category</span>
         <span className="w-28">Impact</span>
@@ -211,7 +221,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
         {notRated.map((row) => (
           <li key={row.key} className="flex min-h-11 flex-wrap items-center gap-x-4 px-4 text-sm text-muted-foreground">
             <span className="w-28">{categoryLabel(row.category)}</span>
-            <Link to={impactPath} className="flex w-28 items-center gap-2 hover:underline">
+            <Link to={impactPath} aria-label={`${categoryLabel(row.category)} impact not rated`} className="flex w-28 items-center gap-2 hover:underline">
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground" />
               Not rated
             </Link>
@@ -223,9 +233,8 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
         <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
           <span>Omitted:</span>
           {omitted.map((row) => (
-            <span key={row.key} title={row.rationale ?? undefined} className="inline-flex h-5 items-center rounded-full bg-muted px-2">
+            <span key={row.key} className="inline-flex h-5 items-center rounded-full bg-muted px-2">
               {categoryLabel(row.category)}
-              {row.rationale && <span className="sr-only">: {row.rationale}</span>}
             </span>
           ))}
         </div>
@@ -264,24 +273,29 @@ function RiskNotes({ projectId, result }: { projectId: string; result: RiskResul
 interface BlockedProps {
   projectId: string
   threatScenarioId: string
-  blocker: RiskBlocker
+  missing: RiskBlocker[]
   inputs: ThreatScenarioRiskInputs
 }
 
-/** Says what is missing for any risk value and where to add it. */
-function Blocked({ projectId, threatScenarioId, blocker, inputs }: BlockedProps) {
-  const message: Record<RiskBlocker, string> = {
-    NO_DAMAGE_SCENARIO: 'No damage scenario is linked yet.',
-    NO_ATTACK_PATH: 'No attack path is linked yet.',
-    NO_RATED_ATTACK_PATH: 'None of the linked attack paths is rated yet.',
-  }
+const MISSING_MESSAGES: Record<RiskBlocker, string> = {
+  NO_DAMAGE_SCENARIO: 'No damage scenario is linked yet.',
+  NO_ATTACK_PATH: 'No attack path is linked yet.',
+  NO_RATED_ATTACK_PATH: 'None of the linked attack paths is rated yet.',
+}
+
+/** Says everything that is missing for any risk value and where to add it. */
+function Blocked({ projectId, threatScenarioId, missing, inputs }: BlockedProps) {
+  const unlinked = missing.filter((item) => item !== 'NO_RATED_ATTACK_PATH')
 
   return (
     <div className="max-w-3xl space-y-2 rounded-lg border border-dashed p-6 text-sm">
-      <p>
-        <span className="font-medium">No risk values yet.</span> {message[blocker]}
-      </p>
-      {blocker === 'NO_RATED_ATTACK_PATH' ? (
+      <p className="font-medium">No risk values yet.</p>
+      <ul aria-label="Missing for risk values" className="grid gap-1">
+        {missing.map((item) => (
+          <li key={item}>{MISSING_MESSAGES[item]}</li>
+        ))}
+      </ul>
+      {missing.includes('NO_RATED_ATTACK_PATH') && (
         <ul className="grid gap-1">
           {inputs.attackPaths.map((path) => (
             <li key={path.id}>
@@ -289,9 +303,10 @@ function Blocked({ projectId, threatScenarioId, blocker, inputs }: BlockedProps)
             </li>
           ))}
         </ul>
-      ) : (
-        <Link to={`${entityPath(projectId, 'threat-scenarios', threatScenarioId)}/relations`} className="underline">
-          Link it on the Relations tab
+      )}
+      {unlinked.length > 0 && (
+        <Link to={`${entityPath(projectId, 'threat-scenarios', threatScenarioId)}/relations`} className="inline-block underline">
+          Link {unlinked.length > 1 ? 'them' : 'it'} on the Relations tab
         </Link>
       )}
     </div>

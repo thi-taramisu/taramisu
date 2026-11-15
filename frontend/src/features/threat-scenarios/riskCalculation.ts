@@ -74,7 +74,8 @@ interface RiskValues {
   max: number | null
 }
 
-export type RiskResult = RiskValues & ({ blocker: null; feasibility: RatedFeasibility } | { blocker: RiskBlocker; feasibility: AggregatedFeasibility })
+/** `missing` lists everything a risk value still needs, so all of it can be added at once; null once nothing is missing. */
+export type RiskResult = RiskValues & ({ missing: null; feasibility: RatedFeasibility } | { missing: RiskBlocker[]; feasibility: AggregatedFeasibility })
 
 function maxOf(values: (number | null)[]) {
   const numbers = values.filter((value): value is number => value !== null)
@@ -103,8 +104,10 @@ export function calculateRisks(inputs: ThreatScenarioRiskInputs): RiskResult {
   })
   const max = maxOf(groups.map((group) => group.max))
   const { feasibility: level, decisive } = feasibility
-  if (inputs.damageScenarios.length === 0) return { feasibility, groups, max, blocker: 'NO_DAMAGE_SCENARIO' }
-  if (inputs.attackPaths.length === 0) return { feasibility, groups, max, blocker: 'NO_ATTACK_PATH' }
-  if (!level || !decisive) return { feasibility, groups, max, blocker: 'NO_RATED_ATTACK_PATH' }
-  return { feasibility: { ...feasibility, feasibility: level, decisive }, groups, max, blocker: null }
+  const missing: RiskBlocker[] = []
+  if (inputs.damageScenarios.length === 0) missing.push('NO_DAMAGE_SCENARIO')
+  if (inputs.attackPaths.length === 0) missing.push('NO_ATTACK_PATH')
+  else if (!level) missing.push('NO_RATED_ATTACK_PATH')
+  if (missing.length > 0 || !level || !decisive) return { feasibility, groups, max, missing }
+  return { feasibility: { ...feasibility, feasibility: level, decisive }, groups, max, missing: null }
 }
