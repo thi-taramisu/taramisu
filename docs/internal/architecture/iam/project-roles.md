@@ -29,7 +29,7 @@ The rows follow the features planned in the [wireframe concept](../../concepts/w
 | Apply AI assistant suggestions | – | ✓ | ✓ |
 | Change project settings: name, description, image, default rating method, AI toggle | – | – | ✓ |
 | Add or remove members and groups; change their roles | – | – | ✓ |
-| Archive, restore, or delete the project | – | – | ✓ |
+| Archive, unarchive, or delete the project | – | – | ✓ |
 
 Actions that need no project role:
 
@@ -171,6 +171,22 @@ blueprint). Revoking access faster would need a check against Authentik on every
 - Known limitation: if an Authentik administrator deletes the account of the only Owner, the project has no Owner left. It can only
   be recovered in the database.
 
+## Deleting a project
+
+- Only Owners delete a project ([#236](https://github.com/thi-taramisu/taramisu/issues/236)). The deletion includes all
+  items and their content.
+- Deleting first only marks the project. From that moment it behaves like a project that does not exist: it is missing from
+  the project list, and every request to it or its content returns `404 Not Found`, for Owners too. The access check
+  enforces this in one place, so no handler has to.
+- Within the grace period (30 days by default) an operator can restore the project with its content and members
+  ([deployment guide](../../../../deploy/README.md#restoring-a-deleted-project)). Taramisu has no application-wide admin
+  role, so there is no restore in the API or the user interface.
+- After the grace period the API deletes the project for good.
+- A content change that passed the access check just before the deletion can still be stored. It stays hidden with the
+  project and is there again after a restore.
+- Archiving ([#233](https://github.com/thi-taramisu/taramisu/issues/233)) is separate: an archived project stays visible
+  and read-only. An archived project can be deleted, and restoring a deleted project does not change whether it is archived.
+
 ## Audit
 
 Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): the API stores one event in the audit history for each
@@ -182,7 +198,8 @@ nothing.
 | `member.added` | Actor, project, member ID; after: role, user or group |
 | `member.role_changed`, including ownership transfer | Actor, project, member ID; role before and after, user or group |
 | `member.removed`, including leaving the project | Actor, project, member ID; before: role, user or group. When someone left, the actor is that user |
-| `project.deleted` | Actor, project; before: name and role assignments (role, user or group) |
+| `project.deleted` | Actor, project; before: name and role assignments (role, user or group). Recorded when the deletion is requested |
+| `project.restored` | Actor (the user named by the operator), project; after: name |
 
 Actor, user, and group are internal IDs, never names or email addresses. Events are kept for the project's lifetime and one
 year after its deletion; at first only operators read them. Each event is also written as an `audit` log line with IDs and
