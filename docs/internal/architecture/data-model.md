@@ -108,6 +108,7 @@ erDiagram
         string name "Top-level project name, e.g., Vehicle Platform X"
         text description "Project description"
         timestamp created_at
+        timestamp deleted_at "Set when the project is deleted; hidden from then on, removed after the grace period"
     }
 
     DISPLAY_ID_COUNTER {
@@ -265,6 +266,8 @@ erDiagram
   those fields. `cybersecurity_specs_wp_10_01` supplies supporting information per **15.6.1.1 NOTE**.
   Deleting an item cascades through its assets, damage scenarios, threat scenarios, attack paths, and
   their dependent properties, links, ratings, risk values, and treatment decisions.
+  Deleting a project sets `deleted_at` and hides the project; after a grace period the row is deleted, which cascades
+  through its role assignments and items ([project roles](iam/project-roles.md#deleting-a-project)).
 * **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
   externally by Authentik. Following strict separation of concerns, no redundant user-specific
   metadata (such as emails or display names) is stored in the application database; it stores only immutable external

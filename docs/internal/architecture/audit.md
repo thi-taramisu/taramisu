@@ -12,7 +12,8 @@ definition events (see the status column in [Events](#events)).
   email addresses.
 - Failed logins, denied requests, and errors go to the **security and operations log** (structured JSON on stderr), not into
   the database.
-- Audit events are kept while the project exists and are deleted **one year after the project is deleted**.
+- Audit events are kept while the project exists and are deleted **one year after the project is deleted**. A deleted
+  project can be restored for 30 days and is then deleted for good.
 - At first only operators read the history, directly in the database. Showing it in the application is an open question.
 
 ## Purpose
@@ -56,8 +57,8 @@ project.
    name, so that operators can tell which project an event belongs to, not the free-text description. Content events keep
    the record as the API returns it, including free text, because that is the work product whose history is traced.
 7. **One event per API operation.** Membership and project events describe what happened (`member.role_changed`). Content
-   events store the record as the API returns it, before and after. `project.deleted` also lists the role assignments it
-   removes, so it stays visible who had access. Content records deleted by cascade get no event of their own; the deletion
+   events store the record as the API returns it, before and after. `project.deleted` also lists the role assignments of
+   the project, so it stays visible who had access. Content records deleted by cascade get no event of their own; the deletion
    event of their parent ends their history.
 8. **Reads are not audit events**, except export, because export moves project data out of Taramisu. The operations log
    still records which user requested which path.
@@ -71,7 +72,8 @@ project.
 | --- | --- | --- | --- |
 | Project | `project.created` | After: name, first Owner | Stored |
 | Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
-| Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
+| Project | `project.deleted` | Before: name and role assignments (role, user or group). Recorded when an Owner requests the deletion | Stored |
+| Project | `project.restored` | After: name. Recorded when an operator restores a deleted project; the actor is the user the operator names | Stored |
 | Project | `project.archived`, `project.unarchived` | Archived state before and after | Stored |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
 | Members | `member.added` | After: role, user or group | Stored |
@@ -125,14 +127,13 @@ CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE 
   in `internal/db/audit.go`; record events are derived from the target type (`item_definition.updated`).
 - `occurred_at` uses `clock_timestamp()`: `now()` is the start of the transaction, so events written in one transaction would
   share it and lose their order.
-- Every event has a user as actor. Changes made by the system itself (retention cleanup, changes by SQL) are not recorded;
-  a system actor can be added when a feature needs one.
+- Every event has a user as actor. Changes made by the system itself (retention cleanup, final deletion of a project after
+  its grace period, changes by SQL) are not recorded; a system actor can be added when a feature needs one.
 
 In the backend, `Store.Audit` (`internal/db/store.go`) opens a transaction and passes it on in the context, so every store
 query called with that context takes part. It runs the change, inserts the event, and writes the `audit` log line after the
-commit. Membership and settings changes lock the project row with `FOR NO KEY UPDATE`, which serializes them but does not
-block writes to the project's content. Project deletion locks with `FOR UPDATE` at once, so it waits for content writes in
-progress instead of deadlocking with them.
+commit. Membership and settings changes and the deletion of a project lock the project row with `FOR NO KEY UPDATE`, which
+serializes them but does not block writes to the project's content.
 
 To record the changes of another record type:
 
@@ -144,7 +145,7 @@ To record the changes of another record type:
    the context it receives and call nothing outside the database: a query with another context runs outside the
    transaction (a locking read then fails with `ErrLockOutsideTransaction`). `Audit` cannot be nested. A dedicated `Store`
    method, as for membership changes and project deletion, is only needed when a change must lock the project without
-   reading it, or summarise records deleted by cascade.
+   reading it, or summarise other records.
 3. Add the target type to `internal/db/audit.go` and move the operations from `notAuditedYet` to `auditedOperations`
    (`audit_coverage_test.go`); a new mutating operation must be in one of the lists. Test fakes that embed several store
    interfaces need an `Audit` method (`audit_fake_test.go`). Set the status above and extend `TestAuditContentPostgres`,
@@ -153,13 +154,20 @@ To record the changes of another record type:
 ## Retention
 
 - Events are kept as long as their project exists, because they document how the project's work products came about.
+- Deleting a project only marks it ([deleting a project](iam/project-roles.md#deleting-a-project)). `project.deleted` is
+  recorded at that moment. After the grace period (`PROJECT_DELETE_GRACE_PERIOD`, default `720h`) the API deletes the
+  project for good; that writes no event, only a log line with the project ID. If an operator restores the project in time,
+  `project.restored` is recorded and the history continues.
 - Content events hold copies of the analysis content, which can be confidential. Deleting a project removes its
   content from the history only when the retention period ends, so that an unwanted deletion can still be investigated and
   the deleted content traced.
-- One year after `project.deleted`, all events of that project are deleted. One year leaves time to notice and investigate an
-  unwanted deletion, for example at the next periodic review, without keeping data about people indefinitely. The API runs
-  this cleanup at start and once a day; the period is configurable (`AUDIT_RETENTION_AFTER_DELETE`, default `8760h`). With
-  several replicas, an advisory lock lets only one of them delete at a time.
+- One year after `project.deleted`, all events of that project are deleted, provided the project is gone for good. If a
+  project was deleted more than once, the latest `project.deleted` counts; a restored project keeps its events. One year
+  leaves time to notice and investigate an unwanted deletion, for example at the next periodic review, without keeping
+  data about people indefinitely. The period is configurable (`AUDIT_RETENTION_AFTER_DELETE`, default `8760h`) and runs
+  from the request, so it includes the grace period.
+- The API runs both cleanups at start and once a day. With several replicas, an advisory lock per cleanup lets only one of
+  them delete at a time.
 - The cleanup finds deleted projects by their `project.deleted` event. Projects deleted directly in the database have no such
   event, and their events are not removed.
 - Log retention depends on the journald configuration of the VM ([deployment guide](../../../deploy/README.md)) and is not
