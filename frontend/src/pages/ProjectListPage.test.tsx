@@ -254,6 +254,8 @@ describe('Main Page project management', () => {
         name: 'Archive Project',
       }),
     )
+    const archiveDialog = await screen.findByRole('alertdialog', { name: 'Archive Battery Security' })
+    await user.click(within(archiveDialog).getByRole('button', { name: 'Archive Project' }))
 
     // Archived projects must disappear from the main overview.
     await waitFor(() => expect(

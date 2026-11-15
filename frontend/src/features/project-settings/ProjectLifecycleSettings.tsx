@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import {
   useArchiveProject,
@@ -29,7 +30,18 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   const archiveProject = useArchiveProject()
   const restoreProject = useRestoreProject()
   const deleteProject = useDeleteProject()
-  const [deleteOpener, setDeleteOpener] = useState<HTMLButtonElement | null>(null)
+  const [openDialog, setOpenDialog] = useState<'archive' | 'delete' | null>(null)
+  // Kept after closing, so the dialog can return focus to the button that opened it.
+  const [opener, setOpener] = useState<HTMLButtonElement | null>(null)
+
+  function open(dialog: 'archive' | 'delete', button: HTMLButtonElement) {
+    setOpener(button)
+    setOpenDialog(dialog)
+  }
+
+  function close(isOpen: boolean) {
+    if (!isOpen) setOpenDialog(null)
+  }
 
   if (project.data?.role !== 'OWNER') return null
 
@@ -57,7 +69,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
           <SettingRow
             title="Archive project"
             action={(
-              <Button variant="outline" disabled={pending} onClick={() => archiveProject.mutate(projectId)}>
+              <Button variant="outline" disabled={pending} onClick={(event) => open('archive', event.currentTarget)}>
                 <Archive aria-hidden="true" />
                 Archive Project
               </Button>
@@ -72,7 +84,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
             <Button
               variant="destructive"
               disabled={pending}
-              onClick={(event) => setDeleteOpener(event.currentTarget)}
+              onClick={(event) => open('delete', event.currentTarget)}
             >
               <Trash2 aria-hidden="true" />
               Delete Project
@@ -88,17 +100,22 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
         </p>
       )}
 
+      <ArchiveProjectDialog
+        projectName={openDialog === 'archive' ? name : null}
+        onOpenChange={close}
+        onConfirm={() => archiveProject.mutate(projectId)}
+        returnFocusTo={opener}
+      />
+
       <DeleteProjectDialog
-        projectName={deleteOpener ? name : null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteOpener(null)
-        }}
+        projectName={openDialog === 'delete' ? name : null}
+        onOpenChange={close}
         onConfirm={() =>
           deleteProject.mutate(projectId, {
             onSuccess: () => navigate('/projects'),
-            onError: () => setDeleteOpener(null),
+            onError: () => setOpenDialog(null),
           })}
-        returnFocusTo={deleteOpener}
+        returnFocusTo={opener}
       />
     </section>
   )

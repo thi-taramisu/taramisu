@@ -48,11 +48,27 @@ describe('ProjectLifecycleSettings', () => {
     expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument()
   })
 
-  it('archives and restores the project', async () => {
+  it('keeps the project active when archiving is cancelled', async () => {
+    const { projects, user } = renderSettings()
+    const lifecycle = await section()
+    const archiveButton = within(lifecycle).getByRole('button', { name: 'Archive Project' })
+
+    await user.click(archiveButton)
+    const dialog = await screen.findByRole('alertdialog', { name: 'Archive Headlamp System' })
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(archiveButton).toHaveFocus())
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(await projects.get('headlamp')).toMatchObject({ archived: false })
+  })
+
+  it('archives the project after the confirmation and restores it', async () => {
     const { projects, user } = renderSettings()
     const lifecycle = await section()
 
     await user.click(within(lifecycle).getByRole('button', { name: 'Archive Project' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Archive Headlamp System' })
+    await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }))
 
     expect(await within(lifecycle).findByRole('button', { name: 'Restore Project' })).toBeInTheDocument()
     expect(within(lifecycle).getByText(/This project is archived and read-only/)).toBeInTheDocument()
@@ -83,6 +99,19 @@ describe('ProjectLifecycleSettings', () => {
     expect((await projects.list()).map((project) => project.id)).not.toContain('headlamp')
   })
 
+  it('returns focus to the delete button when deleting is cancelled', async () => {
+    const { projects, user } = renderSettings()
+    const lifecycle = await section()
+    const deleteButton = within(lifecycle).getByRole('button', { name: 'Delete Project' })
+
+    await user.click(deleteButton)
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete Headlamp System' })
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(deleteButton).toHaveFocus())
+    expect(await projects.get('headlamp')).toMatchObject({ archived: false })
+  })
+
   it('shows the not found page for the settings of a deleted project', async () => {
     const projects = createMockProjectApi()
     await projects.delete('headlamp')
@@ -98,6 +127,8 @@ describe('ProjectLifecycleSettings', () => {
     const lifecycle = await section()
 
     await user.click(within(lifecycle).getByRole('button', { name: 'Archive Project' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Archive Headlamp System' })
+    await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }))
 
     expect(await within(lifecycle).findByRole('alert')).toHaveTextContent('The change could not be saved.')
     expect(within(lifecycle).getByRole('button', { name: 'Archive Project' })).toBeEnabled()

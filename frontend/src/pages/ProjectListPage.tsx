@@ -14,6 +14,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { ProjectImage } from '@/features/projects/ProjectImage'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
+import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
 import type { Project } from '@/api/models/project'
@@ -45,6 +46,9 @@ export function ProjectListPage() {
   const [deleteDialogOpener, setDeleteDialogOpener] =
     useState<HTMLButtonElement | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
+  const [archiveDialogOpener, setArchiveDialogOpener] =
+    useState<HTMLButtonElement | null>(null)
+  const [projectToArchive, setProjectToArchive] = useState<Project | null>(null)
 
   function handleCreateProject(name: string, image?: File) {
     createProject.mutate(
@@ -211,7 +215,10 @@ export function ProjectListPage() {
 
                               <DropdownMenuContent align="end" className="w-max">
                                 <DropdownMenuItem
-                                  onSelect={() => archiveProject.mutate(project.id)}
+                                  onSelect={() => {
+                                    setArchiveDialogOpener(actionsButtons.current.get(project.id) ?? null)
+                                    setProjectToArchive(project)
+                                  }}
                                 >
                                   <Archive className="size-4" />
                                   Archive Project
@@ -282,6 +289,19 @@ export function ProjectListPage() {
         onOpenChange={setCreateDialogOpen}
         onCreateProject={handleCreateProject}
         returnFocusTo={createDialogOpener}
+      />
+
+      <ArchiveProjectDialog
+        projectName={projectToArchive?.name ?? null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProjectToArchive(null)
+          }
+        }}
+        onConfirm={() => {
+          if (projectToArchive) archiveProject.mutate(projectToArchive.id)
+        }}
+        returnFocusTo={archiveDialogOpener}
       />
 
       <DeleteProjectDialog

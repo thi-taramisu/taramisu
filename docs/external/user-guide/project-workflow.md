@@ -67,13 +67,14 @@ Archived projects are not shown in the Favorites section.
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Archive Project**.
+4. Confirm with **Archive Project** in the dialog.
 
 The project is removed from the active overview and appears in
 the Archive view.
 
 Project owners can also archive a project from its settings:
-open **Settings** and select **Archive Project** under
-**Archive and delete**.
+open **Settings**, select **Archive Project** under
+**Archive and delete**, and confirm in the dialog.
 
 ### Restoring a project
 
