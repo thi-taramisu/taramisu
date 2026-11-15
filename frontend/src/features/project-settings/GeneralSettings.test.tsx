@@ -1,16 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import App from '../../App'
+import { renderApp } from '@/test/renderApp'
 import { MAX_IMAGE_SIZE } from '@/lib/imageUpload'
 
 function renderGeneral() {
-  render(
-    <MemoryRouter initialEntries={['/projects/headlamp/settings']}>
-      <App />
-    </MemoryRouter>,
-  )
+  renderApp('/projects/headlamp/settings')
 }
 
 describe('GeneralSettings', () => {

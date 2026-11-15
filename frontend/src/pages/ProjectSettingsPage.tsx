@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import { exampleProject } from '../api/mocks/data/headlamp'
+import { isNotFound } from '../api/errors'
+import { useProject } from '../api/queries/projects'
 import { ProjectHeader } from '../features/workspace/ProjectHeader'
 import { NotFoundPage } from './NotFoundPage'
 
@@ -10,8 +12,10 @@ const SECTIONS = [
 
 /** Project settings with "General" and "Members" sections as child routes. */
 export function ProjectSettingsPage() {
-  const { projectId } = useParams()
-  if (projectId !== exampleProject.id) return <NotFoundPage />
+  const { projectId = '' } = useParams()
+  const project = useProject(projectId)
+  // Settings data exists only for the example project; a deleted project has no settings.
+  if (projectId !== exampleProject.id || isNotFound(project.error)) return <NotFoundPage />
 
   return (
     <div className="flex h-screen flex-col">
