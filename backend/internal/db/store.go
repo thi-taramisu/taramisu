@@ -63,6 +63,9 @@ func (c ctxConn) current(ctx context.Context, sql string) (DBTX, error) {
 }
 
 // lockingClause matches the row-locking clauses of PostgreSQL in any case and spacing.
+// It is a guard against a common mistake, not a SQL parser: a comment or string literal can match, and
+// a comment between the keywords hides a clause. The rollback tests of each audited operation are the
+// check that its queries run in the transaction.
 var lockingClause = regexp.MustCompile(`(?i)\bFOR\s+(NO\s+KEY\s+UPDATE|UPDATE|SHARE|KEY\s+SHARE)\b`)
 
 func isLockingRead(sql string) bool { return lockingClause.MatchString(sql) }
