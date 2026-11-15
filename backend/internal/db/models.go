@@ -600,6 +600,13 @@ type ProjectRoleAssignment struct {
 	AssignedAt    pgtype.Timestamptz
 }
 
+type ProjectTitleImage struct {
+	ID          pgtype.UUID
+	ContentType string
+	SizeBytes   int64
+	Sha256      string
+}
+
 type RiskTreatmentDecision struct {
 	ID                   pgtype.UUID
 	ThreatScenarioID     pgtype.UUID
@@ -623,10 +630,11 @@ type ServiceStatus struct {
 }
 
 type TaraProject struct {
-	ID          pgtype.UUID
-	Name        string
-	Description *string
-	CreatedAt   pgtype.Timestamptz
+	ID           pgtype.UUID
+	Name         string
+	Description  *string
+	TitleImageID pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {

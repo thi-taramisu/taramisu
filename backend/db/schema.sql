@@ -34,10 +34,18 @@ CREATE TABLE iam_group (
     external_iam_group_id text NOT NULL UNIQUE
 );
 
+CREATE TABLE project_title_image (
+    id uuid PRIMARY KEY,
+    content_type text NOT NULL CHECK (content_type IN ('image/png', 'image/jpeg')),
+    size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 5242880),
+    sha256 text NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$')
+);
+
 CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     description text,
+    title_image_id uuid UNIQUE REFERENCES project_title_image(id) ON DELETE SET NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 

@@ -57,6 +57,30 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 > **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, Authentik, and storage data volumes.
 > It keeps `iam/.env` and `storage/.env`; `make up` provisions a fresh stack afterward.
 
+## Project title images
+
+Owners can `PUT /api/v1/projects/{project_id}/title-image` with exactly one
+multipart `file` to upload or replace a title image, and `DELETE` the same URL
+to remove it (idempotent, 204). Create the project first, then upload its image;
+the same endpoint is used later from settings. PNG and JPEG files are decoded
+and validated, with limits of 5 MiB and 20 million pixels. Other formats return
+415, excessive size returns 413, and malformed multipart requests return 400.
+
+Project create/read/list/update/replace responses include `title_image_url` when
+an image exists. It is a relative authenticated download endpoint, not a public
+S3 URL: `GET` requires project read permission and returns the image bytes.
+Clients must send their bearer token (for example, fetch a blob for display).
+Viewers and Editors cannot upload or remove images (403); non-members get 404.
+Project metadata updates preserve the image.
+
+Image metadata and the nullable project reference change atomically. Replaced,
+removed, and deleted-project images become unreferenced rows; the existing
+storage cleanup worker retries their S3 deletion at startup and every minute.
+Replacement/removal also attempt cleanup immediately. Cleanup failure never
+removes metadata needed for a later retry. Upload failures attempt to remove
+the newly written object. Storage configuration and isolated integration test
+settings are shared with the attachments API.
+
 ## Authentication
 
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)

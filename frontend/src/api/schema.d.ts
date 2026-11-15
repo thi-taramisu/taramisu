@@ -201,6 +201,25 @@ export interface paths {
         patch: operations["update-item-definition"];
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/title-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels) */
+        get: operations["get-project-title-image"];
+        /** Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels) */
+        put: operations["replace-project-title-image"];
+        post?: never;
+        /** Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels) */
+        delete: operations["delete-project-title-image"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions": {
         parameters: {
             query?: never;
@@ -466,6 +485,9 @@ export interface components {
             /** Format: uuid */
             user_id?: string;
         };
+        ProjectTitleImageResponse: {
+            url: string;
+        };
         ReadyOutputBody: {
             message: string;
             status: string;
@@ -526,6 +548,8 @@ export interface components {
             name: string;
             /** @enum {string} */
             role: "VIEWER" | "EDITOR" | "OWNER";
+            /** @description Authenticated download endpoint for the project title image */
+            title_image_url?: string;
         };
         UpdateProjectMemberInputBody: {
             /** @enum {string} */
@@ -1973,6 +1997,218 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
+            };
+        };
+    };
+    "get-project-title-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image bytes; authenticated project read access required */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            /** @description Invalid multipart file */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Owner role required for writes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project or image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid project ID */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Storage or database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "replace-project-title-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Image replaced; old object cleanup is retried automatically */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTitleImageResponse"];
+                };
+            };
+            /** @description Invalid multipart file */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Owner role required for writes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project or image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Image exceeds size or pixel limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a valid PNG or JPEG image */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid project ID */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Storage or database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "delete-project-title-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image removed; object cleanup is retried automatically */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid multipart file */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Owner role required for writes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project or image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid project ID */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Storage or database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

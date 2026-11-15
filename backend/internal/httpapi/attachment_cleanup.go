@@ -16,6 +16,7 @@ func (h *Attachments) RunCleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	for {
+		h.tryTitleImageCleanup(ctx)
 		if err := h.cleanupPending(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("scan pending attachment deletions", "error", err)
 		}

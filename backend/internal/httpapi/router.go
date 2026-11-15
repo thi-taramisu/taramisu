@@ -96,6 +96,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
 	registerAttachments(api, o.attachments, queries)
+	registerProjectTitleImage(api, o.attachments, queries)
 	// Fail closed: an /api/ operation without an access declaration must not be served.
 	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
 		panic(err)
