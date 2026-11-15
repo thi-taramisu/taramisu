@@ -1,10 +1,13 @@
 -- Project authorization (see docs/internal/architecture/iam/project-roles.md).
 
 -- Highest role of the caller in a project, from a direct assignment or one of the caller's
--- Authentik groups (taramisu_groups claim). Returns no row when the caller has no role.
+-- Authentik groups (taramisu_groups claim). Returns no row when the caller has no role or the
+-- project is marked as deleted, so a deleted project is hidden from every operation that checks
+-- access, like a project that does not exist.
 -- name: GetProjectRole :one
 SELECT a.project_role
 FROM project_role_assignment a
+JOIN tara_project p ON p.id = a.tara_project_id AND p.deleted_at IS NULL
 LEFT JOIN iam_group g ON g.id = a.group_id
 WHERE a.tara_project_id = sqlc.arg(project_id)
   AND (a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[]))

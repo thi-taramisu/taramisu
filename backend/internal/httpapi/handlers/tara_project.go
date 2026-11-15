@@ -8,7 +8,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -22,7 +21,7 @@ type TaraProjectStore interface {
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
-	// DeleteTaraProject also records the audit event (see db.Store).
+	// DeleteTaraProject marks the project as deleted and records the audit event (see db.Store).
 	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
 }
 
@@ -55,6 +54,7 @@ func (h *TaraProject) Register(api huma.API) {
 	Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), project(PermManage), h.Update)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
+	del.Description = "Owner only. The project disappears for all members at once, with all its content, and is deleted permanently after a grace period (30 days by default). Until then, an operator can restore it."
 	Register(api, del, project(PermManage), h.Delete)
 }
 
@@ -126,7 +126,7 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return toTaraProjectOutput(db.TaraProject(p), db.ProjectRoleOWNER), nil
+	return toTaraProjectOutput(db.TaraProject{ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt}, db.ProjectRoleOWNER), nil
 }
 
 // List returns only projects the caller has a role in.
@@ -217,10 +217,6 @@ func parseUUID(s string) (pgtype.UUID, error) {
 func mapTaraProjectError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, db.ErrProjectNotFound) {
 		return huma.Error404NotFound("project not found")
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
-		return huma.Error409Conflict("project still contains item definitions")
 	}
 	return err
 }

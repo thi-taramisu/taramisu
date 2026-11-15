@@ -15,7 +15,7 @@ const createTaraProject = `-- name: CreateTaraProject :one
 WITH project AS (
     INSERT INTO tara_project (name, description)
     VALUES ($1, $2)
-    RETURNING id, name, description, created_at
+    RETURNING id, name, description, created_at, deleted_at
 ), owner AS (
     INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
     SELECT id, $3, 'OWNER' FROM project
@@ -50,26 +50,8 @@ func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectPa
 	return i, err
 }
 
-const deleteTaraProject = `-- name: DeleteTaraProject :one
-DELETE FROM tara_project WHERE id = $1
-RETURNING id, name
-`
-
-type DeleteTaraProjectRow struct {
-	ID   pgtype.UUID
-	Name string
-}
-
-// Returns the deleted project's settings for the audit history; no row if it does not exist.
-func (q *Queries) DeleteTaraProject(ctx context.Context, id pgtype.UUID) (DeleteTaraProjectRow, error) {
-	row := q.db.QueryRow(ctx, deleteTaraProject, id)
-	var i DeleteTaraProjectRow
-	err := row.Scan(&i.ID, &i.Name)
-	return i, err
-}
-
 const getTaraProject = `-- name: GetTaraProject :one
-SELECT id, name, description, created_at FROM tara_project WHERE id = $1
+SELECT id, name, description, created_at, deleted_at FROM tara_project WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -80,12 +62,13 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getTaraProjectForUpdate = `-- name: GetTaraProjectForUpdate :one
-SELECT id, name, description, created_at FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
+SELECT id, name, description, created_at, deleted_at FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE
 `
 
 // The project before a settings change, locked until the transaction ends (see LockTaraProject).
@@ -97,6 +80,7 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -106,7 +90,8 @@ SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_r
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
-WHERE a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[])
+WHERE p.deleted_at IS NULL
+  AND (a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[]))
 GROUP BY p.id
 ORDER BY p.created_at DESC, p.id
 `
@@ -124,7 +109,8 @@ type ListTaraProjectsRow struct {
 	Role        ProjectRole
 }
 
-// List only projects the caller has a role in, with the caller's highest role.
+// List only projects the caller has a role in, with the caller's highest role. Projects marked as
+// deleted are left out.
 func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsParams) ([]ListTaraProjectsRow, error) {
 	rows, err := q.db.Query(ctx, listTaraProjects, arg.UserID, arg.GroupIds)
 	if err != nil {
@@ -151,8 +137,55 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 	return items, nil
 }
 
+const markTaraProjectDeleted = `-- name: MarkTaraProjectDeleted :one
+UPDATE tara_project SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, name
+`
+
+type MarkTaraProjectDeletedRow struct {
+	ID   pgtype.UUID
+	Name string
+}
+
+// Marks the project as deleted: it is hidden from everyone at once and deleted for good after the
+// grace period (PurgeDeletedTaraProjects). Returns the project's name for the audit history; no row
+// if it does not exist or is already marked (the Store's lock on the project finds that first).
+func (q *Queries) MarkTaraProjectDeleted(ctx context.Context, id pgtype.UUID) (MarkTaraProjectDeletedRow, error) {
+	row := q.db.QueryRow(ctx, markTaraProjectDeleted, id)
+	var i MarkTaraProjectDeletedRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const purgeDeletedTaraProjects = `-- name: PurgeDeletedTaraProjects :many
+DELETE FROM tara_project WHERE deleted_at < $1::timestamptz
+RETURNING id
+`
+
+// Deletes the projects that were marked as deleted before the cutoff, with all their content
+// (ON DELETE CASCADE). A project restored in the meantime no longer matches.
+func (q *Queries) PurgeDeletedTaraProjects(ctx context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, purgeDeletedTaraProjects, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const replaceTaraProject = `-- name: ReplaceTaraProject :one
-UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, created_at
+UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, created_at, deleted_at
 `
 
 type ReplaceTaraProjectParams struct {
@@ -169,8 +202,39 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const restoreTaraProject = `-- name: RestoreTaraProject :one
+UPDATE tara_project SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, name
+`
+
+type RestoreTaraProjectRow struct {
+	ID   pgtype.UUID
+	Name string
+}
+
+// Takes the mark back; no row if the project does not exist or is not marked as deleted.
+func (q *Queries) RestoreTaraProject(ctx context.Context, id pgtype.UUID) (RestoreTaraProjectRow, error) {
+	row := q.db.QueryRow(ctx, restoreTaraProject, id)
+	var i RestoreTaraProjectRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const tryProjectPurgeLock = `-- name: TryProjectPurgeLock :one
+SELECT pg_try_advisory_xact_lock(236001)
+`
+
+// Lets one replica at a time delete projects for good; released when the transaction ends.
+func (q *Queries) TryProjectPurgeLock(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, tryProjectPurgeLock)
+	var pg_try_advisory_xact_lock bool
+	err := row.Scan(&pg_try_advisory_xact_lock)
+	return pg_try_advisory_xact_lock, err
 }
 
 const updateTaraProject = `-- name: UpdateTaraProject :one
@@ -178,7 +242,7 @@ UPDATE tara_project
 SET name = COALESCE($1, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END
 WHERE id = $4
-RETURNING id, name, description, created_at
+RETURNING id, name, description, created_at, deleted_at
 `
 
 type UpdateTaraProjectParams struct {
@@ -201,6 +265,7 @@ func (q *Queries) UpdateTaraProject(ctx context.Context, arg UpdateTaraProjectPa
 		&i.Name,
 		&i.Description,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
