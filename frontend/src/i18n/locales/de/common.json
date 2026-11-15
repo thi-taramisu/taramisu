@@ -36,7 +36,12 @@
       "impact": "Auswirkungen",
       "treatment": "Risikobehandlung",
       "rating": "Bewertung"
-    }
+    },
+    "unassigned": "Nicht zugeordnet",
+    "unassignedIn": "in {{name}},",
+    "unassignedElements_one": "Element",
+    "unassignedElements_other": "Elemente",
+    "inItem": "in {{name}}"
   },
   "entities": {
     "items": "Item",
@@ -44,5 +49,12 @@
     "damage-scenarios": "Schadensszenario",
     "threat-scenarios": "Bedrohungsszenario",
     "attack-paths": "Angriffspfad"
+  },
+  "entityGroups": {
+    "items": "Items",
+    "assets": "Assets",
+    "damage-scenarios": "Schadensszenarien",
+    "threat-scenarios": "Bedrohungsszenarien",
+    "attack-paths": "Angriffspfade"
   }
 }

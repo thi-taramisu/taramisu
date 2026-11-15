@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
@@ -306,14 +306,15 @@ describe('attack path relations', () => {
     expect((await api.threatScenarios.relations('headlamp', 'ts-02')).attackPaths.map((path) => path.code)).toEqual(['AP-1'])
   })
 
-  it('removes a link after confirmation and keeps the attack path', async () => {
+  it('removes a link after confirmation and moves the attack path to "Unassigned"', async () => {
     const { user, api } = renderApp(relations)
 
     await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: `Remove link to ${TS01}` }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove link' }))
 
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
-    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument())
+    expect(await within(within(tree()).getByRole('list', { name: 'Attack Paths in Headlamp system' })).findByRole('link', { name: /AP-1/ })).toBeInTheDocument()
+    expect(within(tree()).getAllByRole('link', { name: /AP-1/ })).toHaveLength(1)
     expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-1' }))
   })
 

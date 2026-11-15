@@ -374,13 +374,14 @@ describe('threat scenario relations', () => {
     expect(await screen.findByRole('link', { name: 'Relations 4' })).toBeInTheDocument()
   })
 
-  it('removes an attack path link and keeps the attack path available', async () => {
+  it('removes an attack path link, moves the attack path to "Unassigned" and keeps it available', async () => {
     const { user, api } = renderApp(relations)
 
     await removeLink(user, 'Attack Paths', 'AP-1 Compromised navigation ECU via cellular')
 
     await waitFor(() => expect(section('Attack Paths').getAllByRole('listitem')).toHaveLength(1))
-    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument())
+    expect(await within(within(tree()).getByRole('list', { name: 'Attack Paths in Headlamp system' })).findByRole('link', { name: /AP-1/ })).toBeInTheDocument()
+    expect(within(tree()).getAllByRole('link', { name: /AP-1/ })).toHaveLength(1)
     expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-1' }))
   })
 

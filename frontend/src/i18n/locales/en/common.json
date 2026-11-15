@@ -36,7 +36,12 @@
       "impact": "Impact",
       "treatment": "Treatment",
       "rating": "Rating"
-    }
+    },
+    "unassigned": "Unassigned",
+    "unassignedIn": "in {{name}},",
+    "unassignedElements_one": "element",
+    "unassignedElements_other": "elements",
+    "inItem": "in {{name}}"
   },
   "entities": {
     "items": "Item",
@@ -44,5 +49,12 @@
     "damage-scenarios": "Damage Scenario",
     "threat-scenarios": "Threat Scenario",
     "attack-paths": "Attack Path"
+  },
+  "entityGroups": {
+    "items": "Items",
+    "assets": "Assets",
+    "damage-scenarios": "Damage Scenarios",
+    "threat-scenarios": "Threat Scenarios",
+    "attack-paths": "Attack Paths"
   }
 }
