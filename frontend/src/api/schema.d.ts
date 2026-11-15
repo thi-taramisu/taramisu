@@ -137,18 +137,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the attack feasibility rating of an attack path */
+        /**
+         * Get the attack feasibility rating of an attack path
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         */
         get: operations["get-attack-feasibility-rating"];
-        /** Create or replace the attack feasibility rating of an attack path */
+        /**
+         * Create or replace the attack feasibility rating of an attack path
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         */
         put: operations["replace-attack-feasibility-rating"];
         post?: never;
-        /** Delete the attack feasibility rating of an attack path */
+        /**
+         * Delete the attack feasibility rating of an attack path
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         */
         delete: operations["delete-attack-feasibility-rating"];
         options?: never;
         head?: never;
         /**
          * Partially update the attack feasibility rating of an attack path
-         * @description Omitted fields remain unchanged. Every field can be cleared with null.
+         * @description Omitted fields remain unchanged. All fields except rating_method can be cleared with null. Method changes must clear incompatible inputs and supply the new method inputs in the same request. feasibility_rating is derived from complete inputs.
          */
         patch: operations["update-attack-feasibility-rating"];
         trace?: never;
@@ -712,9 +721,23 @@ export interface components {
             /** Format: uuid */
             attack_path_id: string;
             /** @enum {string} */
+            attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL";
+            /** @enum {string} */
+            cvss_attack_complexity?: "LOW" | "HIGH";
+            /** @enum {string} */
+            cvss_attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL";
+            /** @enum {string} */
+            cvss_privileges_required?: "NONE" | "LOW" | "HIGH";
+            /** @enum {string} */
+            cvss_scope?: "UNCHANGED" | "CHANGED";
+            /** @enum {string} */
+            cvss_user_interaction?: "NONE" | "REQUIRED";
+            /** @enum {string} */
             feasibility_rating?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
             /** Format: uuid */
             id: string;
+            /** @enum {string} */
+            rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             rationale?: string;
         };
         AttackPathBody: {
@@ -850,7 +873,21 @@ export interface components {
             /** Format: int32 */
             ap_window_of_opportunity?: number;
             /** @enum {string} */
+            attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL";
+            /** @enum {string} */
+            cvss_attack_complexity?: "LOW" | "HIGH";
+            /** @enum {string} */
+            cvss_attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL";
+            /** @enum {string} */
+            cvss_privileges_required?: "NONE" | "LOW" | "HIGH";
+            /** @enum {string} */
+            cvss_scope?: "UNCHANGED" | "CHANGED";
+            /** @enum {string} */
+            cvss_user_interaction?: "NONE" | "REQUIRED";
+            /** @enum {string} */
             feasibility_rating?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
+            /** @enum {string} */
+            rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             rationale?: string;
         };
         FeasibilityRatingUpdateInputBody: {
@@ -867,7 +904,21 @@ export interface components {
             /** Format: int32 */
             ap_window_of_opportunity?: number | null;
             /** @enum {string|null} */
+            attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL" | null;
+            /** @enum {string|null} */
+            cvss_attack_complexity?: "LOW" | "HIGH" | null;
+            /** @enum {string|null} */
+            cvss_attack_vector?: "NETWORK" | "ADJACENT" | "LOCAL" | "PHYSICAL" | null;
+            /** @enum {string|null} */
+            cvss_privileges_required?: "NONE" | "LOW" | "HIGH" | null;
+            /** @enum {string|null} */
+            cvss_scope?: "UNCHANGED" | "CHANGED" | null;
+            /** @enum {string|null} */
+            cvss_user_interaction?: "NONE" | "REQUIRED" | null;
+            /** @enum {string|null} */
             feasibility_rating?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW" | null;
+            /** @enum {string|null} */
+            rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR" | null;
             rationale?: string | null;
         };
         ImpactRatingBody: {
