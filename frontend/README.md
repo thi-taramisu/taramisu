@@ -42,7 +42,7 @@ src/
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
-  test/renderApp.tsx           # renders the app with a fresh mock item API and query cache
+  test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
@@ -86,8 +86,8 @@ src/api/
   queries/backend.ts       # REAL: hooks on the client (health, current user)
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
-  services/                # service interfaces the views use (e.g. ItemService)
-  queries/items.ts         # TanStack Query hooks on the services
+  services/                # service interfaces the views use (e.g. ItemService, ProjectService)
+  queries/items.ts, queries/projects.ts # TanStack Query hooks on the services
   ApiProvider.tsx          # provides the client and the service implementations
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
@@ -95,7 +95,7 @@ src/api/
 `src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
 `ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
-that has no service yet (project list, project settings, example project).
+that has no service yet (project settings, example project).
 
 ## UI components
 

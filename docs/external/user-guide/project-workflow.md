@@ -71,6 +71,10 @@ Archived projects are not shown in the Favorites section.
 The project is removed from the active overview and appears in
 the Archive view.
 
+Project owners can also archive a project from its settings:
+open **Settings** and select **Archive Project** under
+**Archive and delete**.
+
 ### Restoring a project
 
 1. Open **Archive** from the sidebar.
@@ -80,6 +84,9 @@ the Archive view.
 The project returns to the active overview.
 
 Its previous favorite status is preserved.
+
+In the project settings, owners can select **Restore Project**
+instead.
 
 ## Deleting a project
 
@@ -91,6 +98,10 @@ Its previous favorite status is preserved.
 
 Select **Cancel** to keep the project.
 
+Project owners can also delete a project from its settings:
+open **Settings** and select **Delete Project** under
+**Archive and delete**. After the deletion, the project list opens.
+
 Deletion currently affects only temporary frontend state.
 
 ## Opening a project workspace
@@ -101,8 +112,8 @@ TARAmisu workspace.
 Other mock projects are displayed in the overview but do not
 yet provide functional workspace navigation.
 
-The Headlamp example is protected from deletion and archiving
-in the current preview.
+The Headlamp example can be archived and deleted like any other
+project. Reload the page to restore it.
 
 ## Known limitations
 
