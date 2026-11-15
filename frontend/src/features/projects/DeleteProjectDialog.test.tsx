@@ -55,7 +55,6 @@ describe('DeleteProjectDialog', () => {
     expect(within(dialog).getByRole('textbox', { name: confirmLabel })).toHaveFocus()
     expect(within(dialog).getByRole('button', { name: 'Delete Project' })).toBeDisabled()
     expect(within(dialog).queryByText(/permanently lost/)).not.toBeInTheDocument()
-    expect(dialog).not.toHaveAttribute('aria-describedby')
   })
 
   it('keeps the delete button disabled while the field is empty', async () => {

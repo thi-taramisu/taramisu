@@ -88,7 +88,8 @@ function DeleteProjectForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <AlertDialogHeader>
-        <AlertDialogTitle>Delete {projectName}</AlertDialogTitle>
+        {/* Keep repeated spaces visible, as the name must be typed exactly, and break long names. */}
+        <AlertDialogTitle className="whitespace-pre-wrap wrap-anywhere">Delete {projectName}</AlertDialogTitle>
         {step === 'acknowledge' && (
           <AlertDialogDescription>
             This will permanently delete the project, including all of its items, their content, and its stored
@@ -100,7 +101,9 @@ function DeleteProjectForm({
       {step === 'confirm' && (
         <div className="space-y-2">
           <Label htmlFor={inputId}>
-            To confirm, type &quot;{projectName}&quot; in the box below
+            <span className="whitespace-pre-wrap wrap-anywhere">
+              To confirm, type &quot;{projectName}&quot; in the box below
+            </span>
           </Label>
           <Input
             id={inputId}
