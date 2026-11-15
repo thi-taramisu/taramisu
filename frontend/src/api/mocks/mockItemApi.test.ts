@@ -8,6 +8,8 @@ async function treeBelow(api: ReturnType<typeof createMockItemApi>, assetId: str
   return (await api.content.children(project, 'i-01')).find((node) => node.id === assetId)!.children
 }
 
+const unassigned = (api: ReturnType<typeof createMockItemApi>) => api.content.unassigned(project, 'i-01')
+
 describe('createMockItemApi', () => {
   it('is seeded with the headlamp item, its assets and the elements below them', async () => {
     const api = createMockItemApi()
@@ -413,6 +415,53 @@ describe('createMockItemApi', () => {
       await expect(attackPaths.linkThreatScenario(project, 'ap-03', 'nope')).rejects.toMatchObject({ status: 404 })
       expect((await attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).threatScenarios).toEqual([])
       await expect(attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).rejects.toMatchObject({ status: 404 })
+    })
+  })
+
+  describe('unassigned elements', () => {
+    it('lists the elements without a link upwards, with the elements below them', async () => {
+      const api = createMockItemApi()
+
+      expect(await unassigned(api)).toEqual([
+        { type: 'threat-scenarios', id: 'ts-02', code: 'TS-02', name: 'Replayed headlamp command on the CAN bus' },
+        { type: 'threat-scenarios', id: 'ts-03', code: 'TS-03', name: 'Denial of service on the body control ECU' },
+        { type: 'attack-paths', id: 'ap-03', code: 'AP-03', name: 'Manipulated firmware update in the workshop' },
+      ])
+      const item = await api.items.create(project, { name: 'Rear lights', scope_type: 'ITEM' })
+      expect(await api.content.unassigned(project, item.id)).toEqual([])
+      await expect(api.content.unassigned(project, 'nope')).rejects.toMatchObject({ status: 404 })
+    })
+
+    it('moves a threat scenario from "Unassigned" below its damage scenario and back', async () => {
+      const api = createMockItemApi()
+
+      await api.threatScenarios.linkDamageScenario(project, 'ts-02', 'ds-01')
+      expect((await unassigned(api)).map((node) => node.code)).toEqual(['TS-03', 'AP-03'])
+      expect((await treeBelow(api, 'a-01'))![0].children).toMatchObject([{ code: 'TS-01' }, { code: 'TS-02' }])
+
+      await api.threatScenarios.unlinkDamageScenario(project, 'ts-02', 'ds-01')
+      expect((await unassigned(api)).map((node) => node.code)).toEqual(['TS-02', 'TS-03', 'AP-03'])
+      expect((await treeBelow(api, 'a-01'))![0].children).toMatchObject([{ code: 'TS-01' }])
+    })
+
+    it('moves a damage scenario without assets to "Unassigned" with the elements below it', async () => {
+      const api = createMockItemApi()
+
+      await api.damageScenarios.unlinkAsset(project, 'ds-01', 'a-01')
+      expect((await unassigned(api))[0]).toMatchObject({ code: 'DS-01', children: [{ code: 'TS-01', children: [{ code: 'AP-01' }, { code: 'AP-02' }] }] })
+      expect(await treeBelow(api, 'a-01')).toBeUndefined()
+
+      await api.damageScenarios.linkAsset(project, 'ds-01', 'a-02', ['I'])
+      expect((await unassigned(api)).map((node) => node.code)).toEqual(['TS-02', 'TS-03', 'AP-03'])
+      expect(await treeBelow(api, 'a-02')).toMatchObject([{ code: 'DS-01' }])
+    })
+
+    it('shows an attack path linked to an unassigned threat scenario only below it', async () => {
+      const api = createMockItemApi()
+
+      await api.attackPaths.linkThreatScenario(project, 'ap-03', 'ts-03')
+
+      expect(await unassigned(api)).toMatchObject([{ code: 'TS-02' }, { code: 'TS-03', children: [{ code: 'AP-03' }] }])
     })
   })
 })
