@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -172,8 +174,11 @@ func TestAttachmentPersistence(t *testing.T) {
 	if err != nil || len(rows) != 0 {
 		t.Fatalf("rolled-back deletion queued attachments: %v %v", rows, err)
 	}
-	if deleted, err := queries.DeleteTaraProject(ctx, project); err != nil || deleted.ID != project {
-		t.Fatalf("delete project with attachment: %v %v", deleted, err)
+	if _, err = queries.MarkTaraProjectDeleted(ctx, project); err != nil {
+		t.Fatal(err)
+	}
+	if purged, err := queries.PurgeDeletedTaraProjects(ctx, pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}); err != nil || !slices.Contains(purged, project) {
+		t.Fatalf("purge project with attachment: %v %v", purged, err)
 	}
 	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
 	if err != nil || len(rows) != 1 || rows[0].ProjectID.Valid || rows[0].S3ObjectKey != attachment.S3ObjectKey {

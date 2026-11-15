@@ -207,28 +207,16 @@ func (q *Queries) ListProjectRoleAssignments(ctx context.Context, taraProjectID 
 }
 
 const lockTaraProject = `-- name: LockTaraProject :one
-SELECT id FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
+SELECT id FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE
 `
 
 // Serializes membership changes per project. The Store's membership methods take this lock before
 // the guarded statement, so two Owners cannot downgrade or remove each other at the same moment.
-// NO KEY UPDATE still conflicts with itself and with deleting the project, but not with the
+// NO KEY UPDATE still conflicts with itself and with marking the project as deleted, but not with the
 // KEY SHARE locks that foreign key checks take, so content can be written in the meantime.
+// No row for a project marked as deleted, also when it was marked after the request's access check.
 func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, lockTaraProject, id)
-	var id_2 pgtype.UUID
-	err := row.Scan(&id_2)
-	return id_2, err
-}
-
-const lockTaraProjectForDelete = `-- name: LockTaraProjectForDelete :one
-SELECT id FROM tara_project WHERE id = $1 FOR UPDATE
-`
-
-// Locks the project for its deletion. Taking FOR UPDATE at once, instead of upgrading from
-// NO KEY UPDATE at the DELETE, makes concurrent content inserts wait instead of deadlocking.
-func (q *Queries) LockTaraProjectForDelete(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, lockTaraProjectForDelete, id)
 	var id_2 pgtype.UUID
 	err := row.Scan(&id_2)
 	return id_2, err

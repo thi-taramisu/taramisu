@@ -18,6 +18,7 @@ const (
 	EventMemberRoleChanged = "member.role_changed"
 	EventMemberRemoved     = "member.removed"
 	EventProjectDeleted    = TargetProject + ".deleted"
+	EventProjectRestored   = TargetProject + ".restored"
 )
 
 // Target types of audit events.
@@ -95,11 +96,17 @@ type AssignmentState struct {
 	MemberState
 }
 
-// DeletedProjectState is what project.deleted keeps of a project: its name, so that operators can tell
-// which project it was, and who had access. The description is free text and is not kept.
+// DeletedProjectState is what project.deleted keeps of a project when its deletion is requested:
+// its name, so that operators can tell which project it was, and who had access. The description is
+// free text and is not kept.
 type DeletedProjectState struct {
 	Name    string            `json:"name"`
 	Members []AssignmentState `json:"members"`
+}
+
+// RestoredProjectState is what project.restored keeps of a project: its name, like project.deleted.
+type RestoredProjectState struct {
+	Name string `json:"name"`
 }
 
 func insertEvent(ctx context.Context, q *Queries, actor Actor, c Change) error {

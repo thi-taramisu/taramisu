@@ -454,7 +454,10 @@ export interface paths {
         /** Replace a TARA project */
         put: operations["replace-tara-project"];
         post?: never;
-        /** Delete a TARA project */
+        /**
+         * Delete a TARA project
+         * @description Owner only. The project disappears for all members at once, with all its content, and is deleted permanently after a grace period (30 days by default). Until then, an operator can restore it.
+         */
         delete: operations["delete-tara-project"];
         options?: never;
         head?: never;

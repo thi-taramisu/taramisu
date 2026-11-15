@@ -11,8 +11,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// ErrProjectNotFound is returned when the project of a change does not exist (any more).
+// ErrProjectNotFound is returned when the project of a change does not exist (any more) or is marked
+// as deleted; RestoreTaraProject returns it for a project that is not marked as deleted.
 var ErrProjectNotFound = errors.New("project not found")
+
+// ErrActorNotFound is returned when the actor of a change that does not come from a request is not
+// a known user.
+var ErrActorNotFound = errors.New("actor not found")
 
 // ErrNestedAudit is returned when Audit is called with a context that already carries its
 // transaction: the inner event would be logged before the outer change is committed.
@@ -132,18 +137,14 @@ func (s *Store) Audit(ctx context.Context, actor Actor, fn func(ctx context.Cont
 }
 
 // lockProject locks the project row for the rest of the transaction in ctx with FOR NO KEY UPDATE.
-// It serializes membership changes, but does not block writes to the project's content.
+// It serializes membership changes and the deletion, but does not block writes to the project's
+// content. A project marked as deleted is not found.
 func (s *Store) lockProject(ctx context.Context, projectID pgtype.UUID) error {
-	return projectLock(s.LockTaraProject(ctx, projectID))
+	_, err := s.LockTaraProject(ctx, projectID)
+	return projectNotFound(err)
 }
 
-// lockProjectForDelete locks the project row with FOR UPDATE at once, so the deletion waits for
-// content writes in progress instead of deadlocking with them when the DELETE upgrades the lock.
-func (s *Store) lockProjectForDelete(ctx context.Context, projectID pgtype.UUID) error {
-	return projectLock(s.LockTaraProjectForDelete(ctx, projectID))
-}
-
-func projectLock(_ pgtype.UUID, err error) error {
+func projectNotFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrProjectNotFound
 	}
@@ -232,20 +233,22 @@ func (s *Store) DeleteProjectMember(ctx context.Context, actor Actor, arg Delete
 	return row, err
 }
 
-// DeleteTaraProject deletes the project and records its name and role assignments, which the delete
-// removes by cascade. It returns ErrProjectNotFound if the project does not exist.
+// DeleteTaraProject marks the project as deleted and records its name and role assignments. From
+// then on the project is hidden from everyone; PurgeDeletedProjects deletes it for good after the
+// grace period, unless RestoreTaraProject takes the mark back. It returns ErrProjectNotFound if the
+// project does not exist or is already marked.
 func (s *Store) DeleteTaraProject(ctx context.Context, actor Actor, id pgtype.UUID) error {
 	return s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
-		if err := s.lockProjectForDelete(ctx, id); err != nil {
+		if err := s.lockProject(ctx, id); err != nil {
 			return Change{}, err
 		}
 		assignments, err := s.ListProjectRoleAssignments(ctx, id)
 		if err != nil {
 			return Change{}, err
 		}
-		row, err := s.Queries.DeleteTaraProject(ctx, id)
+		row, err := s.MarkTaraProjectDeleted(ctx, id)
 		if err != nil {
-			return Change{}, err
+			return Change{}, projectNotFound(err)
 		}
 		before := DeletedProjectState{Name: row.Name, Members: make([]AssignmentState, 0, len(assignments))}
 		for _, a := range assignments {
@@ -255,8 +258,53 @@ func (s *Store) DeleteTaraProject(ctx context.Context, actor Actor, id pgtype.UU
 	})
 }
 
-// PurgeExpiredAuditEvents deletes the audit history of projects deleted before cutoff. If another
-// replica is already running it, it returns 0 without waiting.
+// RestoreTaraProject makes a project that is marked as deleted available again, with its content and
+// role assignments as they were, and records project.restored. Operators run it within the grace
+// period (cmd/restore-project); the actor is the user they name, because no request carries one. It
+// returns ErrActorNotFound for an unknown actor and ErrProjectNotFound if the project does not exist
+// or is not marked as deleted.
+func (s *Store) RestoreTaraProject(ctx context.Context, actor Actor, id pgtype.UUID) error {
+	return s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
+		known, err := s.IAMUserExists(ctx, actor.UserID)
+		if err != nil {
+			return Change{}, err
+		}
+		if !known {
+			return Change{}, ErrActorNotFound
+		}
+		row, err := s.Queries.RestoreTaraProject(ctx, id)
+		if err != nil {
+			return Change{}, projectNotFound(err)
+		}
+		return Change{Event: EventProjectRestored, ProjectID: id, TargetType: TargetProject, TargetID: id, After: RestoredProjectState{Name: row.Name}}, nil
+	})
+}
+
+// PurgeDeletedProjects deletes the projects marked as deleted before cutoff for good, with all their
+// content, and returns their IDs. It records no audit event: the deletion was recorded when it was
+// requested. All of them are deleted in one transaction, which is enough for the few projects a day
+// can bring. If another replica is already running it, it returns nothing without waiting.
+func (s *Store) PurgeDeletedProjects(ctx context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
+	tx, err := s.conn.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.WithTx(tx)
+	locked, err := q.TryProjectPurgeLock(ctx)
+	if err != nil || !locked {
+		return nil, err
+	}
+	ids, err := q.PurgeDeletedTaraProjects(ctx, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	return ids, tx.Commit(ctx)
+}
+
+// PurgeExpiredAuditEvents deletes the audit history of projects whose deletion was requested before
+// cutoff and that are deleted for good. If another replica is already running it, it returns 0
+// without waiting.
 func (s *Store) PurgeExpiredAuditEvents(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
 	tx, err := s.conn.Begin(ctx)
 	if err != nil {

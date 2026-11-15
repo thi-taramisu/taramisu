@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
@@ -40,7 +39,6 @@ type fakeProjects struct {
 	handlers.ThreatPropertyLinkStore
 	project   db.TaraProject
 	found     bool
-	deleteErr error
 	audit     auditRecorder
 	deletedBy db.Actor
 	// role is the caller's role returned by GetProjectRole; empty means no role.
@@ -125,9 +123,6 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 
 func (f *fakeProjects) DeleteTaraProject(_ context.Context, actor db.Actor, _ pgtype.UUID) error {
 	f.deletedBy = actor
-	if f.deleteErr != nil {
-		return f.deleteErr
-	}
 	if !f.found {
 		return db.ErrProjectNotFound
 	}
@@ -177,19 +172,6 @@ func TestTaraProjectRoutes(t *testing.T) {
 				t.Fatalf("status = %d, want %d: %s", rr.Code, tc.code, rr.Body.String())
 			}
 		})
-	}
-}
-
-func TestTaraProjectDeleteWithItemDefinitions(t *testing.T) {
-	manager, bearer := authtest.NewManagerAndToken(t)
-	store := newFakeProjects(true)
-	store.deleteErr = &pgconn.PgError{Code: "23503"}
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
-	req.Header.Set("Authorization", bearer)
-	rr := httptest.NewRecorder()
-	httpapi.New(store, manager).ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d: %s", rr.Code, http.StatusConflict, rr.Body.String())
 	}
 }
 

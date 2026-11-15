@@ -354,10 +354,11 @@ erDiagram
   get consecutive numbers, and a rolled-back creation also rolls back the counter. The counter never
   decreases, so the number of a deleted element is not reused.
 * **Lock order:** An item creation locks the project (`FOR KEY SHARE`) before the counter row, the order in
-  which a project deletion locks the project and then removes its counters, so it waits for a concurrent
-  deletion instead of deadlocking with it. Element creations take no explicit project lock, because a project
-  with items cannot be deleted. The first creation of a type in a project waits for a deletion through the
-  new counter row's foreign key, but cannot deadlock with it, because the deletion does not see that row.
+  which the purge of a deleted project locks the project and then removes it with its content and counters,
+  so it waits for a concurrent purge instead of deadlocking with it. Element creations take no explicit
+  project lock: if the counter row exists, they do not wait, and the purge deletes the new element with its
+  item. The first creation of a type in a project waits for a purge through the new counter row's foreign key,
+  but cannot deadlock with it, because the purge does not see that row.
   No code creates several element types in one transaction yet; such code must take the counter rows in a
   fixed order, for example the order of `display_id_type`, so that two such transactions cannot deadlock.
 * **Uniqueness:** Elements of an item repeat the item's `tara_project_id` and refer to the item with the
