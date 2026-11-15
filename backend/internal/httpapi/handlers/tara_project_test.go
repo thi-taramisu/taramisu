@@ -45,6 +45,9 @@ type fakeProjects struct {
 	roleQuery  db.GetProjectRoleParams
 	listQuery  db.ListTaraProjectsParams
 	createdFor pgtype.UUID
+	// favorite is the caller's favourite flag; favoriteFor records the last add or remove.
+	favorite    bool
+	favoriteFor db.AddProjectFavoriteParams
 }
 
 func newFakeProjects(found bool) *fakeProjects {
@@ -90,7 +93,21 @@ func (f *fakeProjects) ListTaraProjects(_ context.Context, a db.ListTaraProjects
 		return nil, nil
 	}
 	p := f.project
-	return []db.ListTaraProjectsRow{{ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, Role: f.role}}, nil
+	return []db.ListTaraProjectsRow{{ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, Role: f.role, IsFavorite: f.favorite}}, nil
+}
+
+func (f *fakeProjects) AddProjectFavorite(_ context.Context, a db.AddProjectFavoriteParams) error {
+	f.favorite, f.favoriteFor = true, a
+	return nil
+}
+
+func (f *fakeProjects) RemoveProjectFavorite(_ context.Context, a db.RemoveProjectFavoriteParams) error {
+	f.favorite, f.favoriteFor = false, db.AddProjectFavoriteParams(a)
+	return nil
+}
+
+func (f *fakeProjects) IsProjectFavorite(context.Context, db.IsProjectFavoriteParams) (bool, error) {
+	return f.favorite, nil
 }
 
 func (f *fakeProjects) ReplaceTaraProject(_ context.Context, a db.ReplaceTaraProjectParams) (db.TaraProject, error) {
@@ -153,6 +170,11 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"update missing", false, http.MethodPatch, base + "/" + projectID, `{"name":"c"}`, http.StatusNotFound},
 		{"delete", true, http.MethodDelete, base + "/" + projectID, "", http.StatusNoContent},
 		{"delete missing", false, http.MethodDelete, base + "/" + projectID, "", http.StatusNotFound},
+		{"add favorite", true, http.MethodPut, base + "/" + projectID + "/favorite", "", http.StatusNoContent},
+		{"add favorite bad id", true, http.MethodPut, base + "/nope/favorite", "", http.StatusUnprocessableEntity},
+		{"remove favorite", true, http.MethodDelete, base + "/" + projectID + "/favorite", "", http.StatusNoContent},
+		{"list favorites", true, http.MethodGet, base + "?favorite=true", "", http.StatusOK},
+		{"list bad favorite filter", true, http.MethodGet, base + "?favorite=maybe", "", http.StatusUnprocessableEntity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := httpapi.New(newFakeProjects(tc.found), manager)
@@ -327,4 +349,70 @@ func TestTaraProjectDeleteIsAudited(t *testing.T) {
 	if len(entries) != 1 || entries[0]["event"] != "project.deleted" || entries[0]["project"] != projectID || entries[0]["actor"] != authtest.UserID {
 		t.Fatalf("delete audit = %v", entries)
 	}
+}
+
+func TestTaraProjectFavorite(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	base := "/api/v1/projects/" + projectID
+	send := func(store *fakeProjects, method, path string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(method, path, http.NoBody)
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		httpapi.New(store, manager).ServeHTTP(rr, req)
+		return rr
+	}
+
+	// Favourites are personal: every role may set them, callers without a role get 404.
+	for _, tc := range []struct {
+		role db.ProjectRole
+		code int
+	}{
+		{"", http.StatusNotFound},
+		{db.ProjectRoleVIEWER, http.StatusNoContent},
+		{db.ProjectRoleEDITOR, http.StatusNoContent},
+		{db.ProjectRoleOWNER, http.StatusNoContent},
+	} {
+		for _, method := range []string{http.MethodPut, http.MethodDelete} {
+			t.Run(string(tc.role)+" "+method, func(t *testing.T) {
+				store := newFakeProjects(true)
+				store.role = tc.role
+				if rr := send(store, method, base+"/favorite"); rr.Code != tc.code {
+					t.Fatalf("status = %d, want %d: %s", rr.Code, tc.code, rr.Body.String())
+				}
+			})
+		}
+	}
+
+	t.Run("add and remove use caller and project", func(t *testing.T) {
+		store := newFakeProjects(true)
+		send(store, http.MethodPut, base+"/favorite")
+		want := db.AddProjectFavoriteParams{UserID: testUUIDValue(t, authtest.UserID), ProjectID: testUUIDValue(t, projectID)}
+		if !store.favorite || store.favoriteFor != want {
+			t.Fatalf("add = %+v, favorite = %v", store.favoriteFor, store.favorite)
+		}
+		var got handlers.TaraProjectBody
+		if err := json.Unmarshal(send(store, http.MethodGet, base).Body.Bytes(), &got); err != nil || !got.IsFavorite {
+			t.Fatalf("get after add: %+v %v", got, err)
+		}
+		send(store, http.MethodDelete, base+"/favorite")
+		if store.favorite || store.favoriteFor != want {
+			t.Fatalf("remove = %+v, favorite = %v", store.favoriteFor, store.favorite)
+		}
+	})
+
+	t.Run("list filter", func(t *testing.T) {
+		for query, want := range map[string]bool{"": false, "?favorite=false": false, "?favorite=true": true} {
+			store := newFakeProjects(true)
+			store.favorite = true
+			rr := send(store, http.MethodGet, "/api/v1/projects"+query)
+			var got []handlers.TaraProjectBody
+			if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil || len(got) != 1 || !got[0].IsFavorite {
+				t.Fatalf("list%s: %d %s", query, rr.Code, rr.Body.String())
+			}
+			if store.listQuery.OnlyFavorites != want {
+				t.Fatalf("list%s: OnlyFavorites = %v, want %v", query, store.listQuery.OnlyFavorites, want)
+			}
+		}
+	})
 }
