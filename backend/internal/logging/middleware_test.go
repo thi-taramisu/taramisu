@@ -3,6 +3,7 @@ package logging
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -131,6 +132,37 @@ func TestMiddlewareRecoversPanic(t *testing.T) {
 	}
 	if got[1]["status"] != float64(http.StatusInternalServerError) {
 		t.Errorf("request log status = %v, want 500", got[1]["status"])
+	}
+}
+
+// A response that has started cannot become a 500. It must not look complete to the client either.
+func TestMiddlewareAbortsStartedResponseAfterPanic(t *testing.T) {
+	lines := capture(t, slog.LevelInfo)
+	srv := httptest.NewServer(newRouter(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("partial"))
+		_ = http.NewResponseController(w).Flush()
+		panic("boom")
+	}))
+	defer srv.Close()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/v1/projects/1", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err == nil {
+		t.Errorf("read body %q without error, want the truncated response to fail", body)
+	}
+
+	srv.Close() // waits for the handler, so the log is complete
+	got := lines()
+	if len(got) != 2 || got[0]["panic"] != "boom" || got[1]["msg"] != "request" {
+		t.Fatalf("log lines = %v, want a panic entry, then the request", got)
 	}
 }
 

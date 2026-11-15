@@ -50,7 +50,7 @@ func SetActor(ctx context.Context, userID string) {
 }
 
 // Middleware assigns each request an ID, writes one log line when the request ends, and turns a panic
-// into a logged 500 instead of a dropped connection. It must run inside the chi router so that the
+// into a logged 500. If the response has already started, it logs the panic and aborts the response. It must run inside the chi router so that the
 // route pattern is known when the request is logged.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +65,7 @@ func Middleware(next http.Handler) http.Handler {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 		defer func() {
+			abort := false
 			if recovered := recover(); recovered != nil {
 				if err, ok := recovered.(error); ok && errors.Is(err, http.ErrAbortHandler) {
 					panic(recovered)
@@ -75,9 +76,16 @@ func Middleware(next http.Handler) http.Handler {
 					ww.Header().Set("Content-Type", "application/problem+json")
 					ww.WriteHeader(http.StatusInternalServerError)
 					_, _ = ww.Write([]byte(`{"title":"Internal Server Error","status":500,"detail":"internal server error"}` + "\n"))
+				} else {
+					// The response has started and cannot become a 500 any more.
+					abort = true
 				}
 			}
 			logRequest(ctx, r, ww, req, time.Since(start))
+			if abort {
+				// Makes net/http close the connection, so the client sees a failed response, not a complete one.
+				panic(http.ErrAbortHandler)
+			}
 		}()
 		next.ServeHTTP(ww, r.WithContext(ctx))
 	})
