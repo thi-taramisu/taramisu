@@ -39,6 +39,8 @@ project.
 
 1. **Who, what, when, where, before and after.** Every event records the actor, the event name, the target (type and ID), the
    project, the time, the values before and after, and the request ID that links it to the logs.
+   The actor is always the user who decided: when a user applies a suggestion of the AI assistant, the user is the actor,
+   and the event (`ai_suggestion.applied`) records that the change came from the assistant.
 2. **Same transaction.** The event is written in the transaction that makes the change. A change is never stored without its
    event, and a rolled-back change (for example the `409` for the last Owner) leaves no event. A change that changes nothing,
    such as setting a role to the role a member already has, records no event.
