@@ -12,18 +12,18 @@ Compared on 2026-11-08 against `main` at `ae76b8d`.
 
 | Category | Feature | Priority | Remark | Ticket |
 | --- | --- | --- | --- | --- |
-| Project | Project title image, uploaded at creation or in the settings | Low | | |
-| Project | Favorites, personal per user | Medium | | |
-| Project | Archive and restore, archived projects are read-only for all members | Medium | | |
-| Project | (Optional) Default feasibility method setting for new attack paths | Low | | |
-| Project | Delete a project (that may contain items) with all its content | High | | |
-| Project | Export and import as a file | High | Concept ticket to be created | |
-| Item | Supporting files, several per item | Medium | | |
-| Item | Delete an item with its assets and scenarios | High | | |
-| All elements | Store IDs for elements | High | | |
-| All elements | Global search by name and display ID, with filters, limited to accessible projects (#193) | High | Waiting for frontend concept (#193) | |
-| Attack path | (Optional) Rating method per path: attack potential, CVSS exploitability, or attack vector | Low | | |
+| Project | Project title image, uploaded at creation or in the settings | Low | | #231 |
+| Project | Favorites, personal per user | Medium | | #232 |
+| Project | Archive and restore, archived projects are read-only for all members | Medium | | #233 |
+| Project | (Optional) Default feasibility method setting for new attack paths | Low | | #235 |
+| Project | Delete a project (that may contain items) with all its content | High | | #236 |
+| Project | Export and import as a file | High | Concept ticket to be created | #242 |
+| Item | Supporting files, several per item | Medium | | #237 |
+| Item | Delete an item with its assets and scenarios | High | | #238 |
+| All elements | Store IDs for elements | High | | #239 |
+| All elements | Global search by name and display ID, with filters, limited to accessible projects (#193) | High | Waiting for frontend concept (#193) | #240 |
+| Attack path | (Optional) Rating method per path: attack potential, CVSS exploitability, or attack vector | Low | | #234 |
 | Risk | Risk calculation and aggregated feasibility and risk values | High | Agreed that risk values are calculated by the backend | |
-| Collaboration | Protection against conflicting edits (#89) | Medium | | |
+| Collaboration | Protection against conflicting edits (#89) | Medium | | #241 |
 | AI | (Optional) AI assistant with on/off setting per project, off by default | Low | | |
 | AI | (Optional) Elements and fields marked "AI" until reviewed; accepted suggestions logged | Low | | |
