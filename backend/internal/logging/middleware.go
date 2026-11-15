@@ -81,7 +81,7 @@ func Middleware(next http.Handler) http.Handler {
 					abort = true
 				}
 			}
-			logRequest(ctx, r, ww, req, time.Since(start))
+			logRequest(ctx, r, ww, req, time.Since(start), abort)
 			if abort {
 				// Makes net/http close the connection, so the client sees a failed response, not a complete one.
 				panic(http.ErrAbortHandler)
@@ -91,7 +91,7 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func logRequest(ctx context.Context, r *http.Request, ww middleware.WrapResponseWriter, req *request, duration time.Duration) {
+func logRequest(ctx context.Context, r *http.Request, ww middleware.WrapResponseWriter, req *request, duration time.Duration, aborted bool) {
 	status := ww.Status()
 	if status == 0 {
 		status = http.StatusOK
@@ -112,6 +112,10 @@ func logRequest(ctx context.Context, r *http.Request, ww middleware.WrapResponse
 	}
 	if req.actor != "" {
 		attrs = append(attrs, slog.String("actor", req.actor))
+	}
+	if aborted {
+		// The status was already sent, so it stays in the line; the client did not get a complete response.
+		attrs = append(attrs, slog.Bool("aborted", true))
 	}
 	slog.LogAttrs(ctx, level, "request", attrs...)
 }

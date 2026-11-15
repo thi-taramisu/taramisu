@@ -133,6 +133,9 @@ func TestMiddlewareRecoversPanic(t *testing.T) {
 	if got[1]["status"] != float64(http.StatusInternalServerError) {
 		t.Errorf("request log status = %v, want 500", got[1]["status"])
 	}
+	if _, aborted := got[1]["aborted"]; aborted {
+		t.Errorf("request log = %v, want no aborted flag for a response that got its 500", got[1])
+	}
 }
 
 // A response that has started cannot become a 500. It must not look complete to the client either.
@@ -161,8 +164,8 @@ func TestMiddlewareAbortsStartedResponseAfterPanic(t *testing.T) {
 
 	srv.Close() // waits for the handler, so the log is complete
 	got := lines()
-	if len(got) != 2 || got[0]["panic"] != "boom" || got[1]["msg"] != "request" {
-		t.Fatalf("log lines = %v, want a panic entry, then the request", got)
+	if len(got) != 2 || got[0]["panic"] != "boom" || got[1]["msg"] != "request" || got[1]["aborted"] != true {
+		t.Fatalf("log lines = %v, want a panic entry, then the request marked as aborted", got)
 	}
 }
 
