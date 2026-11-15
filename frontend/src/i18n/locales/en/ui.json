@@ -218,7 +218,7 @@
   "loadItemAssetsError": "The assets of this item could not be loaded.",
   "loadItemThreatsError": "The threat scenarios of this item could not be loaded.",
   "saveRelationError": "The link could not be changed. Please try again.",
-  "relationsHint": "Removing a link does not delete the element. Damage and threat scenarios without links are no longer shown in the tree. An asset link needs at least one property.",
+  "relationsHint": "Removing a link does not delete the element. Without an asset, the damage scenario moves to \"Unassigned\" of the item; so does a threat scenario without a damage scenario. An asset link needs at least one property.",
   "optionalProjectImage": "Optional. PNG, JPEG or WebP, up to {{size, number}} MB.",
   "search": "Search",
   "mockAssetHint": "Saved in the mock data until the asset API exists.",

@@ -218,7 +218,7 @@
   "loadItemAssetsError": "Die Assets dieses Items konnten nicht geladen werden.",
   "loadItemThreatsError": "Die Bedrohungsszenarien dieses Items konnten nicht geladen werden.",
   "saveRelationError": "Die Verknüpfung konnte nicht geändert werden. Bitte versuche es erneut.",
-  "relationsHint": "Das Entfernen einer Verknüpfung löscht das Element nicht. Schadens- und Bedrohungsszenarien ohne Verknüpfungen werden nicht mehr in der Baumansicht angezeigt. Eine Asset-Verknüpfung benötigt mindestens eine Eigenschaft.",
+  "relationsHint": "Das Entfernen einer Verknüpfung löscht das Element nicht. Ohne Asset wird das Schadensszenario unter „Nicht zugeordnet“ des Items verschoben, ebenso ein Bedrohungsszenario ohne Schadensszenario. Eine Asset-Verknüpfung benötigt mindestens eine Eigenschaft.",
   "optionalProjectImage": "Optional. PNG, JPEG oder WebP, bis zu {{size, number}} MB.",
   "search": "Suchen",
   "mockAssetHint": "Wird vorläufig nur in den Beispieldaten gespeichert.",
