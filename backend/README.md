@@ -247,8 +247,9 @@ assignable Authentik groups from the signed `taramisu_groups` token claim are su
 Invalid inputs return 422. Missing or inaccessible projects and items return 404; members whose role
 is too low receive 403. Deleting an item also deletes its assets, damage scenarios, threat scenarios,
 attack paths, and their dependent properties, links, ratings, risk values, and treatment decisions.
-The frontend must ask for confirmation before deletion. Responses use the existing problem JSON
-error format without database details.
+The audit history records this as one `item_definition.deleted` event; the rows deleted with the
+item get none. The frontend must ask for confirmation before deletion. Responses use the existing
+problem JSON error format without database details.
 
 Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
 for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
