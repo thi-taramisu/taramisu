@@ -23,7 +23,7 @@ function SettingRow({ title, children, action }: { title: string; children: Reac
   )
 }
 
-/** Archive, restore and delete a project; only Owners see this section. */
+/** "Danger Zone" of the project settings: archive, restore and delete. Only Owners see it. */
 export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   const navigate = useNavigate()
   const project = useProject(projectId)
@@ -50,8 +50,8 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   const failed = archiveProject.isError || restoreProject.isError || deleteProject.isError
 
   return (
-    <section aria-labelledby="project-lifecycle" className="grid gap-3">
-      <h2 id="project-lifecycle" className="text-base font-semibold">Archive and delete</h2>
+    <section aria-labelledby="danger-zone" className="grid gap-3">
+      <h2 id="danger-zone" className="text-base font-semibold">Danger Zone</h2>
       <div className="divide-y rounded-lg border border-destructive/30">
         {archived ? (
           <SettingRow
@@ -63,7 +63,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
               </Button>
             )}
           >
-            This project is archived and read-only. Restore it to allow changes again.
+            This project is archived and read-only for all members. Restore it to allow changes again.
           </SettingRow>
         ) : (
           <SettingRow
@@ -75,7 +75,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
               </Button>
             )}
           >
-            Make the project read-only for all members. Owners can restore it later.
+            Archive this project to make it read-only for all members. Owners can restore it at any time.
           </SettingRow>
         )}
         <SettingRow

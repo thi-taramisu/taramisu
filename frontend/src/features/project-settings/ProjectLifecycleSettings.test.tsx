@@ -18,7 +18,7 @@ function renderSettings(projects = createMockProjectApi()) {
 }
 
 function section() {
-  return screen.findByRole('region', { name: 'Archive and delete' })
+  return screen.findByRole('region', { name: 'Danger Zone' })
 }
 
 describe('ProjectLifecycleSettings', () => {
@@ -43,7 +43,7 @@ describe('ProjectLifecycleSettings', () => {
       await loaded
     })
     expect(screen.getByRole('heading', { name: 'General' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Archive and delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Danger Zone' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive Project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument()
   })

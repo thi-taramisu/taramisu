@@ -74,7 +74,7 @@ the Archive view.
 
 Project owners can also archive a project from its settings:
 open **Settings**, select **Archive Project** under
-**Archive and delete**, and confirm in the dialog.
+**Danger Zone**, and confirm in the dialog.
 
 ### Restoring a project
 
@@ -101,7 +101,7 @@ Select **Cancel** to keep the project.
 
 Project owners can also delete a project from its settings:
 open **Settings** and select **Delete Project** under
-**Archive and delete**. After the deletion, the project list opens.
+**Danger Zone**. After the deletion, the project list opens.
 
 Deletion currently affects only temporary frontend state.
 

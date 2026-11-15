@@ -39,7 +39,8 @@ export function ArchiveProjectDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="whitespace-pre-wrap wrap-anywhere">Archive {projectName}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will make the project read-only for all members. Owners can restore it at any time.
+            This will make the project and all of its content read-only for all members. Owners can restore it at
+            any time from the archive or the project settings.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
