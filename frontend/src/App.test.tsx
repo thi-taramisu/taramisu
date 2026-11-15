@@ -7,11 +7,11 @@ import { renderApp as renderAt } from './test/renderApp'
 const project = '/projects/headlamp'
 
 describe('routing', () => {
-  it('redirects / to the project list', () => {
+  it('redirects / to the project list', async () => {
     renderAt('/')
 
     expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
+    expect(await screen.findByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
   })
 
   it('shows the workspace with the element tree', async () => {

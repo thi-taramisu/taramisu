@@ -1,5 +1,4 @@
-
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Archive, ArchiveRestore, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,8 +16,15 @@ import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
-import { mockProjects } from '@/api/mocks/data/projects'
 import type { Project } from '@/api/models/project'
+import {
+  useArchiveProject,
+  useCreateProject,
+  useDeleteProject,
+  useProjects,
+  useRestoreProject,
+  useSetFavorite,
+} from '@/api/queries/projects'
 
 type MainView = 'projects' | 'archive'
 
@@ -29,91 +35,39 @@ export function ProjectListPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createDialogOpener, setCreateDialogOpener] =
     useState<HTMLButtonElement | null>(null)
-  const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
+  const projectsQuery = useProjects()
+  const createProject = useCreateProject()
+  const setFavorite = useSetFavorite()
+  const archiveProject = useArchiveProject()
+  const restoreProject = useRestoreProject()
+  const deleteProject = useDeleteProject()
   const actionsButtons = useRef(new Map<string, HTMLButtonElement>())
   const [deleteDialogOpener, setDeleteDialogOpener] =
     useState<HTMLButtonElement | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
-  const imageUrls = useRef(new Set<string>())
-
-  useEffect(() => {
-    const urls = imageUrls.current
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url))
-      urls.clear()
-    }
-  }, [])
-
-  function handleCreateProject(name: string, file?: File) {
-    const image = file ? URL.createObjectURL(file) : undefined
-    if (image) imageUrls.current.add(image)
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      name,
-      image,
-      description: 'New TARA project',
-      favorite: false,
-      archived: false,
-      owner: 'Demo User',
-      updatedAt: new Date().toISOString().slice(0, 10),
-    }
-
-    setProjects((previous) => [...previous, newProject])
-    setActiveView('projects')
-  }
-
-  function handleToggleFavorite(projectId: string) {
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId && !project.archived
-          ? { ...project, favorite: !project.favorite }
-          : project,
-      ),
+  function handleCreateProject(name: string, image?: File) {
+    createProject.mutate(
+      { name, description: 'New TARA project', image },
+      { onSuccess: () => setActiveView('projects') },
     )
   }
 
-  function handleArchiveProject(projectId: string) {
-    if (projectId === exampleProject.id) {
-      return
-    }
-
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId
-          ? { ...project, archived: true }
-          : project,
-      ),
-    )
-  }
-
-  function handleRestoreProject(projectId: string) {
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId
-          ? { ...project, archived: false }
-          : project,
-      ),
-    )
+  function handleToggleFavorite(project: Project) {
+    if (project.archived) return
+    setFavorite.mutate({ projectId: project.id, favorite: !project.favorite })
   }
 
   function handleDeleteProject() {
-    if (!projectToDelete || projectToDelete.id === exampleProject.id) {
-      return
-    }
-
-    setProjects((previous) =>
-      previous.filter((project) => project.id !== projectToDelete.id),
-    )
-
-    if (projectToDelete.image && imageUrls.current.delete(projectToDelete.image)) {
-      URL.revokeObjectURL(projectToDelete.image)
-    }
-    setProjectToDelete(null)
+    if (!projectToDelete) return
+    deleteProject.mutate(projectToDelete.id, { onSettled: () => setProjectToDelete(null) })
   }
 
+  const projects = projectsQuery.data ?? []
   const activeProjects = projects.filter((project) => !project.archived)
   const archivedProjects = projects.filter((project) => project.archived)
+  const actionFailed = [createProject, setFavorite, archiveProject, restoreProject, deleteProject]
+    .some((mutation) => mutation.isError)
 
   return (
     <>
@@ -136,6 +90,24 @@ export function ProjectListPage() {
 
         <main className="min-w-0 flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-8">
+            {projectsQuery.isPending && (
+              <p className="text-sm text-muted-foreground">Loading projects…</p>
+            )}
+            {projectsQuery.isError && (
+              <div className="flex items-center justify-between gap-2">
+                <p role="alert" className="text-sm text-destructive">
+                  The projects could not be loaded.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => void projectsQuery.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            )}
+            {actionFailed && (
+              <p role="alert" className="text-sm text-destructive">
+                The change could not be saved. Please try again.
+              </p>
+            )}
             {activeView === 'projects' ? (
               <>
                 <h1 className="text-2xl font-semibold">Projects</h1>
@@ -161,7 +133,7 @@ export function ProjectListPage() {
                           image={project.image}
                           favorite={project.favorite}
                           onToggleFavorite={() =>
-                            handleToggleFavorite(project.id)
+                            handleToggleFavorite(project)
                           }
                         />
                       ))}
@@ -203,7 +175,7 @@ export function ProjectListPage() {
                               variant="ghost"
                               size="icon"
                               className="shrink-0"
-                              onClick={() => handleToggleFavorite(project.id)}
+                              onClick={() => handleToggleFavorite(project)}
                               aria-label={
                                 project.favorite
                                   ? `Remove ${project.name} from favorites`
@@ -239,8 +211,7 @@ export function ProjectListPage() {
 
                               <DropdownMenuContent align="end" className="w-max">
                                 <DropdownMenuItem
-                                  disabled={project.id === exampleProject.id}
-                                  onSelect={() => handleArchiveProject(project.id)}
+                                  onSelect={() => archiveProject.mutate(project.id)}
                                 >
                                   <Archive className="size-4" />
                                   Archive Project
@@ -248,7 +219,6 @@ export function ProjectListPage() {
 
                                 <DropdownMenuItem
                                   variant="destructive"
-                                  disabled={project.id === exampleProject.id}
                                   onSelect={() => {
                                     setDeleteDialogOpener(actionsButtons.current.get(project.id) ?? null)
                                     setProjectToDelete(project)
@@ -290,7 +260,7 @@ export function ProjectListPage() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => handleRestoreProject(project.id)}
+                            onClick={() => restoreProject.mutate(project.id)}
                             aria-label={`Restore ${project.name}`}
                           >
                             <ArchiveRestore className="size-4" />

@@ -1,23 +1,23 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import { ProjectListPage } from './ProjectListPage'
+import { ApiError } from '@/api/errors'
+import { createMockItemApi } from '@/api/mocks/mockItemApi'
+import { createMockProjectApi } from '@/api/mocks/mockProjectApi'
+import { renderApp } from '@/test/renderApp'
 
 const confirmLabel = 'To confirm, type "Battery Security" in the box below'
 
-function renderAt(path: string) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <ProjectListPage />
-    </MemoryRouter>,
-  )
+/** Renders the project list with a fresh mock project API and waits until the projects are loaded. */
+async function renderAt(path: string) {
+  renderApp(path)
+  await screen.findByRole('button', { name: 'Actions for Battery Security' })
 }
 
 describe('Main Page project management', () => {
   it('creates a project through the dialog', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     await user.click(screen.getByRole('button', { name: 'Create Project' }))
 
@@ -41,12 +41,12 @@ describe('Main Page project management', () => {
     const allProjects = screen.getByRole('heading', { name: 'All Projects' }).closest('section')
 
     expect(allProjects).not.toBeNull()
-    expect(within(allProjects!).getByText('My New TARA Project')).toBeInTheDocument()
+    expect(await within(allProjects!).findByText('My New TARA Project')).toBeInTheDocument()
   })
 
   it('adds and removes a project from favorites', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })
@@ -69,7 +69,7 @@ describe('Main Page project management', () => {
       }),
     )
 
-    expect(within(favorites!).getByText('Vehicle Gateway')).toBeInTheDocument()
+    expect(await within(favorites!).findByText('Vehicle Gateway')).toBeInTheDocument()
 
     expect(
       within(allProjects!).getByRole('button', {
@@ -84,7 +84,7 @@ describe('Main Page project management', () => {
       }),
     )
 
-    expect(within(favorites!).queryByText('Vehicle Gateway')).not.toBeInTheDocument()
+    await waitFor(() => expect(within(favorites!).queryByText('Vehicle Gateway')).not.toBeInTheDocument())
 
     // The project must still exist under All Projects.
     expect(within(allProjects!).getByText('Vehicle Gateway')).toBeInTheDocument()
@@ -98,7 +98,7 @@ describe('Main Page project management', () => {
 
   it('deletes a project only after confirmation', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })
@@ -173,9 +173,9 @@ describe('Main Page project management', () => {
     )
 
     // The deleted project must disappear from both sections.
-    expect(
+    await waitFor(() => expect(
       within(allProjects).queryByText('Battery Security'),
-    ).not.toBeInTheDocument()
+    ).not.toBeInTheDocument())
 
     expect(
       within(favorites).queryByText('Battery Security'),
@@ -191,7 +191,7 @@ describe('Main Page project management', () => {
     'returns focus to the same Actions button after %s (confirm step: %s)',
     async (dismissal, confirmStep) => {
       const user = userEvent.setup()
-      renderAt('/projects')
+      await renderAt('/projects')
 
       const opener = screen.getByRole('button', {
         name: 'Actions for Battery Security',
@@ -228,7 +228,7 @@ describe('Main Page project management', () => {
 
   it('archives and restores a project while preserving its favorite status', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })
@@ -256,9 +256,9 @@ describe('Main Page project management', () => {
     )
 
     // Archived projects must disappear from the main overview.
-    expect(
+    await waitFor(() => expect(
       within(allProjects).queryByText('Battery Security'),
-    ).not.toBeInTheDocument()
+    ).not.toBeInTheDocument())
 
     expect(
       within(favorites).queryByText('Battery Security'),
@@ -282,9 +282,9 @@ describe('Main Page project management', () => {
       }),
     )
 
-    expect(
+    await waitFor(() => expect(
       within(archive).queryByText('Battery Security'),
-    ).not.toBeInTheDocument()
+    ).not.toBeInTheDocument())
 
     // Switch back to Projects.
     await user.click(
@@ -313,5 +313,32 @@ describe('Main Page project management', () => {
         name: 'Remove Battery Security from favorites',
       }),
     ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('allows archiving and deleting the example project', async () => {
+    const user = userEvent.setup()
+    await renderAt('/projects')
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Headlamp System' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Archive Project' })).not.toHaveAttribute('data-disabled')
+    expect(screen.getByRole('menuitem', { name: 'Delete Project' })).not.toHaveAttribute('data-disabled')
+  })
+
+  it('shows an error with a retry when the projects cannot be loaded', async () => {
+    const user = userEvent.setup()
+    const projects = createMockProjectApi()
+    const list = projects.list
+    let fail = true
+    projects.list = () => (fail ? Promise.reject(new ApiError(500, 'Server error.')) : list())
+    renderApp('/projects', createMockItemApi(), projects)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The projects could not be loaded.')
+
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByRole('button', { name: 'Actions for Battery Security' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
