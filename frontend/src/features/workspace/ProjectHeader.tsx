@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { exampleProject } from '../../api/mocks/data/headlamp'
+import { LanguageSelector } from '@/components/layout/LanguageSelector'
 
 /** Top bar of a project (workspace and settings); page-specific controls go into `children` on the right. */
 export function ProjectHeader({ projectId, children }: { projectId: string; children?: ReactNode }) {
   return (
-    <header className="flex items-center gap-4 border-b px-4 py-2">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2">
       <Link to="/projects" className="text-sm text-muted-foreground hover:underline">
         Projects
       </Link>
@@ -17,7 +18,10 @@ export function ProjectHeader({ projectId, children }: { projectId: string; chil
         Settings
       </NavLink>
       <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">Colour schemes</Link>
-      {children && <div className="ml-auto flex items-center gap-2">{children}</div>}
+      <div className="ml-auto flex items-center gap-2">
+        {children}
+        <LanguageSelector />
+      </div>
     </header>
   )
 }
