@@ -25,6 +25,7 @@ import {
   useProjects,
   useRestoreProject,
   useSetFavorite,
+  resetFailed,
 } from '@/api/queries/projects'
 
 type MainView = 'projects' | 'archive'
@@ -50,7 +51,10 @@ export function ProjectListPage() {
     useState<HTMLButtonElement | null>(null)
   const [projectToArchive, setProjectToArchive] = useState<Project | null>(null)
 
+  const mutations = [createProject, setFavorite, archiveProject, restoreProject, deleteProject]
+
   function handleCreateProject(name: string, image?: File) {
+    resetFailed(...mutations)
     createProject.mutate(
       { name, description: 'New TARA project', image },
       { onSuccess: () => setActiveView('projects') },
@@ -59,19 +63,21 @@ export function ProjectListPage() {
 
   function handleToggleFavorite(project: Project) {
     if (project.archived) return
+    resetFailed(...mutations)
     setFavorite.mutate({ projectId: project.id, favorite: !project.favorite })
   }
 
   function handleDeleteProject() {
-    if (!projectToDelete) return
+    // A second confirm while the request runs would delete twice and report the second 404.
+    if (!projectToDelete || deleteProject.isPending) return
+    resetFailed(...mutations)
     deleteProject.mutate(projectToDelete.id, { onSettled: () => setProjectToDelete(null) })
   }
 
   const projects = projectsQuery.data ?? []
   const activeProjects = projects.filter((project) => !project.archived)
   const archivedProjects = projects.filter((project) => project.archived)
-  const actionFailed = [createProject, setFavorite, archiveProject, restoreProject, deleteProject]
-    .some((mutation) => mutation.isError)
+  const actionFailed = mutations.some((mutation) => mutation.isError)
 
   return (
     <>
@@ -267,7 +273,10 @@ export function ProjectListPage() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => restoreProject.mutate(project.id)}
+                            onClick={() => {
+                              resetFailed(...mutations)
+                              restoreProject.mutate(project.id)
+                            }}
                             aria-label={`Restore ${project.name}`}
                           >
                             <ArchiveRestore className="size-4" />
@@ -299,7 +308,9 @@ export function ProjectListPage() {
           }
         }}
         onConfirm={() => {
-          if (projectToArchive) archiveProject.mutate(projectToArchive.id)
+          if (!projectToArchive) return
+          resetFailed(...mutations)
+          archiveProject.mutate(projectToArchive.id)
         }}
         returnFocusTo={archiveDialogOpener}
       />

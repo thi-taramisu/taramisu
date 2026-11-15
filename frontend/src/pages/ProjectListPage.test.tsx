@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/api/errors'
 import { createMockItemApi } from '@/api/mocks/mockItemApi'
 import { createMockProjectApi } from '@/api/mocks/mockProjectApi'
+import { deferred } from '@/test/deferred'
 import { renderApp } from '@/test/renderApp'
 
 const confirmLabel = 'To confirm, type "Battery Security" in the box below'
@@ -341,6 +342,72 @@ describe('Main Page project management', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByRole('button', { name: 'Actions for Battery Security' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('toggles a favorite back and forth on quick clicks, before the requests finish', async () => {
+    const user = userEvent.setup()
+    const projects = createMockProjectApi()
+    const setFavorite = projects.setFavorite
+    const sent: boolean[] = []
+    const request = deferred()
+    projects.setFavorite = async (projectId, favorite) => {
+      sent.push(favorite)
+      await request.promise
+      return setFavorite(projectId, favorite)
+    }
+    renderApp('/projects', createMockItemApi(), projects)
+
+    await screen.findByRole('button', { name: 'Add Vehicle Gateway to favorites' })
+    const allProjects = screen.getByRole('heading', { name: 'All Projects' }).closest('section')!
+    await user.click(within(allProjects).getByRole('button', { name: 'Add Vehicle Gateway to favorites' }))
+    await user.click(within(allProjects).getByRole('button', { name: 'Remove Vehicle Gateway from favorites' }))
+    request.release()
+
+    await waitFor(() => expect(sent).toEqual([true, false]))
+    expect(within(allProjects).getByRole('button', { name: 'Add Vehicle Gateway to favorites' }))
+      .toHaveAttribute('aria-pressed', 'false')
+    expect(await projects.get('vehicle-gateway')).toMatchObject({ favorite: false })
+  })
+
+  it('undoes the star and shows an error when saving a favorite fails', async () => {
+    const user = userEvent.setup()
+    const projects = createMockProjectApi()
+    projects.setFavorite = () => Promise.reject(new ApiError(500, 'Server error.'))
+    renderApp('/projects', createMockItemApi(), projects)
+
+    await user.click(await screen.findByRole('button', { name: 'Add Vehicle Gateway to favorites' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The change could not be saved.')
+    expect(screen.getByRole('button', { name: 'Add Vehicle Gateway to favorites' }))
+      .toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('deletes only once when the confirm button is clicked twice', async () => {
+    const user = userEvent.setup()
+    const projects = createMockProjectApi()
+    const remove = projects.delete
+    let calls = 0
+    const request = deferred()
+    projects.delete = async (projectId) => {
+      calls += 1
+      await request.promise
+      return remove(projectId)
+    }
+    renderApp('/projects', createMockItemApi(), projects)
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Battery Security' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete Project' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete Battery Security' })
+    await user.click(within(dialog).getByRole('button', { name: 'Delete Project' }))
+    await user.type(within(dialog).getByRole('textbox', { name: confirmLabel }), 'Battery Security')
+    const confirm = within(dialog).getByRole('button', { name: 'Delete Project' })
+    await user.click(confirm)
+    await user.click(confirm)
+    request.release()
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Actions for Battery Security' })).not.toBeInTheDocument())
+    expect(calls).toBe(1)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

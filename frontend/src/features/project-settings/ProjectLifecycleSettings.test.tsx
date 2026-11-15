@@ -5,6 +5,7 @@ import { mockProjects } from '@/api/mocks/data/projects'
 import { createMockItemApi } from '@/api/mocks/mockItemApi'
 import { createMockProjectApi } from '@/api/mocks/mockProjectApi'
 import type { ProjectRole } from '@/api/models/project'
+import { deferred } from '@/test/deferred'
 import { renderApp } from '@/test/renderApp'
 
 const settings = '/projects/headlamp/settings'
@@ -15,6 +16,17 @@ function projectsWithHeadlampRole(role: ProjectRole) {
 
 function renderSettings(projects = createMockProjectApi()) {
   return renderApp(settings, createMockItemApi(), projects)
+}
+
+async function confirmDelete(user: ReturnType<typeof renderApp>['user'], lifecycle: HTMLElement) {
+  await user.click(within(lifecycle).getByRole('button', { name: 'Delete Project' }))
+  const dialog = await screen.findByRole('alertdialog', { name: 'Delete Headlamp System' })
+  await user.click(within(dialog).getByRole('button', { name: 'Delete Project' }))
+  await user.type(
+    within(dialog).getByRole('textbox', { name: 'To confirm, type "Headlamp System" in the box below' }),
+    'Headlamp System',
+  )
+  return within(dialog).getByRole('button', { name: 'Delete Project' })
 }
 
 function section() {
@@ -132,5 +144,67 @@ describe('ProjectLifecycleSettings', () => {
 
     expect(await within(lifecycle).findByRole('alert')).toHaveTextContent('The change could not be saved.')
     expect(within(lifecycle).getByRole('button', { name: 'Archive Project' })).toBeEnabled()
+  })
+
+  it('deletes only once when the confirm button is clicked twice', async () => {
+    const projects = createMockProjectApi()
+    const remove = projects.delete
+    const request = deferred()
+    let calls = 0
+    projects.delete = async (projectId) => {
+      calls += 1
+      await request.promise
+      return remove(projectId)
+    }
+    const { user } = renderSettings(projects)
+
+    const confirm = await confirmDelete(user, await section())
+    await user.click(confirm)
+    await user.click(confirm)
+    request.release()
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/projects$/))
+    expect(calls).toBe(1)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('hides an earlier error once a retry succeeds', async () => {
+    const projects = createMockProjectApi()
+    const archive = projects.archive
+    let fail = true
+    projects.archive = (projectId) => (fail ? Promise.reject(new ApiError(500, 'Server error.')) : archive(projectId))
+    const { user } = renderSettings(projects)
+    const lifecycle = await section()
+
+    async function archiveWithConfirmation() {
+      await user.click(within(lifecycle).getByRole('button', { name: 'Archive Project' }))
+      const dialog = await screen.findByRole('alertdialog', { name: 'Archive Headlamp System' })
+      await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }))
+    }
+
+    await archiveWithConfirmation()
+    expect(await within(lifecycle).findByRole('alert')).toBeInTheDocument()
+
+    fail = false
+    await archiveWithConfirmation()
+
+    expect(await within(lifecycle).findByRole('button', { name: 'Restore Project' })).toBeInTheDocument()
+    expect(within(lifecycle).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows an error with a retry when the project cannot be loaded', async () => {
+    const projects = createMockProjectApi()
+    const get = projects.get
+    let fail = true
+    projects.get = (projectId) => (fail ? Promise.reject(new ApiError(500, 'Server error.')) : get(projectId))
+    const { user } = renderSettings(projects)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The archive and delete options could not be loaded.')
+
+    fail = false
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await section()).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

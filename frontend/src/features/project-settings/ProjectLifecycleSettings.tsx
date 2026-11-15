@@ -4,7 +4,9 @@ import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
+import { isNotFound } from '../../api/errors'
 import {
+  resetFailed,
   useArchiveProject,
   useDeleteProject,
   useProject,
@@ -43,11 +45,26 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
     if (!isOpen) setOpenDialog(null)
   }
 
+  // A 404 is handled by the settings page; other errors must not look like missing rights.
+  if (project.isError && !isNotFound(project.error)) {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <p role="alert" className="text-sm text-destructive">
+          The archive and delete options could not be loaded.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => void project.refetch()}>
+          Retry
+        </Button>
+      </div>
+    )
+  }
+
   if (project.data?.role !== 'OWNER') return null
 
   const { name, archived } = project.data
   const pending = archiveProject.isPending || restoreProject.isPending || deleteProject.isPending
-  const failed = archiveProject.isError || restoreProject.isError || deleteProject.isError
+  const mutations = [archiveProject, restoreProject, deleteProject]
+  const failed = mutations.some((mutation) => mutation.isError)
 
   return (
     <section aria-labelledby="danger-zone" className="grid gap-3">
@@ -57,7 +74,10 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
           <SettingRow
             title="Restore project"
             action={(
-              <Button variant="outline" disabled={pending} onClick={() => restoreProject.mutate(projectId)}>
+              <Button variant="outline" disabled={pending} onClick={() => {
+                resetFailed(...mutations)
+                restoreProject.mutate(projectId)
+              }}>
                 <ArchiveRestore aria-hidden="true" />
                 Restore Project
               </Button>
@@ -103,18 +123,25 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
       <ArchiveProjectDialog
         projectName={openDialog === 'archive' ? name : null}
         onOpenChange={close}
-        onConfirm={() => archiveProject.mutate(projectId)}
+        onConfirm={() => {
+          resetFailed(...mutations)
+          archiveProject.mutate(projectId)
+        }}
         returnFocusTo={opener}
       />
 
       <DeleteProjectDialog
         projectName={openDialog === 'delete' ? name : null}
         onOpenChange={close}
-        onConfirm={() =>
+        onConfirm={() => {
+          // A second confirm while the request runs would delete twice and report the second 404.
+          if (deleteProject.isPending) return
+          resetFailed(...mutations)
           deleteProject.mutate(projectId, {
             onSuccess: () => navigate('/projects'),
             onError: () => setOpenDialog(null),
-          })}
+          })
+        }}
         returnFocusTo={opener}
       />
     </section>

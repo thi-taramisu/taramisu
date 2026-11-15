@@ -1,5 +1,6 @@
-// Projects and their settings. The project list goes through `ProjectService` (`../services/projects.ts`),
-// which only the mock implements so far; the settings pages read the mock data in `../mocks/data/` directly.
+// Projects and their settings. Projects go through `ProjectService` (`../services/projects.ts`), which only
+// the mock implements so far. The settings forms (details, members) still read the mock data in
+// `../mocks/data/` directly.
 
 /**
  * A project as the views use it. `id`, `name`, `description` and `role` match `TaraProjectBody` of
