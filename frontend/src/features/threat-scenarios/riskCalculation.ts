@@ -51,6 +51,10 @@ export interface RiskRow {
   risk: number | null
 }
 
+/** A row with a risk value: its impact is rated and the threat scenario has a feasibility. */
+export type RatedRiskRow = RiskRow & { impact: RatedImpact; risk: number }
+export const isRated = (row: RiskRow): row is RatedRiskRow => row.risk !== null
+
 export interface RiskGroup {
   damageScenario: EntityRef
   /** The threat's targets that lead to this damage scenario, which is why it belongs to the threat (RQ-15-03). */
@@ -61,13 +65,16 @@ export interface RiskGroup {
 
 export type RiskBlocker = 'NO_DAMAGE_SCENARIO' | 'NO_ATTACK_PATH' | 'NO_RATED_ATTACK_PATH'
 
-export interface RiskResult {
-  feasibility: AggregatedFeasibility
+/** The feasibility once an attack path is rated: the decisive path is then known. */
+export type RatedFeasibility = AggregatedFeasibility & { feasibility: AttackFeasibility; decisive: AttackPathInput }
+
+interface RiskValues {
   groups: RiskGroup[]
   /** Highest risk value, the overall risk of the threat scenario [RQ-15-16]. */
   max: number | null
-  blocker: RiskBlocker | null
 }
+
+export type RiskResult = RiskValues & ({ blocker: null; feasibility: RatedFeasibility } | { blocker: RiskBlocker; feasibility: AggregatedFeasibility })
 
 function maxOf(values: (number | null)[]) {
   const numbers = values.filter((value): value is number => value !== null)
@@ -94,9 +101,10 @@ export function calculateRisks(inputs: ThreatScenarioRiskInputs): RiskResult {
     })
     return { damageScenario, targetedCauses, rows, max: maxOf(rows.map((row) => row.risk)) }
   })
-  let blocker: RiskBlocker | null = null
-  if (inputs.damageScenarios.length === 0) blocker = 'NO_DAMAGE_SCENARIO'
-  else if (inputs.attackPaths.length === 0) blocker = 'NO_ATTACK_PATH'
-  else if (!feasibility.feasibility) blocker = 'NO_RATED_ATTACK_PATH'
-  return { feasibility, groups, max: maxOf(groups.map((group) => group.max)), blocker }
+  const max = maxOf(groups.map((group) => group.max))
+  const { feasibility: level, decisive } = feasibility
+  if (inputs.damageScenarios.length === 0) return { feasibility, groups, max, blocker: 'NO_DAMAGE_SCENARIO' }
+  if (inputs.attackPaths.length === 0) return { feasibility, groups, max, blocker: 'NO_ATTACK_PATH' }
+  if (!level || !decisive) return { feasibility, groups, max, blocker: 'NO_RATED_ATTACK_PATH' }
+  return { feasibility: { ...feasibility, feasibility: level, decisive }, groups, max, blocker: null }
 }

@@ -5,12 +5,12 @@ import { IMPACT_CLASSES, categoryLabel, impactLabel } from '../damage-scenarios/
 import { RiskBadge } from '../items/RiskBadge'
 import { entityPath } from '../workspace/entities'
 import { RiskMatrix } from './RiskMatrix'
-import type { AggregatedFeasibility, RiskRow } from './riskCalculation'
+import type { RatedFeasibility, RatedRiskRow } from './riskCalculation'
 
 interface RiskCalculationDetailsProps {
   projectId: string
-  row: RiskRow & { impact: NonNullable<RiskRow['impact']>; risk: number }
-  feasibility: AggregatedFeasibility & { feasibility: NonNullable<AggregatedFeasibility['feasibility']> }
+  row: RatedRiskRow
+  feasibility: RatedFeasibility
 }
 
 /** One part of the formula: what it is, its value and where it comes from. */
@@ -61,14 +61,12 @@ export function RiskCalculationDetails({ projectId, row, feasibility }: RiskCalc
             label="Attack Feasibility"
             value={<FeasibilityBadge value={feasibility.feasibility} withWord={false} />}
             source={
-              decisive && (
-                <>
-                  <Link to={`${entityPath(projectId, 'attack-paths', decisive.id)}/rating`} className="underline">
-                    {decisive.code}
-                  </Link>
-                  , most feasible of {feasibility.rated} rated
-                </>
-              )
+              <>
+                <Link to={`${entityPath(projectId, 'attack-paths', decisive.id)}/rating`} className="underline">
+                  {decisive.code}
+                </Link>
+                , most feasible of {feasibility.rated} rated
+              </>
             }
           />
           <Operator>=</Operator>

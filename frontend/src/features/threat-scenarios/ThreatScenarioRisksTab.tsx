@@ -14,7 +14,7 @@ import { categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
 import { RiskBadge } from '../items/RiskBadge'
 import { entityPath } from '../workspace/entities'
 import { RiskCalculationDetails } from './RiskCalculationDetails'
-import { calculateRisks, type RiskBlocker, type RiskResult, type RiskRow } from './riskCalculation'
+import { calculateRisks, isRated, type RatedFeasibility, type RatedImpact, type RatedRiskRow, type RiskBlocker, type RiskResult } from './riskCalculation'
 import { EntityLink } from './EntityLink'
 
 /** Risks tab of a threat scenario ("TS Risks" wireframe): the risk values from impact and attack feasibility. */
@@ -30,15 +30,15 @@ export function ThreatScenarioRisksTab() {
     )
   }
   const result = calculateRisks(inputs.data)
-  return result.blocker ? (
-    <Blocked projectId={projectId} threatScenarioId={entityId} blocker={result.blocker} inputs={inputs.data} />
-  ) : (
+  return result.blocker === null ? (
     <RiskValues projectId={projectId} threatScenarioId={entityId} result={result} />
+  ) : (
+    <Blocked projectId={projectId} threatScenarioId={entityId} blocker={result.blocker} inputs={inputs.data} />
   )
 }
 
 // Solid dots in the rating colours; the label next to them always names the rating.
-const IMPACT_DOTS: Record<NonNullable<RiskRow['impact']>, string> = {
+const IMPACT_DOTS: Record<RatedImpact, string> = {
   SEVERE: 'bg-impact-severe-border',
   MAJOR: 'bg-impact-major-border',
   MODERATE: 'bg-impact-moderate-border',
@@ -51,15 +51,13 @@ const FEASIBILITY_DOTS: Record<AttackFeasibility, string> = {
   VERY_LOW: 'bg-feasibility-very-low-border',
 }
 
-type RatedRow = RiskRow & { impact: NonNullable<RiskRow['impact']>; risk: number }
-const isRated = (row: RiskRow): row is RatedRow => row.risk !== null
-type Feasibility = RiskResult['feasibility'] & { feasibility: NonNullable<RiskResult['feasibility']['feasibility']> }
+type RiskValuesResult = Extract<RiskResult, { blocker: null }>
 
-function RiskValues({ projectId, threatScenarioId, result }: { projectId: string; threatScenarioId: string; result: RiskResult }) {
-  const feasibility = { ...result.feasibility, feasibility: result.feasibility.feasibility! }
+function RiskValues({ projectId, threatScenarioId, result }: { projectId: string; threatScenarioId: string; result: RiskValuesResult }) {
+  const { feasibility } = result
   const { decisive } = feasibility
   const rated = result.groups.flatMap((group) => group.rows).filter(isRated)
-  const top = rated.reduce<RatedRow | null>((best, row) => (!best || row.risk > best.risk ? row : best), null)
+  const top = rated.reduce<RatedRiskRow | null>((best, row) => (!best || row.risk > best.risk ? row : best), null)
   // One calculation at a time, so the page stays short and the open one is easy to find.
   const [openKey, setOpenKey] = useState<string | null>(null)
 
@@ -75,11 +73,9 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
             <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Attack Feasibility</dt>
             <dd className="flex flex-wrap items-center gap-2 text-sm">
               <FeasibilityBadge value={feasibility.feasibility} withWord={false} />
-              {decisive && (
-                <Link to={`${entityPath(projectId, 'attack-paths', decisive.id)}/rating`} className="text-muted-foreground hover:underline">
-                  via {decisive.code}
-                </Link>
-              )}
+              <Link to={`${entityPath(projectId, 'attack-paths', decisive.id)}/rating`} className="text-muted-foreground hover:underline">
+                via {decisive.code}
+              </Link>
             </dd>
           </div>
           <div className="grid gap-2 px-4 py-3">
@@ -120,7 +116,7 @@ interface DamageScenarioRisksProps {
   projectId: string
   threatScenarioId: string
   group: RiskResult['groups'][number]
-  feasibility: Feasibility
+  feasibility: RatedFeasibility
   /** Highest risk of the threat scenario, marked on its rows. */
   highest: number | null
   openKey: string | null
@@ -154,18 +150,17 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
           </span>
         )}
       </div>
-      <>
-          {/* Column labels for the rows: each one reads "impact × feasibility → risk". */}
-          <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            <span className="w-28">Category</span>
-            <span className="w-28">Impact</span>
-            <span className="w-28">Feasibility</span>
-            <span>Risk</span>
-          </div>
-        <ul className="divide-y">
-          {rated.map((row) => {
-            const isHighest = row.risk === highest
-            return (
+      {/* Column labels for the rows: each one reads "impact × feasibility → risk". */}
+      <div aria-hidden="true" className="flex gap-x-4 border-b px-4 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        <span className="w-28">Category</span>
+        <span className="w-28">Impact</span>
+        <span className="w-28">Feasibility</span>
+        <span>Risk</span>
+      </div>
+      <ul className="divide-y">
+        {rated.map((row) => {
+          const isHighest = row.risk === highest
+          return (
             <Collapsible key={row.key} asChild open={openKey === row.key} onOpenChange={(open) => onOpenChange(row.key, open)}>
               <li
                 className={cn('px-4', isHighest && 'bg-muted/40')}
@@ -184,17 +179,15 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                     {impactLabel(row.impact)}{' '}
                     <span className="sr-only">impact</span>
                   </Link>
-                  {feasibility.decisive && (
-                    <Link
-                      to={`${entityPath(projectId, 'attack-paths', feasibility.decisive.id)}/rating`}
-                      title={`Rated on the Rating tab of ${feasibility.decisive.code}, the most feasible attack path`}
-                      className="flex w-28 items-center gap-2 hover:underline"
-                    >
-                      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${FEASIBILITY_DOTS[feasibility.feasibility]}`} />
-                      {FEASIBILITY[feasibility.feasibility].label}{' '}
-                      <span className="sr-only">feasibility</span>
-                    </Link>
-                  )}
+                  <Link
+                    to={`${entityPath(projectId, 'attack-paths', feasibility.decisive.id)}/rating`}
+                    title={`Rated on the Rating tab of ${feasibility.decisive.code}, the most feasible attack path`}
+                    className="flex w-28 items-center gap-2 hover:underline"
+                  >
+                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${FEASIBILITY_DOTS[feasibility.feasibility]}`} />
+                    {FEASIBILITY[feasibility.feasibility].label}{' '}
+                    <span className="sr-only">feasibility</span>
+                  </Link>
                   <RiskBadge value={row.risk} />
                   {isHighest && <span className="text-xs font-medium text-muted-foreground">Highest</span>}
                   <CollapsibleTrigger asChild>
@@ -212,20 +205,19 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                 </CollapsibleContent>
               </li>
             </Collapsible>
-            )
-          })}
-          {/* Unrated categories stay in their place, so nothing open is hidden. */}
-          {notRated.map((row) => (
-            <li key={row.key} className="flex min-h-11 flex-wrap items-center gap-x-4 px-4 text-sm text-muted-foreground">
-              <span className="w-28">{categoryLabel(row.category)}</span>
-              <Link to={impactPath} className="flex w-28 items-center gap-2 hover:underline">
-                <span aria-hidden="true" className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground" />
-                Not rated
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </>
+          )
+        })}
+        {/* Unrated categories stay in their place, so nothing open is hidden. */}
+        {notRated.map((row) => (
+          <li key={row.key} className="flex min-h-11 flex-wrap items-center gap-x-4 px-4 text-sm text-muted-foreground">
+            <span className="w-28">{categoryLabel(row.category)}</span>
+            <Link to={impactPath} className="flex w-28 items-center gap-2 hover:underline">
+              <span aria-hidden="true" className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground" />
+              Not rated
+            </Link>
+          </li>
+        ))}
+      </ul>
       {/* Omitted categories are a justified decision [PM-15-07], so they only get a line at the end. */}
       {omitted.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
