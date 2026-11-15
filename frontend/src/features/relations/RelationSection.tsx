@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
@@ -48,6 +48,16 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
   const directionHint = direction === 'up' ? 'Above in the hierarchy' : 'Below in the hierarchy'
   // Gets the focus after a removal, because the row with the remove button is gone then.
   const [addButton, setAddButton] = useState<HTMLButtonElement | null>(null)
+  const removingId = useRef<string | null>(null)
+
+  // Moves the focus only once the row is really gone; if the removal fails, it stays on the remove button.
+  useEffect(() => {
+    const id = removingId.current
+    if (id === null || pending) return
+    removingId.current = null
+    const focusLost = document.activeElement === null || document.activeElement === document.body
+    if (focusLost && !rows.some((row) => row.id === id)) addButton?.focus()
+  }, [rows, pending, addButton])
 
   return (
     <section aria-labelledby={headingId} className="overflow-hidden rounded-lg border">
@@ -78,8 +88,10 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
                 row={row}
                 typeLabel={ENTITY_TYPES[type].label}
                 pending={pending}
-                returnFocusTo={addButton}
-                onRemove={() => onRemove(row.id)}
+                onRemove={() => {
+                  removingId.current = row.id
+                  onRemove(row.id)
+                }}
               />
             </li>
           ))}
@@ -98,14 +110,12 @@ interface RemoveRelationButtonProps {
   row: RelationEntry
   typeLabel: string
   pending: boolean
-  returnFocusTo: HTMLButtonElement | null
   onRemove: () => void
 }
 
-function RemoveRelationButton({ row, typeLabel, pending, returnFocusTo, onRemove }: RemoveRelationButtonProps) {
+function RemoveRelationButton({ row, typeLabel, pending, onRemove }: RemoveRelationButtonProps) {
   const name = entityTitle(row)
   const [open, setOpen] = useState(false)
-  const removing = useRef(false)
 
   return (
     <AlertDialog open={open} onOpenChange={(next) => setOpen(next && !pending)}>
@@ -122,27 +132,15 @@ function RemoveRelationButton({ row, typeLabel, pending, returnFocusTo, onRemove
           <X aria-hidden="true" />
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent
-        onCloseAutoFocus={(event) => {
-          if (removing.current && returnFocusTo?.isConnected) {
-            event.preventDefault()
-            returnFocusTo.focus()
-          }
-          removing.current = false
-        }}
-      >
+      {/* Returns the focus to the remove button; RelationSection moves it on once the row is gone. */}
+      <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove link to "{name}"?</AlertDialogTitle>
           <AlertDialogDescription>The {typeLabel.toLowerCase()} stays in the project. Only this link is removed.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              removing.current = true
-              onRemove()
-            }}
-          >
+          <AlertDialogAction onClick={onRemove}>
             Remove link
           </AlertDialogAction>
         </AlertDialogFooter>

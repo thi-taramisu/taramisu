@@ -160,13 +160,16 @@ export function useUpdateImpactRatings(projectId: string, damageScenarioId: stri
   })
 }
 
-/** Keeps the saved relations even if the refetch fails, so the next change does not start from the old ones. */
+/**
+ * Keeps the saved relations even if the refetch fails, so the next change does not start from the old ones.
+ * The refetch runs in the background, so the mutation does not stay pending until the whole project is loaded.
+ */
 function useStoreRelations(projectId: string, damageScenarioId: string) {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateProject(projectId)
   return (relations: DamageScenarioRelations) => {
     queryClient.setQueryData(keys.damageScenarioRelations(projectId, damageScenarioId), relations)
-    return invalidate()
+    void invalidate()
   }
 }
 

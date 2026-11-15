@@ -188,6 +188,17 @@ describe('damage scenario relations', () => {
     expect(section('Threat Scenarios').getAllByRole('listitem')).toHaveLength(1)
   })
 
+  it('keeps the focus on the remove button when removing fails', async () => {
+    const api = createMockItemApi()
+    api.damageScenarios.unlinkThreatScenario = () => Promise.reject(new ApiError(500, 'Server error'))
+    const { user } = renderApp(page, api)
+
+    await remove(user, 'Threat Scenarios', TS01)
+
+    expect(await section('Threat Scenarios').findByRole('alert')).toHaveTextContent('The link could not be changed')
+    await waitFor(() => expect(section('Threat Scenarios').getByRole('button', { name: `Remove link to ${TS01}` })).toHaveFocus())
+  })
+
   it('shows an error when the relations cannot be loaded', async () => {
     const api = createMockItemApi()
     api.damageScenarios.relations = () => Promise.reject(new ApiError(500, 'Server error'))
@@ -275,5 +286,42 @@ describe('damage scenario relations', () => {
 
     act(() => finish())
     await waitFor(() => expect(availability).toHaveAttribute('aria-pressed', 'false'))
+  })
+
+  it('unlocks the changes once saved, without waiting for the refetch', async () => {
+    const api = createMockItemApi()
+    const { user } = renderApp(page, api)
+    const assets = await findSection('Assets')
+    api.damageScenarios.relations = () => new Promise(() => undefined)
+    const availability = assets.getByRole('button', { name: 'A-01 Availability' })
+
+    await user.click(availability)
+
+    await waitFor(() => expect(availability).toHaveAttribute('aria-pressed', 'false'))
+    expect(availability).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('blocks the other section while a link is saving, so an older response cannot overwrite a newer one', async () => {
+    const api = createMockItemApi()
+    const { linkAsset } = api.damageScenarios
+    let finish!: () => void
+    api.damageScenarios.linkAsset = (...args) =>
+      new Promise((resolve) => {
+        finish = () => resolve(linkAsset(...args))
+      })
+    const { user } = renderApp(page, api)
+    const assets = await findSection('Assets')
+    const availability = assets.getByRole('button', { name: 'A-01 Availability' })
+
+    await user.click(availability)
+    await waitFor(() => expect(availability).toHaveAttribute('aria-disabled', 'true'))
+
+    const threats = section('Threat Scenarios')
+    expect(threats.getByRole('button', { name: `Remove link to ${TS01}` })).toHaveAttribute('aria-disabled', 'true')
+    await user.click(threats.getByRole('button', { name: 'Add Threat Scenario' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    act(() => finish())
+    await waitFor(() => expect(threats.getByRole('button', { name: `Remove link to ${TS01}` })).not.toHaveAttribute('aria-disabled', 'true'))
   })
 })

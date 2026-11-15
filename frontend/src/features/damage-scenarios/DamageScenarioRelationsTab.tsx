@@ -30,6 +30,8 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
   const itemThreats = useItemThreatScenarios(projectId, scenario.item_definition_id)
   const assetLink = useSetDamageScenarioAssetLink(projectId, scenario.id)
   const threatLink = useSetDamageScenarioThreatLink(projectId, scenario.id)
+  // Both write the full relations into the cache, so only one may run at a time; otherwise an older response could overwrite a newer one.
+  const saving = assetLink.isPending || threatLink.isPending
 
   if (!relations.data) {
     return relations.isError ? (
@@ -56,7 +58,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         title="Assets"
         elementLabel="Asset"
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
-        pending={assetLink.isPending}
+        pending={saving}
         candidatesLoading={itemAssets.isPending}
         candidatesError={itemAssets.isLoadingError ? 'The assets of this item could not be loaded.' : undefined}
         error={assetLink.isError ? SAVE_ERROR : undefined}
@@ -76,7 +78,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
               selected={asset.linkedProperties}
               requireOne
               showUnavailable
-              pending={assetLink.isPending}
+              pending={saving}
               onChange={(properties) => assetLink.mutate({ assetId: asset.id, properties })}
             />
           ),
@@ -89,7 +91,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         title="Threat Scenarios"
         elementLabel="Threat Scenario"
         candidates={threatCandidates}
-        pending={threatLink.isPending}
+        pending={saving}
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
         error={threatLink.isError ? SAVE_ERROR : undefined}
