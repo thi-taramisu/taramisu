@@ -25,10 +25,15 @@ export interface ItemService {
 export interface ItemContentService {
   /** Elements below the item for the sidebar tree (assets, damage scenarios, ...). */
   children(projectId: string, itemId: string): Promise<TreeNode[]>
+  /**
+   * Elements of the item without a link upwards (damage scenarios without an asset, threat scenarios
+   * without a damage scenario, attack paths without a threat scenario), with the elements below them.
+   */
+  unassigned(projectId: string, itemId: string): Promise<TreeNode[]>
   assets(projectId: string, itemId: string): Promise<ItemAsset[]>
   addAsset(projectId: string, itemId: string, asset: NewAsset): Promise<ItemAsset>
   risks(projectId: string, itemId: string): Promise<RiskGroup[]>
-  /** All threat scenarios of the item, also those without links, which the tree does not show yet. */
+  /** All threat scenarios of the item, also those without links. */
   threatScenarios(projectId: string, itemId: string): Promise<EntityRef[]>
   damageScenarios(projectId: string, itemId: string): Promise<EntityRef[]>
   attackPaths(projectId: string, itemId: string): Promise<EntityRef[]>

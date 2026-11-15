@@ -30,7 +30,7 @@ const keys = {
   attackPathRelations: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'relations'] as const,
 }
 
-/** Sidebar tree: the items of the project with the elements below them. */
+/** Sidebar tree: the items of the project with the elements below them and their unassigned elements. */
 export function useProjectTree(projectId: string, { enabled = true } = {}) {
   const api = useApi()
   return useQuery({
@@ -39,13 +39,14 @@ export function useProjectTree(projectId: string, { enabled = true } = {}) {
     queryFn: async (): Promise<TreeNode[]> => {
       const items = await api.items.list(projectId)
       return Promise.all(
-        items.map(async (item) => ({
-          type: 'items' as const,
-          id: item.id,
-          name: item.name,
+        items.map(async (item) => {
           // One item failing (e.g. deleted meanwhile) must not hide the whole tree.
-          children: await api.content.children(projectId, item.id).catch(() => []),
-        })),
+          const [children, unassigned] = await Promise.all([
+            api.content.children(projectId, item.id).catch(() => []),
+            api.content.unassigned(projectId, item.id).catch(() => []),
+          ])
+          return { type: 'items' as const, id: item.id, name: item.name, children, unassigned }
+        }),
       )
     },
   })

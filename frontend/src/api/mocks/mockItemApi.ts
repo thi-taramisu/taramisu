@@ -21,6 +21,7 @@ import {
   run,
   syncLinks,
   titleRef,
+  unassignedNodes,
   validateTitle,
   type StoredItem,
 } from './mockStore'
@@ -169,6 +170,7 @@ export function createMockItemApi(): ItemApi {
     },
     content: {
       children: (projectId, itemId) => run(() => find(projectId, itemId).children),
+      unassigned: (projectId, itemId) => run(() => unassignedNodes(find(projectId, itemId))),
       assets: (projectId, itemId) => run(() => find(projectId, itemId).assets),
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
