@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ListTree } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -50,6 +51,7 @@ export function CreateElementDialog({
   onReset,
   children,
 }: CreateElementDialogProps) {
+  const { t } = useTranslation()
   const id = useId()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -88,7 +90,7 @@ export function CreateElementDialog({
     if (pending) return
     const trimmed = name.trim()
     if (!trimmed) {
-      setNameError('Name is required.')
+      setNameError('ui:nameRequired')
       return
     }
     setPending(true)
@@ -98,7 +100,7 @@ export function CreateElementDialog({
       if (!element) return
       if (another) {
         reset()
-        setCreated(`${element.name} created.`)
+        setCreated(element.name)
       } else {
         close()
         navigate(element.path)
@@ -127,7 +129,7 @@ export function CreateElementDialog({
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
-            <Label htmlFor={`${id}-name`}>Name *</Label>
+            <Label htmlFor={`${id}-name`}>{t('ui:requiredName')}</Label>
             <Input
               id={`${id}-name`}
               value={name}
@@ -144,7 +146,7 @@ export function CreateElementDialog({
             />
             {nameError && (
               <p id={`${id}-name-error`} role="alert" className="text-sm text-destructive">
-                {nameError}
+                {t(nameError)}
               </p>
             )}
           </div>
@@ -158,10 +160,10 @@ export function CreateElementDialog({
               {errorMessage}
             </p>
           )}
-          <DialogFooter className="items-center">
-            <output className="mr-auto text-sm text-muted-foreground">{created}</output>
+          <DialogFooter className="items-center sm:flex-wrap">
+            <output className="w-full text-sm text-muted-foreground">{created && t('ui:created', { name: created })}</output>
             <Button type="button" variant="ghost" disabled={pending} onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t('ui:cancel')}
             </Button>
             <Button
               type="button"
@@ -173,11 +175,11 @@ export function CreateElementDialog({
                 formRef.current?.requestSubmit()
               }}
             >
-              Create &amp; add another
+              {t('ui:createAnother')}
             </Button>
             {/* aria-disabled instead of disabled keeps the focus on the button while the request runs. */}
             <Button type="submit" aria-disabled={pending}>
-              Create &amp; open
+              {t('ui:createOpen')}
             </Button>
           </DialogFooter>
         </form>

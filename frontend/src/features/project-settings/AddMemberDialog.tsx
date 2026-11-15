@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { type FormEvent, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import type { Member, ProjectRole } from '../../api/models/project'
 import { DEFAULT_PROJECT_ROLE, PROJECT_ROLES } from './roles'
 
 export function AddMemberDialog({ onAdd }: { onAdd: (member: Omit<Member, 'id' | 'added'>) => void }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -31,31 +33,31 @@ export function AddMemberDialog({ onAdd }: { onAdd: (member: Omit<Member, 'id' |
       <DialogTrigger asChild>
         <Button>
           <Plus aria-hidden="true" />
-          Add member
+          {t('ui:addMember')}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>Add member</DialogTitle>
+            <DialogTitle>{t('ui:addMember')}</DialogTitle>
             <DialogDescription>Members are not saved yet, this is only an example.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
-            <Label htmlFor="member-email">Email</Label>
+            <Label htmlFor="member-email">{t('ui:email')}</Label>
             <Input id="member-email" name="email" type="email" required />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="member-role">Role</Label>
+            <Label htmlFor="member-role">{t('ui:role')}</Label>
             <NativeSelect id="member-role" name="role" defaultValue={DEFAULT_PROJECT_ROLE} className="w-full">
               {PROJECT_ROLES.map(({ value, label }) => (
                 <NativeSelectOption key={value} value={value}>
-                  {label}
+                  {t(label)}
                 </NativeSelectOption>
               ))}
             </NativeSelect>
           </div>
           <DialogFooter>
-            <Button type="submit">Save</Button>
+            <Button type="submit">{t('ui:save')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

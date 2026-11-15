@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ComponentType, type KeyboardEventHandler } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { TreeNode } from '../../api/models/tree'
-import { ENTITY_TYPES, entityPath } from './entities'
+import { entityPath } from './entities'
+import { useTranslation } from 'react-i18next'
 
 interface FiletreeLinkProps {
   node: TreeNode
@@ -12,6 +13,7 @@ interface FiletreeLinkProps {
 }
 
 export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }: FiletreeLinkProps) {
+  const { t } = useTranslation()
   const label = useRef<HTMLSpanElement>(null)
   const animation = useRef<Animation | null>(null)
   const interaction = useRef({ hovered: false, focused: false })
@@ -51,7 +53,7 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
   return (
     <NavLink
       to={{ pathname: entityPath(projectId, node.type, node.id), search }}
-      title={`${ENTITY_TYPES[node.type].label}: ${node.name}`}
+      title={`${t(`entities.${node.type}`)}: ${node.name}`}
       onKeyDown={onKeyDown}
       onMouseEnter={() => updateScrolling('hovered', true)}
       onMouseLeave={() => updateScrolling('hovered', false)}

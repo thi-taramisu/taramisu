@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { ChevronDown, Eraser, MessageSquareText } from 'lucide-react'
 import { useParams } from 'react-router-dom'
@@ -9,10 +10,10 @@ import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
 
 const CATEGORIES: { value: ImpactCategory; label: string }[] = [
-  { value: 'SAFETY', label: 'Safety' },
-  { value: 'FINANCIAL', label: 'Financial' },
-  { value: 'OPERATIONAL', label: 'Operational' },
-  { value: 'PRIVACY', label: 'Privacy' },
+  { value: 'SAFETY', label: 'ui:safety' },
+  { value: 'FINANCIAL', label: 'ui:financial' },
+  { value: 'OPERATIONAL', label: 'ui:operational' },
+  { value: 'PRIVACY', label: 'ui:privacy' },
 ]
 
 interface RatingOption {
@@ -21,14 +22,14 @@ interface RatingOption {
 }
 
 const SCALE: RatingOption[] = [
-  { value: 'SEVERE', label: 'Severe' },
-  { value: 'MAJOR', label: 'Major' },
-  { value: 'MODERATE', label: 'Moderate' },
-  { value: 'NEGLIGIBLE', label: 'Negligible' },
+  { value: 'SEVERE', label: 'ui:severe' },
+  { value: 'MAJOR', label: 'ui:major' },
+  { value: 'MODERATE', label: 'ui:moderate' },
+  { value: 'NEGLIGIBLE', label: 'ui:negligible' },
 ]
 
 // Not a level of the scale, so it is shown apart from it.
-const OMITTED: RatingOption = { value: 'OMITTED', label: 'Omitted' }
+const OMITTED: RatingOption = { value: 'OMITTED', label: 'ui:omitted' }
 
 const RATING_CLASSES: Record<ImpactRatingValue, string> = {
   SEVERE: 'border-impact-severe-border bg-impact-severe text-impact-severe-foreground',
@@ -69,26 +70,27 @@ type FormErrors = Partial<Record<ImpactCategory, string>>
 function omissionErrors(values: FormValues): FormErrors {
   const rated = CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
   const errors: FormErrors = {}
-  for (const { value, label } of CATEGORIES) {
+  for (const { value } of CATEGORIES) {
     if (values[value].rating !== 'OMITTED') continue
-    if (!rated) errors[value] = `${label} can only be omitted if another category is rated.`
-    else if (!values[value].rationale.trim()) errors[value] = `A rationale is required to omit ${label}.`
+    if (!rated) errors[value] = 'ui:omitRequiresRating'
+    else if (!values[value].rationale.trim()) errors[value] = 'ui:omitRequiresRationale'
   }
   return errors
 }
 
 /** Impact tab of a damage scenario: one rating per impact category S / F / O / P. */
 export function DamageScenarioImpactTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: ratings, isError } = useImpactRatings(projectId, entityId)
 
   if (!ratings) {
     return isError ? (
       <p role="alert" className="text-sm text-destructive">
-        The impact ratings could not be loaded.
+        {t('ui:loadImpactError')}
       </p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading impact ratings…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingImpact')}</output>
     )
   }
   // Remount on damage scenario change so the form starts from the saved values.
@@ -96,6 +98,7 @@ export function DamageScenarioImpactTab() {
 }
 
 function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: string; damageScenarioId: string; ratings: ImpactRating[] }) {
+  const { t } = useTranslation()
   const [values, setValues] = useState(() => toValues(ratings))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
   const [saved, setSaved] = useState(values)
@@ -150,14 +153,14 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
       </div>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
+          {t('ui:save')}
         </Button>
         <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
+          {update.isSuccess && !dirty && t('ui:saved')}
         </output>
         {update.isError && (
           <p role="alert" className="text-sm text-destructive">
-            The impact ratings could not be saved. Please try again.
+            {t('ui:saveImpactError')}
           </p>
         )}
       </div>
@@ -175,17 +178,18 @@ interface RatingSegmentProps {
 
 /** Radio styled as a segment; its width depends on the space only, so selecting or clearing a rating moves nothing. */
 function RatingSegment({ name, option, checked, onSelect, className }: RatingSegmentProps) {
+  const { t } = useTranslation()
   return (
     <label
       className={cn(
-        'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
+        'relative flex min-h-10 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
         'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
         checked ? `z-10 font-medium ${RATING_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
         className,
       )}
     >
       <input type="radio" name={name} value={option.value} checked={checked} onChange={onSelect} className="sr-only" />
-      <span className="truncate px-1">{option.label}</span>
+      <span className="px-1 text-center text-xs leading-tight">{t(option.label)}</span>
     </label>
   )
 }
@@ -199,6 +203,7 @@ interface ImpactCategoryRowProps {
 
 /** One impact category: the rating, and below it the rationale, collapsed to a preview until opened. */
 function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategoryRowProps) {
+  const { t } = useTranslation()
   const id = useId()
   const [open, setOpen] = useState(false)
   const { rating, rationale } = values
@@ -220,7 +225,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
   return (
     <div className="grid items-center gap-x-4 gap-y-1 py-3 @xl:grid-cols-[7rem_1fr]">
       <span id={`${id}-label`} className="text-sm font-medium">
-        {category.label}
+        {t(category.label)}
       </span>
       <div className="flex items-center gap-3">
         {/* Five equal tracks of at most 6rem, so the segments only depend on the available space. */}
@@ -250,8 +255,8 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           size="icon-sm"
           className="shrink-0 text-muted-foreground"
           disabled={!rating && !rationale}
-          aria-label={`Clear ${category.label}`}
-          title="Clear rating and rationale"
+          aria-label={t('ui:clearCategory', { category: t(category.label) })}
+          title={t('ui:clearRating')}
           onClick={clear}
         >
           <Eraser aria-hidden="true" />
@@ -264,7 +269,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
             {/* The negative margin lines the icon up with the rating segments above. */}
             <Button type="button" variant="ghost" size="sm" className="relative -ml-1.5">
               <MessageSquareText aria-hidden="true" data-icon="inline-start" />
-              <span className="sr-only">{category.label}</span> Rationale
+              <span className="sr-only">{t(category.label)}</span> {t('ui:rationale')}
               <ChevronDown aria-hidden="true" data-icon="inline-end" className={cn('transition-transform', expanded && 'rotate-180')} />
             </Button>
           </CollapsibleTrigger>
@@ -272,7 +277,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
         </div>
         <CollapsibleContent className="grid gap-2">
           <Textarea
-            aria-label={`${category.label} rationale`}
+            aria-label={t('ui:categoryRationale', { category: t(category.label) })}
             value={rationale}
             onChange={(event) => onChange({ rationale: event.target.value })}
             aria-invalid={Boolean(error)}
@@ -280,7 +285,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           />
           {error && (
             <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
-              {error}
+              {t(error, { category: t(category.label) })}
             </p>
           )}
         </CollapsibleContent>

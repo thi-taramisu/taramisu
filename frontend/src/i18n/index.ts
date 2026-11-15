@@ -2,6 +2,8 @@ import { createInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import en from './locales/en/common.json'
 import de from './locales/de/common.json'
+import enUi from './locales/en/ui.json'
+import deUi from './locales/de/ui.json'
 
 const STORAGE_KEY = 'taramisu.language'
 export const i18n = createInstance()
@@ -24,7 +26,7 @@ export function getInitialLanguage(): 'en' | 'de' {
 }
 
 i18n.use(initReactI18next).init({
-  resources: { en: { common: en }, de: { common: de } },
+  resources: { en: { common: en, ui: enUi }, de: { common: de, ui: deUi } },
   lng: getInitialLanguage(),
   supportedLngs: ['en', 'de'],
   fallbackLng: 'en',

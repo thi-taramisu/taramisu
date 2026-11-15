@@ -1,3 +1,49 @@
 {
-  "language": "Language"
+  "language": "Language",
+  "navigation": {
+    "projects": "Projects",
+    "archive": "Archive",
+    "favorites": "Favorites",
+    "allProjects": "All Projects",
+    "settings": "Settings",
+    "general": "General",
+    "members": "Members",
+    "colourSchemes": "Colour schemes",
+    "sidebar": "Sidebar",
+    "mainNavigation": "Main navigation",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "createProject": "Create Project",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "back": "Back",
+    "backToProjects": "Back to projects",
+    "backToProject": "Back to project",
+    "graph": "Graph",
+    "projectElements": "Project elements",
+    "resizeProjectElements": "Resize project elements",
+    "new": "New",
+    "newDamageScenario": "Damage Scenario",
+    "entityTabs": "{{type}} tabs",
+    "expandElement": "Expand {{name}}",
+    "collapseElement": "Collapse {{name}}",
+    "assetsWithCount": "Assets ({{count}})",
+    "tabs": {
+      "definition": "Definition",
+      "assets": "Assets",
+      "risks": "Risks",
+      "review": "Review",
+      "relations": "Relations",
+      "impact": "Impact",
+      "treatment": "Treatment",
+      "rating": "Rating"
+    }
+  },
+  "entities": {
+    "items": "Item",
+    "assets": "Asset",
+    "damage-scenarios": "Damage scenario",
+    "threat-scenarios": "Threat scenario",
+    "attack-paths": "Attack path"
+  }
 }

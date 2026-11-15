@@ -18,11 +18,13 @@ import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
 import { mockProjects } from '@/api/mocks/data/projects'
 import type { Project } from '@/api/models/project'
+import { useTranslation } from 'react-i18next'
 
 type MainView = 'projects' | 'archive'
 
 /** Start page: project overview, favorites, and archived projects. */
 export function ProjectListPage() {
+  const { t } = useTranslation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeView, setActiveView] = useState<MainView>('projects')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -121,17 +123,17 @@ export function ProjectListPage() {
           <div className="mx-auto max-w-4xl space-y-8">
             {activeView === 'projects' ? (
               <>
-                <h1 className="text-2xl font-semibold">Projects</h1>
+                <h1 className="text-2xl font-semibold">{t('navigation.projects')}</h1>
                 <section className="space-y-4">
                   <div className="flex justify-end">
                     <Link
                       to="/design-system/colors"
                       className="text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                      Colour schemes
+                      {t('navigation.colourSchemes')}
                     </Link>
                   </div>
-                  <h2 className="text-xl font-semibold">Favorites</h2>
+                  <h2 className="text-xl font-semibold">{t('navigation.favorites')}</h2>
 
                   <div className="flex flex-wrap gap-4">
                     {activeProjects
@@ -151,7 +153,7 @@ export function ProjectListPage() {
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-semibold">All Projects</h2>
+                  <h2 className="text-xl font-semibold">{t('navigation.allProjects')}</h2>
 
                   <div className="space-y-3">
                     {activeProjects.map((project) => {
@@ -187,8 +189,8 @@ export function ProjectListPage() {
                               onClick={() => handleToggleFavorite(project.id)}
                               aria-label={
                                 project.favorite
-                                  ? `Remove ${project.name} from favorites`
-                                  : `Add ${project.name} to favorites`
+                                  ? t('ui:removeFavorite', { name: project.name })
+                                  : t('ui:addFavorite', { name: project.name })
                               }
                               aria-pressed={project.favorite}
                             >
@@ -212,7 +214,7 @@ export function ProjectListPage() {
                                       actionsButtons.current.delete(project.id)
                                     }
                                   }}
-                                  aria-label={`Actions for ${project.name}`}
+                                  aria-label={t('ui:projectActions', { name: project.name })}
                                 >
                                   <Ellipsis className="size-5" />
                                 </Button>
@@ -224,7 +226,7 @@ export function ProjectListPage() {
                                   onSelect={() => handleArchiveProject(project.id)}
                                 >
                                   <Archive className="size-4" />
-                                  Archive Project
+                                  {t('ui:archiveProject')}
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
@@ -236,7 +238,7 @@ export function ProjectListPage() {
                                   }}
                                 >
                                   <Trash2 className="size-4" />
-                                  Delete Project
+                                  {t('ui:deleteProject')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -249,11 +251,11 @@ export function ProjectListPage() {
               </>
             ) : (
               <section className="space-y-4">
-                <h1 className="text-xl font-semibold">Archive</h1>
+                <h1 className="text-xl font-semibold">{t('navigation.archive')}</h1>
 
                 {archivedProjects.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No archived projects.
+                    {t('ui:noArchivedProjects')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -271,10 +273,10 @@ export function ProjectListPage() {
                             type="button"
                             variant="outline"
                             onClick={() => handleRestoreProject(project.id)}
-                            aria-label={`Restore ${project.name}`}
+                            aria-label={t('ui:restoreNamedProject', { name: project.name })}
                           >
                             <ArchiveRestore className="size-4" />
-                            Restore Project
+                            {t('ui:restoreProject')}
                           </Button>
                         </CardHeader>
                       </Card>

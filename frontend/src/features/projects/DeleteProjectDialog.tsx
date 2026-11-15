@@ -1,4 +1,5 @@
-﻿import {
+import { Trans, useTranslation } from 'react-i18next'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +22,7 @@ export function DeleteProjectDialog({
   onConfirm,
   returnFocusTo,
 }: DeleteProjectDialogProps) {
+  const { t } = useTranslation()
   return (
     <Dialog
       open={projectName !== null}
@@ -35,12 +37,9 @@ export function DeleteProjectDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Delete Project?</DialogTitle>
+          <DialogTitle>{t('ui:deleteProjectTitle')}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete
-            {' '}
-            <strong>{projectName}</strong>?
-            This action cannot be undone.
+            <Trans t={t} i18nKey="ui:deleteProjectDescription" values={{ name: projectName }} components={{ strong: <strong /> }} />
           </DialogDescription>
         </DialogHeader>
 
@@ -49,14 +48,14 @@ export function DeleteProjectDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t('ui:cancel')}
           </Button>
 
           <Button
             variant="destructive"
             onClick={onConfirm}
           >
-            Delete Project
+            {t('ui:deleteProject')}
           </Button>
         </DialogFooter>
       </DialogContent>

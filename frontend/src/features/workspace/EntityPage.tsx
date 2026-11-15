@@ -4,6 +4,7 @@ import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, findNode, formatEntityId } from './entities'
 import { Placeholder } from './Placeholder'
+import { useTranslation } from 'react-i18next'
 
 interface EntityPageProps {
   type: EntityType
@@ -22,10 +23,12 @@ interface EntityPageProps {
  * With `?view=graph` it shows the relation graph instead (Graph Concept wireframes).
  */
 export function EntityPage({ type, name, code, actions, tabLabels = {} }: EntityPageProps) {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const { data: tree } = useProjectTree(projectId)
-  const { label, tabs } = ENTITY_TYPES[type]
+  const { tabs } = ENTITY_TYPES[type]
+  const label = t(`entities.${type}`)
   const node = tree && findNode(type, entityId, tree)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
   const displayCode = code || node?.code
@@ -48,7 +51,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
         <Placeholder title="Graph view" />
       ) : (
         <>
-          <nav aria-label={`${label} tabs`} className="flex gap-4 border-b">
+          <nav aria-label={t('navigation.entityTabs', { type: label })} className="flex flex-wrap gap-4 border-b">
             {tabs.map((tab) => (
               <NavLink
                 key={tab.path}
@@ -58,7 +61,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
                   `-mb-px border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
                 }
               >
-                {tabLabels[tab.path] ?? tab.label}
+                {tabLabels[tab.path] ?? t(`navigation.tabs.${tab.path || 'definition'}`)}
               </NavLink>
             ))}
           </nav>

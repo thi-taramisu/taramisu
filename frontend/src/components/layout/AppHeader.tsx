@@ -2,6 +2,7 @@ import { LogIn, LogOut, Menu, UserCircle } from 'lucide-react'
 import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import { LanguageSelector } from './LanguageSelector'
+import { useTranslation } from 'react-i18next'
 
 type AppHeaderProps = {
   collapsed: boolean
@@ -9,6 +10,7 @@ type AppHeaderProps = {
 }
 
 export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
+  const { t } = useTranslation()
   const { status, user, signIn, signOut } = useAuth()
 
   return (
@@ -16,7 +18,7 @@ export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
       <Button
         variant="ghost"
         size="icon"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={t(collapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}
         aria-expanded={!collapsed}
         aria-controls="main-sidebar"
         onClick={onToggleSidebar}
@@ -34,13 +36,13 @@ export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
             </span>
             <Button type="button" variant="outline" size="sm" onClick={() => void signOut()}>
               <LogOut className="size-4" />
-              Sign out
+              {t('navigation.signOut')}
             </Button>
           </>
         ) : (
           <Button type="button" variant="outline" size="sm" onClick={() => void signIn()}>
             <LogIn className="size-4" />
-            Sign in
+            {t('navigation.signIn')}
           </Button>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -16,22 +17,23 @@ function EntityLink({ projectId, type, entity }: { projectId: string; type: Enti
 
 /** Risks tab of an item ("Item Summary" wireframe): read-only, one row per asset × damage × threat. */
 export function ItemRisksTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: groups, isError } = useItemRisks(projectId, entityId)
 
   if (!groups) {
     return isError ? (
       <p role="alert" className="text-sm text-destructive">
-        The risks could not be loaded.
+        {t('ui:loadRisksError')}
       </p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading risks…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingRisks')}</output>
     )
   }
   if (groups.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        No risks yet. Risks appear once threat scenarios are linked to the item's assets and rated.
+        {t('ui:noRisks')}
       </p>
     )
   }
@@ -39,17 +41,17 @@ export function ItemRisksTab() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        One row per asset × damage scenario × threat scenario. Risk = highest value over the impact categories of that damage scenario.
+        {t('ui:risksDescription')}
       </p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Property</TableHead>
-            <TableHead>Damage scenario</TableHead>
-            <TableHead>Threat scenario</TableHead>
-            <TableHead>Feasibility</TableHead>
-            <TableHead>Risk</TableHead>
-            <TableHead>Treatment</TableHead>
+            <TableHead>{t('ui:property')}</TableHead>
+            <TableHead>{t('entities.damage-scenarios')}</TableHead>
+            <TableHead>{t('entities.threat-scenarios')}</TableHead>
+            <TableHead>{t('ui:feasibility')}</TableHead>
+            <TableHead>{t('ui:risk')}</TableHead>
+            <TableHead>{t('navigation.tabs.treatment')}</TableHead>
           </TableRow>
         </TableHeader>
         {groups.map(({ asset, rows }) => {
@@ -58,13 +60,13 @@ export function ItemRisksTab() {
             <TableBody key={asset.id}>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead scope="rowgroup" colSpan={5} className="text-foreground">
-                  <span className="mr-2 text-xs text-muted-foreground uppercase">Asset</span>
+                  <span className="mr-2 text-xs text-muted-foreground uppercase">{t('entities.assets')}</span>
                   <EntityLink projectId={projectId} type="assets" entity={asset} />
                   <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    {rows.length} {rows.length === 1 ? 'row' : 'rows'} · properties {asset.properties.join(' ')}
+                    {t('ui:rowCount', { count: rows.length })} · {t('ui:propertiesList', { properties: asset.properties.join(' ') })}
                   </span>
                 </TableHead>
-                <TableCell className="text-right">{maxRisk && <RiskBadge value={maxRisk} prefix="max Risk" />}</TableCell>
+                <TableCell className="text-right">{maxRisk && <RiskBadge value={maxRisk} prefix={t('ui:maxRisk')} />}</TableCell>
               </TableRow>
               {rows.map((row) => (
                 <TableRow key={`${row.property}/${row.damageScenario?.id}/${row.threatScenario.id}`}>
@@ -76,7 +78,7 @@ export function ItemRisksTab() {
                         <span className="text-xs text-muted-foreground">{row.damageScenario.impact}</span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">no damage scenario linked</span>
+                      <span className="text-muted-foreground">{t('ui:noLinkedDamage')}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -86,16 +88,16 @@ export function ItemRisksTab() {
                   <TableCell>
                     {row.feasibility ? (
                       <>
-                        {row.feasibility.rating} <span className="text-xs text-muted-foreground">via {row.feasibility.attackPath}</span>
+                        {row.feasibility.rating} <span className="text-xs text-muted-foreground">{t('ui:via', { path: row.feasibility.attackPath })}</span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">Not rated</span>
+                      <span className="text-muted-foreground">{t('ui:notRated')}</span>
                     )}
                   </TableCell>
                   <TableCell>
                     <RiskBadge value={row.risk} />
                   </TableCell>
-                  <TableCell>{row.treatment ?? <span className="text-muted-foreground">Open</span>}</TableCell>
+                  <TableCell>{row.treatment ?? <span className="text-muted-foreground">{t('ui:open')}</span>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

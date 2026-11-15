@@ -77,4 +77,93 @@ describe('language selector', () => {
     expect(i18n.resolvedLanguage).toBe('en')
     expect(localStorage.getItem('taramisu.language')).toBeNull()
   })
+
+  it('translates navigation without changing routes or entity names', async () => {
+    const { user } = renderApp('/projects/headlamp/items/i-01/assets')
+    expect(await screen.findByRole('link', { name: 'Assets (4)' })).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+    expect(screen.getByRole('navigation', { name: 'Projektelemente' })).toBeInTheDocument()
+    expect(screen.getByRole('separator', { name: 'Breite der Seitenleiste ändern' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Assets (4)' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: 'Headlamp system' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Headlamp system einklappen' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: 'Risiken' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('/projects/headlamp/items/i-01/risks')
+    expect(screen.getByRole('link', { name: 'Risiken' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByText('Reduce')).toBeInTheDocument()
+    expect(screen.getAllByText('Medium')).toHaveLength(2)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sprache' }), 'en')
+    expect(screen.getByRole('link', { name: 'Risks' })).toHaveAttribute('aria-current', 'page')
+  })
+})
+
+
+function leaves(value: Record<string, unknown>, prefix = ''): Record<string, string> {
+  return Object.fromEntries(Object.entries(value).flatMap(([key, child]) =>
+    typeof child === 'string' ? [[prefix + key, child]] : Object.entries(leaves(child as Record<string, unknown>, `${prefix}${key}.`)),
+  ))
+}
+
+it('has matching translation keys and interpolation variables in both languages', () => {
+  for (const namespace of ['common', 'ui']) {
+    const en = leaves(i18n.getResourceBundle('en', namespace))
+    const de = leaves(i18n.getResourceBundle('de', namespace))
+    expect(Object.keys(de).toSorted()).toEqual(Object.keys(en).toSorted())
+    for (const key of Object.keys(en)) {
+      expect(de[key].trim()).not.toBe('')
+      expect(de[key].match(/{{[^}]+}}/g)?.toSorted()).toEqual(en[key].match(/{{[^}]+}}/g)?.toSorted())
+    }
+  }
+})
+
+it.each(['en', 'de'])('uses %s throughout the create-project dialog and preserves the entered name', async (language) => {
+  await i18n.changeLanguage(language)
+  const { user } = renderApp('/projects')
+  const de = language === 'de'
+  await user.click(screen.getByRole('button', { name: de ? 'Projekt erstellen' : 'Create Project' }))
+  expect(screen.getByRole('dialog', { name: de ? 'Projekt erstellen' : 'Create Project' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: de ? 'Schließen' : 'Close' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: de ? 'Abbrechen' : 'Cancel' })).toBeInTheDocument()
+  await user.type(screen.getByLabelText(de ? 'Projektname' : 'Project name'), 'Mein TARA-Projekt')
+  await user.click(screen.getByRole('button', { name: de ? /^Erstellen$/ : /^Create$/ }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByText('Mein TARA-Projekt')).toBeInTheDocument()
+})
+
+it('switches an existing validation error without changing the form data', async () => {
+  const { user } = renderApp('/projects/headlamp/items/i-01')
+  const name = await screen.findByLabelText('Name *')
+  await user.clear(name)
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Name is required.')
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+  expect(screen.getByRole('alert')).toHaveTextContent('Bitte einen Namen eingeben.')
+  expect(name).toHaveValue('')
+  expect((screen.getByLabelText('Systemgrenze *') as HTMLTextAreaElement).value).toContain('Headlamp system')
+})
+
+it('updates existing native validation messages when switching languages', async () => {
+  const { user } = renderApp('/projects/headlamp/settings')
+  const name = screen.getByLabelText('Name') as HTMLInputElement
+  await user.clear(name)
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  expect(name.validationMessage).toBe('Please fill out this field.')
+
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+  expect(name.validationMessage).toBe('Bitte fülle dieses Feld aus.')
+  expect(name).toHaveValue('')
+
+  await user.type(name, '   ')
+  await user.click(screen.getByRole('button', { name: 'Speichern' }))
+  expect(name.validationMessage).toBe('Bitte gib einen gültigen Wert ein.')
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Sprache' }), 'en')
+  expect(name.validationMessage).toBe('Please enter a valid value.')
+  expect(name).toHaveValue('   ')
+
+  await user.type(name, 'New project')
+  expect(name.validationMessage).toBe('')
+  expect(name).toHaveValue('   New project')
 })
