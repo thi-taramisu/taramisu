@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { ProjectListPage } from './ProjectListPage'
 
+const confirmLabel = 'To confirm, type "Battery Security" in the box below'
+
 function renderAt(path: string) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -122,23 +124,25 @@ describe('Main Page project management', () => {
     )
 
     const dialog = await screen.findByRole('dialog', {
-      name: 'Delete Project?',
+      name: 'Delete Battery Security',
     })
 
-    expect(within(dialog).getByText('Battery Security')).toBeInTheDocument()
-
-    // Cancel must preserve the project.
+    // Cancel after typing must preserve the project.
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete Project' }),
+    )
+    await user.type(
+      within(dialog).getByRole('textbox', { name: confirmLabel }),
+      'Battery Security',
+    )
     await user.click(
       within(dialog).getByRole('button', { name: 'Cancel' }),
     )
 
-    expect(
-      screen.queryByRole('dialog', { name: 'Delete Project?' }),
-    ).not.toBeInTheDocument()
-
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(within(allProjects).getByText('Battery Security')).toBeInTheDocument()
 
-    // Reopen the actions menu.
+    // Reopening starts again at the first step with an empty field.
     await user.click(
       within(allProjects).getByRole('button', {
         name: 'Actions for Battery Security',
@@ -150,10 +154,18 @@ describe('Main Page project management', () => {
     )
 
     const confirmationDialog = await screen.findByRole('dialog', {
-      name: 'Delete Project?',
+      name: 'Delete Battery Security',
     })
+    expect(within(confirmationDialog).queryByRole('textbox')).not.toBeInTheDocument()
 
-    // Confirm deletion.
+    await user.click(
+      within(confirmationDialog).getByRole('button', { name: 'Delete Project' }),
+    )
+    const input = within(confirmationDialog).getByRole('textbox', { name: confirmLabel })
+    expect(input).toHaveValue('')
+
+    // Confirm deletion by typing the project name.
+    await user.type(input, 'Battery Security')
     await user.click(
       within(confirmationDialog).getByRole('button', {
         name: 'Delete Project',
@@ -170,9 +182,16 @@ describe('Main Page project management', () => {
     ).not.toBeInTheDocument()
   })
 
-  it.each(['Escape', 'Cancel', 'Close'])(
-    'returns focus to the same Actions button after %s',
-    async (dismissal) => {
+  it.each([
+    ['Escape', false],
+    ['Cancel', false],
+    ['Close', false],
+    ['Escape', true],
+    ['Cancel', true],
+    ['Close', true],
+  ])(
+    'returns focus to the same Actions button after %s (confirm step: %s)',
+    async (dismissal, confirmStep) => {
       const user = userEvent.setup()
       renderAt('/projects')
 
@@ -184,8 +203,13 @@ describe('Main Page project management', () => {
       await user.keyboard('{End}{Enter}')
 
       const dialog = await screen.findByRole('dialog', {
-        name: 'Delete Project?',
+        name: 'Delete Battery Security',
       })
+      if (confirmStep) {
+        await user.click(
+          within(dialog).getByRole('button', { name: 'Delete Project' }),
+        )
+      }
       if (dismissal === 'Escape') {
         await user.keyboard('{Escape}')
       } else {

@@ -1,4 +1,5 @@
-﻿import {
+﻿import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -7,6 +8,8 @@
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 type DeleteProjectDialogProps = {
   projectName: string | null
@@ -15,51 +18,130 @@ type DeleteProjectDialogProps = {
   returnFocusTo?: HTMLButtonElement | null
 }
 
+type Step = 'acknowledge' | 'confirm'
+
+/** Two-step confirmation before deleting a project: acknowledge the warning, then type the project name. */
 export function DeleteProjectDialog({
   projectName,
   onOpenChange,
   onConfirm,
   returnFocusTo,
 }: DeleteProjectDialogProps) {
+  const [step, setStep] = useState<Step>('acknowledge')
+
   return (
     <Dialog
       open={projectName !== null}
       onOpenChange={onOpenChange}
     >
       <DialogContent
+        // The confirm step has no warning text, so the dialog has no description there.
+        {...(step === 'confirm' && { 'aria-describedby': undefined })}
         onCloseAutoFocus={(event) => {
+          // Runs after the close animation, so the dialog does not jump back to the first step while fading out.
+          setStep('acknowledge')
           if (returnFocusTo?.isConnected) {
             event.preventDefault()
             returnFocusTo.focus()
           }
         }}
       >
-        <DialogHeader>
-          <DialogTitle>Delete Project?</DialogTitle>
+        {/* The form unmounts with the closed dialog, which clears the typed name. */}
+        <DeleteProjectForm
+          projectName={projectName ?? ''}
+          step={step}
+          onContinue={() => setStep('confirm')}
+          onCancel={() => onOpenChange(false)}
+          onConfirm={onConfirm}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteProjectForm({
+  projectName,
+  step,
+  onContinue,
+  onCancel,
+  onConfirm,
+}: {
+  projectName: string
+  step: Step
+  onContinue: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const inputId = useId()
+  const [confirmation, setConfirmation] = useState('')
+  const matches = projectName !== '' && confirmation === projectName
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // The first step's button unmounts, so focus moves to the field instead of being lost.
+  useEffect(() => {
+    if (step === 'confirm') inputRef.current?.focus()
+  }, [step])
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (matches) onConfirm()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogHeader>
+        <DialogTitle>Delete {projectName}</DialogTitle>
+        {step === 'acknowledge' && (
           <DialogDescription>
-            Are you sure you want to delete
-            {' '}
-            <strong>{projectName}</strong>?
-            This action cannot be undone.
+            This will permanently delete the project, including all of its items, their content, and its stored
+            files. Everything will be permanently lost and cannot be restored.
           </DialogDescription>
-        </DialogHeader>
+        )}
+      </DialogHeader>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
+      {step === 'confirm' && (
+        <div className="space-y-2">
+          <Label htmlFor={inputId}>
+            To confirm, type &quot;{projectName}&quot; in the box below
+          </Label>
+          <Input
+            id={inputId}
+            ref={inputRef}
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      )}
 
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+
+        {step === 'acknowledge' ? (
           <Button
+            type="button"
             variant="destructive"
-            onClick={onConfirm}
+            onClick={onContinue}
           >
             Delete Project
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : (
+          <Button
+            type="submit"
+            variant="destructive"
+            disabled={!matches}
+          >
+            Delete Project
+          </Button>
+        )}
+      </DialogFooter>
+    </form>
   )
 }
