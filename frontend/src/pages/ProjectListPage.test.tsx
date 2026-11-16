@@ -1,21 +1,17 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
-import { ProjectListPage } from './ProjectListPage'
+import { renderApp } from '../test/renderApp'
 
-function renderAt(path: string) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <ProjectListPage />
-    </MemoryRouter>,
-  )
+async function renderAt(path: string) {
+  renderApp(path)
+  await screen.findByRole('button', { name: 'Actions for Battery Security' })
 }
 
 describe('Main Page project management', () => {
   it('creates a project through the dialog', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     await user.click(screen.getByRole('button', { name: 'Create Project' }))
 
@@ -44,7 +40,7 @@ describe('Main Page project management', () => {
 
   it('adds and removes a project from favorites', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })
@@ -96,7 +92,7 @@ describe('Main Page project management', () => {
 
   it('deletes a project only after confirmation', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })
@@ -174,7 +170,7 @@ describe('Main Page project management', () => {
     'returns focus to the same Actions button after %s',
     async (dismissal) => {
       const user = userEvent.setup()
-      renderAt('/projects')
+      await renderAt('/projects')
 
       const opener = screen.getByRole('button', {
         name: 'Actions for Battery Security',
@@ -206,7 +202,7 @@ describe('Main Page project management', () => {
 
   it('archives and restores a project while preserving its favorite status', async () => {
     const user = userEvent.setup()
-    renderAt('/projects')
+    await renderAt('/projects')
 
     const favorites = screen
       .getByRole('heading', { name: 'Favorites' })

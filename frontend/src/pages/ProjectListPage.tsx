@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Archive, ArchiveRestore, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +17,7 @@ import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
-import { mockProjects } from '@/api/mocks/data/projects'
+import { useArchiveProject, useCreateProject, useDeleteProject, useProjects, useRestoreProject, useSetFavorite, resetFailed } from '@/api/queries/projects'
 import type { Project } from '@/api/models/project'
 
 type MainView = 'projects' | 'archive'
@@ -29,88 +29,50 @@ export function ProjectListPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createDialogOpener, setCreateDialogOpener] =
     useState<HTMLButtonElement | null>(null)
-  const [projects, setProjects] = useState<Project[]>(() => [...mockProjects])
+  const projectsQuery = useProjects()
+  const projects = projectsQuery.data ?? []
+  const createProject = useCreateProject()
+  const archiveProject = useArchiveProject()
+  const restoreProject = useRestoreProject()
+  const deleteProject = useDeleteProject()
+  const setFavorite = useSetFavorite()
   const actionsButtons = useRef(new Map<string, HTMLButtonElement>())
   const [deleteDialogOpener, setDeleteDialogOpener] =
     useState<HTMLButtonElement | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
-  const imageUrls = useRef(new Set<string>())
+  const mutations = [createProject, archiveProject, restoreProject, deleteProject, setFavorite]
 
-  useEffect(() => {
-    const urls = imageUrls.current
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url))
-      urls.clear()
-    }
-  }, [])
-
-  function handleCreateProject(name: string, file?: File) {
-    const image = file ? URL.createObjectURL(file) : undefined
-    if (image) imageUrls.current.add(image)
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      name,
-      image,
-      description: 'New TARA project',
-      favorite: false,
-      archived: false,
-      role: 'OWNER',
-      owner: 'Demo User',
-      updatedAt: new Date().toISOString().slice(0, 10),
-    }
-
-    setProjects((previous) => [...previous, newProject])
+  function handleCreateProject(name: string, image?: File) {
+    resetFailed(...mutations)
+    createProject.mutate({ name, image, description: 'New TARA project' })
     setActiveView('projects')
   }
 
   function handleToggleFavorite(projectId: string) {
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId && !project.archived
-          ? { ...project, favorite: !project.favorite }
-          : project,
-      ),
-    )
+    const project = projects.find((p) => p.id === projectId)
+    if (project && !project.archived) {
+      resetFailed(...mutations)
+      setFavorite.mutate({ projectId, favorite: !project.favorite })
+    }
   }
 
   function handleArchiveProject(projectId: string) {
-    if (projectId === exampleProject.id) {
-      return
+    if (projectId !== exampleProject.id) {
+      resetFailed(...mutations)
+      archiveProject.mutate(projectId)
     }
-
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId
-          ? { ...project, archived: true }
-          : project,
-      ),
-    )
   }
 
   function handleRestoreProject(projectId: string) {
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === projectId
-          ? { ...project, archived: false }
-          : project,
-      ),
-    )
+    resetFailed(...mutations)
+    restoreProject.mutate(projectId)
   }
 
   function handleDeleteProject() {
-    if (!projectToDelete || projectToDelete.id === exampleProject.id) {
-      return
-    }
-
-    setProjects((previous) =>
-      previous.filter((project) => project.id !== projectToDelete.id),
-    )
-
-    if (projectToDelete.image && imageUrls.current.delete(projectToDelete.image)) {
-      URL.revokeObjectURL(projectToDelete.image)
-    }
-    setProjectToDelete(null)
+    if (!projectToDelete || projectToDelete.id === exampleProject.id || deleteProject.isPending) return
+    resetFailed(...mutations)
+    deleteProject.mutate(projectToDelete.id, { onSettled: () => setProjectToDelete(null) })
   }
 
   const activeProjects = projects.filter((project) => !project.archived)
@@ -137,6 +99,13 @@ export function ProjectListPage() {
 
         <main className="min-w-0 flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-8">
+            {projectsQuery.isPending && <output>Loading projects…</output>}
+            {projectsQuery.isError && (
+              <p role="alert">The projects could not be loaded. <Button variant="link" onClick={() => void projectsQuery.refetch()}>Retry</Button></p>
+            )}
+            {mutations.some((action) => action.isError) && (
+              <p role="alert">The change could not be saved. Please try again.</p>
+            )}
             {activeView === 'projects' ? (
               <>
                 <h1 className="text-2xl font-semibold">Projects</h1>

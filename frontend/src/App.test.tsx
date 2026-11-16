@@ -7,11 +7,11 @@ import { renderApp as renderAt } from './test/renderApp'
 const project = '/projects/headlamp'
 
 describe('routing', () => {
-  it('redirects / to the project list', () => {
+  it('redirects / to the project list', async () => {
     renderAt('/')
 
     expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
+    expect(await screen.findByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
   })
 
   it('shows the workspace with the element tree', async () => {
@@ -49,7 +49,7 @@ describe('routing', () => {
   it('switches between tabs', async () => {
     const { user } = renderAt(`${project}/threat-scenarios/ts-01`)
 
-    await user.click(screen.getByRole('link', { name: 'Treatment' }))
+    await user.click(await screen.findByRole('link', { name: 'Treatment' }))
 
     expect(screen.getByText('Treatment: not implemented yet')).toBeInTheDocument()
   })
@@ -96,10 +96,10 @@ describe('routing', () => {
     '/item-definition',
   ])(
     'shows the not found page for %s',
-    (path) => {
+    async (path) => {
       renderAt(path)
 
-      expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
     },
   )
 })
