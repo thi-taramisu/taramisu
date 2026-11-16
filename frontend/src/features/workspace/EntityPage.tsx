@@ -50,7 +50,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
         {actions}
       </div>
       {searchParams.get('view') === 'graph' ? (
-        <Placeholder title="Graph view" />
+        <Placeholder title={t('ui:graphView')} />
       ) : (
         <>
           <nav aria-label={t('navigation.entityTabs', { type: label })} className="flex flex-wrap gap-4 border-b">

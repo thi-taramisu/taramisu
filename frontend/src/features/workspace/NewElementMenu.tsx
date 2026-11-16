@@ -7,7 +7,7 @@ import { CreateItemDialog } from '../items/CreateItemDialog'
 import { useTranslation } from 'react-i18next'
 
 // Only items and damage scenarios can be created so far; the other types follow with their own tickets.
-const OTHER_TYPES = ['Asset', 'Threat Scenario', 'Attack Path']
+const OTHER_TYPES = ['assets', 'threat-scenarios', 'attack-paths']
 
 /** "+ New" button above the element tree (Add Items wireframes). */
 export function NewElementMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
@@ -34,7 +34,7 @@ export function NewElementMenu({ projectId, projectName }: { projectId: string; 
           </DropdownMenuItem>
           {OTHER_TYPES.map((label) => (
             <DropdownMenuItem key={label} disabled>
-              {label}
+              {t(`entities.${label}`)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

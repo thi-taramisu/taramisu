@@ -131,22 +131,22 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
       <section aria-labelledby={`${id}-files`} className="overflow-hidden rounded-lg border">
         <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2">
           <h2 id={`${id}-files`} className="text-sm font-medium">
-            Supporting files
+            {t('ui:supportingFiles')}
           </h2>
           <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">0</span>
-          <span className="text-xs text-muted-foreground">sketches, architecture, interface lists · optional, never a substitute for the written definition</span>
+          <span className="text-xs text-muted-foreground">{t('ui:supportingFilesHint')}</span>
         </div>
         <div className="p-4">
           <div className="flex w-56 flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
             <Upload aria-hidden="true" className="size-4" />
-            <span>Drop files here or browse</span>
-            <span className="text-xs">File upload follows with the attachment API (#79)</span>
+            <span>{t('ui:dropFiles')}</span>
+            <span className="text-xs">{t('ui:fileUploadPending')}</span>
           </div>
         </div>
       </section>
 
       {item.id === EXAMPLE_DIAGRAM_ITEM && (
-        <section aria-label="Item diagram" className="h-[480px] overflow-hidden rounded-lg border">
+        <section aria-label={t('ui:itemDiagram')} className="h-[480px] overflow-hidden rounded-lg border">
           <ItemDefinitionDiagram />
         </section>
       )}

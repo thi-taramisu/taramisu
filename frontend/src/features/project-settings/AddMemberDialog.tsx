@@ -40,7 +40,7 @@ export function AddMemberDialog({ onAdd }: { onAdd: (member: Omit<Member, 'id' |
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{t('ui:addMember')}</DialogTitle>
-            <DialogDescription>Members are not saved yet, this is only an example.</DialogDescription>
+            <DialogDescription>{t('ui:mockMembersHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="member-email">{t('ui:email')}</Label>

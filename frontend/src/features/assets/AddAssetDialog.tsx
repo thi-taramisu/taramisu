@@ -59,7 +59,7 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{t('ui:addAsset')}</DialogTitle>
-            <DialogDescription>Saved in the mock data until the asset API exists.</DialogDescription>
+            <DialogDescription>{t('ui:mockAssetHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="asset-name">{t('ui:name')}</Label>

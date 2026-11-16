@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ProjectImageInput } from '@/features/project-settings/ProjectImageInput'
+import { MAX_IMAGE_SIZE } from '@/lib/imageUpload'
 
 type CreateProjectDialogProps = {
   open: boolean
@@ -79,7 +80,7 @@ export function CreateProjectDialog({
 
           <ProjectImageInput defaultValue={null} />
           <p className="text-xs text-muted-foreground">
-            Optional. PNG, JPEG or WebP, up to 5 MB.
+            {t('ui:optionalProjectImage', { size: MAX_IMAGE_SIZE / 1024 / 1024 })}
           </p>
 
           <DialogFooter>

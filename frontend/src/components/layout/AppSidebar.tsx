@@ -28,13 +28,13 @@ export function AppSidebar({
       }`}
     >
       {collapsed ? (
-        <div className="mb-4 flex justify-center p-2" title="Search">
+        <div className="mb-4 flex justify-center p-2" title={t('ui:search')}>
           <Search size={18} />
         </div>
       ) : (
         <div className="mb-4 flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
           <Search size={16} />
-          <span>Search</span>
+          <span>{t('ui:search')}</span>
         </div>
       )}
 
