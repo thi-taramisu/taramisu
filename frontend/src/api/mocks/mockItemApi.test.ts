@@ -4,6 +4,10 @@ import { createMockItemApi } from './mockItemApi'
 
 const project = 'headlamp'
 
+async function treeBelow(api: ReturnType<typeof createMockItemApi>, assetId: string) {
+  return (await api.content.children(project, 'i-01')).find((node) => node.id === assetId)!.children
+}
+
 describe('createMockItemApi', () => {
   it('is seeded with the headlamp item, its assets and the elements below them', async () => {
     const api = createMockItemApi()
@@ -166,6 +170,59 @@ describe('createMockItemApi', () => {
     await first.items.delete(project, 'i-01')
 
     expect((await second.items.get(project, 'i-01')).name).toBe('Headlamp system')
+  })
+
+  describe('damage scenario relations', () => {
+    it('returns the linked assets with their properties and the linked threat scenarios', async () => {
+      const relations = await createMockItemApi().damageScenarios.relations(project, 'ds-01')
+
+      expect(relations.assets).toEqual([{ id: 'a-01', code: 'A-01', name: 'Headlamp on/off command', properties: ['I', 'A'], linkedProperties: ['I', 'A'] }])
+      expect(relations.threatScenarios.map((threat) => threat.code)).toEqual(['TS-01'])
+    })
+
+    it('rejects links that the database constraints do not allow', async () => {
+      const { damageScenarios } = createMockItemApi()
+
+      await expect(damageScenarios.linkAsset(project, 'ds-01', 'nope', ['I'])).rejects.toMatchObject({ status: 404 })
+      await expect(damageScenarios.linkAsset(project, 'ds-01', 'a-02', [])).rejects.toMatchObject({ status: 422 })
+      await expect(damageScenarios.linkAsset(project, 'ds-01', 'a-02', ['C'])).rejects.toMatchObject({ status: 422 })
+      await expect(damageScenarios.linkAsset(project, 'ds-01', 'a-01', ['I', 'I'])).rejects.toMatchObject({ status: 422 })
+      await expect(damageScenarios.linkThreatScenario(project, 'ds-01', 'ts-01')).rejects.toMatchObject({ status: 409 })
+      await expect(damageScenarios.linkThreatScenario(project, 'ds-01', 'nope')).rejects.toMatchObject({ status: 404 })
+      await expect(damageScenarios.unlinkThreatScenario(project, 'ds-01', 'ts-02')).rejects.toMatchObject({ status: 404 })
+      await expect(damageScenarios.unlinkAsset(project, 'ds-01', 'a-02')).rejects.toMatchObject({ status: 404 })
+    })
+
+    it('replaces the properties of an existing asset link', async () => {
+      const { damageScenarios } = createMockItemApi()
+
+      const relations = await damageScenarios.linkAsset(project, 'ds-01', 'a-01', ['A'])
+
+      expect(relations.assets).toMatchObject([{ id: 'a-01', linkedProperties: ['A'] }])
+    })
+
+    it('moves the damage scenario with its threat scenarios between assets in the tree and updates the counters', async () => {
+      const api = createMockItemApi()
+
+      await api.damageScenarios.linkAsset(project, 'ds-01', 'a-02', ['I'])
+      await api.damageScenarios.unlinkAsset(project, 'ds-01', 'a-01')
+
+      expect(await treeBelow(api, 'a-01')).toBeUndefined()
+      expect(await treeBelow(api, 'a-02')).toMatchObject([{ code: 'DS-01', children: [{ code: 'TS-01', children: [{ code: 'AP-01' }, { code: 'AP-02' }] }] }])
+      const assets = await api.content.assets(project, 'i-01')
+      expect(assets.find((a) => a.id === 'a-01')).toMatchObject({ damageScenarios: 0, threatScenarios: 0, maxRisk: null })
+      expect(assets.find((a) => a.id === 'a-02')).toMatchObject({ damageScenarios: 1, threatScenarios: 1 })
+    })
+
+    it('keeps the attack paths of a threat scenario when it is linked again', async () => {
+      const api = createMockItemApi()
+
+      await api.damageScenarios.unlinkThreatScenario(project, 'ds-01', 'ts-01')
+      expect((await treeBelow(api, 'a-01'))![0].children).toBeUndefined()
+      await api.damageScenarios.linkThreatScenario(project, 'ds-01', 'ts-01')
+
+      expect((await treeBelow(api, 'a-01'))![0].children).toMatchObject([{ code: 'TS-01', children: [{ code: 'AP-01' }, { code: 'AP-02' }] }])
+    })
   })
 })
 
