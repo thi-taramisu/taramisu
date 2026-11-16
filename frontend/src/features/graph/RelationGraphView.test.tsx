@@ -15,6 +15,15 @@ describe('graph view', () => {
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'false')
   })
+  it('fits the graph from a single control without remounting the canvas', async () => {
+    const { user } = renderApp(route)
+    const fit = await screen.findByRole('button', { name: /fit view/i })
+    expect(screen.getAllByRole('button', { name: /fit (view|graph)/i })).toHaveLength(1)
+
+    await user.click(fit)
+
+    expect(screen.getByRole('button', { name: /fit view/i })).toBe(fit)
+  })
   it('shows loading errors rather than presenting incomplete relations as an empty graph and allows retry', async () => {
     const api = createMockItemApi()
     const risks = api.content.risks

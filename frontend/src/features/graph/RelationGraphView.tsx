@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { MarkerType, type Edge, type XYPosition } from '@xyflow/react'
-import { ArrowRight, Expand, RotateCcw, X } from 'lucide-react'
+import { ArrowRight, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -20,7 +20,7 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
   const minimal = params.get('graphMode') === 'minimal'
   const focus = elementKey(type, entityId)
   const [selected, setSelected] = useState<{ focus: string; key: string } | null>(null)
-  const [fitVersion, setFitVersion] = useState(0)
+  const [resetVersion, setResetVersion] = useState(0)
   const layoutKey = `${projectId}:${focus}`
   const [layouts, setLayouts] = useState<Record<string, Record<string, XYPosition>>>({})
   const graph = useRelationGraph(projectId)
@@ -111,14 +111,13 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
           <Label htmlFor="graph-minimal">Minimal view</Label>
           <Button variant="ghost" size="sm" aria-label="Reset graph layout" onClick={() => {
             setLayouts((previous) => ({ ...previous, [layoutKey]: {} }))
-            setFitVersion((value) => value + 1)
+            setResetVersion((value) => value + 1)
           }}><RotateCcw aria-hidden="true" />Reset layout</Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Fit graph" onClick={() => setFitVersion((value) => value + 1)}><Expand aria-hidden="true" /></Button>
         </div>
       </div>
       <div className="relative min-h-[480px] flex-1" style={{ height: 'min(65vh, 720px)' }}>
         <GraphCanvas
-          key={`${focus}:${fitVersion}`}
+          key={`${focus}:${resetVersion}`}
           nodes={nodes}
           edges={edges}
           onMove={(id, position) => setLayouts((previous) => ({

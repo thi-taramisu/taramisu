@@ -3,6 +3,7 @@ import { Background, ConnectionMode, Controls, ReactFlow, useNodesState, type Ed
 import { GraphNode, type RelationNode } from './GraphNode'
 
 const nodeTypes = { relation: GraphNode }
+const fitViewOptions = { padding: 0.22, maxZoom: 1 }
 
 /** Keep the high-frequency drag updates inside the canvas, preserving React Flow's dragging state. */
 export function GraphCanvas({ nodes: initialNodes, edges, onMove, onClearSelection }: {
@@ -25,7 +26,7 @@ export function GraphCanvas({ nodes: initialNodes, edges, onMove, onClearSelecti
       nodeTypes={nodeTypes}
       connectionMode={ConnectionMode.Loose}
       fitView
-      fitViewOptions={{ padding: 0.22, maxZoom: 1 }}
+      fitViewOptions={fitViewOptions}
       nodesDraggable
       nodeDragThreshold={4}
       nodesConnectable={false}
@@ -36,7 +37,7 @@ export function GraphCanvas({ nodes: initialNodes, edges, onMove, onClearSelecti
       onPaneClick={onClearSelection}
     >
       <Background color="var(--border)" gap={24} size={1} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false} fitViewOptions={fitViewOptions} />
     </ReactFlow>
   )
 }
