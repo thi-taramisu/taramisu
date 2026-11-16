@@ -247,9 +247,10 @@ entries:
   - model: authentik_flows.flow
     id: authentication-de
     identifiers:
-      slug: taramisu-authentication-de
-    attrs:
       name: Taramisu login (German)
+    attrs:
+      # Native selection evaluates authentication flows in slug order.
+      slug: default-authentication-de
       title: Bei Taramisu anmelden
       designation: authentication
       authentication: none
@@ -443,6 +444,13 @@ entries:
         from django.utils.translation import get_language
 
         return (get_language() or "en").split("-")[0] == "de"
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf authentication-de
+      policy: !KeyOf german-language
+      order: 0
+    attrs:
+      negate: false
   - model: authentik_stages_redirect.redirectstage
     id: redirect-authentication-de
     identifiers:
