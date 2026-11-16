@@ -6,6 +6,14 @@ import type { TreeNode } from '../../models/tree'
 // MOCK DATA: the headlamp system, the example project of the course. Seeds the mock item API and
 // stands in for the project until the backend has project, asset and risk endpoints.
 
+/** Attack paths per threat scenario, for the tree; a shared threat scenario shows them below every parent. */
+export const headlampThreatAttackPaths: Record<string, TreeNode[]> = {
+  'ts-01': [
+    { type: 'attack-paths', id: 'ap-01', code: 'AP-01', name: 'Compromised navigation ECU via cellular' },
+    { type: 'attack-paths', id: 'ap-02', code: 'AP-02', name: 'Malicious device on the OBD-II connector' },
+  ],
+}
+
 export const exampleProject = {
   id: 'headlamp',
   name: 'Headlamp system (example)',
@@ -33,10 +41,7 @@ export const exampleProject = {
                   id: 'ts-01',
                   code: 'TS-01',
                   name: 'Spoofed headlamp command on the CAN bus',
-                  children: [
-                    { type: 'attack-paths', id: 'ap-01', code: 'AP-01', name: 'Compromised navigation ECU via cellular' },
-                    { type: 'attack-paths', id: 'ap-02', code: 'AP-02', name: 'Malicious device on the OBD-II connector' },
-                  ],
+                  children: headlampThreatAttackPaths['ts-01'],
                 },
               ],
             },

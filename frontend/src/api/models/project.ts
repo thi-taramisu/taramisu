@@ -5,6 +5,8 @@ export type Project = {
   id: string
   name: string
   description: string
+  /** Local object URL of the selected project image. */
+  image?: string
   favorite: boolean
   archived: boolean
   owner: string
