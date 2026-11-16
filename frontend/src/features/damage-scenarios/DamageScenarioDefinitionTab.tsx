@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import { useDamageScenario, useUpdateDamageScenario } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 
 const TEXT_FIELDS = [
   {
@@ -42,6 +43,7 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
   const [saved, setSaved] = useState(values)
   const [titleError, setTitleError] = useState<string>()
   const update = useUpdateDamageScenario(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   const dirty = (Object.keys(values) as (keyof FormValues)[]).some((key) =>
     // The title is saved trimmed, so surrounding spaces alone are no change.
     key === 'title' ? values.title.trim() !== saved.title : values[key] !== saved[key],
@@ -79,47 +81,52 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-title`}>Name *</Label>
-        <Input
-          id={`${id}-title`}
-          value={values.title}
-          required
-          onChange={(event) => change('title', event.target.value)}
-          aria-invalid={Boolean(titleError)}
-          aria-describedby={titleError ? `${id}-title-error` : undefined}
-        />
-        {titleError && (
-          <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-            {titleError}
-          </p>
-        )}
-      </div>
-      {TEXT_FIELDS.map((field) => (
-        <div key={field.key} className="grid gap-2">
-          <Label htmlFor={`${id}-${field.key}`}>{field.label}</Label>
-          <Textarea
-            id={`${id}-${field.key}`}
-            value={values[field.key]}
-            placeholder={field.placeholder}
-            onChange={(event) => change(field.key, event.target.value)}
+      {/* Read-only projects show the fields disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Input
+            id={`${id}-title`}
+            value={values.title}
+            required
+            onChange={(event) => change('title', event.target.value)}
+            aria-invalid={Boolean(titleError)}
+            aria-describedby={titleError ? `${id}-title-error` : undefined}
           />
+          {titleError && (
+            <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
+              {titleError}
+            </p>
+          )}
         </div>
-      ))}
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            The damage scenario could not be saved. Please try again.
-          </p>
-        )}
-      </div>
+        {TEXT_FIELDS.map((field) => (
+          <div key={field.key} className="grid gap-2">
+            <Label htmlFor={`${id}-${field.key}`}>{field.label}</Label>
+            <Textarea
+              id={`${id}-${field.key}`}
+              value={values[field.key]}
+              placeholder={field.placeholder}
+              onChange={(event) => change(field.key, event.target.value)}
+            />
+          </div>
+        ))}
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            Save
+          </Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && 'Saved.'}
+          </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              The damage scenario could not be saved. Please try again.
+            </p>
+          )}
+        </div>
+      )}
     </form>
   )
 }

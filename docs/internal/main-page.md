@@ -56,6 +56,13 @@ in-memory mock. Changes last until reload.
 
 Every project, including the Headlamp example, can be archived and deleted.
 
+An archived project is read-only until an owner restores it. Its workspace
+and general settings show a banner and the forms disabled; the workspace
+also disables New and hides the delete and link actions. The Danger Zone
+and the members stay available until the backend (#233) defines which
+actions are allowed while archived.
+The workspace and settings of a deleted project show "Page not found".
+
 ## Navigation
 
 The project overview is available at `/projects`.

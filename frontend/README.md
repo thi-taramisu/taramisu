@@ -97,6 +97,10 @@ src/api/
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
 that has no service yet (project settings, example project).
 
+Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
+instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
+can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
+
 ## UI components
 
 We use [shadcn/ui](https://ui.shadcn.com) (see [ADR 0002](../docs/internal/adr/0002-frontend-ui-library.md)). Add new components with the

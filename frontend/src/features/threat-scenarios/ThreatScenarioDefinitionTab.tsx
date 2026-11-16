@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { useSetThreatTargets, useThreatScenario, useThreatScenarioRelations, useUpdateThreatScenario } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
 import { hasSameTargets } from './targetSelection'
 import { ThreatTargetsField } from './ThreatTargetsField'
@@ -73,6 +74,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
   const [titleError, setTitleError] = useState<string>()
   const updateScenario = useUpdateThreatScenario(projectId, scenario.id)
   const saveTargets = useSetThreatTargets(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   const [status, setStatus] = useState<SaveStatus>('idle')
   // Set once the fields are saved, so a failure of the targets after them does not say nothing was saved.
   const [fieldsSaved, setFieldsSaved] = useState(false)
@@ -144,84 +146,89 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-title`}>Name *</Label>
-        <Input
-          id={`${id}-title`}
-          value={values.title}
-          required
-          onChange={(event) => change({ title: event.target.value })}
-          aria-invalid={Boolean(titleError)}
-          aria-describedby={titleError ? `${id}-title-error` : undefined}
+      {/* Read-only projects show the fields and targets disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Input
+            id={`${id}-title`}
+            value={values.title}
+            required
+            onChange={(event) => change({ title: event.target.value })}
+            aria-invalid={Boolean(titleError)}
+            aria-describedby={titleError ? `${id}-title-error` : undefined}
+          />
+          {titleError && (
+            <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
+              {titleError}
+            </p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-cause`}>Cause of Compromise</Label>
+          <Input
+            id={`${id}-cause`}
+            value={values.cause_of_compromise}
+            placeholder="How the property is compromised, e.g. spoofing, tampering or denial of service"
+            onChange={(event) => change({ cause_of_compromise: event.target.value })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-elicitation`}>Elicitation</Label>
+          <NativeSelect
+            id={`${id}-elicitation`}
+            value={values.elicitation_method}
+            onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
+            className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
+          >
+            <NativeSelectOption value="">Select…</NativeSelectOption>
+            {ELICITATION_METHODS.map((method) => (
+              <NativeSelectOption key={method.value} value={method.value}>
+                {method.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-notes`}>Technical Notes</Label>
+          <Textarea
+            id={`${id}-notes`}
+            value={values.technical_notes}
+            placeholder="Interdependencies, attackers, tools and attack surfaces"
+            onChange={(event) => change({ technical_notes: event.target.value })}
+          />
+        </div>
+        <ThreatTargetsField
+          damageScenarios={relations.damageScenarios}
+          value={currentTargets}
+          onChange={(next) => {
+            setTargets(next)
+            keepPending()
+          }}
+          relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
         />
-        {titleError && (
-          <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-            {titleError}
-          </p>
-        )}
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-cause`}>Cause of Compromise</Label>
-        <Input
-          id={`${id}-cause`}
-          value={values.cause_of_compromise}
-          placeholder="How the property is compromised, e.g. spoofing, tampering or denial of service"
-          onChange={(event) => change({ cause_of_compromise: event.target.value })}
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-elicitation`}>Elicitation</Label>
-        <NativeSelect
-          id={`${id}-elicitation`}
-          value={values.elicitation_method}
-          onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
-          className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
-        >
-          <NativeSelectOption value="">Select…</NativeSelectOption>
-          {ELICITATION_METHODS.map((method) => (
-            <NativeSelectOption key={method.value} value={method.value}>
-              {method.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-notes`}>Technical Notes</Label>
-        <Textarea
-          id={`${id}-notes`}
-          value={values.technical_notes}
-          placeholder="Interdependencies, attackers, tools and attack surfaces"
-          onChange={(event) => change({ technical_notes: event.target.value })}
-        />
-      </div>
-      <ThreatTargetsField
-        damageScenarios={relations.damageScenarios}
-        value={currentTargets}
-        onChange={(next) => {
-          setTargets(next)
-          keepPending()
-        }}
-        relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
-      />
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || status === 'pending'}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {status === 'saved' && !dirty && 'Saved.'}
-        </output>
-        {status === 'fields-failed' && (
-          <p role="alert" className="text-sm text-destructive">
-            The threat scenario could not be saved. Please try again.
-          </p>
-        )}
-        {status === 'targets-failed' && (
-          <p role="alert" className="text-sm text-destructive">
-            {fieldsSaved ? 'The fields were saved, but the targets could not be saved.' : 'The targets could not be saved.'} Please try again.
-          </p>
-        )}
-      </div>
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || status === 'pending'}>
+            Save
+          </Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {status === 'saved' && !dirty && 'Saved.'}
+          </output>
+          {status === 'fields-failed' && (
+            <p role="alert" className="text-sm text-destructive">
+              The threat scenario could not be saved. Please try again.
+            </p>
+          )}
+          {status === 'targets-failed' && (
+            <p role="alert" className="text-sm text-destructive">
+              {fieldsSaved ? 'The fields were saved, but the targets could not be saved.' : 'The targets could not be saved.'} Please try again.
+            </p>
+          )}
+        </div>
+      )}
     </form>
   )
 }

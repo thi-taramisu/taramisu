@@ -72,6 +72,10 @@ Archived projects are not shown in the Favorites section.
 The project is removed from the active overview and appears in
 the Archive view.
 
+An archived project is read-only for all members. Its elements
+and general settings can be viewed but not changed, and a notice
+below the project header says so. Members can still be managed.
+
 Project owners can also archive a project from its settings:
 open **Settings**, select **Archive Project** under
 **Danger Zone**, and confirm in the dialog.
@@ -82,7 +86,8 @@ open **Settings**, select **Archive Project** under
 2. Locate the archived project.
 3. Select **Restore Project**.
 
-The project returns to the active overview.
+The project returns to the active overview and can be edited
+again.
 
 Its previous favorite status is preserved.
 

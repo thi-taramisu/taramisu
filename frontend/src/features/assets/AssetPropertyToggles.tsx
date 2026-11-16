@@ -13,12 +13,14 @@ interface AssetPropertyTogglesProps {
   requireOne?: boolean
   /** Also shows the properties the asset does not have, so C / I / A line up in a table. */
   showUnavailable?: boolean
+  /** Shows the selection without changing it, e.g. in a read-only project. */
+  disabled?: boolean
 }
 
 /** C / I / A toggles of an asset link (DS Relation wireframe); only the properties the asset has can be linked. */
-export function AssetPropertyToggles({ asset, selected, onChange, pending = false, requireOne = false, showUnavailable = false }: AssetPropertyTogglesProps) {
+export function AssetPropertyToggles({ asset, selected, onChange, pending = false, requireOne = false, showUnavailable = false, disabled = false }: AssetPropertyTogglesProps) {
   return (
-    <fieldset className="flex gap-1">
+    <fieldset disabled={disabled} className="flex gap-1">
       <legend className="sr-only">{asset.code} properties</legend>
       {CIA_PROPERTIES.filter((p) => showUnavailable || asset.properties.includes(p.value)).map((p) => {
         if (!asset.properties.includes(p.value)) {

@@ -56,11 +56,11 @@ export function AttackStepsField({ steps, onChange, actions }: AttackStepsFieldP
                 <span aria-hidden="true" className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs tabular-nums">
                   {number}
                 </span>
-                {/* Reads like the list of the wireframe; an empty step keeps its border, so it is clear where to type. */}
+                {/* Reads like the list of the wireframe, also when read-only; an empty step keeps its border, so it is clear where to type. */}
                 <Textarea
                   aria-label={`Step ${number}`}
                   value={step.description}
-                  className={`min-h-8 resize-none bg-transparent py-1 text-sm hover:border-input md:text-sm dark:bg-transparent ${step.description.trim() ? 'border-transparent' : ''}`}
+                  className={`min-h-8 resize-none bg-transparent py-1 text-sm enabled:hover:border-input disabled:bg-transparent md:text-sm dark:bg-transparent dark:disabled:bg-transparent ${step.description.trim() ? 'border-transparent' : ''}`}
                   onChange={(event) => onChange(steps.map((s) => (s.key === step.key ? { ...s, description: event.target.value } : s)))}
                 />
                 <div className="flex shrink-0 items-center text-muted-foreground">

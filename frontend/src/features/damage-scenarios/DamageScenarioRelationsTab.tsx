@@ -8,6 +8,7 @@ import {
   useSetDamageScenarioAssetLink,
   useSetDamageScenarioThreatLink,
 } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
@@ -31,6 +32,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
   const itemThreats = useItemThreatScenarios(projectId, scenario.item_definition_id)
   const assetLink = useSetDamageScenarioAssetLink(projectId, scenario.id)
   const threatLink = useSetDamageScenarioThreatLink(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   // Both write the full relations into the cache, so only one may run at a time; otherwise an older response could overwrite a newer one.
   const saving = assetLink.isPending || threatLink.isPending
 
@@ -73,6 +75,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
               requireOne
               showUnavailable
               pending={saving}
+              disabled={!canEdit}
               onChange={(properties) => assetLink.mutate({ assetId: asset.id, properties })}
             />
           ),

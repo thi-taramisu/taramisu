@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderApp } from '@/test/renderApp'
 import { MAX_IMAGE_SIZE } from '@/lib/imageUpload'
 
-function renderGeneral() {
+/** Waits for Save, which appears once the project is loaded and known to be editable. */
+async function renderGeneral() {
   renderApp('/projects/headlamp/settings')
+  await screen.findByRole('button', { name: 'Save' })
 }
 
 describe('GeneralSettings', () => {
@@ -13,8 +15,8 @@ describe('GeneralSettings', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the project name and description', () => {
-    renderGeneral()
+  it('shows the project name and description', async () => {
+    await renderGeneral()
 
     expect(screen.getByLabelText('Name')).toHaveValue('Headlamp system (example)')
     expect(screen.getByLabelText('Description')).toHaveValue(
@@ -24,7 +26,7 @@ describe('GeneralSettings', () => {
 
   it('requires a name that is not only spaces', async () => {
     const user = userEvent.setup()
-    renderGeneral()
+    await renderGeneral()
 
     const name = screen.getByLabelText('Name')
     expect(name).toBeRequired()
@@ -42,7 +44,7 @@ describe('GeneralSettings', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:image')
     const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL')
     const user = userEvent.setup()
-    renderGeneral()
+    await renderGeneral()
 
     expect(screen.queryByAltText('Preview')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
@@ -61,7 +63,7 @@ describe('GeneralSettings', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:image')
     // Without applyAccept, user-event uploads files the picker would hide, like choosing "All files".
     const user = userEvent.setup({ applyAccept: false })
-    renderGeneral()
+    await renderGeneral()
 
     const image = screen.getByLabelText('Image')
     expect(image).toHaveAttribute('accept', 'image/png,image/jpeg,image/webp')
@@ -79,7 +81,7 @@ describe('GeneralSettings', () => {
   it('rejects images larger than the size limit', async () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:image')
     const user = userEvent.setup()
-    renderGeneral()
+    await renderGeneral()
 
     const image = screen.getByLabelText('Image')
     const large = new File(['image'], 'large.png', { type: 'image/png' })

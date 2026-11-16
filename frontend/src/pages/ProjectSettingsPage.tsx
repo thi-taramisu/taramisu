@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import { exampleProject } from '../api/mocks/data/headlamp'
 import { isNotFound } from '../api/errors'
 import { useProject } from '../api/queries/projects'
+import { ArchivedProjectBanner } from '../features/projects/ArchivedProjectBanner'
 import { ProjectHeader } from '../features/workspace/ProjectHeader'
 import { NotFoundPage } from './NotFoundPage'
 
@@ -20,6 +21,7 @@ export function ProjectSettingsPage() {
   return (
     <div className="flex h-screen flex-col">
       <ProjectHeader projectId={projectId} />
+      <ArchivedProjectBanner projectId={projectId} />
       <div className="flex min-h-0 flex-1">
         <nav aria-label="Settings" className="w-56 shrink-0 space-y-1 border-r p-3">
           <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
