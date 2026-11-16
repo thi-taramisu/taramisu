@@ -14,6 +14,7 @@ from django.conf import settings
 from requests import Session
 
 from authentik.core.models import User
+from authentik.providers.oauth2.models import AccessToken
 
 BASE = f"http://authentik-server:9000{os.environ.get('AUTHENTIK_WEB__PATH', '').rstrip('/')}"
 
@@ -301,6 +302,7 @@ class EnrollmentTest(unittest.TestCase):
             params={
                 "client_id": "taramisu",
                 "response_type": "code",
+                "scope": "openid",
                 "redirect_uri": "http://localhost/auth/callback",
                 "code_challenge": challenge2,
                 "code_challenge_method": "S256",
@@ -342,6 +344,25 @@ class EnrollmentTest(unittest.TestCase):
             resp_bad_redirect.status_code == 302 and bad_redirect_loc.startswith("http://localhost:4444/"),
             f"Expected unapproved localhost redirect_uri to be rejected, got redirect to {bad_redirect_loc}",
         )
+
+        # Standard RP-initiated logout accepts only the registered return URL.
+        logout_params = {"id_token_hint": tokens["id_token"],
+                         "post_logout_redirect_uri": "https://untrusted.example/logout"}
+        response = client.get(f"{BASE}/application/o/taramisu/end-session/",
+                              params=logout_params, allow_redirects=False, timeout=20)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(AccessToken.objects.filter(user=user).exists())
+        logout_params["post_logout_redirect_uri"] = "http://localhost/projects"
+        response = client.get(f"{BASE}/application/o/taramisu/end-session/",
+                              params=logout_params, allow_redirects=False, timeout=20)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AccessToken.objects.filter(user=user).exists())
+        target = urllib.parse.urlparse(response.headers["Location"])
+        client.get(urllib.parse.urljoin(BASE + "/", response.headers["Location"]), timeout=20).raise_for_status()
+        result = client.get(f"{BASE}/api/v3/flows/executor/{target.path.rstrip('/').split('/')[-1]}/",
+                            params={"query": target.query}, timeout=20).json()
+        self.assertEqual(result["component"], "xak-flow-redirect")
+        self.assertEqual(result["to"], "http://localhost/projects")
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(EnrollmentTest)

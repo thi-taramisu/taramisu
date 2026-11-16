@@ -44,6 +44,12 @@ entries:
           url: !Env OIDC_REDIRECT_URI
         - matching_mode: strict
           url: http://localhost:5173/auth/callback
+        - matching_mode: strict
+          url: !Env OIDC_POST_LOGOUT_REDIRECT_URI
+          redirect_uri_type: logout
+        - matching_mode: strict
+          url: http://localhost:5173/projects
+          redirect_uri_type: logout
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
