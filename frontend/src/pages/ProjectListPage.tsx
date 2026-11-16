@@ -55,6 +55,7 @@ export function ProjectListPage() {
       description: 'New TARA project',
       favorite: false,
       archived: false,
+      role: 'OWNER',
       owner: 'Demo User',
       updatedAt: new Date().toISOString().slice(0, 10),
     }
