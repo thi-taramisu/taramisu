@@ -10,6 +10,7 @@ import { ItemPage } from './features/items/ItemPage'
 import { ItemRisksTab } from './features/items/ItemRisksTab'
 import { GeneralSettings } from './features/project-settings/GeneralSettings'
 import { MembersSettings } from './features/project-settings/MembersSettings'
+import { SearchProvider } from './features/search/SearchProvider'
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
@@ -40,33 +41,35 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
 // Route concept: docs/internal/frontend-routes.md
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/projects" replace />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route path="/design-sheet.html" element={<Navigate to="/design-system/colors" replace />} />
-      <Route path="/design-system/colors" element={<ColorSchemesPage />} />
-      <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />
-      <Route path="/projects" element={<ProjectListPage />} />
-      <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />}>
-        <Route index element={<GeneralSettings />} />
-        <Route path="members" element={<MembersSettings />} />
-      </Route>
-      <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
-        <Route index element={<Placeholder title="Select an element in the tree" />} />
-        {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
-          <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
-            {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
-              const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
-              return path ? (
-                <Route key={path} path={path} element={element} />
-              ) : (
-                <Route key="index" index element={element} />
-              )
-            })}
-          </Route>
-        ))}
-      </Route>
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <SearchProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/design-sheet.html" element={<Navigate to="/design-system/colors" replace />} />
+        <Route path="/design-system/colors" element={<ColorSchemesPage />} />
+        <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
+        <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />}>
+          <Route index element={<GeneralSettings />} />
+          <Route path="members" element={<MembersSettings />} />
+        </Route>
+        <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
+          <Route index element={<Placeholder title="Select an element in the tree" />} />
+          {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
+            <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
+              {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
+                const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
+                return path ? (
+                  <Route key={path} path={path} element={element} />
+                ) : (
+                  <Route key="index" index element={element} />
+                )
+              })}
+            </Route>
+          ))}
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </SearchProvider>
   )
 }
