@@ -28,11 +28,9 @@ The Search entry is currently a placeholder.
 
 ## Display mode
 
-Use **Light** / **Dark** in the header to switch the display immediately. Your choice is saved in
-this browser and restored on your next visit. Choose **Neutral**, **Ocean** or **Iris** from the adjacent
-color-scheme menu to apply that palette throughout the app. Both choices are saved independently.
-The default is light mode with Neutral. The toggle also works
-with Tab followed by Space or Enter.
+Use the sun or moon button in the header to switch between light and dark mode. Open **Colour schemes**
+to apply **Neutral**, **Ocean** or **Iris** throughout the app. The browser saves both choices independently.
+The default is light mode with Neutral. The mode button also works with Tab followed by Space or Enter.
 
 ## Creating a project
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { AppearanceControls } from '../theme/AppearanceControls'
+import { ThemeToggle } from '../theme/ThemeToggle'
 import { exampleProject } from '../../api/mocks/data/headlamp'
 
 /** Top bar of a project (workspace and settings); page-specific controls go into `children` on the right. */
@@ -19,7 +19,7 @@ export function ProjectHeader({ projectId, children }: { projectId: string; chil
       </NavLink>
       <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">Colour schemes</Link>
       <div className="ml-auto flex items-center gap-2">
-        <AppearanceControls />
+        <ThemeToggle />
         {children}
       </div>
     </header>

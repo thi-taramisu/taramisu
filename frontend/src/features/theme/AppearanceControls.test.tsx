@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppearanceControls } from './AppearanceControls'
+import { ThemeToggle } from './ThemeToggle'
 import { COLOR_SCHEME_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
 
 afterEach(() => {
@@ -16,7 +17,7 @@ afterEach(() => {
 describe('AppearanceControls', () => {
   it('applies and saves each palette while keeping dark mode independent', async () => {
     const user = userEvent.setup()
-    render(<AppearanceControls />)
+    render(<><ThemeToggle /><AppearanceControls /></>)
     const select = screen.getByRole('combobox', { name: 'Color scheme' })
     expect(select).toHaveValue('neutral')
     await user.click(screen.getByRole('button', { name: 'Dark mode' }))
