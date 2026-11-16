@@ -6,6 +6,10 @@ import type { RiskGroup } from '../models/risk'
 import type { ThreatDamageLink, ThreatScenario } from '../models/threatScenario'
 import type { EntityRef, TreeNode } from '../models/tree'
 import type { ItemApi } from '../services/items'
+import type { ProjectService } from '../services/projects'
+import type { SearchService } from '../services/search'
+import { createMockProjectApi } from './mockProjectApi'
+import { createMockSearchService } from './mockSearch'
 import { exampleProject, headlampAssets, headlampItem, headlampRisks, headlampThreatAttackPaths } from './data/headlamp'
 import {
   headlampDamageScenarioLinks,
@@ -157,7 +161,7 @@ function run<T>(fn: () => T): Promise<T> {
  * In-memory implementation of the item API, seeded with the headlamp example. Each call returns
  * copies, so callers cannot change the stored state by accident.
  */
-export function createMockItemApi(): ItemApi {
+export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
   const db = seed()
 
   function find(projectId: string, itemId: string) {
@@ -175,6 +179,18 @@ export function createMockItemApi(): ItemApi {
   }
 
   return {
+    projects,
+    search: createMockSearchService(projects, () => [...db.values()].flatMap((entry) => {
+      const { item, assets, damageScenarios, threatScenarios, threatAttackPaths } = entry
+      const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
+      return [
+        { ...common, type: 'items' as const, id: item.id, name: item.name },
+        ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
+        ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
+        ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
+        ...Object.values(threatAttackPaths).flat().map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.name })),
+      ]
+    })),
     items: {
       list: (projectId) =>
         run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),

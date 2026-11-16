@@ -73,7 +73,10 @@ export function useItemThreatScenarios(projectId: string, itemId: string) {
 
 function useInvalidateProject(projectId: string) {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: keys.project(projectId) })
+  return () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: keys.project(projectId) }),
+    queryClient.invalidateQueries({ queryKey: ['search'] }),
+  ])
 }
 
 export function useCreateItem(projectId: string) {
@@ -101,6 +104,7 @@ export function useDeleteItem(projectId: string, itemId: string) {
       // its page is still mounted. If the item page is opened again (browser back), its refetch
       // gets the 404 without retries and shows the not-found state.
       queryClient.setQueryData<TreeNode[]>(keys.tree(projectId), (tree) => tree?.filter((node) => node.id !== itemId))
+      void queryClient.invalidateQueries({ queryKey: ['search'] })
       return queryClient.invalidateQueries({ queryKey: keys.tree(projectId) })
     },
   })
