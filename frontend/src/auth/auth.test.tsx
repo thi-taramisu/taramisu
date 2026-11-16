@@ -149,6 +149,29 @@ describe('OIDC + PKCE helpers', () => {
 })
 
 describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
+  it('passes language selector changes to each sign-in request', async () => {
+    const user = userEvent.setup()
+    const navigateExternal = vi.fn<(url: string) => void>()
+    render(
+      <MemoryRouter>
+        <AuthProvider config={testOidcConfig} onNavigateExternal={navigateExternal}>
+          <AppHeader collapsed={false} onToggleSidebar={() => {}} />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    for (const language of ['de', 'en', 'de']) {
+      await user.selectOptions(screen.getByRole('combobox'), language)
+      await user.click(screen.getByRole('button', { name: language === 'de' ? 'Anmelden' : 'Sign in' }))
+      await waitFor(() => expect(navigateExternal).toHaveBeenCalledOnce())
+      const url = new URL(navigateExternal.mock.calls[0]![0])
+      expect(url.searchParams.get('ui_locales')).toBe(language)
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+      navigateExternal.mockClear()
+    }
+    localStorage.removeItem('taramisu.language')
+  })
+
   it('completes OIDC callback, hydrates /me, persists across page refresh, and supports Sign out', async () => {
     const user = userEvent.setup()
     const authUrl = new URL(await buildAuthorizationUrl('/projects', testOidcConfig))
