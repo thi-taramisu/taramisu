@@ -38,10 +38,15 @@ export function entityPath(projectId: string, type: EntityType, id: string) {
 
 /** First occurrence of the entity in the tree, depth-first. */
 export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeNode | undefined {
+  return findNodePath(type, id, nodes)?.at(-1)
+}
+
+/** First matching relation path, consistent with findNode for shared entities. */
+export function findNodePath(type: EntityType, id: string, nodes: TreeNode[]): TreeNode[] | undefined {
   for (const node of nodes) {
-    if (node.type === type && node.id === id) return node
-    const found = node.children && findNode(type, id, node.children)
-    if (found) return found
+    if (node.type === type && node.id === id) return [node]
+    const path = node.children && findNodePath(type, id, node.children)
+    if (path) return [node, ...path]
   }
   return undefined
 }
