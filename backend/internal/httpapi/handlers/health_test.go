@@ -28,6 +28,10 @@ type healthQueries struct {
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 }

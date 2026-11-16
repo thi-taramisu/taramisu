@@ -33,6 +33,10 @@ type fakeProjects struct {
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	project   db.TaraProject
 	found     bool
 	deleteErr error
