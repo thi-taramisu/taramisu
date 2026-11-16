@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { CiaProperty, NewAsset } from '../models/asset'
-import type { DamageScenarioBody, DamageScenarioRelations, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
+import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
+import type { PatchThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
 import type { TreeNode } from '../models/tree'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
@@ -18,6 +19,10 @@ const keys = {
   damageScenario: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id] as const,
   impactRatings: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'impact'] as const,
   damageScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'relations'] as const,
+  itemDamageScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'damage-scenarios'] as const,
+  itemAttackPaths: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'attack-paths'] as const,
+  threatScenario: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id] as const,
+  threatScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id, 'relations'] as const,
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
@@ -161,14 +166,14 @@ export function useUpdateImpactRatings(projectId: string, damageScenarioId: stri
 }
 
 /**
- * Keeps the saved relations even if the refetch fails, so the next change does not start from the old ones.
+ * Keeps the saved data even if the refetch fails, so the next change does not start from the old data.
  * The refetch runs in the background, so the mutation does not stay pending until the whole project is loaded.
  */
-function useStoreRelations(projectId: string, damageScenarioId: string) {
+function useStoreSaved(projectId: string, key: QueryKey) {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateProject(projectId)
-  return (relations: DamageScenarioRelations) => {
-    queryClient.setQueryData(keys.damageScenarioRelations(projectId, damageScenarioId), relations)
+  return (saved: unknown) => {
+    queryClient.setQueryData(key, saved)
     void invalidate()
   }
 }
@@ -176,24 +181,93 @@ function useStoreRelations(projectId: string, damageScenarioId: string) {
 /** Links an asset with the given properties or changes them; no properties remove the link. */
 export function useSetDamageScenarioAssetLink(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const storeRelations = useStoreRelations(projectId, damageScenarioId)
+  const storeSaved = useStoreSaved(projectId, keys.damageScenarioRelations(projectId, damageScenarioId))
   return useMutation({
     mutationFn: ({ assetId, properties }: { assetId: string; properties: CiaProperty[] }) =>
       properties.length > 0
         ? api.damageScenarios.linkAsset(projectId, damageScenarioId, assetId, properties)
         : api.damageScenarios.unlinkAsset(projectId, damageScenarioId, assetId),
-    onSuccess: storeRelations,
+    onSuccess: storeSaved,
   })
 }
 
 export function useSetDamageScenarioThreatLink(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const storeRelations = useStoreRelations(projectId, damageScenarioId)
+  const storeSaved = useStoreSaved(projectId, keys.damageScenarioRelations(projectId, damageScenarioId))
   return useMutation({
     mutationFn: ({ threatScenarioId, linked }: { threatScenarioId: string; linked: boolean }) =>
       linked
         ? api.damageScenarios.linkThreatScenario(projectId, damageScenarioId, threatScenarioId)
         : api.damageScenarios.unlinkThreatScenario(projectId, damageScenarioId, threatScenarioId),
-    onSuccess: storeRelations,
+    onSuccess: storeSaved,
+  })
+}
+
+export function useItemDamageScenarios(projectId: string, itemId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.itemDamageScenarios(projectId, itemId), queryFn: () => api.content.damageScenarios(projectId, itemId) })
+}
+
+export function useItemAttackPaths(projectId: string, itemId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.itemAttackPaths(projectId, itemId), queryFn: () => api.content.attackPaths(projectId, itemId) })
+}
+
+export function useThreatScenario(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.threatScenario(projectId, threatScenarioId),
+    queryFn: () => api.threatScenarios.get(projectId, threatScenarioId),
+  })
+}
+
+/** Saves the fields of the Definition tab; the targets are saved on their own, so a failure of one keeps the other. */
+export function useUpdateThreatScenario(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  const storeSaved = useStoreSaved(projectId, keys.threatScenario(projectId, threatScenarioId))
+  return useMutation({
+    mutationFn: (body: PatchThreatScenarioBody) => api.threatScenarios.update(projectId, threatScenarioId, body),
+    onSuccess: storeSaved,
+  })
+}
+
+export function useSetThreatTargets(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  const storeSaved = useStoreSaved(projectId, keys.threatScenarioRelations(projectId, threatScenarioId))
+  return useMutation({
+    mutationFn: (targets: ThreatTarget[]) => api.threatScenarios.setTargets(projectId, threatScenarioId, targets),
+    onSuccess: storeSaved,
+  })
+}
+
+export function useThreatScenarioRelations(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.threatScenarioRelations(projectId, threatScenarioId),
+    queryFn: () => api.threatScenarios.relations(projectId, threatScenarioId),
+  })
+}
+
+export function useSetThreatDamageLink(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  const storeSaved = useStoreSaved(projectId, keys.threatScenarioRelations(projectId, threatScenarioId))
+  return useMutation({
+    mutationFn: ({ damageScenarioId, linked }: { damageScenarioId: string; linked: boolean }) =>
+      linked
+        ? api.threatScenarios.linkDamageScenario(projectId, threatScenarioId, damageScenarioId)
+        : api.threatScenarios.unlinkDamageScenario(projectId, threatScenarioId, damageScenarioId),
+    onSuccess: storeSaved,
+  })
+}
+
+export function useSetThreatAttackPathLink(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  const storeSaved = useStoreSaved(projectId, keys.threatScenarioRelations(projectId, threatScenarioId))
+  return useMutation({
+    mutationFn: ({ attackPathId, linked }: { attackPathId: string; linked: boolean }) =>
+      linked
+        ? api.threatScenarios.linkAttackPath(projectId, threatScenarioId, attackPathId)
+        : api.threatScenarios.unlinkAttackPath(projectId, threatScenarioId, attackPathId),
+    onSuccess: storeSaved,
   })
 }

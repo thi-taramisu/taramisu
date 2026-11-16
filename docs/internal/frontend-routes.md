@@ -68,6 +68,9 @@ The damage scenario Relations tab (#185) links assets (with C / I / A) and threa
 built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
 without a link are not in the tree until the "Unassigned" group exists; threat scenarios stay available in "+ Add Threat Scenario".
 
+The threat scenario page (#194) has the Definition tab (name, cause, elicitation, technical notes, targets) and the Relations tab (damage
+scenarios, attack paths), both on the mock API. Its Risks and Treatment tabs are still placeholders.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:
