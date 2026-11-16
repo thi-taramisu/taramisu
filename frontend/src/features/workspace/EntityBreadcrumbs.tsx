@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import type { TreeNode } from '../../api/models/tree'
-import { entityPath } from './entities'
+import { entityPath, entityTitle } from './entities'
 
 /** Data-driven relation path; wrapping keeps even long names fully accessible. */
 export function EntityBreadcrumbs({ projectId, path }: { projectId: string; path: readonly TreeNode[] }) {
@@ -11,7 +11,7 @@ export function EntityBreadcrumbs({ projectId, path }: { projectId: string; path
       <ol className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {path.map((node, index) => {
           const current = index === path.length - 1
-          const label = `${node.code || node.id} ${node.name}`
+          const label = entityTitle(node)
           return (
             <li key={`${node.type}/${node.id}`} className="flex min-w-0 max-w-full items-baseline gap-2">
               {index > 0 && <span aria-hidden="true" className="text-muted-foreground">/</span>}

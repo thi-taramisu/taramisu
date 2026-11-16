@@ -55,8 +55,8 @@ moves to its first child, and Arrow Left collapses it or moves to its parent. Ov
 on leave; reduced-motion preferences disable the animation.
 
 Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
-Segments display the element code, or its ID when no code exists, and name. Parent links preserve query parameters; long labels wrap
-without shortening. If the path cannot be loaded, the current ID remains visible with a "Path unavailable" fallback.
+Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
+parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 
 ## API client
 

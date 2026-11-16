@@ -30,6 +30,21 @@ function renderPage(path: string, api = createMockItemApi()) {
 const breadcrumbs = () => within(screen.getByRole('navigation', { name: 'Breadcrumbs' }))
 
 describe('Entity breadcrumbs', () => {
+  it('shows a newly created item by name while keeping its UUID in parent navigation', async () => {
+    const api = createMockItemApi()
+    const item = await api.items.create('headlamp', { name: 'New headlamp', scope_type: 'ITEM' })
+    const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', component: 'ECU', properties: ['I'] })
+    const user = userEvent.setup()
+    renderPage(`assets/${asset.id}`, api)
+    await breadcrumbs().findByText(`${asset.code} Firmware`)
+    const parent = breadcrumbs().getByRole('link', { name: 'New headlamp' })
+    expect(parent).toHaveAttribute('href', `/projects/headlamp/items/${item.id}`)
+    expect(screen.getByRole('navigation', { name: 'Breadcrumbs' })).not.toHaveTextContent(item.id)
+    await user.click(parent)
+    expect(breadcrumbs().getByText('New headlamp')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('navigation', { name: 'Breadcrumbs' })).not.toHaveTextContent(item.id)
+  })
+
   it('shows the full path on tabs, with IDs, and follows parent links while preserving view parameters', async () => {
     const user = userEvent.setup()
     renderPage('attack-paths/ap-01/rating?view=graph&filter=open')
@@ -37,13 +52,13 @@ describe('Entity breadcrumbs', () => {
     expect(current).toHaveAttribute('aria-current', 'page')
     expect(breadcrumbs().queryByRole('link', { name: /AP-01/ })).not.toBeInTheDocument()
     expect(breadcrumbs().getAllByRole('listitem')).toHaveLength(5)
-    expect(breadcrumbs().getByRole('link', { name: 'i-01 Headlamp system' })).toHaveAttribute('href', '/projects/headlamp/items/i-01?view=graph&filter=open')
+    expect(breadcrumbs().getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', '/projects/headlamp/items/i-01?view=graph&filter=open')
     const parent = breadcrumbs().getByRole('link', { name: /TS-01/ })
     await user.click(parent)
     expect(breadcrumbs().getByText('TS-01 Spoofed headlamp command on the CAN bus')).toHaveAttribute('aria-current', 'page')
     expect(breadcrumbs().queryByText(/AP-01/)).not.toBeInTheDocument()
-    await user.click(breadcrumbs().getByRole('link', { name: 'i-01 Headlamp system' }))
-    expect(breadcrumbs().getByText('i-01 Headlamp system')).toHaveAttribute('aria-current', 'page')
+    await user.click(breadcrumbs().getByRole('link', { name: 'Headlamp system' }))
+    expect(breadcrumbs().getByText('Headlamp system')).toHaveAttribute('aria-current', 'page')
     expect(breadcrumbs().queryByRole('link')).not.toBeInTheDocument()
   })
 
@@ -93,11 +108,11 @@ describe('Entity breadcrumbs', () => {
     list.mockRestore()
     const children = vi.spyOn(api.content, 'children').mockResolvedValue([])
     await refresh()
-    expect(await breadcrumbs().findByText('a-01 Path unavailable')).toHaveAttribute('aria-current', 'page')
+    expect(await breadcrumbs().findByText('Path unavailable')).toHaveAttribute('aria-current', 'page')
     children.mockRestore()
     await refresh()
     expect(await breadcrumbs().findByText('A-01 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumbs().getByRole('link', { name: 'i-01 Headlamp system' })).toBeInTheDocument()
+    expect(breadcrumbs().getByRole('link', { name: 'Headlamp system' })).toBeInTheDocument()
   })
 
   it.each(['missing', 'error', 'missing parent', 'empty'] as const)('keeps the page usable with a clear fallback (%s)', async (failure) => {
@@ -107,8 +122,8 @@ describe('Entity breadcrumbs', () => {
     if (failure === 'missing parent') vi.spyOn(api.content, 'children').mockRejectedValue(new Error('Deleted'))
     renderPage(`assets/${failure === 'missing' ? 'unknown' : 'a-01'}`, api)
     const id = failure === 'missing' ? 'unknown' : 'a-01'
-    expect(breadcrumbs().getByText(`${id} Loading…`)).toHaveAttribute('aria-current', 'page')
-    expect(await breadcrumbs().findByText(`${id} Path unavailable`)).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumbs().getByText('Loading…')).toHaveAttribute('aria-current', 'page')
+    expect(await breadcrumbs().findByText('Path unavailable')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: id })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Asset tabs' })).toBeInTheDocument()
   })
