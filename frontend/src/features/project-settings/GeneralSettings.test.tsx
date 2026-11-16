@@ -49,14 +49,18 @@ describe('GeneralSettings', () => {
     const user = userEvent.setup()
     renderGeneral()
 
-    expect(screen.queryByAltText('Preview')).not.toBeInTheDocument()
+    const generatedImage = screen.getByAltText('').getAttribute('src')
+    expect(generatedImage).toMatch(/^data:image\/svg\+xml[;,]/)
     expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
 
     const image = screen.getByLabelText('Image')
     await user.upload(image, new File(['image'], 'headlamp.png', { type: 'image/png' }))
     expect(screen.getByAltText('Preview')).toHaveAttribute('src', 'blob:image')
 
+    expect(screen.queryByAltText('')).not.toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Remove' }))
+    expect(screen.getByAltText('')).toHaveAttribute('src', generatedImage)
     expect(screen.queryByAltText('Preview')).not.toBeInTheDocument()
     expect(image).toHaveValue('')
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:image')

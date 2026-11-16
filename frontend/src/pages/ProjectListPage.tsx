@@ -156,6 +156,7 @@ export function ProjectListPage() {
                       .map((project) => (
                         <ProjectCard
                           key={project.id}
+                          projectId={project.id}
                           name={project.name}
                           description={project.description}
                           image={project.image}
@@ -185,7 +186,7 @@ export function ProjectListPage() {
                       return (
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
-                            <ProjectImage image={project.image} className="size-14 rounded-md" />
+                            <ProjectImage projectId={project.id} projectName={project.name} image={project.image} className="size-14 rounded-md" />
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
@@ -279,7 +280,7 @@ export function ProjectListPage() {
                     {archivedProjects.map((project) => (
                       <Card key={project.id} className="py-3">
                         <CardHeader className="flex flex-row items-center gap-4">
-                          <ProjectImage image={project.image} className="size-14 rounded-md" />
+                          <ProjectImage projectId={project.id} projectName={project.name} image={project.image} className="size-14 rounded-md" />
                           <div className="min-w-0 flex-1">
                             <CardTitle>{project.name}</CardTitle>
                             <CardDescription>
