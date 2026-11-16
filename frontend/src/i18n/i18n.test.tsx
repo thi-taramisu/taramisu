@@ -119,6 +119,20 @@ it('has matching translation keys and interpolation variables in both languages'
   }
 })
 
+it('formats quantities when the language changes while preserving plural selection', async () => {
+  await i18n.changeLanguage('en')
+  expect(i18n.t('navigation.assetsWithCount', { count: 1234 })).toBe('Assets (1,234)')
+  expect(i18n.t('ui:assetCount', { count: 1 })).toBe('1 asset')
+  expect(i18n.t('ui:assetCount', { count: 1234 })).toBe('1,234 assets')
+  expect(i18n.t('ui:imageSizeError', { size: 1.5 })).toBe('Images can be at most 1.5 MB.')
+
+  await i18n.changeLanguage('de')
+  expect(i18n.t('navigation.assetsWithCount', { count: 1234 })).toBe('Assets (1.234)')
+  expect(i18n.t('ui:assetCount', { count: 1 })).toBe('1 Asset')
+  expect(i18n.t('ui:assetCount', { count: 1234 })).toBe('1.234 Assets')
+  expect(i18n.t('ui:imageSizeError', { size: 1.5 })).toBe('Bilder dürfen höchstens 1,5 MB groß sein.')
+})
+
 it.each(['en', 'de'])('uses %s throughout the create-project dialog and preserves the entered name', async (language) => {
   await i18n.changeLanguage(language)
   const { user } = renderApp('/projects')

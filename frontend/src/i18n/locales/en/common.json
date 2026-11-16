@@ -27,7 +27,7 @@
     "entityTabs": "{{type}} tabs",
     "expandElement": "Expand {{name}}",
     "collapseElement": "Collapse {{name}}",
-    "assetsWithCount": "Assets ({{count}})",
+    "assetsWithCount": "Assets ({{count, number}})",
     "tabs": {
       "definition": "Definition",
       "assets": "Assets",

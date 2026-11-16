@@ -27,7 +27,7 @@
     "entityTabs": "Registerkarten: {{type}}",
     "expandElement": "{{name}} ausklappen",
     "collapseElement": "{{name}} einklappen",
-    "assetsWithCount": "Assets ({{count}})",
+    "assetsWithCount": "Assets ({{count, number}})",
     "tabs": {
       "definition": "Definition",
       "assets": "Assets",
