@@ -35,6 +35,7 @@ src/
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
@@ -89,6 +90,28 @@ src/api/
 `ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
 that has no service yet (project list, project settings, example project).
+
+## Global search
+
+Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
+focuses its input, searches names, internal IDs and display IDs (for example `TS-01`), and opens the selected result with Enter.
+Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
+
+Project and element-type filters can be combined. Several types or projects are ORed within that filter; project and type filters
+are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
+projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
+Results include the project, type and ID. Further matches are available through **Load more results**.
+
+The frontend currently uses `SearchService` (`src/api/services/search.ts`) and the live in-memory mock stores. Project list changes
+survive route navigation and are shared with search; a reload still resets all mock data. The project service reuses the structure
+introduced in PR #286. Search reads all stored elements, including unlinked scenarios, rather than indexing only visible Filetree nodes.
+TanStack Query isolates requests by search session, query, filters and user identity and cancels outdated requests.
+Results from another query are never used as placeholder data. Mutations invalidate search results alongside their entity queries.
+
+The real search endpoint, generated API types, pagination contract and membership authorization are pending **#240** and **#239**.
+The mock scopes results to the projects returned by its project service, including when a caller supplies other project IDs. This models
+access restrictions for development; production authorization must be enforced by the backend. Replace the service in `ApiProvider`
+when that contract is available; do not fetch unauthorized project data and filter it in the component.
 
 ## UI components
 
