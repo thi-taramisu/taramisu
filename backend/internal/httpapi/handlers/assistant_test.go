@@ -34,26 +34,27 @@ func (s *assistantStore) ListItemDefinitions(context.Context, db.ListItemDefinit
 	return []db.ItemDefinition{s.row}, nil
 }
 
-// fakeModel answers with the scripted replies in order and records every request.
+// fakeModel answers with the scripted replies in order, reports usage for every call and records every request.
 type fakeModel struct {
 	replies  []llm.Message
+	usage    llm.Usage
 	err      error
 	requests []llm.Request
 }
 
-func (f *fakeModel) Complete(_ context.Context, req llm.Request) (llm.Message, error) {
+func (f *fakeModel) Complete(_ context.Context, req llm.Request) (llm.Completion, error) {
 	f.requests = append(f.requests, req)
 	if f.err != nil {
-		return llm.Message{}, f.err
+		return llm.Completion{}, f.err
 	}
 	if len(f.replies) == 0 {
-		return llm.Message{}, errors.New("fake model has no reply left")
+		return llm.Completion{}, errors.New("fake model has no reply left")
 	}
 	reply := f.replies[0]
 	if len(f.replies) > 1 {
 		f.replies = f.replies[1:]
 	}
-	return reply, nil
+	return llm.Completion{Message: reply, Usage: f.usage}, nil
 }
 
 func toolCall(id, name string) llm.Message {
@@ -78,7 +79,7 @@ func TestAssistantRunsToolsAndAnswers(t *testing.T) {
 		toolCall("call_1", "get_project"),
 		toolCall("call_2", "list_item_definitions"),
 		{Role: "assistant", Content: "Demo ECU has the item Headlamp."},
-	}}
+	}, usage: llm.Usage{InputTokens: 100, OutputTokens: 10}}
 	handler, token, store := assistantAPI(t, db.ProjectRoleVIEWER, model)
 
 	w := request(handler, http.MethodPost, assistantPath, askQuestion, token)
@@ -89,12 +90,20 @@ func TestAssistantRunsToolsAndAnswers(t *testing.T) {
 	var out struct {
 		Answer    string   `json:"answer"`
 		ToolsUsed []string `json:"tools_used"`
+		Usage     struct {
+			InputTokens  int `json:"input_tokens"`
+			OutputTokens int `json:"output_tokens"`
+		} `json:"usage"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
 	if out.Answer != "Demo ECU has the item Headlamp." || strings.Join(out.ToolsUsed, ",") != "get_project,list_item_definitions" {
 		t.Errorf("output = %+v", out)
+	}
+	// Three model calls of 100 input and 10 output tokens each.
+	if out.Usage.InputTokens != 300 || out.Usage.OutputTokens != 30 {
+		t.Errorf("usage = %+v, want the sum of all model calls (300 in, 30 out)", out.Usage)
 	}
 	if len(model.requests) != 3 {
 		t.Fatalf("model calls = %d, want 3", len(model.requests))

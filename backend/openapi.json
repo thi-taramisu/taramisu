@@ -206,11 +206,33 @@
               "array",
               "null"
             ]
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AssistantUsage"
           }
         },
         "required": [
           "answer",
-          "tools_used"
+          "tools_used",
+          "usage"
+        ],
+        "type": "object"
+      },
+      "AssistantUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "input_tokens": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "output_tokens": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "input_tokens",
+          "output_tokens"
         ],
         "type": "object"
       },
