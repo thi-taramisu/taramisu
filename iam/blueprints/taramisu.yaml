@@ -36,7 +36,7 @@ entries:
       access_token_validity: minutes=10
       refresh_token_validity: days=7
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
-      authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      authentication_flow: null
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
       redirect_uris:

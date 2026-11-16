@@ -67,10 +67,22 @@ cookie and carries the choice into registration. A new sign-in request overrides
 an earlier IAM language choice. Direct flow visits use Authentik's language cookie
 or browser language; custom content falls back to English for languages other than German.
 
-The enrollment blueprint routes German requests to `taramisu-authentication-de`
+The enrollment blueprint routes German requests to `default-authentication-de`
 and `taramisu-enrollment-de`. These flows provide translated titles and prompt labels
 while sharing password, MFA, account creation, and identifier-validation rules with
 the English flows. Account approval remains mandatory in both languages.
+
+The provider and default brand leave their fixed authentication flow unset so
+Authentik can select a flow before rendering. Authentication flows are evaluated in
+slug order: `default-authentication-de` requires German and precedes the unrestricted
+`default-authentication-flow` English fallback. This avoids briefly showing an English
+heading before German login. The German flow is identified by its stable name in the
+blueprint so reapplying it renames an existing flow in place.
+
+Start sign-in from Taramisu or `/auth/flows/-/default/authentication/`. A direct visit
+to the German-specific flow requires a German language cookie or browser preference;
+its language policy rejects other languages. Existing redirects still support German
+visits to the old English entry point and language changes during registration.
 
 Authentik 2026.8.3's in-flow locale selector changes frontend text without reloading
 custom server-provided labels. Branding hides it to avoid a mixed-language form;

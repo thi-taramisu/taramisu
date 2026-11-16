@@ -10,6 +10,7 @@ entries:
       domain: authentik-default
       default: true
     attrs:
+      flow_authentication: null
       branding_title: Taramisu
       branding_logo: /static/dist/assets/icons/blank.svg
       branding_favicon: /static/dist/assets/icons/blank.svg
