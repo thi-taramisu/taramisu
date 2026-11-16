@@ -58,3 +58,54 @@ Approved users can sign in at <http://localhost> (or <http://localhost/auth/if/f
 
 See the [internal registration flow guide](../docs/internal/architecture/iam/registration-flow.md)
 for validation, approval, and tests.
+
+## Login and registration language
+
+Choose **English** or **Deutsch** in Taramisu before signing in. Each authorization
+request sends the current selection as OIDC `ui_locales`; Authentik sets its language
+cookie and carries the choice into registration. A new sign-in request overrides
+an earlier IAM language choice. Direct flow visits use Authentik's language cookie
+or browser language; custom content falls back to English for languages other than German.
+
+The enrollment blueprint routes German requests to `default-authentication-de`
+and `taramisu-enrollment-de`. These flows provide translated titles and prompt labels
+while sharing password, MFA, account creation, and identifier-validation rules with
+the English flows. Account approval remains mandatory in both languages.
+
+The provider and default brand leave their fixed authentication flow unset so
+Authentik can select a flow before rendering. Authentication flows are evaluated in
+slug order: `default-authentication-de` requires German and precedes the unrestricted
+`default-authentication-flow` English fallback. This avoids briefly showing an English
+heading before German login. The German flow is identified by its stable name in the
+blueprint so reapplying it renames an existing flow in place.
+
+Start sign-in from Taramisu or `/auth/flows/-/default/authentication/`. A direct visit
+to the German-specific flow requires a German language cookie or browser preference;
+its language policy rejects other languages. Existing redirects still support German
+visits to the old English entry point and language changes during registration.
+
+Authentik 2026.8.3's in-flow locale selector changes frontend text without reloading
+custom server-provided labels. Branding hides it to avoid a mixed-language form;
+return to Taramisu and select the language there before starting a new sign-in.
+
+After applying the blueprints, run the live regressions described in the
+[registration flow guide](../docs/internal/architecture/iam/registration-flow.md).
+They cover both languages, including stale language cookies, registration labels,
+custom validation and confirmation. Existing security regressions cover approval,
+identifier collisions, profile changes, and PKCE.
+
+The redundant “Log in to continue to Taramisu” subtitle is hidden with branding CSS;
+the translated flow heading identifies the application. This selector targets the
+identification stage's introductory paragraph; check it when upgrading Authentik.
+
+Authentik's own German catalogue still has some English accessibility labels and
+formal wording on the password screen. We leave that catalogue unchanged. Native
+required-field and email-format validation follows the browser's UI language;
+custom registration validation follows the language selected in Taramisu.
+
+Sign-out uses Authentik's standard provider invalidation flow and returns directly to
+`${APP_URL}/projects`, avoiding a separate confirmation screen. The provider registers
+that URL and the Vite development URL (`http://localhost:5173/projects`) as strict
+post-logout redirects. Reapply startup configuration after changing `APP_URL`; a custom
+`VITE_OIDC_POST_LOGOUT_REDIRECT_URI` must also be registered in the provider.
+Provider logout revokes its tokens while retaining the Authentik SSO session.
