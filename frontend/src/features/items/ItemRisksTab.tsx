@@ -83,12 +83,12 @@ export function ItemRisksTab() {
                   </TableCell>
                   <TableCell>
                     <EntityLink projectId={projectId} type="threat-scenarios" entity={row.threatScenario} />{' '}
-                    <Badge variant={row.relation === 'targeted' ? 'default' : 'outline'}>{row.relation}</Badge>
+                    <Badge variant={row.relation === 'targeted' ? 'default' : 'outline'}>{t(row.relation === 'targeted' ? 'ui:targetedRelation' : 'ui:viaDamageRelation')}</Badge>
                   </TableCell>
                   <TableCell>
                     {row.feasibility ? (
                       <>
-                        {row.feasibility.rating} <span className="text-xs text-muted-foreground">{t('ui:via', { path: row.feasibility.attackPath })}</span>
+                        {t(`ui:feasibilityValues.${row.feasibility.rating}`, { defaultValue: row.feasibility.rating })} <span className="text-xs text-muted-foreground">{t('ui:via', { path: row.feasibility.attackPath })}</span>
                       </>
                     ) : (
                       <span className="text-muted-foreground">{t('ui:notRated')}</span>
@@ -97,7 +97,7 @@ export function ItemRisksTab() {
                   <TableCell>
                     <RiskBadge value={row.risk} />
                   </TableCell>
-                  <TableCell>{row.treatment ?? <span className="text-muted-foreground">{t('ui:open')}</span>}</TableCell>
+                  <TableCell>{row.treatment ? t(`ui:treatmentValues.${row.treatment}`, { defaultValue: row.treatment }) : <span className="text-muted-foreground">{t('ui:open')}</span>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

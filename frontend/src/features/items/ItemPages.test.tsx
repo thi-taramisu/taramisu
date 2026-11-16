@@ -34,7 +34,7 @@ describe('create item', () => {
 
     expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
     expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
+    for (const name of ['Asset', 'Threat scenario', 'Attack path']) {
       expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
     }
   })

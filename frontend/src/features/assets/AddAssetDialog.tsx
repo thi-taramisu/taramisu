@@ -13,13 +13,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { CiaProperty, NewAsset } from '../../api/models/asset'
-
-const PROPERTIES: { value: CiaProperty; label: string }[] = [
-  { value: 'C', label: 'ui:confidentiality' },
-  { value: 'I', label: 'ui:integrity' },
-  { value: 'A', label: 'ui:availability' },
-]
+import type { NewAsset } from '../../api/models/asset'
+import { CIA_PROPERTIES } from './ciaProperties'
 
 /** Dialog to add an asset to the current item. */
 export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<unknown> }) {
@@ -35,7 +30,7 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<
       await onAdd({
         name: String(form.get('name')),
         component: String(form.get('component')),
-        properties: PROPERTIES.map((p) => p.value).filter((value) => form.has(value)),
+        properties: CIA_PROPERTIES.map((p) => p.value).filter((value) => form.has(value)),
       })
       setState('idle')
       setOpen(false)
@@ -64,7 +59,7 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{t('ui:addAsset')}</DialogTitle>
-            <DialogDescription>Saved in the mock data until the asset API exists.</DialogDescription>
+            <DialogDescription>{t('ui:mockAssetHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="asset-name">{t('ui:name')}</Label>
@@ -76,7 +71,7 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<
           </div>
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-sm font-medium">{t('ui:cybersecurityProperties')}</legend>
-            {PROPERTIES.map((p) => (
+            {CIA_PROPERTIES.map((p) => (
               <Label key={p.value} className="font-normal">
                 <input type="checkbox" name={p.value} />
                 {t(p.label)}

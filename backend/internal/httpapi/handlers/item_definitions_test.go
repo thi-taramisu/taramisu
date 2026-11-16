@@ -30,6 +30,10 @@ type itemStore struct {
 	handlers.TaraProjectStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 	handlers.AttackPathStore

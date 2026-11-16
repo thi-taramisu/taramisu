@@ -92,8 +92,8 @@ describe('language selector', () => {
     await user.click(screen.getByRole('link', { name: 'Risiken' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/projects/headlamp/items/i-01/risks')
     expect(screen.getByRole('link', { name: 'Risiken' })).toHaveAttribute('aria-current', 'page')
-    expect(await screen.findByText('Reduce')).toBeInTheDocument()
-    expect(screen.getAllByText('Medium')).toHaveLength(2)
+    expect(await screen.findByText('Reduzieren')).toBeInTheDocument()
+    expect(screen.getAllByText('Mittel')).toHaveLength(2)
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Sprache' }), 'en')
     expect(screen.getByRole('link', { name: 'Risks' })).toHaveAttribute('aria-current', 'page')
