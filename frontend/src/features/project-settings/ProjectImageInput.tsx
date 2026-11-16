@@ -1,12 +1,14 @@
+import { useTranslation } from 'react-i18next'
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { ImageIcon, Upload } from 'lucide-react'
 import { AspectRatio } from '@/components/ui/aspect-ratio'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { IMAGE_ERROR_MESSAGES, IMAGE_TYPES, type ImageError, validateImage } from '@/lib/imageUpload'
+import { MAX_IMAGE_SIZE, IMAGE_TYPES, type ImageError, validateImage } from '@/lib/imageUpload'
 
 /** File input for the project image with a local preview; the file is not uploaded yet. */
 export function ProjectImageInput({ defaultValue }: { defaultValue: string | null }) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState(defaultValue)
   const [removed, setRemoved] = useState(false)
@@ -30,7 +32,7 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
       setPreview(fallback)
       return
     }
-    setPreview(URL.createObjectURL(file))
+    setPreview(encodeURI(URL.createObjectURL(file)))
   }
 
   function remove() {
@@ -40,13 +42,18 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
     setPreview(null)
   }
 
+  // Treat saved and locally selected image sources as URLs, never as markup.
+  const imageSource = preview && /^(https?:\/\/|blob:|\/)/i.test(preview) && !/[<>"']/.test(preview)
+    ? preview
+    : null
+
   return (
     <div className="grid gap-2">
-      <Label htmlFor="project-image">Image</Label>
+      <Label htmlFor="project-image">{t('ui:image')}</Label>
       <div className="w-full max-w-md">
         <AspectRatio ratio={3 / 1} className="flex items-center justify-center overflow-hidden rounded-lg border bg-muted">
-          {preview ? (
-            <img src={preview} alt="Preview" className="size-full object-cover" />
+          {imageSource ? (
+            <img src={imageSource} alt={t('ui:preview')} className="size-full object-cover" />
           ) : (
             <ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />
           )}
@@ -70,15 +77,15 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
           <Upload aria-hidden="true" />
-          Upload image
+          {t('ui:uploadImage')}
         </Button>
         <Button type="button" variant="ghost" disabled={!preview} onClick={remove}>
-          Remove
+          {t('ui:remove')}
         </Button>
       </div>
       {error && (
         <p id="project-image-error" role="alert" className="text-sm text-destructive">
-          {IMAGE_ERROR_MESSAGES[error]}
+          {t(error === 'type' ? 'ui:imageTypeError' : 'ui:imageSizeError', { size: MAX_IMAGE_SIZE / 1024 / 1024 })}
         </p>
       )}
     </div>

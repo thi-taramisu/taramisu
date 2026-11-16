@@ -1,4 +1,4 @@
-﻿
+import { useTranslation } from 'react-i18next'
 import { Star } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ export function ProjectCard({
   favorite,
   onToggleFavorite,
 }: ProjectCardProps) {
+  const { t } = useTranslation()
   return (
     <Card className="w-64 overflow-hidden py-0">
       <ProjectImage image={image} className="h-32 w-full" />
@@ -38,8 +39,8 @@ export function ProjectCard({
           onClick={onToggleFavorite}
           aria-label={
             favorite
-              ? `Remove ${name} from favorites`
-              : `Add ${name} to favorites`
+              ? t('ui:removeFavorite', { name: name })
+              : t('ui:addFavorite', { name: name })
           }
           aria-pressed={favorite}
         >

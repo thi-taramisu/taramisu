@@ -1,0 +1,49 @@
+{
+  "language": "Sprache",
+  "navigation": {
+    "projects": "Projekte",
+    "archive": "Archiv",
+    "favorites": "Favoriten",
+    "allProjects": "Alle Projekte",
+    "settings": "Einstellungen",
+    "general": "Allgemein",
+    "members": "Mitglieder",
+    "colourSchemes": "Farbschemata",
+    "sidebar": "Seitenleiste",
+    "mainNavigation": "Hauptnavigation",
+    "expandSidebar": "Seitenleiste ausklappen",
+    "collapseSidebar": "Seitenleiste einklappen",
+    "createProject": "Projekt erstellen",
+    "signIn": "Anmelden",
+    "signOut": "Abmelden",
+    "back": "Zurück",
+    "backToProjects": "Zur Projektübersicht",
+    "backToProject": "Zurück zum Projekt",
+    "graph": "Graph",
+    "projectElements": "Projektelemente",
+    "resizeProjectElements": "Breite der Seitenleiste ändern",
+    "new": "Neu",
+    "newDamageScenario": "Schadensszenario",
+    "entityTabs": "Registerkarten: {{type}}",
+    "expandElement": "{{name}} ausklappen",
+    "collapseElement": "{{name}} einklappen",
+    "assetsWithCount": "Assets ({{count, number}})",
+    "tabs": {
+      "definition": "Definition",
+      "assets": "Assets",
+      "risks": "Risiken",
+      "review": "Überprüfung",
+      "relations": "Verknüpfungen",
+      "impact": "Auswirkungen",
+      "treatment": "Risikobehandlung",
+      "rating": "Bewertung"
+    }
+  },
+  "entities": {
+    "items": "Item",
+    "assets": "Asset",
+    "damage-scenarios": "Schadensszenario",
+    "threat-scenarios": "Bedrohungsszenario",
+    "attack-paths": "Angriffspfad"
+  }
+}

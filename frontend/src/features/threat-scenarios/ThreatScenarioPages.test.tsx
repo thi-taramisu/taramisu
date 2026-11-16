@@ -408,7 +408,7 @@ describe('threat scenario relations', () => {
     await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: `Remove link to ${DS01}` }))
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveAccessibleDescription(
-      'The damage scenario stays in the project. The link and any threat scenario targets that depend on it are removed.',
+      'The element stays in the project. The link and any threat scenario targets that depend on it are removed.',
     )
     await user.click(within(dialog).getByRole('button', { name: 'Remove link' }))
 

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { Upload } from 'lucide-react'
 import { useParams } from 'react-router-dom'
@@ -13,9 +14,9 @@ import { useItem, useUpdateItem } from '../../api/queries/items'
 const EXAMPLE_DIAGRAM_ITEM = 'i-01'
 
 const TEXT_FIELDS = [
-  { key: 'boundary', label: 'Boundary', placeholder: 'What belongs to the item, what is outside, and the interfaces that cross the boundary' },
-  { key: 'functions', label: 'Functions', placeholder: 'Functions of the item at vehicle level' },
-  { key: 'operational_environment', label: 'Operational Environment', placeholder: 'Connectivity, update paths, workshop access' },
+  { key: 'boundary', label: 'ui:boundary', placeholder: 'ui:boundaryPlaceholder' },
+  { key: 'functions', label: 'ui:functions', placeholder: 'ui:functionsPlaceholder' },
+  { key: 'operational_environment', label: 'ui:operationalEnvironment', placeholder: 'ui:environmentPlaceholder' },
 ] as const
 
 type FormValues = Pick<ItemDefinition, 'name'> & Record<(typeof TEXT_FIELDS)[number]['key'], string>
@@ -39,6 +40,7 @@ export function ItemDefinitionTab() {
 }
 
 function DefinitionForm({ item }: { item: ItemDefinition }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(item))
   // Last saved state; kept here so a failed refetch of the item cannot make the form dirty again.
@@ -60,7 +62,7 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
     event.preventDefault()
     const name = values.name.trim()
     if (!name) {
-      setNameError('Name is required.')
+      setNameError('ui:nameRequired')
       return
     }
     update.mutate(
@@ -82,9 +84,9 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
   return (
     <div className="max-w-3xl space-y-6">
       <form onSubmit={handleSubmit} noValidate className="grid gap-4">
-        <p className="text-xs text-muted-foreground">Fields marked * are needed before the item definition is complete.</p>
+        <p className="text-xs text-muted-foreground">{t('ui:itemRequiredFields')}</p>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-name`}>Name *</Label>
+          <Label htmlFor={`${id}-name`}>{t('ui:requiredName')}</Label>
           <Input
             id={`${id}-name`}
             value={values.name}
@@ -96,31 +98,31 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
           />
           {nameError && (
             <p id={`${id}-name-error`} role="alert" className="text-sm text-destructive">
-              {nameError}
+              {t(nameError)}
             </p>
           )}
         </div>
         {TEXT_FIELDS.map((field) => (
           <div key={field.key} className="grid gap-2">
-            <Label htmlFor={`${id}-${field.key}`}>{field.label} *</Label>
+            <Label htmlFor={`${id}-${field.key}`}>{t(field.label)} *</Label>
             <Textarea
               id={`${id}-${field.key}`}
               value={values[field.key]}
-              placeholder={field.placeholder}
+              placeholder={t(field.placeholder)}
               onChange={(event) => change(field.key, event.target.value)}
             />
           </div>
         ))}
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={!dirty || update.isPending}>
-            Save
+            {t('ui:save')}
           </Button>
           <output aria-live="polite" className="text-sm text-muted-foreground">
-            {update.isSuccess && !dirty && 'Saved.'}
+            {update.isSuccess && !dirty && t('ui:saved')}
           </output>
           {update.isError && (
             <p role="alert" className="text-sm text-destructive">
-              The item could not be saved. Please try again.
+              {t('ui:saveItemError')}
             </p>
           )}
         </div>
@@ -129,22 +131,22 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
       <section aria-labelledby={`${id}-files`} className="overflow-hidden rounded-lg border">
         <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2">
           <h2 id={`${id}-files`} className="text-sm font-medium">
-            Supporting files
+            {t('ui:supportingFiles')}
           </h2>
           <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">0</span>
-          <span className="text-xs text-muted-foreground">sketches, architecture, interface lists · optional, never a substitute for the written definition</span>
+          <span className="text-xs text-muted-foreground">{t('ui:supportingFilesHint')}</span>
         </div>
         <div className="p-4">
           <div className="flex w-56 flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
             <Upload aria-hidden="true" className="size-4" />
-            <span>Drop files here or browse</span>
-            <span className="text-xs">File upload follows with the attachment API (#79)</span>
+            <span>{t('ui:dropFiles')}</span>
+            <span className="text-xs">{t('ui:fileUploadPending')}</span>
           </div>
         </div>
       </section>
 
       {item.id === EXAMPLE_DIAGRAM_ITEM && (
-        <section aria-label="Item diagram" className="h-[480px] overflow-hidden rounded-lg border">
+        <section aria-label={t('ui:itemDiagram')} className="h-[480px] overflow-hidden rounded-lg border">
           <ItemDefinitionDiagram />
         </section>
       )}

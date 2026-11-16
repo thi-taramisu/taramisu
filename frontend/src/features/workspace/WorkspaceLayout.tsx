@@ -8,9 +8,11 @@ import { Filetree } from './Filetree'
 import { NewElementMenu } from './NewElementMenu'
 import { ProjectHeader } from './ProjectHeader'
 import { ResizableSidebar } from './ResizableSidebar'
+import { useTranslation } from 'react-i18next'
 
 /** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content. */
 export function WorkspaceLayout() {
+  const { t } = useTranslation()
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const graphView = searchParams.get('view') === 'graph'
@@ -26,18 +28,18 @@ export function WorkspaceLayout() {
           checked={graphView}
           onCheckedChange={(checked) => setSearchParams(checked ? { view: 'graph' } : {})}
         />
-        <Label htmlFor="graph-view">Graph</Label>
+        <Label htmlFor="graph-view">{t('navigation.graph')}</Label>
       </ProjectHeader>
       <div className="flex min-h-0 flex-1">
-        <ResizableSidebar label="Project elements" className="bg-sidebar p-2 text-sidebar-foreground">
+        <ResizableSidebar label={t('navigation.projectElements')} resizeLabel={t('navigation.resizeProjectElements')} className="bg-sidebar p-2 text-sidebar-foreground">
           <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
-            <h2 className="text-xs font-medium text-muted-foreground">Project elements</h2>
+            <h2 className="text-xs font-medium text-muted-foreground">{t('navigation.projectElements')}</h2>
             <NewElementMenu projectId={projectId} projectName={exampleProject.name} />
           </div>
           {tree.data ? (
             <Filetree nodes={tree.data} projectId={projectId} />
           ) : (
-            <p className="px-2 py-3 text-sm text-muted-foreground">{tree.isError ? 'The elements could not be loaded.' : 'Loading…'}</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground">{tree.isError ? t('ui:loadElementsError') : t('ui:loading')}</p>
           )}
         </ResizableSidebar>
         {/* relative keeps absolutely positioned content such as sr-only text inside the scroll area; it would extend the page otherwise. */}

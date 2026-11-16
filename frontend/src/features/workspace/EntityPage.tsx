@@ -5,6 +5,7 @@ import type { EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
 import { EntityBreadcrumbs } from './EntityBreadcrumbs'
 import { Placeholder } from './Placeholder'
+import { useTranslation } from 'react-i18next'
 
 interface EntityPageProps {
   type: EntityType
@@ -25,10 +26,12 @@ interface EntityPageProps {
  * With `?view=graph` it shows the relation graph instead (Graph Concept wireframes).
  */
 export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCounts = {} }: EntityPageProps) {
+  const { t, i18n } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const { data: tree, isPending } = useProjectTree(projectId)
-  const { label, tabs } = ENTITY_TYPES[type]
+  const { tabs } = ENTITY_TYPES[type]
+  const label = t(`entities.${type}`)
   const path = tree && findNodePath(type, entityId, tree)
   const node = path?.at(-1)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
@@ -38,7 +41,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
   return (
     <div className="flex h-full flex-col gap-4">
       <EntityBreadcrumbs projectId={projectId} path={path ?? [{
-        type, id: entityId, name: isPending ? 'Loading…' : 'Path unavailable',
+        type, id: entityId, name: isPending ? t('ui:loading') : t('ui:pathUnavailable'),
       }]} />
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -52,10 +55,10 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
         {actions}
       </div>
       {searchParams.get('view') === 'graph' ? (
-        <Placeholder title="Graph view" />
+        <Placeholder title={t('ui:graphView')} />
       ) : (
         <>
-          <nav aria-label={`${label} tabs`} className="flex gap-4 border-b">
+          <nav aria-label={t('navigation.entityTabs', { type: label })} className="flex flex-wrap gap-4 border-b">
             {tabs.map((tab) => (
               <NavLink
                 key={tab.path}
@@ -65,10 +68,10 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
                   `-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
                 }
               >
-                {tabLabels[tab.path] ?? tab.label}{' '}
+                {tabLabels[tab.path] ?? t(`navigation.tabs.${tab.path || 'definition'}`)}{' '}
                 {tabCounts[tab.path] !== undefined && (
                   <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-xs tabular-nums">
-                    {tabCounts[tab.path]}
+                    {tabCounts[tab.path].toLocaleString(i18n.resolvedLanguage)}
                   </span>
                 )}
               </NavLink>

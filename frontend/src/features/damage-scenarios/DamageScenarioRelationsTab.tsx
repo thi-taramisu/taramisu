@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import {
@@ -10,9 +11,7 @@ import {
 } from '../../api/queries/items'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
-import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
-
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
 export function DamageScenarioRelationsTab() {
@@ -24,6 +23,7 @@ export function DamageScenarioRelationsTab() {
 }
 
 function Relations({ projectId, scenario }: { projectId: string; scenario: DamageScenario }) {
+  const { t } = useTranslation()
   const relations = useDamageScenarioRelations(projectId, scenario.id)
   // Links stay within the item that owns the damage scenario.
   const itemAssets = useItemAssets(projectId, scenario.item_definition_id)
@@ -35,34 +35,35 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
 
   if (!relations.data) {
     return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The relations could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:loadRelationsError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading relations…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingRelations')}</output>
     )
   }
 
   const { assets, threatScenarios: threats } = relations.data
   // A link needs at least one property, so assets without any cannot be linked.
   const assetCandidates = itemAssets.data?.filter((asset) => asset.properties.length > 0 && !assets.some((a) => a.id === asset.id)) ?? []
-  const threatCandidates = itemThreats.data?.filter((threat) => !threats.some((t) => t.id === threat.id)) ?? []
+  const threatCandidates = itemThreats.data?.filter((threat) => !threats.some((linkedThreat) => linkedThreat.id === threat.id)) ?? []
 
   return (
     <div className="space-y-4">
       {relations.isError && (
-        <p role="alert" className="text-sm text-destructive">The relations could not be refreshed.</p>
+        <p role="alert" className="text-sm text-destructive">{t('ui:refreshRelationsError')}</p>
       )}
       <RelationSection
         projectId={projectId}
         type="assets"
         direction="up"
-        title="Assets"
-        elementLabel="Asset"
-        removeEffect={LINK_REMOVE_WITH_TARGETS}
+        title={t('ui:relationAssetsTitle')}
+        pluralLabel={t('ui:relationAssetsPlural')}
+        elementLabel={t('entities.assets')}
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
+        removeEffect={t('ui:removeLinkWithTargets')}
         pending={saving}
         candidatesLoading={itemAssets.isPending}
-        candidatesError={itemAssets.isLoadingError ? 'The assets of this item could not be loaded.' : undefined}
-        error={assetLink.isError ? LINK_SAVE_ERROR : undefined}
+        candidatesError={itemAssets.isLoadingError ? t('ui:loadItemAssetsError') : undefined}
+        error={assetLink.isError ? t('ui:saveRelationError') : undefined}
         // New links start with all properties of the asset, as in the create dialog; they are refined in the table.
         onAdd={(assetId) => {
           const properties = assetCandidates.find((asset) => asset.id === assetId)?.properties ?? []
@@ -89,20 +90,21 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         projectId={projectId}
         type="threat-scenarios"
         direction="down"
-        title="Threat Scenarios"
-        elementLabel="Threat Scenario"
-        removeEffect={LINK_REMOVE_WITH_TARGETS}
+        title={t('ui:relationThreatsTitle')}
+        pluralLabel={t('ui:relationThreatsPlural')}
+        elementLabel={t('ui:relationThreatLabel')}
         candidates={threatCandidates}
+        removeEffect={t('ui:removeLinkWithTargets')}
         pending={saving}
         candidatesLoading={itemThreats.isPending}
-        candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
-        error={threatLink.isError ? LINK_SAVE_ERROR : undefined}
+        candidatesError={itemThreats.isLoadingError ? t('ui:loadItemThreatsError') : undefined}
+        error={threatLink.isError ? t('ui:saveRelationError') : undefined}
         onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
         onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">
-        Removing a link does not delete the element. Damage and threat scenarios without links are no longer shown in the tree. An asset link needs at least one property.
+        {t('ui:relationsHint')}
       </p>
     </div>
   )

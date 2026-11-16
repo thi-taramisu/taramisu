@@ -2,14 +2,16 @@ import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import { exampleProject } from '../api/mocks/data/headlamp'
 import { ProjectHeader } from '../features/workspace/ProjectHeader'
 import { NotFoundPage } from './NotFoundPage'
+import { useTranslation } from 'react-i18next'
 
 const SECTIONS = [
-  { path: '', label: 'General' },
-  { path: 'members', label: 'Members' },
+  { path: '', label: 'navigation.general' },
+  { path: 'members', label: 'navigation.members' },
 ]
 
 /** Project settings with "General" and "Members" sections as child routes. */
 export function ProjectSettingsPage() {
+  const { t } = useTranslation()
   const { projectId } = useParams()
   if (projectId !== exampleProject.id) return <NotFoundPage />
 
@@ -17,11 +19,11 @@ export function ProjectSettingsPage() {
     <div className="flex h-screen flex-col">
       <ProjectHeader projectId={projectId} />
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Settings" className="w-56 shrink-0 space-y-1 border-r p-3">
+        <nav aria-label={t('navigation.settings')} className="w-56 shrink-0 space-y-1 border-r p-3">
           <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
-            ← Back
+            ← {t('navigation.back')}
           </Link>
-          <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">Settings</h2>
+          <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">{t('navigation.settings')}</h2>
           {SECTIONS.map((s) => (
             <NavLink
               key={s.path}
@@ -31,7 +33,7 @@ export function ProjectSettingsPage() {
                 `block rounded-md px-2 py-1 text-sm hover:bg-muted ${isActive ? 'bg-muted font-medium' : ''}`
               }
             >
-              {s.label}
+              {t(s.label)}
             </NavLink>
           ))}
         </nav>
