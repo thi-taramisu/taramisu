@@ -108,6 +108,12 @@ func TestAssistantRunsToolsAndAnswers(t *testing.T) {
 	if len(model.requests) != 3 {
 		t.Fatalf("model calls = %d, want 3", len(model.requests))
 	}
+	// All model calls of one question share one trace ID, for tracing in the LLM service.
+	for i, req := range model.requests {
+		if req.TraceID == "" || req.TraceID != model.requests[0].TraceID {
+			t.Errorf("request %d trace ID = %q, want the same non-empty ID for all calls", i, req.TraceID)
+		}
+	}
 	first := model.requests[0]
 	if first.Model != "test-model" || first.Messages[0].Role != "system" || first.Messages[1].Content != "Which items does the project have?" {
 		t.Errorf("first request = %+v, want model, system prompt and question", first)

@@ -52,6 +52,9 @@ type Request struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
 	Tools    []Tool    `json:"tools,omitempty"`
+	// TraceID groups the model calls of one question for optional tracing in the LLM service.
+	// It is sent as the X-Trace-Id header, never to the model API.
+	TraceID string `json:"-"`
 }
 
 // Usage counts the tokens of model calls. It stays zero when the model API does not report it.
@@ -109,6 +112,9 @@ func (c *HTTPClient) Complete(ctx context.Context, req Request) (Completion, err
 		return Completion{}, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if req.TraceID != "" {
+		httpReq.Header.Set("X-Trace-Id", req.TraceID)
+	}
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {

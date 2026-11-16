@@ -6,6 +6,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -167,8 +169,9 @@ func runToolLoop(ctx context.Context, client llm.Client, model string, messages 
 	}
 
 	result := toolLoopResult{toolsUsed: []string{}}
+	traceID := newTraceID() // one trace for all model calls of this question
 	for range maxToolRounds {
-		completion, err := client.Complete(ctx, llm.Request{Model: model, Messages: messages, Tools: definitions})
+		completion, err := client.Complete(ctx, llm.Request{Model: model, Messages: messages, Tools: definitions, TraceID: traceID})
 		if err != nil {
 			return toolLoopResult{}, err
 		}
@@ -189,6 +192,13 @@ func runToolLoop(ctx context.Context, client llm.Client, model string, messages 
 		}
 	}
 	return toolLoopResult{}, errToolRoundsExceeded
+}
+
+// newTraceID returns 32 random hex characters, the format the LLM service accepts in X-Trace-Id.
+func newTraceID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // runTool runs one tool call and returns its result as JSON. An unknown tool is reported to the model,
