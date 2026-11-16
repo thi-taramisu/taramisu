@@ -348,10 +348,11 @@ erDiagram
 | **`RISK_TREATMENT_DECISION`** | **15.9** (`[RQ-15-17]`, **15.9.2 NOTE**, `[WP-15-08]`) | Stores the treatment decision (`AVOIDING \| REDUCING \| SHARING \| RETAINING`), rationale, and Cybersecurity Claim flag (`is_cybersecurity_claim`) for a `THREAT_SCENARIO`. |
 
 Attachments belong to a project and inherit its direct and group roles. Metadata lives in PostgreSQL; bytes live in
-private S3-compatible storage (SeaweedFS), keyed by a random UUID. Project and uploader deletion is restricted while
-attachments exist, so metadata cannot be cascaded away leaving storage objects behind.
-The `delete_pending` flag records deletion intent durably; list queries exclude pending attachments, and a separate
-query retrieves them for cleanup.
+private S3-compatible storage (SeaweedFS), keyed by a random UUID. Permanent project deletion sets the attachment's
+`project_id` to null, preserving its object key for cleanup. Uploader deletion remains restricted while attachments exist.
+The `delete_pending` flag records individual file deletion intent; the cleanup query also selects attachments whose
+project no longer exists. Updating a project without deleting its row does not queue its files for cleanup.
 
 The API retries pending deletions at startup and every minute. It removes the S3 object before removing its metadata;
-failed attempts remain pending and hidden from reads until a retry succeeds.
+failed attempts retain their metadata until a retry succeeds. Pending attachments and files of deleted projects cannot
+be downloaded through the project API.

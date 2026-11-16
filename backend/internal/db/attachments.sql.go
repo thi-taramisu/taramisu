@@ -53,16 +53,11 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 }
 
 const deleteAttachment = `-- name: DeleteAttachment :exec
-DELETE FROM attachment WHERE project_id = $1 AND id = $2 AND delete_pending
+DELETE FROM attachment WHERE id = $1 AND (delete_pending OR project_id IS NULL)
 `
 
-type DeleteAttachmentParams struct {
-	ProjectID pgtype.UUID
-	ID        pgtype.UUID
-}
-
-func (q *Queries) DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) error {
-	_, err := q.db.Exec(ctx, deleteAttachment, arg.ProjectID, arg.ID)
+func (q *Queries) DeleteAttachment(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAttachment, id)
 	return err
 }
 
@@ -135,7 +130,7 @@ func (q *Queries) ListAttachments(ctx context.Context, arg ListAttachmentsParams
 }
 
 const listPendingAttachmentDeletions = `-- name: ListPendingAttachmentDeletions :many
-SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE delete_pending AND id > $1 ORDER BY id LIMIT 100
+SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE (delete_pending OR project_id IS NULL) AND id > $1 ORDER BY id LIMIT 100
 `
 
 func (q *Queries) ListPendingAttachmentDeletions(ctx context.Context, id pgtype.UUID) ([]Attachment, error) {

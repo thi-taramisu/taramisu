@@ -241,7 +241,7 @@ CREATE INDEX risk_treatment_decision_risk_value_id_idx
 
 CREATE TABLE attachment (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id uuid NOT NULL REFERENCES tara_project (id),
+    project_id uuid REFERENCES tara_project (id) ON DELETE SET NULL,
     file_name text NOT NULL CHECK (length(file_name) BETWEEN 1 AND 255),
     content_type text NOT NULL,
     size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
@@ -252,4 +252,4 @@ CREATE TABLE attachment (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX attachment_project_id_created_at_id_idx ON attachment (project_id, created_at, id);
-CREATE INDEX attachment_pending_deletion_idx ON attachment (id) WHERE delete_pending;
+CREATE INDEX attachment_pending_deletion_idx ON attachment (id) WHERE delete_pending OR project_id IS NULL;

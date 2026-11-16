@@ -67,7 +67,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch"} {
+	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -242,12 +242,16 @@ func TestAttachmentsIntegration(t *testing.T) {
 			}
 			check(request("GET", strings.Replace(location, project, uuid.NewString(), 1), user, nil, ""), 404)
 			if strings.HasPrefix(scenario, "delete-") {
+				projectDeletion := strings.HasPrefix(scenario, "delete-project-")
 				// Commit the fixture: a fresh handler must recover using persisted state.
 				if e = tx.Commit(ctx); e != nil {
 					t.Fatal(e)
 				}
 				database.DBTX = pool
 				t.Cleanup(func() {
+					if _, e := pool.Exec(ctx, "DELETE FROM attachment WHERE id=$1", meta.ID); e != nil {
+						t.Error(e)
+					}
 					for _, q := range []string{"DELETE FROM attachment WHERE project_id=$1", "DELETE FROM tara_project WHERE id=$1"} {
 						if _, e := pool.Exec(ctx, q, project); e != nil {
 							t.Error(e)
@@ -257,9 +261,9 @@ func TestAttachmentsIntegration(t *testing.T) {
 						t.Error(e)
 					}
 				})
-				database.fail = scenario == "delete-db-failure"
+				database.fail = scenario == "delete-db-failure" || scenario == "delete-project-db-failure"
 				database.failMark = scenario == "delete-marker-failure"
-				tracked.failDelete = scenario == "delete-storage-failure"
+				tracked.failDelete = scenario == "delete-storage-failure" || scenario == "delete-project-storage-failure"
 				if scenario == "delete-marker-failure" {
 					check(request("DELETE", location, user, nil, ""), 503)
 					check(request("GET", location, user, nil, ""), 200)
@@ -269,6 +273,13 @@ func TestAttachmentsIntegration(t *testing.T) {
 					database.failMark = false
 				}
 				switch scenario {
+				case "delete-project-storage-failure", "delete-project-db-failure":
+					// Permanent project deletion queues the file without contacting S3.
+					check(request("DELETE", "/api/v1/projects/"+project, other, nil, ""), 404)
+					check(request("DELETE", "/api/v1/projects/"+project, user, nil, ""), 204)
+					if tracked.deletes != 0 {
+						t.Fatal("project deletion contacted storage before cleanup")
+					}
 				case "delete-restart", "delete-replicas":
 					// Simulate a process dying after the durable marker, before S3 deletion.
 					if _, e = pool.Exec(ctx, "UPDATE attachment SET delete_pending=true WHERE id=$1", meta.ID); e != nil {
@@ -281,8 +292,12 @@ func TestAttachmentsIntegration(t *testing.T) {
 					check(request("DELETE", location, user, nil, ""), 202)
 				}
 				listed := request("GET", base, user, nil, "")
-				check(listed, 200)
-				if listed.Body.String() != "[]\n" {
+				if projectDeletion {
+					check(listed, 404)
+				} else {
+					check(listed, 200)
+				}
+				if !projectDeletion && listed.Body.String() != "[]\n" {
 					t.Fatalf("pending attachment visible: %s", listed.Body.String())
 				}
 				check(request("GET", location, user, nil, ""), 404)
@@ -291,6 +306,19 @@ func TestAttachmentsIntegration(t *testing.T) {
 				if scenario != "delete-restart" && scenario != "delete-replicas" {
 					if e = h.cleanupPending(ctx); e != nil {
 						t.Fatal(e)
+					}
+				}
+				if projectDeletion {
+					var key string
+					if e = pool.QueryRow(ctx, "SELECT s3_object_key::text FROM attachment WHERE id=$1 AND project_id IS NULL", meta.ID).Scan(&key); e != nil || key != tracked.key {
+						t.Fatalf("failed cleanup lost the object's key: %q %v", key, e)
+					}
+					if tracked.failDelete {
+						body, err := objects.Get(ctx, key)
+						if err != nil {
+							t.Fatalf("object missing before successful cleanup: %v", err)
+						}
+						_ = body.Close()
 					}
 				}
 				database.fail = false

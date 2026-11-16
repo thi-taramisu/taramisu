@@ -9,10 +9,10 @@ SELECT * FROM attachment WHERE project_id = $1 AND NOT delete_pending ORDER BY c
 SELECT * FROM attachment WHERE project_id = $1 AND id = $2;
 
 -- name: DeleteAttachment :exec
-DELETE FROM attachment WHERE project_id = $1 AND id = $2 AND delete_pending;
+DELETE FROM attachment WHERE id = $1 AND (delete_pending OR project_id IS NULL);
 
 -- name: MarkAttachmentDeleting :execrows
 UPDATE attachment SET delete_pending = true WHERE project_id = $1 AND id = $2;
 
 -- name: ListPendingAttachmentDeletions :many
-SELECT * FROM attachment WHERE delete_pending AND id > $1 ORDER BY id LIMIT 100;
+SELECT * FROM attachment WHERE (delete_pending OR project_id IS NULL) AND id > $1 ORDER BY id LIMIT 100;
