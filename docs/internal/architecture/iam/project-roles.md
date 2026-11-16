@@ -182,8 +182,11 @@ The API writes one structured log entry (`audit` message) for each of these even
 | Member removed or left the project | Actor, project, member ID, user or group, role before; whether the actor removed themselves |
 | Project deleted | Actor, project |
 
-Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp. A persistent audit
-history in the database is not part of this specification.
+Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp.
+
+Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): these events are also stored in the database,
+in the same transaction as the change. Events are kept for the project's lifetime and one year after its deletion. At first
+only operators read them. The table, retention, readers, and further events are described in [Audit and logging](../audit.md).
 
 ## User interface
 

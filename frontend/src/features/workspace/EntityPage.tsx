@@ -16,14 +16,16 @@ interface EntityPageProps {
   actions?: ReactNode
   /** Tab labels by tab path, e.g. to show a count. */
   tabLabels?: Record<string, string>
+  /** Numbers shown in a circle after the tab label, by tab path. */
+  tabCounts?: Record<string, number>
 }
 
 /**
  * Page of one element (item, asset, ...) with its tabs as child routes.
  * With `?view=graph` it shows the relation graph instead (Graph Concept wireframes).
  */
-export function EntityPage({ type, name, code, actions, tabLabels = {} }: EntityPageProps) {
-  const { t } = useTranslation()
+export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCounts = {} }: EntityPageProps) {
+  const { t, i18n } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
   const { data: tree } = useProjectTree(projectId)
@@ -58,10 +60,15 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
                 to={tab.path}
                 end
                 className={({ isActive }) =>
-                  `-mb-px border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
+                  `-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
                 }
               >
-                {tabLabels[tab.path] ?? t(`navigation.tabs.${tab.path || 'definition'}`)}
+                {tabLabels[tab.path] ?? t(`navigation.tabs.${tab.path || 'definition'}`)}{' '}
+                {tabCounts[tab.path] !== undefined && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-xs tabular-nums">
+                    {tabCounts[tab.path].toLocaleString(i18n.resolvedLanguage)}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>

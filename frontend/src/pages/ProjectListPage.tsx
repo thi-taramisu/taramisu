@@ -1,5 +1,5 @@
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Archive, ArchiveRestore, Ellipsis, Star, Trash2 } from 'lucide-react'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
+import { ProjectImage } from '@/features/projects/ProjectImage'
 import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
@@ -36,10 +37,23 @@ export function ProjectListPage() {
     useState<HTMLButtonElement | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
 
-  function handleCreateProject(name: string) {
+  const imageUrls = useRef(new Set<string>())
+
+  useEffect(() => {
+    const urls = imageUrls.current
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+      urls.clear()
+    }
+  }, [])
+
+  function handleCreateProject(name: string, file?: File) {
+    const image = file ? URL.createObjectURL(file) : undefined
+    if (image) imageUrls.current.add(image)
     const newProject: Project = {
       id: crypto.randomUUID(),
       name,
+      image,
       description: 'New TARA project',
       favorite: false,
       archived: false,
@@ -94,6 +108,9 @@ export function ProjectListPage() {
       previous.filter((project) => project.id !== projectToDelete.id),
     )
 
+    if (projectToDelete.image && imageUrls.current.delete(projectToDelete.image)) {
+      URL.revokeObjectURL(projectToDelete.image)
+    }
     setProjectToDelete(null)
   }
 
@@ -143,6 +160,7 @@ export function ProjectListPage() {
                           key={project.id}
                           name={project.name}
                           description={project.description}
+                          image={project.image}
                           favorite={project.favorite}
                           onToggleFavorite={() =>
                             handleToggleFavorite(project.id)
@@ -169,6 +187,7 @@ export function ProjectListPage() {
                       return (
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
+                            <ProjectImage image={project.image} className="size-14 rounded-md" />
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
@@ -262,6 +281,7 @@ export function ProjectListPage() {
                     {archivedProjects.map((project) => (
                       <Card key={project.id} className="py-3">
                         <CardHeader className="flex flex-row items-center gap-4">
+                          <ProjectImage image={project.image} className="size-14 rounded-md" />
                           <div className="min-w-0 flex-1">
                             <CardTitle>{project.name}</CardTitle>
                             <CardDescription>

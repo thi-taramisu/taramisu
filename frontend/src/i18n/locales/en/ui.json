@@ -162,5 +162,7 @@
   "fieldRequired": "Please fill out this field.",
   "invalidEmail": "Please enter a valid email address.",
   "invalidValue": "Please enter a valid value.",
-  "authExchange": "Exchanging authorization code with Authentik."
+  "authExchange": "Exchanging authorization code with Authentik.",
+  "unavailableAssetProperty": "{{property}}: not a property of this asset",
+  "keepLinkedProperty": "{{property}}: at least one property must stay linked"
 }

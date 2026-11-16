@@ -162,5 +162,7 @@
   "fieldRequired": "Bitte fülle dieses Feld aus.",
   "invalidEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
   "invalidValue": "Bitte gib einen gültigen Wert ein.",
-  "authExchange": "Der Autorisierungscode wird mit Authentik ausgetauscht."
+  "authExchange": "Der Autorisierungscode wird mit Authentik ausgetauscht.",
+  "unavailableAssetProperty": "{{property}}: keine Eigenschaft dieses Assets",
+  "keepLinkedProperty": "{{property}}: mindestens eine Eigenschaft muss verknüpft bleiben"
 }
