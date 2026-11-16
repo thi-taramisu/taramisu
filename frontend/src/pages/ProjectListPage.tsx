@@ -239,7 +239,7 @@ export function ProjectListPage() {
                                 </Button>
                               </DropdownMenuTrigger>
 
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" className="w-max">
                                 <DropdownMenuItem
                                   disabled={project.id === exampleProject.id}
                                   onSelect={() => handleArchiveProject(project.id)}

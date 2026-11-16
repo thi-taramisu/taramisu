@@ -1,13 +1,17 @@
-import { Trans, useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 type DeleteProjectDialogProps = {
   projectName: string | null
@@ -16,49 +20,124 @@ type DeleteProjectDialogProps = {
   returnFocusTo?: HTMLButtonElement | null
 }
 
+type Step = 'acknowledge' | 'confirm'
+
+/** Two-step confirmation before deleting a project: acknowledge the warning, then type the project name. */
 export function DeleteProjectDialog({
   projectName,
   onOpenChange,
   onConfirm,
   returnFocusTo,
 }: DeleteProjectDialogProps) {
-  const { t } = useTranslation()
+  const [step, setStep] = useState<Step>('acknowledge')
+
   return (
-    <Dialog
+    <AlertDialog
       open={projectName !== null}
       onOpenChange={onOpenChange}
     >
-      <DialogContent
+      <AlertDialogContent
+        // The confirm step has no warning text, so the dialog has no description there.
+        {...(step === 'confirm' && { 'aria-describedby': undefined })}
         onCloseAutoFocus={(event) => {
+          // Runs after the close animation, so the dialog does not jump back to the first step while fading out.
+          setStep('acknowledge')
           if (returnFocusTo?.isConnected) {
             event.preventDefault()
             returnFocusTo.focus()
           }
         }}
       >
-        <DialogHeader>
-          <DialogTitle>{t('ui:deleteProjectTitle')}</DialogTitle>
-          <DialogDescription>
-            <Trans t={t} i18nKey="ui:deleteProjectDescription" values={{ name: projectName }} components={{ strong: <strong /> }} />
-          </DialogDescription>
-        </DialogHeader>
+        {/* The form unmounts with the closed dialog, which clears the typed name. */}
+        <DeleteProjectForm
+          projectName={projectName ?? ''}
+          step={step}
+          onContinue={() => setStep('confirm')}
+          onConfirm={onConfirm}
+        />
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            {t('ui:cancel')}
-          </Button>
+function DeleteProjectForm({
+  projectName,
+  step,
+  onContinue,
+  onConfirm,
+}: {
+  projectName: string
+  step: Step
+  onContinue: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useTranslation()
+  const inputId = useId()
+  const [confirmation, setConfirmation] = useState('')
+  const matches = projectName !== '' && confirmation === projectName
+  const inputRef = useRef<HTMLInputElement>(null)
 
+  // The first step's button unmounts, so focus moves to the field instead of being lost.
+  useEffect(() => {
+    if (step === 'confirm') inputRef.current?.focus()
+  }, [step])
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (matches) onConfirm()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <AlertDialogHeader>
+        {/* Keep repeated spaces visible, as the name must be typed exactly, and break long names. */}
+        <AlertDialogTitle className="whitespace-pre-wrap wrap-anywhere">{t('ui:deleteNamed', { name: projectName })}</AlertDialogTitle>
+        {step === 'acknowledge' && (
+          <AlertDialogDescription>
+            {t('ui:deleteProjectFullWarning')}
+          </AlertDialogDescription>
+        )}
+      </AlertDialogHeader>
+
+      {step === 'confirm' && (
+        <div className="space-y-2">
+          <Label htmlFor={inputId}>
+            <span className="whitespace-pre-wrap wrap-anywhere">
+              {t('ui:confirmProjectName', { name: projectName })}
+            </span>
+          </Label>
+          <Input
+            id={inputId}
+            ref={inputRef}
+            value={confirmation}
+            onChange={(event) => setConfirmation(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      )}
+
+      <AlertDialogFooter>
+        <AlertDialogCancel type="button">{t('ui:cancel')}</AlertDialogCancel>
+
+        {step === 'acknowledge' ? (
           <Button
+            type="button"
             variant="destructive"
-            onClick={onConfirm}
+            onClick={onContinue}
           >
             {t('ui:deleteProject')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : (
+          <Button
+            type="submit"
+            variant="destructive"
+            disabled={!matches}
+          >
+            {t('ui:deleteProject')}
+          </Button>
+        )}
+      </AlertDialogFooter>
+    </form>
   )
 }

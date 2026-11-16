@@ -59,6 +59,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         pluralLabel={t('ui:relationAssetsPlural')}
         elementLabel={t('entities.assets')}
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
+        removeEffect={t('ui:removeLinkWithTargets')}
         pending={saving}
         candidatesLoading={itemAssets.isPending}
         candidatesError={itemAssets.isLoadingError ? t('ui:loadItemAssetsError') : undefined}
@@ -93,6 +94,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         pluralLabel={t('ui:relationThreatsPlural')}
         elementLabel={t('ui:relationThreatLabel')}
         candidates={threatCandidates}
+        removeEffect={t('ui:removeLinkWithTargets')}
         pending={saving}
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? t('ui:loadItemThreatsError') : undefined}

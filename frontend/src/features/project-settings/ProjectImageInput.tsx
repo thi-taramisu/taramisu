@@ -32,7 +32,7 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
       setPreview(fallback)
       return
     }
-    setPreview(URL.createObjectURL(file))
+    setPreview(encodeURI(URL.createObjectURL(file)))
   }
 
   function remove() {
@@ -42,13 +42,18 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
     setPreview(null)
   }
 
+  // Treat saved and locally selected image sources as URLs, never as markup.
+  const imageSource = preview && /^(https?:\/\/|blob:|\/)/i.test(preview) && !/[<>"']/.test(preview)
+    ? preview
+    : null
+
   return (
     <div className="grid gap-2">
       <Label htmlFor="project-image">{t('ui:image')}</Label>
       <div className="w-full max-w-md">
         <AspectRatio ratio={3 / 1} className="flex items-center justify-center overflow-hidden rounded-lg border bg-muted">
-          {preview ? (
-            <img src={preview} alt={t('ui:preview')} className="size-full object-cover" />
+          {imageSource ? (
+            <img src={imageSource} alt={t('ui:preview')} className="size-full object-cover" />
           ) : (
             <ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />
           )}

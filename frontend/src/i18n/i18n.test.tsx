@@ -181,3 +181,25 @@ it('updates existing native validation messages when switching languages', async
   expect(name.validationMessage).toBe('')
   expect(name).toHaveValue('   New project')
 })
+
+it('keeps the threat definition and relations translated when switching with an invalid draft', async () => {
+  const { user, api } = renderApp('/projects/headlamp/threat-scenarios/ts-01')
+  const name = await screen.findByLabelText('Name *')
+  await user.clear(name)
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Name is required.')
+
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+  expect(screen.getByRole('alert')).toHaveTextContent('Bitte einen Namen eingeben.')
+  expect(screen.getByRole('navigation', { name: 'Navigationspfad' })).toBeInTheDocument()
+  expect(screen.getByLabelText('Ursache der Kompromittierung')).toHaveValue('Spoofing of CAN messages')
+  expect(screen.getByRole('checkbox', { name: /· Integrität/ })).toBeChecked()
+  await user.type(name, 'Manipulierter Lichtbefehl')
+  await user.click(screen.getByRole('button', { name: 'Speichern' }))
+  expect(await screen.findByText('Gespeichert.')).toBeInTheDocument()
+  expect(await api.threatScenarios.get('headlamp', 'ts-01')).toMatchObject({ title: 'Manipulierter Lichtbefehl' })
+
+  await user.click(screen.getByRole('link', { name: 'Verknüpfungen 3' }))
+  expect(await screen.findByRole('region', { name: 'Schadensszenarien' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Angriffspfad hinzufügen' })).toBeInTheDocument()
+})

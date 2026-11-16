@@ -27,10 +27,12 @@ interface AddRelationDialogProps {
   /** Keeps the dialog closed while a request runs; the focus stays on the button. */
   pending?: boolean
   triggerRef?: Ref<HTMLButtonElement>
+  /** Opens the create dialog with the typed name; without it creating is not available yet. */
+  onCreate?: (name: string) => void
 }
 
 /** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
-export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false, triggerRef }: AddRelationDialogProps) {
+export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false, triggerRef, onCreate }: AddRelationDialogProps) {
   const { t } = useTranslation()
   const id = useId()
   const [open, setOpen] = useState(false)
@@ -97,10 +99,20 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
           </div>
         </div>
         <DialogFooter className="mx-0 mb-0 justify-start p-2 sm:justify-start">
-          {/* Follows with the create dialogs of the element types, like the disabled entries of the "+ New" menu. */}
-          <Button type="button" variant="ghost" size="sm" disabled>
+          {/* Without a create dialog of the element type it stays disabled, like the entries of the "+ New" menu. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!onCreate}
+            onClick={() => {
+              const name = search.trim()
+              handleOpenChange(false)
+              onCreate?.(name)
+            }}
+          >
             <Plus aria-hidden="true" />
-            {t('ui:createRelatedElement', { element: elementLabel })}
+            {t(onCreate && term ? 'ui:createNamedRelatedElement' : 'ui:createRelatedElement', { element: elementLabel, name: search.trim() })}
           </Button>
         </DialogFooter>
       </DialogContent>

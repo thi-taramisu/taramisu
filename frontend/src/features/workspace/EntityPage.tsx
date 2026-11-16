@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES, findNode, formatEntityId } from './entities'
+import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
+import { EntityBreadcrumbs } from './EntityBreadcrumbs'
 import { Placeholder } from './Placeholder'
 import { useTranslation } from 'react-i18next'
 
@@ -28,16 +29,20 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
   const { t, i18n } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
-  const { data: tree } = useProjectTree(projectId)
+  const { data: tree, isPending } = useProjectTree(projectId)
   const { tabs } = ENTITY_TYPES[type]
   const label = t(`entities.${type}`)
-  const node = tree && findNode(type, entityId, tree)
+  const path = tree && findNodePath(type, entityId, tree)
+  const node = path?.at(-1)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
   const displayCode = code || node?.code
   const typeAndId = displayCode ? `${label} ${formatEntityId(displayCode)}` : label
 
   return (
     <div className="flex h-full flex-col gap-4">
+      <EntityBreadcrumbs projectId={projectId} path={path ?? [{
+        type, id: entityId, name: isPending ? t('ui:loading') : t('ui:pathUnavailable'),
+      }]} />
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tabular-nums text-muted-foreground">{typeAndId}</p>

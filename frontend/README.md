@@ -34,6 +34,7 @@ src/
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: Definition with targets and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
@@ -54,6 +55,10 @@ Branches start expanded; navigating to a hidden descendant reveals its ancestors
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
+
+Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
+parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 
 ## API client
 
