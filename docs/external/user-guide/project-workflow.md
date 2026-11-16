@@ -86,7 +86,8 @@ Its previous favorite status is preserved.
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Delete Project**.
-4. Confirm the action in the confirmation dialog.
+4. Read the warning and select **Delete Project** in the dialog.
+5. Type the project name and select **Delete Project** again.
 
 Select **Cancel** to keep the project.
 
