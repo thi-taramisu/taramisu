@@ -1,9 +1,8 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { SearchProject, SearchType } from '../../api/models/search'
 import { SEARCH_TYPES, searchTypeLabel } from './search'
+import { ProjectFilter } from './ProjectFilter'
 
 interface SearchFiltersProps {
   projects: SearchProject[]
@@ -31,20 +30,7 @@ export function SearchFilters({ projects, projectIds, types, onProjectsChange, o
         ))}
       </fieldset>
       <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor="search-project-filter" className="sr-only">Filter by project</Label>
-        <NativeSelect
-          id="search-project-filter"
-          size="sm"
-          value=""
-          onChange={(event) => {
-            if (event.target.value) onProjectsChange([...projectIds, event.target.value])
-          }}
-        >
-          <NativeSelectOption value="">Filter by project…</NativeSelectOption>
-          {projects.filter((project) => !projectIds.includes(project.id)).map((project) => (
-            <NativeSelectOption key={project.id} value={project.id}>{project.name}</NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <ProjectFilter projects={projects} selectedIds={projectIds} onChange={onProjectsChange} />
         {projectIds.length === 0 && <span className="text-xs text-muted-foreground">All accessible projects</span>}
       </div>
       {(projectIds.length > 0 || types.length > 0) && (

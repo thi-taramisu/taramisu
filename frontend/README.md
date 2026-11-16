@@ -102,6 +102,10 @@ are ANDed. Opening in a project workspace or its settings starts with that proje
 projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
 Results include the project, type and ID. Further matches are available through **Load more results**.
 
+The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50
+matches initially and offers **Show more projects** for browsing. Arrow keys and Enter work across these batches. Escape closes the
+picker first and returns focus to its trigger; the global query and selected filters stay intact.
+
 The frontend currently uses `SearchService` (`src/api/services/search.ts`) and the live in-memory mock stores. Project list changes
 survive route navigation and are shared with search; a reload still resets all mock data. The project service reuses the structure
 introduced in PR #286. Search reads all stored elements, including unlinked scenarios, rather than indexing only visible Filetree nodes.

@@ -35,6 +35,8 @@ Press Escape, select Close or click outside the dialog to dismiss it.
 
 Use the type buttons and project selector to narrow the results. Multiple selected types are included;
 project filters narrow the matches further. Active filters can be removed individually or with **Clear filters**.
+The project selector lets you search its list by name or ID without leaving the search dialog. Choose several projects using the
+checkbox marks; use **Show more projects** to browse additional matches. Escape closes the project selector first.
 Opening search from a project starts with that project selected. Remove its filter to search across projects;
 the project overview starts without a project filter.
 

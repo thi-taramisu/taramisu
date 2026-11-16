@@ -1,5 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import type { SearchPage } from '../../api/models/search'
 import { renderApp } from '../../test/renderApp'
@@ -100,14 +100,41 @@ describe('Spotlight search', () => {
 
   it('combines multiple selected projects and clears all active filters', async () => {
     const { user, dialog } = await openSearch()
-    const select = within(dialog).getByLabelText('Filter by project')
-    await user.selectOptions(select, 'battery-security')
-    await user.selectOptions(select, 'vehicle-gateway')
+    await user.click(within(dialog).getByRole('button', { name: 'Filter by project' }))
+    const projects = within(screen.getByRole('listbox', { name: 'Project filters' }))
+    await user.click(projects.getByRole('option', { name: /^Battery Security/ }))
+    await user.click(projects.getByRole('option', { name: /^Vehicle Gateway/ }))
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    await user.keyboard('{Escape}')
+    expect(dialog).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Project' }))
     await waitFor(() => expect(resultList(dialog).getAllByRole('option')).toHaveLength(2))
     await user.click(within(dialog).getByRole('button', { name: 'Clear filters' }))
     expect(within(dialog).queryByLabelText('Active search filters')).not.toBeInTheDocument()
     expect(await within(dialog).findByText('All accessible projects')).toBeInTheDocument()
+  })
+
+  it('keeps the local project lookup separate from global search and closes only the dropdown on Escape', async () => {
+    const { user, api, dialog, input } = await openSearch()
+    await user.type(input, 'TS-01')
+    await resultList(dialog).findByRole('option', { name: /Spoofed headlamp/ })
+    const search = vi.spyOn(api.search, 'search')
+    const trigger = within(dialog).getByRole('button', { name: 'Filter by project' })
+    await user.click(trigger)
+    const projectInput = screen.getByRole('combobox', { name: 'Search projects' })
+    await user.type(projectInput, 'BATTERY')
+
+    expect(screen.getByRole('listbox', { name: 'Project filters' })).toHaveTextContent('Battery Security')
+    expect(input).toHaveValue('TS-01')
+    expect(search).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('combobox', { name: 'Search projects' })).not.toBeInTheDocument()
+    expect(dialog).toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows no matches and starts a fresh search session on reopening', async () => {
