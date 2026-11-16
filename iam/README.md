@@ -90,3 +90,10 @@ Authentik's own German catalogue still has some English accessibility labels and
 formal wording on the password screen. We leave that catalogue unchanged. Native
 required-field and email-format validation follows the browser's UI language;
 custom registration validation follows the language selected in Taramisu.
+
+Sign-out uses Authentik's standard provider invalidation flow and returns directly to
+`${APP_URL}/projects`, avoiding a separate confirmation screen. The provider registers
+that URL and the Vite development URL (`http://localhost:5173/projects`) as strict
+post-logout redirects. Reapply startup configuration after changing `APP_URL`; a custom
+`VITE_OIDC_POST_LOGOUT_REDIRECT_URI` must also be registered in the provider.
+Provider logout revokes its tokens while retaining the Authentik SSO session.

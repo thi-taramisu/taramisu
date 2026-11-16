@@ -54,6 +54,7 @@ services:
       <<: *authentik-environment
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
       OIDC_REDIRECT_URI: ${APP_URL:-http://localhost}/auth/callback
+      OIDC_POST_LOGOUT_REDIRECT_URI: ${APP_URL:-http://localhost}/projects
       DEV_PASSWORD: ${DEV_PASSWORD:?Set DEV_PASSWORD in iam/.env; see iam/.env.example}
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Set AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env; see iam/.env.example}
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}
