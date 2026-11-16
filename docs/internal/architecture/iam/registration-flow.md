@@ -74,4 +74,12 @@ docker compose --env-file iam/.env -f deploy/compose.yaml exec -T authentik-work
 
 The tests call live enrollment, login, and profile-edit endpoints. They cover
 approval, sequential and concurrent collisions, ambiguous login rejection, and
-profile validation, and remove their temporary Authentik users.
+profile validation, and remove their temporary Authentik users. The language regression
+starts with OIDC authorization in English and German and checks the language cookie,
+flow titles, labels, confirmation, and custom validation messages.
+
+For a UI check, select each language in Taramisu, sign in, and follow the registration
+link. Check short and mismatched passwords, invalid and duplicate usernames, duplicate
+email addresses, and the approval confirmation. Return to Taramisu to change languages
+before starting a fresh sign-in. See the [language configuration](../../../../iam/README.md#login-and-registration-language)
+for why the Authentik in-flow language selector is hidden.

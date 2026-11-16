@@ -21,7 +21,8 @@ entries:
     attrs:
       field_key: username
       label: Username
-      type: username
+      # The shared policy validates uniqueness with localized errors.
+      type: text
       required: true
       order: 0
   - model: authentik_stages_prompt.prompt
@@ -64,13 +65,22 @@ entries:
       type: password
       required: true
       order: 4
-  - model: authentik_policies_password.passwordpolicy
+  - model: authentik_policies_expression.expressionpolicy
     id: password-policy
     identifiers:
-      name: taramisu-enrollment-password
+      name: taramisu-enrollment-password-length
     attrs:
-      length_min: 12
-      error_message: Use at least 12 characters for your password.
+      expression: |
+        from django.utils.translation import get_language
+
+        if len(request.context["prompt_data"]["password"]) < 12:
+            ak_message(
+                "Verwende mindestens 12 Zeichen für dein Passwort."
+                if (get_language() or "en").split("-")[0] == "de"
+                else "Use at least 12 characters for your password."
+            )
+            return False
+        return True
   - model: authentik_policies_expression.expressionpolicy
     id: username-policy
     identifiers:
@@ -80,21 +90,32 @@ entries:
         import re
         from django.db.models import Q
         from authentik.core.models import User
+        from django.utils.translation import get_language
 
+        german = (get_language() or "en").split("-")[0] == "de"
         data = request.context["prompt_data"]
-        username = data["username"].lower()
+        username = data["username"].strip().lower()
         if not re.fullmatch(r"[a-z0-9._-]{1,150}", username):
-            ak_message("Use letters, numbers, dots, underscores or hyphens for your username.")
+            ak_message(
+                "Verwende Buchstaben, Zahlen, Punkte, Unterstriche oder Bindestriche für deinen Benutzernamen."
+                if german else "Use letters, numbers, dots, underscores or hyphens for your username."
+            )
             return False
         users = User.objects.all()
         if request.user.is_authenticated:
             users = users.exclude(pk=request.user.pk)
         if users.filter(username__iexact=username).exists():
-            ak_message("Username is already taken.")
+            ak_message(
+                "Dieser Benutzername ist bereits vergeben."
+                if german else "Username is already taken."
+            )
             return False
         email = data["email"].strip().lower()
         if users.filter(Q(email__iexact=email) | Q(username__iexact=email)).exists():
-            ak_message("Email address is already in use.")
+            ak_message(
+                "Diese E-Mail-Adresse wird bereits verwendet."
+                if german else "Email address is already in use."
+            )
             return False
         data["username"] = username
         data["email"] = email
@@ -191,7 +212,13 @@ entries:
       expression: |
         from django.db.models import Q
         from authentik.core.models import User
+        from django.utils.translation import get_language
 
+        if (get_language() or "en").split("-")[0] == "de":
+            request.context["flow_plan"].context["deny_message"] = (
+                "Diese Anmeldekennung ist nicht eindeutig. Verwende deinen eindeutigen "
+                "Benutzernamen oder wende dich an einen Administrator."
+            )
         identifier = request.context.get("pending_user_identifier")
         if not identifier:
             return False
@@ -205,3 +232,310 @@ entries:
       order: 0
     attrs:
       failure_result: true
+
+  # Flow titles and prompt labels are literal strings in Authentik. Locale-specific
+  # flows share the security stages and policies; routing preserves OAuth context.
+  - model: authentik_flows.flow
+    id: enrollment-de
+    identifiers:
+      slug: taramisu-enrollment-de
+    attrs:
+      name: Taramisu registration (German)
+      title: Für Taramisu registrieren
+      designation: enrollment
+      authentication: require_unauthenticated
+  - model: authentik_flows.flow
+    id: authentication-de
+    identifiers:
+      slug: taramisu-authentication-de
+    attrs:
+      name: Taramisu login (German)
+      title: Bei Taramisu anmelden
+      designation: authentication
+      authentication: none
+  - model: authentik_stages_prompt.prompt
+    id: username-de
+    identifiers:
+      name: taramisu-enrollment-username-de
+    attrs:
+      field_key: username
+      label: Benutzername
+      type: text
+      required: true
+      order: 0
+  - model: authentik_stages_prompt.prompt
+    id: name-de
+    identifiers:
+      name: taramisu-enrollment-name-de
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      order: 1
+  - model: authentik_stages_prompt.prompt
+    id: email-de
+    identifiers:
+      name: taramisu-enrollment-email-de
+    attrs:
+      field_key: email
+      label: E-Mail-Adresse
+      type: email
+      required: true
+      order: 2
+  - model: authentik_stages_prompt.prompt
+    id: password-de
+    identifiers:
+      name: taramisu-enrollment-password-de
+    attrs:
+      field_key: password
+      label: Passwort
+      type: password
+      required: true
+      order: 3
+  - model: authentik_stages_prompt.prompt
+    id: password_repeat-de
+    identifiers:
+      name: taramisu-enrollment-password_repeat-de
+    attrs:
+      field_key: password_repeat
+      label: Passwort bestätigen
+      type: password
+      required: true
+      order: 4
+  - model: authentik_stages_prompt.promptstage
+    id: details-de
+    identifiers:
+      name: taramisu-enrollment-details-de
+    attrs:
+      fields:
+        - !KeyOf username-de
+        - !KeyOf name-de
+        - !KeyOf email-de
+        - !KeyOf password-de
+        - !KeyOf password_repeat-de
+      validation_policies:
+        - !KeyOf password-policy
+        - !KeyOf username-policy
+  - model: authentik_stages_prompt.prompt
+    id: confirmation-message-de
+    identifiers:
+      name: taramisu-enrollment-confirmation-message-de
+    attrs:
+      field_key: registration_confirmation
+      type: static
+      label: Registrierung eingereicht
+      initial_value: Registrierung eingereicht. Ein Administrator muss dein Konto freigeben, bevor du dich anmelden kannst.
+      required: false
+      order: 0
+  - model: authentik_stages_prompt.promptstage
+    id: confirmation-de
+    identifiers:
+      name: taramisu-enrollment-confirmation-de
+    attrs:
+      fields:
+        - !KeyOf confirmation-message-de
+  - model: authentik_stages_identification.identificationstage
+    id: identification-de
+    identifiers:
+      name: taramisu-authentication-identification-de
+    attrs:
+      user_fields: [email, username]
+      enrollment_flow: !KeyOf enrollment-de
+      case_insensitive_matching: true
+      show_matched_user: false
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-de-details-de-binding
+    identifiers:
+      target: !KeyOf enrollment-de
+      stage: !KeyOf details-de
+      order: 10
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-de-create-user-binding
+    identifiers:
+      target: !KeyOf enrollment-de
+      stage: !KeyOf create-user
+      order: 20
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_flows.flowstagebinding
+    id: enrollment-de-confirmation-de-binding
+    identifiers:
+      target: !KeyOf enrollment-de
+      stage: !KeyOf confirmation-de
+      order: 30
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_flows.flowstagebinding
+    id: authentication-de-identification-de-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !KeyOf identification-de
+      order: 10
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_flows.flowstagebinding
+    id: authentication-de-ambiguous-login-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !KeyOf ambiguous-login
+      order: 15
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf authentication-de-ambiguous-login-binding
+      policy: !KeyOf ambiguous-login-policy
+      order: 0
+    attrs:
+      failure_result: true
+  - model: authentik_flows.flowstagebinding
+    id: authentication-de-password-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !Find [authentik_stages_password.passwordstage, [name, default-authentication-password]]
+      order: 20
+    attrs:
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf authentication-de-password-binding
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name, default-authentication-flow-password-stage]]
+      order: 10
+    attrs:
+      failure_result: true
+  - model: authentik_flows.flowstagebinding
+    id: authentication-de-mfa-validation-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !Find [authentik_stages_authenticator_validate.authenticatorvalidatestage, [name, default-authentication-mfa-validation]]
+      order: 30
+    attrs:
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf authentication-de-mfa-validation-binding
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name, default-authentication-flow-authenticator-validate-stage]]
+      order: 10
+    attrs:
+      failure_result: true
+  - model: authentik_flows.flowstagebinding
+    id: authentication-de-login-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, default-authentication-login]]
+      order: 100
+    attrs:
+      re_evaluate_policies: true
+  - model: authentik_policies_expression.expressionpolicy
+    id: german-language
+    identifiers:
+      name: taramisu-german-language
+    attrs:
+      expression: |
+        from django.utils.translation import get_language
+
+        return (get_language() or "en").split("-")[0] == "de"
+  - model: authentik_stages_redirect.redirectstage
+    id: redirect-authentication-de
+    identifiers:
+      name: taramisu-redirect-authentication-de
+    attrs:
+      mode: flow
+      target_flow: !KeyOf authentication-de
+      keep_context: true
+  - model: authentik_flows.flowstagebinding
+    id: redirect-authentication-de-binding
+    identifiers:
+      target: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      stage: !KeyOf redirect-authentication-de
+      order: 0
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf redirect-authentication-de-binding
+      policy: !KeyOf german-language
+      order: 0
+    attrs:
+      negate: false
+  - model: authentik_stages_redirect.redirectstage
+    id: redirect-authentication-en
+    identifiers:
+      name: taramisu-redirect-authentication-en
+    attrs:
+      mode: flow
+      target_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      keep_context: true
+  - model: authentik_flows.flowstagebinding
+    id: redirect-authentication-en-binding
+    identifiers:
+      target: !KeyOf authentication-de
+      stage: !KeyOf redirect-authentication-en
+      order: 0
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf redirect-authentication-en-binding
+      policy: !KeyOf german-language
+      order: 0
+    attrs:
+      negate: true
+  - model: authentik_stages_redirect.redirectstage
+    id: redirect-enrollment-de
+    identifiers:
+      name: taramisu-redirect-enrollment-de
+    attrs:
+      mode: flow
+      target_flow: !KeyOf enrollment-de
+      keep_context: true
+  - model: authentik_flows.flowstagebinding
+    id: redirect-enrollment-de-binding
+    identifiers:
+      target: !KeyOf enrollment
+      stage: !KeyOf redirect-enrollment-de
+      order: 0
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf redirect-enrollment-de-binding
+      policy: !KeyOf german-language
+      order: 0
+    attrs:
+      negate: false
+  - model: authentik_stages_redirect.redirectstage
+    id: redirect-enrollment-en
+    identifiers:
+      name: taramisu-redirect-enrollment-en
+    attrs:
+      mode: flow
+      target_flow: !KeyOf enrollment
+      keep_context: true
+  - model: authentik_flows.flowstagebinding
+    id: redirect-enrollment-en-binding
+    identifiers:
+      target: !KeyOf enrollment-de
+      stage: !KeyOf redirect-enrollment-en
+      order: 0
+    attrs:
+      evaluate_on_plan: false
+      re_evaluate_policies: true
+  - model: authentik_policies.policybinding
+    identifiers:
+      target: !KeyOf redirect-enrollment-en-binding
+      policy: !KeyOf german-language
+      order: 0
+    attrs:
+      negate: true
