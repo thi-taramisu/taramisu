@@ -60,7 +60,8 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
 
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
     if ('title' in next) setTitleError(undefined)
   }
 
@@ -79,9 +80,10 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
         attack_steps_and_weaknesses: toSteps(steps),
       },
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
-          setSteps(toDrafts(updated.attack_steps_and_weaknesses))
+          setValues((current) => (current === values ? toValues(updated) : current))
+          setSteps((current) => (current === steps ? toDrafts(updated.attack_steps_and_weaknesses) : current))
           setSaved(updated)
         },
       },
@@ -134,7 +136,7 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
         steps={steps}
         onChange={(next) => {
           setSteps(next)
-          update.reset()
+          if (!update.isPending) update.reset()
         }}
       />
       <div className="flex items-center gap-3">

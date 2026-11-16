@@ -49,7 +49,8 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
 
   function change(key: keyof FormValues, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
     if (key === 'title') setTitleError(undefined)
   }
 
@@ -67,8 +68,9 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
         road_user_harm_description: values.road_user_harm_description || null,
       },
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
+          setValues((current) => (current === values ? toValues(updated) : current))
           setSaved(toValues(updated))
         },
       },

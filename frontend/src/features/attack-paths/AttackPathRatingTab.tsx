@@ -70,7 +70,8 @@ function RatingForm({ projectId, attackPathId, rating }: { projectId: string; at
 
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -78,8 +79,9 @@ function RatingForm({ projectId, attackPathId, rating }: { projectId: string; at
     update.mutate(
       { ...values.scores, ap_total_score: total, feasibility_rating: feasibility, rationale: values.rationale.trim() || null },
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
+          setValues((current) => (current === values ? toValues(updated) : current))
           setSaved(toValues(updated))
         },
       },

@@ -91,9 +91,14 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (!targetsDirty) setTargets(relations.targets)
   }
 
+  // Keeps Save disabled while a request runs.
+  function keepPending() {
+    setStatus((prev) => (prev === 'pending' ? prev : 'idle'))
+  }
+
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    setStatus('idle')
+    keepPending()
     if ('title' in next) setTitleError(undefined)
   }
 
@@ -115,7 +120,8 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           elicitation_method: values.elicitation_method || null,
           technical_notes: values.technical_notes || null,
         })
-        setValues(toValues(result))
+        // Takes over the saved values only where nothing was edited while saving.
+        setValues((current) => (current === values ? toValues(result) : current))
         setSaved(toValues(result))
         setFieldsSaved(true)
       } catch {
@@ -126,7 +132,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (targetsDirty) {
       try {
         const result = await saveTargets.mutateAsync(currentTargets)
-        setTargets(result.targets)
+        setTargets((current) => (current === targets ? result.targets : current))
         setSavedTargets(result.targets)
       } catch {
         setStatus('targets-failed')
@@ -194,7 +200,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
         value={currentTargets}
         onChange={(next) => {
           setTargets(next)
-          setStatus('idle')
+          keepPending()
         }}
         relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
       />

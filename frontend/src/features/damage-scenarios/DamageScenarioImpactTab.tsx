@@ -107,7 +107,8 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
 
   function change(category: ImpactCategory, patch: Partial<CategoryValues>) {
     setValues((prev) => ({ ...prev, [category]: { ...prev[category], ...patch } }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
     // A change in one category can resolve the error of another, e.g. rating it in favour of an omission.
     setErrors({})
   }
@@ -126,8 +127,9 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
         reused_from_functional_safety: value === 'SAFETY' && values[value].reusedFromFunctionalSafety,
       })),
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
+          setValues((current) => (current === values ? toValues(updated) : current))
           setSaved(toValues(updated))
         },
       },

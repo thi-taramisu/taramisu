@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
@@ -146,6 +147,28 @@ describe('attack path definition', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
     expect(screen.getByLabelText(/Name/)).toHaveDisplayValue('Compromised navigation ECU via cellular 2')
   })
+
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.attackPaths.update)
+    api.attackPaths.update = update.held
+    const { user } = renderApp(page, api)
+    const name = await screen.findByLabelText(/Name/)
+    await user.type(name, ' 2')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.type(name, '3')
+    await user.type(screen.getAllByRole('textbox', { name: /^Step / })[0], ' Again.')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(name).toHaveDisplayValue('Compromised navigation ECU via cellular 23')
+    expect(stepTexts()[0]).toBe('Compromise the navigation ECU via its cellular connection. Again.')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.queryByText('Saved.')).not.toBeInTheDocument()
+    expect(update.calls).toBe(1)
+    expect((await api.attackPaths.get('headlamp', 'ap-01')).title).toBe('Compromised navigation ECU via cellular 2')
+  })
 })
 
 describe('attack path rating', () => {
@@ -201,6 +224,24 @@ describe('attack path rating', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('The rating could not be saved')
     expect(factor('Equipment').getByRole('radio', { name: 'Bespoke 7 points' })).toBeChecked()
+  })
+
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.attackPaths.updateRating)
+    api.attackPaths.updateRating = update.held
+    const { user } = renderApp(rating, api)
+    await user.click((await findFactor('Equipment')).getByRole('radio', { name: 'Bespoke 7 points' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.click(factor('Elapsed Time').getByRole('radio', { name: '≤1 month 4 points' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(factor('Elapsed Time').getByRole('radio', { name: '≤1 month 4 points' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    expect(await api.attackPaths.rating('headlamp', 'ap-01')).toMatchObject({ ap_equipment: 7, ap_elapsed_time: 17 })
   })
 
   it('offers the same choice as a dropdown for narrow screens', async () => {
