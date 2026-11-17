@@ -7,7 +7,7 @@ Labels added after an issue has been processed do not send another entry.
 
 PRs targeting `main` notify on opening or labeling, once per destination.
 A label for a new channel sends there; repeated labels stay silent.
-Merges send a separate **🎉 PR merged** message. Unmerged closes stay silent.
+Merges send a separate **Pull request merged** message. Unmerged closes stay silent.
 All PR messages are mention-free.
 
 ## Setup

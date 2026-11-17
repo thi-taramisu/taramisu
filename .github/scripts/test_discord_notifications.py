@@ -30,7 +30,7 @@ class NotificationTests(unittest.TestCase):
         self.assertIn("  pull_request_target:\n    branches: [main]\n    types: [opened, labeled, closed]\n", workflow)
         self.assertIn("github.event.action != 'closed' || github.event.pull_request.merged == true", workflow)
 
-    def test_merged_pr_celebrates_with_merge_time_without_mentions(self):
+    def test_merged_pr_shows_status_without_mentions(self):
         event = event_payload("pull_request_target", "closed", ["backend", "IAM"])
         event.pop("label")
         event["sender"] = {"login": "merger"}
@@ -47,13 +47,11 @@ class NotificationTests(unittest.TestCase):
             "parse": [], "users": [], "roles": [], "replied_user": False,
         })
         embed = payload["embeds"][0]
-        self.assertTrue(embed["title"].startswith("🎉 PR merged #42"))
-        self.assertEqual(embed["description"], "`merger` merged this pull request. Great work, team! 🥳")
+        self.assertEqual(embed["color"], 0x3BA55C)
+        self.assertEqual(embed["title"], "Pull request merged · #42")
+        self.assertIn("`merger`", embed["description"])
         self.assertEqual(embed["url"], event["pull_request"]["html_url"])
-        self.assertIn("28.10.2026 · 10:00", embed["footer"]["text"])
-        self.assertEqual(embed["fields"], [
-            {"name": "Branches", "value": "`feature/example → main`"},
-        ])
+        self.assertIn("`feature/example` → `main`", embed["description"])
 
     def test_closed_unmerged_pr_is_ignored(self):
         for merged in (False, None, "true"):
@@ -156,9 +154,7 @@ class NotificationTests(unittest.TestCase):
                 self.assertEqual(payload["allowed_mentions"], {
                     "parse": [], "users": [], "roles": [], "replied_user": False,
                 })
-                self.assertEqual(payload["embeds"][0]["fields"], [
-                    {"name": "Branches", "value": "`feature/example → main`"},
-                ])
+                self.assertIn("`feature/example` → `main`", payload["embeds"][0]["description"])
 
     def test_unrouted_labels_are_ignored(self):
         for action in ("opened", "labeled"):

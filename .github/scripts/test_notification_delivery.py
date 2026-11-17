@@ -46,7 +46,7 @@ class DeliveryTests(unittest.TestCase):
             deliver_pr(github, event, ENV)
             deliver_pr(github, event, ENV)
             self.assertEqual(send.call_count, 2)
-            self.assertTrue(send.call_args.args[1]["embeds"][0]["title"].startswith("🎉 PR merged"))
+            self.assertEqual(send.call_args.args[1]["embeds"][0]["title"], "Pull request merged · #42")
 
     @patch("discord_pr_notifications.send_webhook")
     def test_failed_pr_delivery_is_retried(self, send):

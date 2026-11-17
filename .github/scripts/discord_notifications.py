@@ -7,10 +7,8 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
 
 # Configuration: add labels here and expose their secrets in the workflow's env.
 # Webhook URLs belong in environment variables / GitHub secrets
@@ -30,8 +28,10 @@ LABEL_ROLES = {
     "IAM": "1563190604408553522",
 }
 WEBHOOK_TIMEOUT_SECONDS = 20
-ISSUE_COLOR = 0x238636
-PR_COLOR = 0x8957E5
+ISSUE_COLOR = 0x5865F2
+PR_COLOR = 0x5865F2
+MERGED_COLOR = 0x3BA55C
+LABEL_COLOR = 0xC99A45
 
 
 def event_item(event_name, event):
@@ -72,46 +72,36 @@ def destinations(labels, environ):
     return grouped
 
 
+def display_text(value):
+    """Keep GitHub text on one line and escape Discord Markdown."""
+    return re.sub(r"([\\`*_{}\[\]()<>~|])", r"\\\1", " ".join(value.split()))
+
+
 def embed_payload(event_name, event, labels):
     item = event_item(event_name, event)
     is_issue = event_name == "issues"
     is_merged = event["action"] == "closed"
-    kind = "🐛 Issue" if is_issue else "🔀 PR"
-    if is_merged:
-        kind = "🎉 PR merged"
+    kind = "Issue" if is_issue else "Pull request"
+    action = "merged" if is_merged else "opened" if event["action"] == "opened" else "labeled"
     actor = event.get("sender", {}).get("login") or item["user"]["login"]
-    if event["action"] == "opened":
-        description = f"`{actor}` opened {'an issue' if is_issue else 'a pull request'}"
-    elif is_merged:
-        description = f"`{actor}` merged this pull request. Great work, team! 🥳"
-    else:
+    title = display_text(item["title"])[:256].rstrip("\\")
+    context = f"`{actor}`"
+    if action == "labeled":
         label = event["label"]["name"].replace("`", "'")
-        description = f"`{actor}` added `{label}`"
-    fields = []
-    footer_parts = ["GitHub", *[f"[{label}]" for label in labels]]
+        context += f" added `{label}`"
     if not is_issue:
         head = item.get("head", {}).get("ref")
         base = item.get("base", {}).get("ref")
         if head and base:
-            branches = f"{head} → {base}".replace("`", "'")[:1022]
-            fields.append({"name": "Branches", "value": f"`{branches}`"})
+            head = head.replace("`", "'")[:250]
+            base = base.replace("`", "'")[:250]
+            context += f" · `{head}` → `{base}`"
     embed = {
-        "title": f"{kind} #{item['number']} · {item['title']}"[:256],
+        "title": f"{kind} {action} · #{item['number']}",
         "url": item["html_url"],
-        "description": description,
-        "color": ISSUE_COLOR if is_issue else PR_COLOR,
-        "fields": fields,
-        "footer": {
-            "text": " · ".join(footer_parts),
-            "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-        },
+        "description": f"**{title}**\n\n{context}",
+        "color": MERGED_COLOR if is_merged else LABEL_COLOR if action == "labeled" else ISSUE_COLOR if is_issue else PR_COLOR,
     }
-    timestamp_key = "merged_at" if is_merged else "created_at" if event["action"] == "opened" else "updated_at"
-    timestamp = item.get(timestamp_key)
-    if timestamp:
-        local_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Berlin"))
-        footer_parts.append(local_time.strftime("%d.%m.%Y · %H:%M"))
-        embed["footer"]["text"] = " · ".join(footer_parts)
     roles = list(dict.fromkeys(
         LABEL_ROLES[label] for label in labels if LABEL_ROLES.get(label)
     )) if is_issue else []
