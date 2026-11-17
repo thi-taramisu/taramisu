@@ -264,7 +264,23 @@ Source of truth: `internal/httpapi/`.
 ## Attack feasibility ratings
 
 `/api/v1/item-definitions/{item_definition_id}/attack-paths/{attack_path_id}/feasibility-rating`
-supports `rating_method` values `ATTACK_POTENTIAL` (default on PUT), `CVSS`, and `ATTACK_VECTOR`.
+supports `rating_method` values `ATTACK_POTENTIAL`, `CVSS`, and `ATTACK_VECTOR`.
+Projects expose nullable `default_rating_method` through project POST/GET/list/PUT/PATCH.
+Changing it requires Owner (`PermManage`); PATCH omission preserves it, explicit null clears it,
+and PUT omission clears it. Values use the same checked text choices as the rating method in #234.
+
+Attack-path POST accepts optional `initial_rating_method`. The API snapshots the explicit value,
+otherwise the project's default, otherwise `ATTACK_POTENTIAL`, in the same SQL statement that
+creates the path. This snapshot is returned by path GET/list and is unchanged by path PUT/PATCH
+or later project-default changes. Existing paths inherit their current rating method during migration,
+or `ATTACK_POTENTIAL` if unrated; no existing rating inputs or results are changed.
+
+Rating PUT uses this path snapshot when `rating_method` is omitted. An explicit method overrides it;
+PATCH keeps the rating's current method when omitted. Neither operation changes the path's initial
+snapshot. Deleting and recreating a rating also uses that snapshot. Selecting a project default or
+creating a path does not create a rating with invented inputs: CVSS and attack vector still require
+their complete inputs when the rating is saved.
+
 The method belongs to the one-to-one rating record, so method and inputs change atomically.
 Existing ratings receive `ATTACK_POTENTIAL`; migration preserves their stored results until the next write.
 

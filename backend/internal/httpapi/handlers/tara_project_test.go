@@ -138,6 +138,9 @@ func TestTaraProjectRoutes(t *testing.T) {
 		code   int
 	}{
 		{"create", true, http.MethodPost, base, `{"name":"a"}`, http.StatusCreated},
+		{"create invalid default method", true, http.MethodPost, base, `{"name":"a","default_rating_method":"OTHER"}`, http.StatusUnprocessableEntity},
+		{"replace invalid default method", true, http.MethodPut, base + "/" + projectID, `{"name":"a","default_rating_method":"OTHER"}`, http.StatusUnprocessableEntity},
+		{"patch invalid default method", true, http.MethodPatch, base + "/" + projectID, `{"default_rating_method":"OTHER"}`, http.StatusUnprocessableEntity},
 		{"create empty name", true, http.MethodPost, base, `{"name":""}`, http.StatusUnprocessableEntity},
 		{"create whitespace name", true, http.MethodPost, base, `{"name":"   "}`, http.StatusUnprocessableEntity},
 		{"list", true, http.MethodGet, base, "", http.StatusOK},

@@ -55,10 +55,11 @@ func (h *TaraProject) Register(api huma.API) {
 }
 
 type TaraProjectBody struct {
-	ID          string    `json:"id" format:"uuid"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	DefaultRatingMethod *string   `json:"default_rating_method" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR" doc:"Default for new attack paths; null falls back to ATTACK_POTENTIAL"`
+	ID                  string    `json:"id" format:"uuid"`
+	Name                string    `json:"name"`
+	Description         *string   `json:"description,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 }
@@ -77,24 +78,27 @@ type TaraProjectIDInput struct {
 
 type CreateTaraProjectInput struct {
 	Body struct {
-		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
-		Description *string `json:"description,omitempty"`
+		DefaultRatingMethod *string `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                string  `json:"name" minLength:"1" pattern:"\\S"`
+		Description         *string `json:"description,omitempty"`
 	}
 }
 
 type ReplaceTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
-		Description *string `json:"description,omitempty"`
+		DefaultRatingMethod *string `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                string  `json:"name" minLength:"1" pattern:"\\S"`
+		Description         *string `json:"description,omitempty"`
 	}
 }
 
 type UpdateTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
-		Description Optional[string] `json:"description,omitempty"`
+		DefaultRatingMethod Optional[string] `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
+		Description         Optional[string] `json:"description,omitempty"`
 	}
 }
 
@@ -105,9 +109,10 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 		return nil, err
 	}
 	p, err := h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
-		OwnerID:     ownerID,
+		DefaultRatingMethod: in.Body.DefaultRatingMethod,
+		Name:                in.Body.Name,
+		Description:         in.Body.Description,
+		OwnerID:             ownerID,
 	})
 	if err != nil {
 		return nil, err
@@ -128,7 +133,7 @@ func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOu
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, DefaultRatingMethod: p.DefaultRatingMethod, CreatedAt: p.CreatedAt,
 		}, p.Role))
 	}
 	return out, nil
@@ -144,9 +149,10 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
 	p, err := h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{
-		ID:          projectIDFromContext(ctx),
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
+		ID:                  projectIDFromContext(ctx),
+		DefaultRatingMethod: in.Body.DefaultRatingMethod,
+		Name:                in.Body.Name,
+		Description:         in.Body.Description,
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -156,10 +162,12 @@ func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) 
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
 	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:             projectIDFromContext(ctx),
-		Name:           in.Body.Name,
-		SetDescription: in.Body.Description.Set,
-		Description:    in.Body.Description.Value,
+		ID:                     projectIDFromContext(ctx),
+		Name:                   in.Body.Name,
+		SetDefaultRatingMethod: in.Body.DefaultRatingMethod.Set,
+		DefaultRatingMethod:    in.Body.DefaultRatingMethod.Value,
+		SetDescription:         in.Body.Description.Set,
+		Description:            in.Body.Description.Value,
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -201,11 +209,12 @@ func mapTaraProjectError(err error) error {
 
 func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
 	return TaraProjectBody{
-		ID:          p.ID.String(),
-		Name:        p.Name,
-		Description: p.Description,
-		CreatedAt:   p.CreatedAt.Time,
-		Role:        role,
+		DefaultRatingMethod: p.DefaultRatingMethod,
+		ID:                  p.ID.String(),
+		Name:                p.Name,
+		Description:         p.Description,
+		CreatedAt:           p.CreatedAt.Time,
+		Role:                role,
 	}
 }
 

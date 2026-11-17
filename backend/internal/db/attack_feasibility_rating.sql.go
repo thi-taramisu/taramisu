@@ -233,7 +233,8 @@ WITH proposed AS (
         $7::integer AS ap_total_score,
         $8::attack_feasibility AS feasibility_rating,
         $9::text AS rationale,
-        $10::text AS rating_method,
+        COALESCE($10::text,
+            (SELECT initial_rating_method FROM attack_path WHERE id = $1)) AS rating_method,
         $11::text AS cvss_attack_vector,
         $12::text AS cvss_attack_complexity,
         $13::text AS cvss_privileges_required,
@@ -292,7 +293,7 @@ type UpsertAttackFeasibilityRatingParams struct {
 	ApTotalScore           *int32
 	FeasibilityRating      *AttackFeasibility
 	Rationale              *string
-	RatingMethod           string
+	RatingMethod           *string
 	CvssAttackVector       *string
 	CvssAttackComplexity   *string
 	CvssPrivilegesRequired *string
