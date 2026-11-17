@@ -31,16 +31,19 @@ src/
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health/live on the real backend
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
+  features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
+  features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
-  test/renderApp.tsx           # renders the app with a fresh mock item API and query cache
+  test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
@@ -55,6 +58,10 @@ Branches start expanded; navigating to a hidden descendant reveals its ancestors
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
+
+Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
+parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 
 ## API client
 
@@ -80,8 +87,8 @@ src/api/
   queries/backend.ts       # REAL: hooks on the client (health, current user)
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
-  services/                # service interfaces the views use (e.g. ItemService)
-  queries/items.ts         # TanStack Query hooks on the services
+  services/                # service interfaces the views use (e.g. ItemService, ProjectService)
+  queries/items.ts, queries/projects.ts # TanStack Query hooks on the services
   ApiProvider.tsx          # provides the client and the service implementations
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
@@ -89,15 +96,22 @@ src/api/
 `src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
 `ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
-that has no service yet (project list, project settings, example project).
+that has no service yet (project settings, example project).
+
+Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
+instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
+can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
 
 ## Global search
 
 Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
 focuses its input, searches names, internal IDs and display IDs (for example `TS-01`), and opens the selected result with Enter.
 Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
+The dialog stays anchored near the top with a fixed-height, scrollable results area. Input is debounced by 250 ms; filters apply
+immediately. While typing, previous results stay visible but cannot be opened until the current search finishes.
 
-Project and element-type filters can be combined. Several types or projects are ORed within that filter; project and type filters
+Project and element-type filters can be combined. Toggle a selected type button to remove that type; project chips have a remove button.
+Several types or projects are ORed within that filter; project and type filters
 are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
 projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
 Results include the project, type and ID. Further matches are available through **Load more results**.

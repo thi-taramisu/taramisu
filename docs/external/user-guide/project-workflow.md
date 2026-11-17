@@ -34,7 +34,8 @@ Use the arrow keys and Enter, or click a result, to open it. Select **Load more 
 Press Escape, select Close or click outside the dialog to dismiss it.
 
 Use the type buttons and project selector to narrow the results. Multiple selected types are included;
-project filters narrow the matches further. Active filters can be removed individually or with **Clear filters**.
+project filters narrow the matches further. Toggle a selected type button to remove it; remove a project using its filter chip.
+Select **Clear filters** to remove all selections.
 The project selector lets you search its list by name or ID without leaving the search dialog. Choose several projects using the
 checkbox marks; use **Show more projects** to browse additional matches. Escape closes the project selector first.
 Opening search from a project starts with that project selected. Remove its filter to search across projects;
@@ -49,7 +50,7 @@ Project changes survive navigation but reset on reload. Production search and me
 2. Select **Create Project** in the sidebar.
 3. Enter a project name.
 4. Optionally select **Upload image** and choose a PNG, JPEG or WebP file
-   up to 5 MB. Check the preview; select **Remove** to create without an image.
+   up to 5 MB. If you skip the upload or select **Remove**, TARAmisu generates a cover image locally.
 5. Select **Create** or press Enter.
 
 A project name is required. Empty names and names containing only
@@ -84,9 +85,18 @@ Archived projects are not shown in the Favorites section.
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Archive Project**.
+4. Confirm with **Archive Project** in the dialog.
 
 The project is removed from the active overview and appears in
 the Archive view.
+
+An archived project is read-only for all members. Its elements
+and general settings can be viewed but not changed, and a notice
+below the project header says so. Members can still be managed.
+
+Project owners can also archive a project from its settings:
+open **Settings**, select **Archive Project** under
+**Danger Zone**, and confirm in the dialog.
 
 ### Restoring a project
 
@@ -94,31 +104,38 @@ the Archive view.
 2. Locate the archived project.
 3. Select **Restore Project**.
 
-The project returns to the active overview.
+The project returns to the active overview and can be edited
+again.
 
 Its previous favorite status is preserved.
+
+In the project settings, owners can select **Restore Project**
+instead.
 
 ## Deleting a project
 
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Delete Project**.
-4. Confirm the action in the confirmation dialog.
+4. Read the warning and select **Delete Project** in the dialog.
+5. Type the project name and select **Delete Project** again.
 
 Select **Cancel** to keep the project.
+
+Project owners can also delete a project from its settings:
+open **Settings** and select **Delete Project** under
+**Danger Zone**. After the deletion, the project list opens.
 
 Deletion currently affects only temporary frontend state.
 
 ## Opening a project workspace
 
-The Headlamp example project provides navigation to the existing
-TARAmisu workspace.
+Open a project from the overview or search results to enter its workspace. The Headlamp example contains
+assessment data; other mock projects start with an empty workspace. Project settings are currently available
+only for the Headlamp example, so other projects do not show a Settings link.
 
-Other mock projects are displayed in the overview but do not
-yet provide functional workspace navigation.
-
-The Headlamp example is protected from deletion and archiving
-in the current preview.
+The Headlamp example can be archived and deleted like any other
+project. Reload the page to restore it.
 
 ## Known limitations
 
@@ -126,10 +143,10 @@ The current frontend preview has the following limitations:
 
 - Project data is not persisted.
 - Backend project management APIs are not yet connected.
-- Search is not functional.
-- Only the Headlamp example has a functional workspace.
+- Search uses temporary mock data.
+- Only the Headlamp example has seeded assessment data and project settings.
 - The Archive view does not have a dedicated URL.
-- Project management actions use temporary React state.
+- Project management actions use temporary in-memory data.
 
 These limitations do not represent the final intended application behavior.
 

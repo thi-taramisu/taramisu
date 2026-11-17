@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { SearchProject, SearchType } from '../../api/models/search'
-import { SEARCH_TYPES, searchTypeLabel } from './search'
+import { SEARCH_TYPES } from './search'
 import { ProjectFilter } from './ProjectFilter'
 
 interface SearchFiltersProps {
@@ -23,7 +23,7 @@ export function SearchFilters({ projects, projectIds, types, onProjectsChange, o
             key={value}
             type="button"
             size="xs"
-            variant={types.includes(value) ? 'secondary' : 'ghost'}
+            variant={types.includes(value) ? 'secondary' : 'outline'}
             aria-pressed={types.includes(value)}
             onClick={() => onTypesChange(types.includes(value) ? types.filter((type) => type !== value) : [...types, value])}
           >{label}</Button>
@@ -39,7 +39,6 @@ export function SearchFilters({ projects, projectIds, types, onProjectsChange, o
             const name = projects.find((project) => project.id === id)?.name ?? id
             return <FilterChip key={id} label={name} onRemove={() => onProjectsChange(projectIds.filter((projectId) => projectId !== id))} />
           })}
-          {types.map((type) => <FilterChip key={type} label={searchTypeLabel(type)} onRemove={() => onTypesChange(types.filter((value) => value !== type))} />)}
           <Button type="button" variant="ghost" size="xs" onClick={() => { onProjectsChange([]); onTypesChange([]) }}>Clear filters</Button>
         </div>
       )}

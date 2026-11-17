@@ -1,18 +1,9 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { EntityRef, EntityType } from '../../api/models/tree'
 import { useItemRisks } from '../../api/queries/items'
-import { entityPath } from '../workspace/entities'
+import { EntityLink } from '../workspace/EntityLink'
 import { RiskBadge } from './RiskBadge'
-
-function EntityLink({ projectId, type, entity }: { projectId: string; type: EntityType; entity: EntityRef }) {
-  return (
-    <Link to={entityPath(projectId, type, entity.id)} className="hover:underline">
-      <span className="font-mono text-xs text-muted-foreground">{entity.code}</span> {entity.name}
-    </Link>
-  )
-}
 
 /** Risks tab of an item ("Item Summary" wireframe): read-only, one row per asset × damage × threat. */
 export function ItemRisksTab() {

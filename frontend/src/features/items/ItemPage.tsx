@@ -3,12 +3,14 @@ import { EntityPage } from '../workspace/EntityPage'
 import { DeleteItemDialog } from './DeleteItemDialog'
 import { isNotFound } from '../../api/errors'
 import { useItem, useItemAssets } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 
 /** Item page: header from the item API, delete action and the asset count on the Assets tab. */
 export function ItemPage() {
   const { projectId = '', entityId = '' } = useParams()
   const item = useItem(projectId, entityId)
   const assets = useItemAssets(projectId, entityId)
+  const { canEdit } = useProjectAccess(projectId)
 
   if (isNotFound(item.error)) {
     return (
@@ -41,7 +43,7 @@ export function ItemPage() {
               The item could not be refreshed.
             </p>
           )}
-          <DeleteItemDialog item={item.data} />
+          {canEdit && <DeleteItemDialog item={item.data} />}
         </>
       }
       tabLabels={assets.data ? { assets: `Assets (${assets.data.length})` } : undefined}

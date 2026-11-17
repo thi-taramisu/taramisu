@@ -5,10 +5,11 @@ import { searchResultKey, searchTypeLabel } from './search'
 
 const ICONS = { projects: Folder, items: Box, assets: Shield, 'damage-scenarios': TriangleAlert, 'threat-scenarios': FileText, 'attack-paths': GitBranch } satisfies Record<SearchType, typeof Folder>
 
-export function SearchResults({ results, activeKey, listId, onActiveChange, onChoose }: {
+export function SearchResults({ results, activeKey, listId, disabled, onActiveChange, onChoose }: {
   results: SearchResult[]
   activeKey: string | undefined
   listId: string
+  disabled: boolean
   onActiveChange: (key: string) => void
   onChoose: (result: SearchResult) => void
 }) {
@@ -22,6 +23,7 @@ export function SearchResults({ results, activeKey, listId, onActiveChange, onCh
           <button
             type="button"
             tabIndex={-1}
+            disabled={disabled}
             key={key}
             id={`${listId}-${index}`}
             // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- Combobox options keep DOM focus in the input and display rich content.

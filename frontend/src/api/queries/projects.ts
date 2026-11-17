@@ -20,6 +20,19 @@ export function useProject(projectId: string) {
   return useQuery({ queryKey: keys.project(projectId), queryFn: () => api.projects.get(projectId) })
 }
 
+/**
+ * What the current user may do in a project. Archived projects are read-only for all members until they
+ * are restored; nothing can be edited before the project is loaded. The backend enforces the same (#233),
+ * so this only shapes the UI.
+ */
+export function useProjectAccess(projectId: string) {
+  const { data: project } = useProject(projectId)
+  return {
+    archived: project?.archived ?? false,
+    canEdit: project !== undefined && !project.archived,
+  }
+}
+
 /** Writes a changed or new project into its query and the list, without refetching the list. */
 function useStoreProject() {
   const queryClient = useQueryClient()

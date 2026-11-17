@@ -8,11 +8,13 @@ import {
   useSetDamageScenarioAssetLink,
   useSetDamageScenarioThreatLink,
 } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
+import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
+import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 
-const SAVE_ERROR = 'The link could not be changed. Please try again.'
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
 export function DamageScenarioRelationsTab() {
@@ -30,16 +32,11 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
   const itemThreats = useItemThreatScenarios(projectId, scenario.item_definition_id)
   const assetLink = useSetDamageScenarioAssetLink(projectId, scenario.id)
   const threatLink = useSetDamageScenarioThreatLink(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   // Both write the full relations into the cache, so only one may run at a time; otherwise an older response could overwrite a newer one.
   const saving = assetLink.isPending || threatLink.isPending
 
-  if (!relations.data) {
-    return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The relations could not be loaded.</p>
-    ) : (
-      <output className="text-sm text-muted-foreground">Loading relations…</output>
-    )
-  }
+  if (!relations.data) return <RelationsQueryStatus query={relations} />
 
   const { assets, threatScenarios: threats } = relations.data
   // A link needs at least one property, so assets without any cannot be linked.
@@ -48,20 +45,19 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
 
   return (
     <div className="space-y-4">
-      {relations.isError && (
-        <p role="alert" className="text-sm text-destructive">The relations could not be refreshed.</p>
-      )}
+      <RelationsQueryStatus query={relations} />
       <RelationSection
         projectId={projectId}
         type="assets"
         direction="up"
         title="Assets"
         elementLabel="Asset"
+        removeEffect={LINK_REMOVE_WITH_TARGETS}
         candidates={assetCandidates.map((asset) => ({ ...asset, details: <CiaProperties properties={asset.properties} /> }))}
         pending={saving}
         candidatesLoading={itemAssets.isPending}
         candidatesError={itemAssets.isLoadingError ? 'The assets of this item could not be loaded.' : undefined}
-        error={assetLink.isError ? SAVE_ERROR : undefined}
+        error={assetLink.isError ? LINK_SAVE_ERROR : undefined}
         // New links start with all properties of the asset, as in the create dialog; they are refined in the table.
         onAdd={(assetId) => {
           const properties = assetCandidates.find((asset) => asset.id === assetId)?.properties ?? []
@@ -79,6 +75,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
               requireOne
               showUnavailable
               pending={saving}
+              disabled={!canEdit}
               onChange={(properties) => assetLink.mutate({ assetId: asset.id, properties })}
             />
           ),
@@ -90,13 +87,14 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         direction="down"
         title="Threat Scenarios"
         elementLabel="Threat Scenario"
+        removeEffect={LINK_REMOVE_WITH_TARGETS}
         candidates={threatCandidates}
         pending={saving}
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
-        error={threatLink.isError ? SAVE_ERROR : undefined}
-        onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
-        onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
+        error={threatLink.isError ? LINK_SAVE_ERROR : undefined}
+        onAdd={(id) => threatLink.mutate({ id, linked: true })}
+        onRemove={(id) => threatLink.mutate({ id, linked: false })}
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">

@@ -11,12 +11,14 @@ export function ProjectHeader({ projectId, projectName = exampleProject.name, ch
         Projects
       </Link>
       <span className="font-medium">{projectName}</span>
-      <NavLink
-        to={`/projects/${projectId}/settings`}
-        className={({ isActive }) => `text-sm hover:underline ${isActive ? 'font-medium' : 'text-muted-foreground'}`}
-      >
-        Settings
-      </NavLink>
+      {projectId === exampleProject.id && (
+        <NavLink
+          to={`/projects/${projectId}/settings`}
+          className={({ isActive }) => `text-sm hover:underline ${isActive ? 'font-medium' : 'text-muted-foreground'}`}
+        >
+          Settings
+        </NavLink>
+      )}
       <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">Colour schemes</Link>
       <div className="ml-auto flex items-center gap-2"><SearchTrigger compact />{children}</div>
     </header>

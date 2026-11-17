@@ -7,6 +7,7 @@ import { renderApp } from '../../test/renderApp'
 const dialogName = 'Search projects and elements'
 const inputName = 'Search by name or ID'
 const resultList = (dialog: HTMLElement) => within(within(dialog).getByRole('listbox', { name: 'Search results' }))
+const waitForSearch = (dialog: HTMLElement) => waitFor(() => expect(within(dialog).queryByText('Searching…')).not.toBeInTheDocument())
 
 async function openSearch(path = '/projects', api = createMockItemApi()) {
   const app = renderApp(path, api)
@@ -27,6 +28,7 @@ describe('Spotlight search', () => {
     await user.click(screen.getByRole('button', { name: dialogName }))
     const dialog = screen.getByRole('dialog', { name: dialogName })
     await user.type(within(dialog).getByRole('combobox', { name: inputName }), 'Spotlight project')
+    await waitForSearch(dialog)
     await user.click(await resultList(dialog).findByRole('option', { name: /Spotlight project/ }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByText('Spotlight project')).toBeInTheDocument()
@@ -55,6 +57,7 @@ describe('Spotlight search', () => {
   it('searches by display ID and opens the selected element with Enter', async () => {
     const { user, input, dialog } = await openSearch()
     await user.type(input, 'ts-01')
+    await waitForSearch(dialog)
     const option = await resultList(dialog).findByRole('option', { name: /Spoofed headlamp/ })
     expect(option).toHaveTextContent('TS-01')
     expect(option).toHaveTextContent('Threat scenario')
@@ -64,6 +67,7 @@ describe('Spotlight search', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/projects/headlamp/threat-scenarios/ts-01')
     expect(await screen.findByRole('heading', { name: /Spoofed headlamp/ })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Elicitation')).toBeInTheDocument()
   })
 
   it('moves the active option with arrows while keeping focus in the input', async () => {
@@ -81,6 +85,45 @@ describe('Spotlight search', () => {
     expect(input).toHaveAttribute('aria-activedescendant', options.at(-1)!.id)
   })
 
+  it('debounces typing and prevents opening previous results while a new query is pending', async () => {
+    const { user, api, input, dialog } = await openSearch()
+    const search = vi.spyOn(api.search, 'search')
+    await user.type(input, 'TS-01')
+
+    expect(search).not.toHaveBeenCalled()
+    expect(input).not.toHaveAttribute('aria-activedescendant')
+    for (const option of resultList(dialog).getAllByRole('option')) expect(option).toBeDisabled()
+    await user.keyboard('{Enter}')
+    expect(dialog).toBeInTheDocument()
+
+    await waitForSearch(dialog)
+    expect(search).toHaveBeenCalledTimes(1)
+    expect(search.mock.calls[0][0]).toMatchObject({ query: 'TS-01' })
+    expect(resultList(dialog).getByRole('option', { name: /Spoofed headlamp/ })).toBeEnabled()
+  })
+
+  it('applies filters immediately to the current input and toggles types without duplicate chips', async () => {
+    const { user, api, input, dialog } = await openSearch()
+    const search = vi.spyOn(api.search, 'search')
+    await user.type(input, 'TS-01')
+    await user.click(within(dialog).getByRole('button', { name: 'Threat scenario', pressed: false }))
+    await waitForSearch(dialog)
+
+    expect(search).toHaveBeenCalledTimes(1)
+    expect(search.mock.calls[0][0]).toMatchObject({ query: 'TS-01', types: ['threat-scenarios'] })
+    expect(within(dialog).getByRole('button', { name: 'Threat scenario', pressed: true })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Remove Threat scenario filter' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Threat scenario', pressed: true }))
+    expect(within(dialog).getByRole('button', { name: 'Threat scenario', pressed: false })).toBeInTheDocument()
+  })
+
+  it('closes from the search-row button and returns focus to the opener', async () => {
+    const { user, dialog } = await openSearch()
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: dialogName })).toHaveFocus()
+  })
+
   it('starts scoped to the current project, combines/removes filters, and opens a different project', async () => {
     const { user, dialog, input } = await openSearch('/projects/headlamp/items/i-01')
     expect(within(dialog).getByRole('button', { name: 'Remove Headlamp System filter' })).toBeInTheDocument()
@@ -88,14 +131,16 @@ describe('Spotlight search', () => {
     expect(await resultList(dialog).findByRole('option', { name: /Headlamp System.*Project/ })).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Asset' }))
     await waitFor(() => expect(resultList(dialog).getAllByRole('option')).toHaveLength(5))
-    await user.click(within(dialog).getByRole('button', { name: 'Remove Asset filter' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Asset', pressed: true }))
     await user.click(within(dialog).getByRole('button', { name: 'Remove Headlamp System filter' }))
     await user.type(input, 'battery')
+    await waitForSearch(dialog)
     await user.click(await resultList(dialog).findByRole('option', { name: /Battery Security/ }))
     expect(screen.getByTestId('location')).toHaveTextContent('/projects/battery-security')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByText('Battery Security')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
   it('combines multiple selected projects and clears all active filters', async () => {
@@ -117,6 +162,7 @@ describe('Spotlight search', () => {
   it('keeps the local project lookup separate from global search and closes only the dropdown on Escape', async () => {
     const { user, api, dialog, input } = await openSearch()
     await user.type(input, 'TS-01')
+    await waitForSearch(dialog)
     await resultList(dialog).findByRole('option', { name: /Spoofed headlamp/ })
     const search = vi.spyOn(api.search, 'search')
     const trigger = within(dialog).getByRole('button', { name: 'Filter by project' })
@@ -201,6 +247,7 @@ describe('Spotlight search', () => {
     for (let i = 0; i < 24; i++) await api.projects.create({ name: `Paging project ${i}` })
     const { user, input, dialog } = await openSearch('/projects', api)
     await user.type(input, 'Paging project')
+    await waitForSearch(dialog)
     await waitFor(() => expect(resultList(dialog).getAllByRole('option')).toHaveLength(20))
     await user.click(within(dialog).getByRole('button', { name: 'Load more results' }))
     await waitFor(() => expect(resultList(dialog).getAllByRole('option')).toHaveLength(24))

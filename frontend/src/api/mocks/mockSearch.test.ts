@@ -71,6 +71,19 @@ describe('mock global search', () => {
     expect(new Set([...first.results, ...second.results].map((result) => result.id)).size).toBe(25)
   })
 
+  it('indexes saved threat scenario and attack path titles from their detail services', async () => {
+    const api = createMockItemApi()
+    await api.threatScenarios.update('headlamp', 'ts-01', { title: 'Renamed threat' })
+    await api.attackPaths.update('headlamp', 'ap-01', { title: 'Renamed attack path' })
+
+    const page = await api.search.search({ ...request, query: 'Renamed' }, options())
+    expect(page.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'ts-01', type: 'threat-scenarios', name: 'Renamed threat' }),
+      expect.objectContaining({ id: 'ap-01', type: 'attack-paths', name: 'Renamed attack path' }),
+    ]))
+    expect(page.total).toBe(2)
+  })
+
   it('honors cancellation before and after the project lookup', async () => {
     const api = createMockItemApi()
     const controller = new AbortController()
