@@ -7,12 +7,38 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from discord_issue_digest import GitHub, timestamp
-from discord_notifications import DeliveryError, LABEL_WEBHOOKS, destinations, embed_payload, event_item, send_webhook
+from discord_notifications import (
+    DeliveryError, GitHub, LABEL_WEBHOOKS, NO_MENTIONS, PR_COLOR, MERGED_COLOR, LABEL_COLOR,
+    destinations, display_text, send_webhook, timestamp,
+)
+
+
+def pr_payload(event):
+    item = event["pull_request"]
+    is_merged = event["action"] == "closed"
+    action = "merged" if is_merged else "opened" if event["action"] == "opened" else "labeled"
+    actor = event.get("sender", {}).get("login") or item["user"]["login"]
+    title = display_text(item["title"])[:256].rstrip("\\")
+    context = []
+    if action == "labeled":
+        label = event["label"]["name"].replace("`", "'")
+        context.append(f"Added `{label}`")
+    base = item.get("base", {}).get("ref")
+    if base and base != "main":
+        base = base.replace("`", "'")[:250]
+        context.append(f"Into `{base}`")
+    embed = {
+        "title": f"{action.capitalize()} · PR #{item['number']}",
+        "url": item["html_url"],
+        "description": "\n".join([title, " · ".join(context)]).rstrip(),
+        "footer": {"text": f"by {actor}"},
+        "color": MERGED_COLOR if is_merged else LABEL_COLOR if action == "labeled" else PR_COLOR,
+    }
+    return {"allowed_mentions": NO_MENTIONS, "embeds": [embed]}
 
 
 def deliver_pr(github, event, environ):
-    if event_item("pull_request_target", event) is None:
+    if event.get("action") not in ("opened", "labeled", "closed"):
         return
     number = event["pull_request"]["number"]
     item = github.request(f"/pulls/{number}")
@@ -33,7 +59,7 @@ def deliver_pr(github, event, environ):
         if key in sent:
             continue
         try:
-            send_webhook(webhook, embed_payload("pull_request_target", event, routed_labels))
+            send_webhook(webhook, pr_payload(event))
         except DeliveryError:
             print("PR delivery failed for: " + ", ".join(routed_labels), file=sys.stderr)
             failed = True

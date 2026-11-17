@@ -1,96 +1,20 @@
-"""Deliver new-issue digests with checkpoints on a dedicated GitHub state branch."""
+"""Deliver twice-daily issue digests using persisted channel checkpoints."""
 
-import base64
 import hashlib
-import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
 
-from discord_notifications import DeliveryError, ISSUE_COLOR, LABEL_WEBHOOKS, NoRedirect, destinations, display_text, send_webhook
-
-STATE_BRANCH = "automation/discord-issue-digest-state"
-STATE_PATH = "discord-issue-digest.json"
-
-
-def timestamp(value):
-    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
-class GitHub:
-    def __init__(self):
-        self.root = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}"
-        self.token = os.environ["GH_TOKEN"]
-        self.sha = None
-
-    def request(self, path, data=None, method=None):
-        request = urllib.request.Request(
-            self.root + path,
-            data=json.dumps(data).encode() if data is not None else None,
-            headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
-                     "Content-Type": "application/json", "User-Agent": "Taramisu-Issue-Digest"},
-            method=method,
-        )
-        with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
-            return json.load(response)
-
-    def load(self, initial_since):
-        try:
-            result = self.request(f"/contents/{STATE_PATH}?{urlencode({'ref': STATE_BRANCH})}")
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                raise
-            # Only initialize a missing branch. A missing file on an existing branch
-            # is an error, not permission to replay old notifications.
-            try:
-                self.request(f"/git/ref/heads/{STATE_BRANCH}")
-            except urllib.error.HTTPError as ref_error:
-                if ref_error.code != 404:
-                    raise
-            else:
-                raise ValueError("Digest state file is missing from the existing state branch")
-            self.request("/git/refs", {"ref": f"refs/heads/{STATE_BRANCH}", "sha": os.environ["GITHUB_SHA"]})
-            state = {"version": 1, "initial_since": initial_since, "channels": {}}
-            self.save(state)
-            return state
-        self.sha = result["sha"]
-        state = json.loads(base64.b64decode(result["content"]))
-        if state["version"] != 1:
-            raise ValueError("Unsupported digest state version")
-        return state
-
-    def save(self, state):
-        data = {"message": "Update Discord issue digest checkpoint", "branch": STATE_BRANCH,
-                "content": base64.b64encode(json.dumps(state, sort_keys=True).encode()).decode()}
-        if self.sha:
-            data["sha"] = self.sha
-        self.sha = self.request(f"/contents/{STATE_PATH}", data, "PUT")["content"]["sha"]
-
-    def issues(self, since, until):
-        # GitHub filters updated_at strictly after since; overlap one second
-        # so an issue created exactly at our inclusive boundary is not lost.
-        api_since = timestamp(datetime.fromisoformat(since.replace("Z", "+00:00")) - timedelta(seconds=1))
-        page = 1
-        while True:
-            items = self.request("/issues?" + urlencode({
-                "state": "all", "sort": "created", "direction": "desc", "since": api_since,
-                "per_page": 100, "page": page,
-            }))
-            for item in items:
-                if "pull_request" not in item and since <= item["created_at"] < until:
-                    yield item
-            if len(items) < 100 or items[-1]["created_at"] < since:
-                return
-            page += 1
+from discord_notifications import (
+    DeliveryError, GitHub, ISSUE_COLOR, LABEL_WEBHOOKS, NO_MENTIONS,
+    destinations, display_text, send_webhook, timestamp,
+)
 
 
 def digest_batches(issues, now=None):
     """One compact list per batch, within Discord's description limit."""
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    heading = "Morning issue digest" if now.hour < 12 else "Evening issue digest"
+    heading = "☀️ Morning issue digest" if now.hour < 12 else "🌙 Evening issue digest"
     pending = list(issues)
     while pending:
         batch, lines = [], []
@@ -98,14 +22,14 @@ def digest_batches(issues, now=None):
             item = pending[0]
             title = display_text(item["title"]).replace("\\[", "[").replace("\\]", "]")[:180].rstrip("\\")
             line = f"[#{item['number']}]({item['html_url']}) · {title}"
-            if lines and len("\n\n".join([*lines, line])) > 4096:
+            if lines and len("\n".join([*lines, line])) > 4096:
                 break
             batch.append(pending.pop(0))
             lines.append(line)
         yield batch, {
-            "allowed_mentions": {"parse": [], "users": [], "roles": [], "replied_user": False},
-            "embeds": [{"title": f"{heading} ({len(batch)} new {'issue' if len(batch) == 1 else 'issues'})",
-                        "description": "\n\n".join(lines), "color": ISSUE_COLOR}],
+            "allowed_mentions": NO_MENTIONS,
+            "embeds": [{"author": {"name": f"{heading} ({len(batch)} new {'issue' if len(batch) == 1 else 'issues'})"},
+                        "description": "\n".join(lines), "color": ISSUE_COLOR}],
         }
 
 
