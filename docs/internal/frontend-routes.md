@@ -112,7 +112,8 @@ Edit opens the normal detail page (some entity editors are still placeholders). 
 the display mode. The normal and minimal variants share the same entities and relations.
 
 The graph reads current mock services via `useRelationGraph`, deduplicates shared tree occurrences, and
-merges relations from the risk rows. Attack paths point to threats, which point to damage scenarios.
+merges relations from the risk rows. Unassigned elements (#258) are included without a relation to their item.
+Attack paths point to threats, which point to damage scenarios.
 A threat view also includes the linked asset as context. New damage scenarios and saved names are
 reflected after the existing project-query invalidation. Failed requests show an error and Retry,
 rather than presenting incomplete data as a valid empty graph.

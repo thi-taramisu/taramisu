@@ -34,6 +34,11 @@ describe('graph view', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
   })
+  it('shows the graph of an unassigned element', async () => {
+    renderApp('/projects/headlamp/threat-scenarios/ts-03?view=graph')
+    expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
+    expect(screen.queryByText('No graph data for this element.')).not.toBeInTheDocument()
+  })
   it('does not invent nodes for an unknown entity', async () => {
     renderApp('/projects/headlamp/assets/unknown?view=graph')
     expect(await screen.findByText('No graph data for this element.')).toBeInTheDocument()

@@ -45,6 +45,8 @@ export function buildRelationGraph(items: { tree: TreeNode; risks: RiskGroup[] }
       else link(parentKey, key)
     }
     node.children?.forEach((child) => visit(child, node, paths))
+    // Unassigned elements have no link upwards, so they are visited without the item as their parent.
+    node.unassigned?.forEach((child) => visit(child, undefined, paths))
   }
   for (const { tree, risks } of items) {
     const itemPaths = new Set<string>()
