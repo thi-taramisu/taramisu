@@ -173,6 +173,8 @@ describe('create damage scenario', () => {
     }
     const { user } = renderApp(`${project}/assets/a-02`, api)
     const dialog = await openNewDamageScenarioDialog(user)
+    // The asset of the page is linked once it is loaded, so the hint does not announce "Unassigned" meanwhile.
+    expect(within(dialog).getByText('Will appear in the tree below each linked asset.')).toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))

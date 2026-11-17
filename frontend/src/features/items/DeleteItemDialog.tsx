@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { ItemDefinition } from '../../api/models/item'
-import type { TreeNode } from '../../api/models/tree'
+import type { EntityType, TreeNode } from '../../api/models/tree'
 import { useDeleteItem, useItemChildren, useItemUnassigned } from '../../api/queries/items'
+import { ENTITY_TYPES } from '../workspace/entities'
 
 /** Each element once by type and id, also when the tree shows it below several parents. */
 function collectElements(nodes: readonly TreeNode[], found = new Map<string, TreeNode>()) {
@@ -30,12 +31,13 @@ function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }
 
-/** What is deleted along with the item; an item can have unassigned elements without any asset. */
-function deletedWithItem(assets: number, others: number) {
-  const elements = '(damage scenarios, threat scenarios, attack paths)'
-  if (assets === 0) return `This also deletes its ${plural(others, 'element')} ${elements}. `
-  if (others === 0) return `This also deletes its ${plural(assets, 'asset')}. `
-  return `This also deletes its ${plural(assets, 'asset')} and ${plural(others, 'other element')} ${elements}. `
+/** What is deleted along with the item by type, e.g. "4 assets and 1 damage scenario"; types it does not have are left out. */
+function deletedWithItem(elements: readonly TreeNode[]) {
+  const counts = (Object.keys(ENTITY_TYPES) as EntityType[]).flatMap((type) => {
+    const count = elements.filter((node) => node.type === type).length
+    return count > 0 ? [plural(count, ENTITY_TYPES[type].label.toLowerCase())] : []
+  })
+  return counts.length > 0 ? `This also deletes its ${new Intl.ListFormat('en').format(counts)}. ` : ''
 }
 
 /** Confirmation before deleting an item; not in the wireframes, built from the shadcn AlertDialog. */
@@ -51,8 +53,6 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const deleteItem = useDeleteItem(projectId, item.id)
 
   const elements = [...collectElements([...(children.data ?? []), ...(unassigned.data ?? [])]).values()]
-  const assets = elements.filter((node) => node.type === 'assets').length
-  const others = elements.length - assets
   const loaded = children.isSuccess && unassigned.isSuccess
 
   function handleDelete() {
@@ -78,7 +78,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete "{item.name}"?</AlertDialogTitle>
           <AlertDialogDescription>
-            {elements.length > 0 ? deletedWithItem(assets, others) : ''}
+            {deletedWithItem(elements)}
             This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

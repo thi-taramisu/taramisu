@@ -90,7 +90,7 @@ describe('delete item', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete item' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Delete "Headlamp system"?' })
-    expect(dialog).toHaveTextContent('4 assets and 7 other elements')
+    expect(dialog).toHaveTextContent('This also deletes its 4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths.')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('delete item', () => {
 
     failing = false
     await user.click(within(dialog).getByRole('button', { name: 'Retry' }))
-    expect(await within(dialog).findByText(/4 assets and 7 other elements/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled()
   })
 
@@ -134,7 +134,7 @@ describe('delete item', () => {
     const { user } = renderApp(`${project}/items/i-01`, api)
 
     await user.click(await screen.findByRole('button', { name: 'Delete item' }))
-    expect(await within(screen.getByRole('alertdialog')).findByText(/4 assets and 7 other elements/)).toBeInTheDocument()
+    expect(await within(screen.getByRole('alertdialog')).findByText(/4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths/)).toBeInTheDocument()
   })
 
   it('names the unassigned elements of an item without assets', async () => {
@@ -145,8 +145,7 @@ describe('delete item', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete item' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Delete "Extra item"?' })
-    expect(await within(dialog).findByText(/This also deletes its 1 element \(damage scenarios/)).toBeInTheDocument()
-    expect(dialog).not.toHaveTextContent('asset')
+    expect(await within(dialog).findByText(/This also deletes its 1 damage scenario\. /)).toBeInTheDocument()
   })
 
   it('deletes an item with nothing below it without a warning', async () => {

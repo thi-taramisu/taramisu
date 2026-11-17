@@ -120,8 +120,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder="e.g. Loss of cell balancing"
-      // From the shown links, so the hint matches the asset chips; while the assets load, creating with links is blocked anyway.
-      hint={linked.length > 0 ? 'Will appear in the tree below each linked asset.' : 'Will appear in "Unassigned" of the item until it is linked.'}
+      // Matches the asset chips once the assets are there; until then the chosen links say where it will appear.
+      hint={(assets ? linked : links).length > 0 ? 'Will appear in the tree below each linked asset.' : 'Will appear in "Unassigned" of the item until it is linked.'}
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? `${unfinished.code} was created, but the next step failed. Please try again.`)
