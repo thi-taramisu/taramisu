@@ -260,3 +260,50 @@ For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `
 `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).
 API-changing PRs must include an updated spec; CI regenerates and fails if it is stale.
 Source of truth: `internal/httpapi/`.
+
+## Attack feasibility ratings
+
+`/api/v1/item-definitions/{item_definition_id}/attack-paths/{attack_path_id}/feasibility-rating`
+supports `rating_method` values `ATTACK_POTENTIAL`, `CVSS`, and `ATTACK_VECTOR`.
+Projects expose nullable `default_rating_method` through project POST/GET/list/PUT/PATCH.
+Changing it requires Owner (`PermManage`); PATCH omission preserves it, explicit null clears it,
+and PUT omission clears it. Values use the same checked text choices as the rating method in #234.
+
+Attack-path POST accepts optional `initial_rating_method`. The API snapshots the explicit value,
+otherwise the project's default, otherwise `ATTACK_POTENTIAL`, in the same SQL statement that
+creates the path. This snapshot is returned by path GET/list and is unchanged by path PUT/PATCH
+or later project-default changes. Existing paths inherit their current rating method during migration,
+or `ATTACK_POTENTIAL` if unrated; no existing rating inputs or results are changed.
+
+Rating PUT uses this path snapshot when `rating_method` is omitted. An explicit method overrides it;
+PATCH keeps the rating's current method when omitted. Neither operation changes the path's initial
+snapshot. Deleting and recreating a rating also uses that snapshot. Selecting a project default or
+creating a path does not create a rating with invented inputs: CVSS and attack vector still require
+their complete inputs when the rating is saved.
+
+The method belongs to the one-to-one rating record, so method and inputs change atomically.
+Existing ratings receive `ATTACK_POTENTIAL`; migration preserves their stored results until the next write.
+
+- Attack potential keeps the five existing nonnegative factors and the optional, sum-checked
+  `ap_total_score`. Complete factors derive HIGH for totals <=13, MEDIUM <=19, LOW <=24,
+  otherwise VERY_LOW. Incomplete drafts return no feasibility rating.
+- CVSS uses **v3.1 exploitability only**, with required `cvss_attack_vector`
+  (NETWORK/ADJACENT/LOCAL/PHYSICAL), `cvss_attack_complexity` (LOW/HIGH),
+  `cvss_privileges_required` (NONE/LOW/HIGH), `cvss_user_interaction` (NONE/REQUIRED),
+  and `cvss_scope` (UNCHANGED/CHANGED). Scope selects the privileges weight.
+  The formula is `8.22 * AV * AC * PR * UI` from the
+  [FIRST specification](https://www.first.org/cvss/v3.1/specification-document).
+  Full-precision scores map to HIGH >=2.96, MEDIUM >=2.00, LOW >=1.06, otherwise VERY_LOW.
+- Attack vector requires `attack_vector`: NETWORK maps to HIGH, ADJACENT to MEDIUM,
+  LOCAL to LOW, and PHYSICAL to VERY_LOW.
+
+These thresholds and vector mappings are application policy and should be reviewed by the
+backend team against its chosen ISO/SAE 21434 approach. They are not the CVSS severity bands.
+Inputs from another method are rejected with HTTP 422. PUT replaces all inputs; PATCH retains
+omitted inputs, so switching methods must clear incompatible fields with null and provide the
+new method's required fields in the same request. `rating_method` cannot be null.
+The legacy `feasibility_rating` request field remains accepted, but the server derives its value.
+
+The SQL write queries construct the proposed row, calculate scores, and persist the result in
+one statement. PATCH locks its source row before merging fields. Database constraints enforce
+method/input consistency, including for direct SQL writes; derivation runs through the API queries.

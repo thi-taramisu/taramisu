@@ -181,6 +181,53 @@
             "format": "uuid",
             "type": "string"
           },
+          "attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": "string"
+          },
+          "cvss_attack_complexity": {
+            "enum": [
+              "LOW",
+              "HIGH"
+            ],
+            "type": "string"
+          },
+          "cvss_attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": "string"
+          },
+          "cvss_privileges_required": {
+            "enum": [
+              "NONE",
+              "LOW",
+              "HIGH"
+            ],
+            "type": "string"
+          },
+          "cvss_scope": {
+            "enum": [
+              "UNCHANGED",
+              "CHANGED"
+            ],
+            "type": "string"
+          },
+          "cvss_user_interaction": {
+            "enum": [
+              "NONE",
+              "REQUIRED"
+            ],
+            "type": "string"
+          },
           "feasibility_rating": {
             "enum": [
               "HIGH",
@@ -192,6 +239,14 @@
           },
           "id": {
             "format": "uuid",
+            "type": "string"
+          },
+          "rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
             "type": "string"
           },
           "rationale": {
@@ -219,6 +274,15 @@
             "format": "uuid",
             "type": "string"
           },
+          "initial_rating_method": {
+            "description": "Creation-time method used when rating PUT omits rating_method; unaffected by later project default changes",
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": "string"
+          },
           "is_partial_early_stage": {
             "type": "boolean"
           },
@@ -231,6 +295,7 @@
           }
         },
         "required": [
+          "initial_rating_method",
           "id",
           "item_definition_id",
           "title",
@@ -249,6 +314,39 @@
             "type": "string"
           },
           "attack_steps_and_weaknesses": {},
+          "is_partial_early_stage": {
+            "type": "boolean"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "CreateAttackPathInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_approach": {
+            "enum": [
+              "TOP_DOWN",
+              "BOTTOM_UP"
+            ],
+            "type": "string"
+          },
+          "attack_steps_and_weaknesses": {},
+          "initial_rating_method": {
+            "description": "Overrides the project default for this new path",
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": "string"
+          },
           "is_partial_early_stage": {
             "type": "boolean"
           },
@@ -292,6 +390,14 @@
       "CreateTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
+          "default_rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -553,6 +659,53 @@
             "minimum": 0,
             "type": "integer"
           },
+          "attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": "string"
+          },
+          "cvss_attack_complexity": {
+            "enum": [
+              "LOW",
+              "HIGH"
+            ],
+            "type": "string"
+          },
+          "cvss_attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": "string"
+          },
+          "cvss_privileges_required": {
+            "enum": [
+              "NONE",
+              "LOW",
+              "HIGH"
+            ],
+            "type": "string"
+          },
+          "cvss_scope": {
+            "enum": [
+              "UNCHANGED",
+              "CHANGED"
+            ],
+            "type": "string"
+          },
+          "cvss_user_interaction": {
+            "enum": [
+              "NONE",
+              "REQUIRED"
+            ],
+            "type": "string"
+          },
           "feasibility_rating": {
             "enum": [
               "HIGH",
@@ -561,6 +714,17 @@
               "VERY_LOW"
             ],
             "type": "string"
+          },
+          "rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "rationale": {
             "type": "string"
@@ -619,12 +783,88 @@
               "null"
             ]
           },
+          "attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvss_attack_complexity": {
+            "enum": [
+              "LOW",
+              "HIGH"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvss_attack_vector": {
+            "enum": [
+              "NETWORK",
+              "ADJACENT",
+              "LOCAL",
+              "PHYSICAL"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvss_privileges_required": {
+            "enum": [
+              "NONE",
+              "LOW",
+              "HIGH"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvss_scope": {
+            "enum": [
+              "UNCHANGED",
+              "CHANGED"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvss_user_interaction": {
+            "enum": [
+              "NONE",
+              "REQUIRED"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "feasibility_rating": {
             "enum": [
               "HIGH",
               "MEDIUM",
               "LOW",
               "VERY_LOW"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
             ],
             "type": [
               "string",
@@ -1052,6 +1292,14 @@
       "ReplaceTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
+          "default_rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -1229,6 +1477,18 @@
             "format": "date-time",
             "type": "string"
           },
+          "default_rating_method": {
+            "description": "Default for new attack paths; null falls back to ATTACK_POTENTIAL",
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "description": {
             "type": "string"
           },
@@ -1249,6 +1509,7 @@
           }
         },
         "required": [
+          "default_rating_method",
           "id",
           "name",
           "created_at",
@@ -1521,6 +1782,17 @@
       "UpdateTaraProjectInputBody": {
         "additionalProperties": false,
         "properties": {
+          "default_rating_method": {
+            "enum": [
+              "ATTACK_POTENTIAL",
+              "CVSS",
+              "ATTACK_VECTOR"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "description": {
             "type": [
               "string",
@@ -3209,7 +3481,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AttackPathInputBody"
+                "$ref": "#/components/schemas/CreateAttackPathInputBody"
               }
             }
           },
@@ -3298,6 +3570,7 @@
     },
     "/api/v1/item-definitions/{item_definition_id}/attack-paths/{attack_path_id}/feasibility-rating": {
       "delete": {
+        "description": "Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.",
         "operationId": "delete-attack-feasibility-rating",
         "parameters": [
           {
@@ -3386,6 +3659,7 @@
         "x-taramisu-permission": "edit"
       },
       "get": {
+        "description": "Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.",
         "operationId": "get-attack-feasibility-rating",
         "parameters": [
           {
@@ -3481,7 +3755,7 @@
         "x-taramisu-permission": "read"
       },
       "patch": {
-        "description": "Omitted fields remain unchanged. Every field can be cleared with null.",
+        "description": "Omitted fields remain unchanged. All fields except rating_method can be cleared with null. Method changes must clear incompatible inputs and supply the new method inputs in the same request. feasibility_rating is derived from complete inputs.",
         "operationId": "update-attack-feasibility-rating",
         "parameters": [
           {
@@ -3587,6 +3861,7 @@
         "x-taramisu-permission": "edit"
       },
       "put": {
+        "description": "Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.",
         "operationId": "replace-attack-feasibility-rating",
         "parameters": [
           {

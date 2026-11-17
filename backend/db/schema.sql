@@ -38,6 +38,7 @@ CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     description text,
+    default_rating_method text CHECK (default_rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR')),
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -169,7 +170,8 @@ CREATE TABLE attack_path (
     title text NOT NULL,
     analysis_approach analysis_approach,
     is_partial_early_stage boolean NOT NULL DEFAULT true,
-    attack_steps_and_weaknesses jsonb
+    attack_steps_and_weaknesses jsonb,
+    initial_rating_method text NOT NULL DEFAULT 'ATTACK_POTENTIAL' CHECK (initial_rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR'))
 );
 
 CREATE INDEX attack_path_item_definition_id_idx ON attack_path (item_definition_id);
@@ -186,6 +188,13 @@ CREATE INDEX threat_attack_path_link_attack_path_id_idx ON threat_attack_path_li
 CREATE TABLE attack_feasibility_rating (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     attack_path_id uuid NOT NULL UNIQUE REFERENCES attack_path (id) ON DELETE CASCADE,
+    rating_method text NOT NULL DEFAULT 'ATTACK_POTENTIAL' CHECK (rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR')),
+    cvss_attack_vector text CHECK (cvss_attack_vector IN ('NETWORK', 'ADJACENT', 'LOCAL', 'PHYSICAL')),
+    cvss_attack_complexity text CHECK (cvss_attack_complexity IN ('LOW', 'HIGH')),
+    cvss_privileges_required text CHECK (cvss_privileges_required IN ('NONE', 'LOW', 'HIGH')),
+    cvss_user_interaction text CHECK (cvss_user_interaction IN ('NONE', 'REQUIRED')),
+    cvss_scope text CHECK (cvss_scope IN ('UNCHANGED', 'CHANGED')),
+    attack_vector text CHECK (attack_vector IN ('NETWORK', 'ADJACENT', 'LOCAL', 'PHYSICAL')),
     ap_elapsed_time integer CHECK (ap_elapsed_time >= 0),
     ap_specialist_expertise integer CHECK (ap_specialist_expertise >= 0),
     ap_knowledge_of_item integer CHECK (ap_knowledge_of_item >= 0),
@@ -194,6 +203,19 @@ CREATE TABLE attack_feasibility_rating (
     ap_total_score integer CHECK (ap_total_score >= 0),
     feasibility_rating attack_feasibility,
     rationale text,
+    -- Only the selected method may have inputs. CVSS needs all five metrics;
+    -- attack vector needs its vector. Attack potential keeps supporting partial drafts.
+    -- num_nonnulls counts populated fields, including numeric values of zero.
+    CONSTRAINT attack_feasibility_method_inputs CHECK (
+        (rating_method = 'ATTACK_POTENTIAL'
+            AND num_nonnulls(cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector) = 0)
+        OR (rating_method = 'CVSS'
+            AND num_nonnulls(cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope) = 5
+            AND num_nonnulls(ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, attack_vector) = 0)
+        OR (rating_method = 'ATTACK_VECTOR' AND attack_vector IS NOT NULL
+            AND num_nonnulls(ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score,
+                cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope) = 0)
+    ),
     CONSTRAINT attack_feasibility_rating_total_consistent CHECK (
         ap_total_score IS NULL OR (
             ap_elapsed_time IS NOT NULL

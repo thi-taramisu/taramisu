@@ -507,16 +507,23 @@ type AssetCybersecurityProperty struct {
 }
 
 type AttackFeasibilityRating struct {
-	ID                    pgtype.UUID
-	AttackPathID          pgtype.UUID
-	ApElapsedTime         *int32
-	ApSpecialistExpertise *int32
-	ApKnowledgeOfItem     *int32
-	ApWindowOfOpportunity *int32
-	ApEquipment           *int32
-	ApTotalScore          *int32
-	FeasibilityRating     *AttackFeasibility
-	Rationale             *string
+	ID                     pgtype.UUID
+	AttackPathID           pgtype.UUID
+	RatingMethod           string
+	CvssAttackVector       *string
+	CvssAttackComplexity   *string
+	CvssPrivilegesRequired *string
+	CvssUserInteraction    *string
+	CvssScope              *string
+	AttackVector           *string
+	ApElapsedTime          *int32
+	ApSpecialistExpertise  *int32
+	ApKnowledgeOfItem      *int32
+	ApWindowOfOpportunity  *int32
+	ApEquipment            *int32
+	ApTotalScore           *int32
+	FeasibilityRating      *AttackFeasibility
+	Rationale              *string
 }
 
 type AttackPath struct {
@@ -526,6 +533,7 @@ type AttackPath struct {
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
+	InitialRatingMethod      string
 }
 
 type DamageScenario struct {
@@ -610,10 +618,11 @@ type ServiceStatus struct {
 }
 
 type TaraProject struct {
-	ID          pgtype.UUID
-	Name        string
-	Description *string
-	CreatedAt   pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Name                string
+	Description         *string
+	DefaultRatingMethod *string
+	CreatedAt           pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {

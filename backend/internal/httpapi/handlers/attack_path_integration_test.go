@@ -178,6 +178,68 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	call(http.MethodDelete, links+"/"+link.ID, "", http.StatusNoContent)
 	call(http.MethodDelete, links+"/"+link.ID, "", http.StatusNotFound)
 
+	// Each PUT replaces the previous method and its inputs atomically.
+	// Exercise AP cutoff boundaries, each vector, and CVSS Scope-dependent weights.
+	cases := []struct{ name, body, want string }{
+		{"draft", `{}`, ""},
+		{"AP 13", `{"ap_elapsed_time":13,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "HIGH"},
+		{"AP 14", `{"ap_elapsed_time":14,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "MEDIUM"},
+		{"AP 19", `{"ap_elapsed_time":19,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "MEDIUM"},
+		{"AP 20", `{"ap_elapsed_time":20,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "LOW"},
+		{"AP 24", `{"ap_elapsed_time":24,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "LOW"},
+		{"AP 25", `{"ap_elapsed_time":25,"ap_specialist_expertise":0,"ap_knowledge_of_item":0,"ap_window_of_opportunity":0,"ap_equipment":0}`, "VERY_LOW"},
+		{"vector NETWORK", `{"rating_method":"ATTACK_VECTOR","attack_vector":"NETWORK"}`, "HIGH"},
+		{"vector ADJACENT", `{"rating_method":"ATTACK_VECTOR","attack_vector":"ADJACENT"}`, "MEDIUM"},
+		{"vector LOCAL", `{"rating_method":"ATTACK_VECTOR","attack_vector":"LOCAL"}`, "LOW"},
+		{"vector PHYSICAL", `{"rating_method":"ATTACK_VECTOR","attack_vector":"PHYSICAL"}`, "VERY_LOW"},
+		{"CVSS NETWORK NONE UNCHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"NETWORK","cvss_attack_complexity":"LOW","cvss_privileges_required":"NONE","cvss_user_interaction":"NONE","cvss_scope":"UNCHANGED"}`, "HIGH"},
+		{"CVSS LOCAL NONE UNCHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"LOCAL","cvss_attack_complexity":"LOW","cvss_privileges_required":"NONE","cvss_user_interaction":"NONE","cvss_scope":"UNCHANGED"}`, "MEDIUM"},
+		{"CVSS LOCAL LOW UNCHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"LOCAL","cvss_attack_complexity":"LOW","cvss_privileges_required":"LOW","cvss_user_interaction":"REQUIRED","cvss_scope":"UNCHANGED"}`, "LOW"},
+		{"CVSS PHYSICAL HIGH UNCHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"PHYSICAL","cvss_attack_complexity":"LOW","cvss_privileges_required":"HIGH","cvss_user_interaction":"REQUIRED","cvss_scope":"UNCHANGED"}`, "VERY_LOW"},
+		{"CVSS NETWORK HIGH CHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"NETWORK","cvss_attack_complexity":"LOW","cvss_privileges_required":"HIGH","cvss_user_interaction":"NONE","cvss_scope":"CHANGED"}`, "MEDIUM"},
+		{"CVSS NETWORK HIGH UNCHANGED", `{"rating_method":"CVSS","cvss_attack_vector":"NETWORK","cvss_attack_complexity":"LOW","cvss_privileges_required":"HIGH","cvss_user_interaction":"NONE","cvss_scope":"UNCHANGED"}`, "LOW"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got handlers.AttackFeasibilityRatingBody
+			if err := json.Unmarshal(call(http.MethodPut, rating, tc.body, http.StatusOK), &got); err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if got.FeasibilityRating != nil {
+					t.Fatalf("draft rated: %+v", got)
+				}
+				return
+			}
+			if got.FeasibilityRating == nil || string(*got.FeasibilityRating) != tc.want {
+				t.Fatalf("rating = %+v, want %s", got, tc.want)
+			}
+		})
+	}
+	// Failed writes run in savepoints so PostgreSQL errors do not abort the fixture.
+	for _, body := range []string{
+		`{"rating_method":"CVSS"}`,
+		`{"rating_method":"ATTACK_VECTOR"}`,
+		`{"rating_method":"ATTACK_VECTOR","attack_vector":"NETWORK","ap_elapsed_time":1}`,
+		`{"cvss_attack_vector":"NETWORK"}`,
+		`{"attack_vector":"NETWORK"}`,
+		`{"ap_elapsed_time":1,"ap_total_score":9}`,
+	} {
+		callFailing(http.MethodPut, rating, body, http.StatusUnprocessableEntity)
+	}
+	call(http.MethodPut, rating, `{"rating_method":"ATTACK_VECTOR","attack_vector":"NETWORK"}`, http.StatusOK)
+	// Changing an input must recalculate feasibility even if the request supplies HIGH.
+	var patched handlers.AttackFeasibilityRatingBody
+	if err := json.Unmarshal(call(http.MethodPatch, rating, `{"attack_vector":"PHYSICAL","feasibility_rating":"HIGH"}`, http.StatusOK), &patched); err != nil {
+		t.Fatal(err)
+	}
+	if patched.FeasibilityRating == nil || *patched.FeasibilityRating != db.AttackFeasibilityVERYLOW {
+		t.Fatalf("PATCH did not derive rating: %+v", patched)
+	}
+	callFailing(http.MethodPatch, rating, `{"rating_method":"CVSS"}`, http.StatusUnprocessableEntity)
+	call(http.MethodPatch, rating, `{"rating_method":null}`, http.StatusUnprocessableEntity)
+	call(http.MethodPatch, rating, `{"rating_method":"ATTACK_POTENTIAL","attack_vector":null}`, http.StatusOK)
+
 	call(http.MethodDelete, rating, "", http.StatusNoContent)
 	call(http.MethodDelete, rating, "", http.StatusNotFound)
 	call(http.MethodDelete, member, "", http.StatusNoContent)

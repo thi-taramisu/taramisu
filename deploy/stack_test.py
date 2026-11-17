@@ -552,7 +552,14 @@ def cleanup_stack(initial_count: int) -> bool:
     """Restores the api service to its initial replica count and waits until NGINX serves it again."""
     try:
         scale_api(initial_count, new_session=True)
-        # Until the resolver TTL expires, NGINX may still route to a replica that was just removed.
+        for replica in wait_for_api_replicas(initial_count):
+            wait_for_replica_ready(replica["ip"])
+        # Cleanup can remove every address used by the final test and restart a
+        # previously stopped replica. Refresh DNS and passive failure state before
+        # returning the stack to the developer. The tests above still verify
+        # runtime discovery and failover without reloading NGINX.
+        run_compose("exec", "-T", "proxy", "nginx", "-t", new_session=True)
+        run_compose("exec", "-T", "proxy", "nginx", "-s", "reload", new_session=True)
         if not proxy_ready(STACK.base_url, attempts=10, delay=1):
             print("Warning: api is not ready through NGINX after restoring the replica count", file=sys.stderr)
             return False
