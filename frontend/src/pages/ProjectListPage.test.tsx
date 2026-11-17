@@ -16,7 +16,7 @@ async function renderAt(path: string) {
 }
 
 describe('Main Page project management', () => {
-  it('creates a project through the dialog', async () => {
+  it('creates a project with a generated image when no file is uploaded', async () => {
     const user = userEvent.setup()
     await renderAt('/projects')
 
@@ -42,7 +42,8 @@ describe('Main Page project management', () => {
     const allProjects = screen.getByRole('heading', { name: 'All Projects' }).closest('section')
 
     expect(allProjects).not.toBeNull()
-    expect(await within(allProjects!).findByText('My New TARA Project')).toBeInTheDocument()
+    const row = (await within(allProjects!).findByText('My New TARA Project')).closest<HTMLElement>('[data-slot=card]')
+    expect(within(row!).getByAltText('')).toHaveAttribute('src', expect.stringMatching(/^data:image\/svg\+xml[;,]/))
   })
 
   it('adds and removes a project from favorites', async () => {

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ProjectImage } from './ProjectImage'
 
 type ProjectCardProps = {
+  projectId: string
   name: string
   description: string
   image?: string
@@ -13,6 +14,7 @@ type ProjectCardProps = {
 }
 
 export function ProjectCard({
+  projectId,
   name,
   description,
   image,
@@ -21,7 +23,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   return (
     <Card className="w-64 overflow-hidden py-0">
-      <ProjectImage image={image} className="h-32 w-full" />
+      <ProjectImage projectId={projectId} image={image} className="h-32 w-full" />
 
       <CardContent className="flex items-center justify-between gap-3 py-4">
         <div className="min-w-0">

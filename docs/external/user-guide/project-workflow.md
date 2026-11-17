@@ -32,7 +32,7 @@ The Search entry is currently a placeholder.
 2. Select **Create Project** in the sidebar.
 3. Enter a project name.
 4. Optionally select **Upload image** and choose a PNG, JPEG or WebP file
-   up to 5 MB. Check the preview; select **Remove** to create without an image.
+   up to 5 MB. If you skip the upload or select **Remove**, TARAmisu generates a cover image locally.
 5. Select **Create** or press Enter.
 
 A project name is required. Empty names and names containing only

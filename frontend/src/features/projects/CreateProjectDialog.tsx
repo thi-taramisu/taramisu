@@ -77,7 +77,7 @@ export function CreateProjectDialog({
 
           <ProjectImageInput defaultValue={null} />
           <p className="text-xs text-muted-foreground">
-            Optional. PNG, JPEG or WebP, up to 5 MB.
+            Optional. Upload a PNG, JPEG or WebP up to 5 MB, or use an automatically generated image.
           </p>
 
           <DialogFooter>

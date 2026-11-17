@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { generatedProjectImage } from '../projects/projectImageSource'
 import { headlampDetails } from '../../api/mocks/data/projectSettings'
 import { useProjectAccess } from '../../api/queries/projects'
 import { ProjectImageInput } from './ProjectImageInput'
@@ -32,7 +33,7 @@ export function GeneralSettings() {
             <Label htmlFor="project-description">Description</Label>
             <Textarea id="project-description" name="description" defaultValue={headlampDetails.description} className="min-h-32" />
           </div>
-          <ProjectImageInput defaultValue={headlampDetails.image} />
+          <ProjectImageInput defaultValue={headlampDetails.image} generatedImage={generatedProjectImage(projectId)} />
         </fieldset>
         {canEdit && (
           <div className="flex justify-end">
