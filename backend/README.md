@@ -59,7 +59,8 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 ## Sentry
 
 Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Info, Warn, and Error logs and
-HTTP panics are reported. Request bodies, headers, cookies, query parameters, and automatically collected user
+HTTP panics are reported. Records with the message `audit` stay in local JSON logs and are never forwarded to Sentry.
+Request bodies, headers, cookies, query parameters, and automatically collected user
 information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
 the Compose API stop timeout is 15 seconds to cover all three phases.
 

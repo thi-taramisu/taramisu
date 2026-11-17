@@ -12,7 +12,7 @@ import (
 	sentryslog "github.com/getsentry/sentry-go/slog"
 )
 
-// New writes JSON logs to output and forwards them to Sentry when a DSN is set.
+// New writes JSON logs to output and forwards non-audit logs to Sentry when a DSN is set.
 // Call the returned flush function before exiting.
 func New(options sentry.ClientOptions, output io.Writer) (*slog.Logger, func(time.Duration) bool, error) {
 	console := slog.NewJSONHandler(output, nil)
@@ -55,7 +55,27 @@ func New(options sentry.ClientOptions, output io.Writer) (*slog.Logger, func(tim
 	// HTTP middleware clones this hub to isolate each request.
 	sentry.CurrentHub().BindClient(client)
 	remote := sentryslog.Option{LogLevel: []slog.Level{slog.LevelInfo, slog.LevelWarn, slog.LevelError}}.NewSentryHandler(ctx)
-	return slog.New(multiHandler{console, remote}), client.Flush, nil
+	return slog.New(multiHandler{console, nonAuditHandler{remote}}), client.Flush, nil
+}
+
+// Audit records contain identity attributes and must never reach the remote handler.
+type nonAuditHandler struct {
+	slog.Handler
+}
+
+func (h nonAuditHandler) Handle(ctx context.Context, record slog.Record) error {
+	if record.Message == "audit" {
+		return nil
+	}
+	return h.Handler.Handle(ctx, record)
+}
+
+func (h nonAuditHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return nonAuditHandler{h.Handler.WithAttrs(attrs)}
+}
+
+func (h nonAuditHandler) WithGroup(name string) slog.Handler {
+	return nonAuditHandler{h.Handler.WithGroup(name)}
 }
 
 type multiHandler []slog.Handler

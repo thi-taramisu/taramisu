@@ -2,8 +2,11 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +62,72 @@ func TestSentryLogDelivery(t *testing.T) {
 	}
 	if !strings.Contains(remote.String(), "request.port") {
 		t.Errorf("Sentry missing grouped attribute: %s", remote.String())
+	}
+}
+
+func TestAuditLogsStayLocal(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(strconv.FormatBool(enabled), func(t *testing.T) {
+			var console bytes.Buffer
+			payloads := make(chan string, 10)
+			options := sentry.ClientOptions{}
+			if enabled {
+				options.Dsn = "https://public@example.com/1"
+				options.HTTPTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						return nil, err
+					}
+					payloads <- string(body)
+					return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
+				})
+			}
+			logger, flush, err := New(options, &console)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer flush(time.Second)
+			// Exercise the audit helper's record shape and derived loggers so adding
+			// attributes or groups cannot bypass the remote filter.
+			loggers := []*slog.Logger{
+				logger,
+				logger.With("component", "membership"),
+				logger.WithGroup("request").With("operation", "update"),
+				logger.With("component", "membership").WithGroup("request"),
+			}
+			for _, derived := range loggers {
+				for _, level := range []slog.Level{slog.LevelInfo, slog.LevelWarn, slog.LevelError} {
+					derived.Log(context.Background(), level, "audit",
+						"event", "member.updated", "actor", "private-actor",
+						"project", "private-project", "member", "private-member", "user", "private-user")
+				}
+			}
+			logger.Info("ordinary application log")
+			if !flush(5 * time.Second) {
+				t.Fatal("Sentry flush timed out")
+			}
+			var remote strings.Builder
+			for len(payloads) > 0 {
+				remote.WriteString(<-payloads)
+			}
+			for _, expected := range []string{"audit", "member.updated", "private-actor", "private-project", "private-member", "private-user"} {
+				if !strings.Contains(console.String(), expected) {
+					t.Errorf("console missing audit data %q", expected)
+				}
+				if strings.Contains(remote.String(), expected) {
+					t.Errorf("Sentry received audit data %q", expected)
+				}
+			}
+			if count := strings.Count(console.String(), `"msg":"audit"`); count != len(loggers)*3 {
+				t.Errorf("console contains %d audit records, want %d", count, len(loggers)*3)
+			}
+			if enabled && !strings.Contains(remote.String(), "ordinary application log") {
+				t.Error("Sentry did not receive the ordinary application log")
+			}
+			if !enabled && remote.Len() != 0 {
+				t.Error("Sentry received data while disabled")
+			}
+		})
 	}
 }
 
