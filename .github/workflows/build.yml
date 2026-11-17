@@ -50,6 +50,7 @@ jobs:
               # The frontend types are generated from it, so an API change is checked against them.
               - 'backend/openapi.json'
               - '.github/workflows/build.yml'
+              - '.github/workflows/publish.yml'
             backend:
               - 'backend/**'
               - '.github/workflows/build.yml'
@@ -64,6 +65,7 @@ jobs:
               - 'docs/docusaurus/**'
               - 'docs/external/**'
               - '.github/workflows/build.yml'
+              - '.github/workflows/publish.yml'
 
   frontend:
     name: Frontend
@@ -293,6 +295,9 @@ jobs:
       - name: Start stack
         run: ./deploy/dev.sh
 
+      - name: Sentry ingest and isolation test
+        run: python3 deploy/sentry_smoke_test.py
+
       - name: Multi-replica & failover test
         run: make -C deploy test-stack
 
@@ -330,7 +335,7 @@ jobs:
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
           | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | API types drift check, Typecheck, Vitest (V8 Coverage), Build & Playwright E2E |
           | **Backend** | ${{ needs.backend.result == 'success' && '✅ Passed' || (needs.backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Go Module Verify, Build, Atlas & sqlc Drift Check, PostgreSQL Integration, Race Tests, Coverage (80%) & OpenAPI Spec |
-          | **Stack Integration** | ${{ needs.stack.result == 'success' && '✅ Passed' || (needs.stack.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Live Multi-Replica & Failover Verification (`--scale api=2`) |
+          | **Stack Integration** | ${{ needs.stack.result == 'success' && '✅ Passed' || (needs.stack.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | Sentry delivery & isolation, live multi-replica & failover verification (`--scale api=2`) |
           EOF
 
       - name: Check job results

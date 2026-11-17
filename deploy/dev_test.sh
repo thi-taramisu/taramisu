@@ -10,7 +10,7 @@ mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend" "$scratch/deploy" "$scrat
 cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
 cp ../backend/Makefile "$scratch/backend/"
-cp ../proxy/nginx.conf "$scratch/proxy/"
+cp ../proxy/nginx.conf ../proxy/25-sentry-ingest.sh "$scratch/proxy/"
 cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
@@ -207,12 +207,13 @@ root = Path(sys.argv[1]).resolve()
 model = json.loads((root / 'model.json').read_text())
 services = model['services']
 assert model['name'] == 'taramisu'
-assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
+assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'sentry-ingest', 'docs',
                          'authentik-server', 'authentik-worker', 'authentik-db'}
 expected_networks = {
     'api': {'proxy', 'app-db'},
     'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
     'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
+    'sentry-ingest': {'edge', 'proxy'},
     'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
     'docs': {'proxy'},
 }
@@ -249,6 +250,12 @@ assert 'OIDC_CLIENT_SECRET' not in worker['environment']
 assert api['environment']['OIDC_ISSUER'] == 'http://127.0.0.1:8080/auth/application/o/taramisu/'
 assert api['environment']['OIDC_JWKS_URL'] == 'http://authentik-server:9000/auth/application/o/taramisu/jwks/'
 assert api['depends_on']['migrate']['condition'] == 'service_completed_successfully'
+assert api['environment']['SENTRY_ENVIRONMENT'] == services['frontend']['build']['args']['VITE_SENTRY_ENVIRONMENT'] == 'production'
+assert api['environment']['SENTRY_TUNNEL_URL'] == 'http://sentry-ingest:8081'
+assert api['stop_grace_period'] == '15s'
+assert services['sentry-ingest']['environment']['SENTRY_DSN'] == ''
+assert api['depends_on']['sentry-ingest']['condition'] == 'service_healthy'
+assert not services['sentry-ingest'].get('ports')
 assert 'authentik-server' not in api['depends_on']
 assert services['pgadmin']['profiles'] == ['tools']
 probe = services['authentik-db']['healthcheck']['test']
@@ -268,6 +275,7 @@ for service, target, source in [
     ('authentik-worker', '/blueprints/custom', root / 'iam/blueprints'),
     ('authentik-server', '/web/dist/assets/icons/blank.svg', root / 'iam/branding/blank.svg'),
     ('proxy', '/etc/nginx/conf.d/default.conf', root / 'proxy/nginx.conf'),
+    ('sentry-ingest', '/docker-entrypoint.d/25-sentry-ingest.sh', root / 'proxy/25-sentry-ingest.sh'),
 ]:
     mount = next(v for v in services[service]['volumes'] if v['target'] == target)
     assert Path(mount['source']).resolve() == source, (service, mount)
