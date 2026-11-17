@@ -346,3 +346,5 @@ func TestRiskProjectPermissions(t *testing.T) {
 		})
 	}
 }
+
+func (s *riskFake) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }

@@ -320,3 +320,5 @@ func TestDamageRoutesRequireAuthentication(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeDamage) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }

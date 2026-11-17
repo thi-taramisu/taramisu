@@ -278,10 +278,10 @@ export function ProjectListPage() {
                               resetFailed(...mutations)
                               restoreProject.mutate(project.id)
                             }}
-                            aria-label={`Restore ${project.name}`}
+                            aria-label={`Unarchive ${project.name}`}
                           >
                             <ArchiveRestore className="size-4" />
-                            Restore Project
+                            Unarchive Project
                           </Button>
                         </CardHeader>
                       </Card>

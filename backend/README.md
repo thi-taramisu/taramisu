@@ -78,6 +78,24 @@ The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-gro
 host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
 omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
 
+## Archived projects
+
+Owners can `POST /api/v1/projects/{id}/archive` and `POST /api/v1/projects/{id}/unarchive`.
+Both return the project and are idempotent: repeated archive preserves its original timestamp.
+Project responses include `archived_at` (null for active projects). The project list accepts
+`?archived=true` (archived only), `?archived=false` (active only), or neither (both, the existing default).
+
+The shared project authorization blocks project settings and all analysis-content writes while archived
+with HTTP 409. Reads, project deletion, and membership maintenance (including leaving) remain available;
+normal role and last-Owner rules still apply. Unarchive is Owner-only. Role failures retain 403/404 and
+are checked before archive state. Archive state is checked against the database for every write,
+without caching. Requests already authorized before archiving may still complete.
+
+New project operations inherit archive protection through `InProject`. Only explicit maintenance
+exceptions use `.AllowArchived()`; a read permission on a write operation does not bypass protection.
+Run the backend integration tests with a migrated `TEST_DATABASE_URL` to verify the archive lifecycle,
+filters, maintenance exceptions, and rejection of every registered project-content write.
+
 ## Checks
 
 ```sh

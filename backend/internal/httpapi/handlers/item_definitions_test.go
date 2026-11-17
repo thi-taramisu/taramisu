@@ -306,3 +306,5 @@ func TestItemDefinitionPermissions(t *testing.T) {
 		}
 	}
 }
+
+func (s *itemStore) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }

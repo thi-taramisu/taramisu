@@ -80,11 +80,11 @@ Project owners can also archive a project from its settings:
 open **Settings**, select **Archive Project** under
 **Danger Zone**, and confirm in the dialog.
 
-### Restoring a project
+### Unarchiving a project
 
 1. Open **Archive** from the sidebar.
 2. Locate the archived project.
-3. Select **Restore Project**.
+3. Select **Unarchive Project**.
 
 The project returns to the active overview and can be edited
 again.
