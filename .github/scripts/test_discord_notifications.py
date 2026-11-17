@@ -22,12 +22,13 @@ def event_payload(event_name="issues", action="opened", labels=None, added_label
 
 
 class NotificationTests(unittest.TestCase):
-    def test_workflow_uses_only_label_events_for_issues(self):
+    def test_workflow_uses_schedule_for_issues(self):
         workflow_path = Path(__file__).resolve().parents[1] / "workflows" / "discord-notifications.yml"
         workflow = workflow_path.read_text(encoding="utf-8")
-        self.assertIn("  issues:\n    types: [labeled]\n", workflow)
+        self.assertNotIn("  issues:\n", workflow)
+        self.assertIn("  schedule:\n", workflow)
         self.assertIn("  pull_request_target:\n    branches: [main]\n    types: [opened, labeled, closed]\n", workflow)
-        self.assertIn("if: github.event.action != 'closed' || github.event.pull_request.merged == true", workflow)
+        self.assertIn("github.event.action != 'closed' || github.event.pull_request.merged == true", workflow)
 
     def test_merged_pr_celebrates_with_merge_time_without_mentions(self):
         event = event_payload("pull_request_target", "closed", ["backend", "IAM"])
