@@ -46,6 +46,7 @@ function seed(): Map<string, StoredItem> {
     attackPaths: headlampAttackPaths,
     attackFeasibilityRatings: headlampAttackFeasibilityRatings,
     threatTargets: headlampThreatTargets,
+    riskValues: [],
   })
   return new Map([[headlampItem.id, entry]])
 }
@@ -148,6 +149,7 @@ export function createMockItemApi(): ItemApi {
             attackPaths: [],
             attackFeasibilityRatings: [],
             threatTargets: [],
+            riskValues: [],
           })
           return item
         }),

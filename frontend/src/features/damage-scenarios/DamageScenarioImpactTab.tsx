@@ -7,36 +7,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/models/damageScenario'
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
-
-const CATEGORIES: { value: ImpactCategory; label: string }[] = [
-  { value: 'SAFETY', label: 'Safety' },
-  { value: 'FINANCIAL', label: 'Financial' },
-  { value: 'OPERATIONAL', label: 'Operational' },
-  { value: 'PRIVACY', label: 'Privacy' },
-]
+import { IMPACT_CATEGORIES, IMPACT_CLASSES, IMPACT_SCALE } from './impactScale'
 
 interface RatingOption {
   value: ImpactRatingValue
   label: string
 }
 
-const SCALE: RatingOption[] = [
-  { value: 'SEVERE', label: 'Severe' },
-  { value: 'MAJOR', label: 'Major' },
-  { value: 'MODERATE', label: 'Moderate' },
-  { value: 'NEGLIGIBLE', label: 'Negligible' },
-]
-
 // Not a level of the scale, so it is shown apart from it.
 const OMITTED: RatingOption = { value: 'OMITTED', label: 'Omitted' }
-
-const RATING_CLASSES: Record<ImpactRatingValue, string> = {
-  SEVERE: 'border-impact-severe-border bg-impact-severe text-impact-severe-foreground',
-  MAJOR: 'border-impact-major-border bg-impact-major text-impact-major-foreground',
-  MODERATE: 'border-impact-moderate-border bg-impact-moderate text-impact-moderate-foreground',
-  NEGLIGIBLE: 'border-impact-negligible-border bg-impact-negligible text-impact-negligible-foreground',
-  OMITTED: 'border-impact-omitted-border bg-impact-omitted text-impact-omitted-foreground',
-}
 
 interface CategoryValues {
   rating: ImpactRatingValue | null
@@ -49,7 +28,7 @@ type FormValues = Record<ImpactCategory, CategoryValues>
 
 function toValues(ratings: ImpactRating[]): FormValues {
   return Object.fromEntries(
-    CATEGORIES.map(({ value }) => {
+    IMPACT_CATEGORIES.map(({ value }) => {
       const rating = ratings.find((r) => r.impact_category === value)
       return [
         value,
@@ -67,9 +46,9 @@ type FormErrors = Partial<Record<ImpactCategory, string>>
 
 /** A category can only be omitted with a rationale and in favour of a rated category [PM-15-07]. */
 function omissionErrors(values: FormValues): FormErrors {
-  const rated = CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
+  const rated = IMPACT_CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
   const errors: FormErrors = {}
-  for (const { value, label } of CATEGORIES) {
+  for (const { value, label } of IMPACT_CATEGORIES) {
     if (values[value].rating !== 'OMITTED') continue
     if (!rated) errors[value] = `${label} can only be omitted if another category is rated.`
     else if (!values[value].rationale.trim()) errors[value] = `A rationale is required to omit ${label}.`
@@ -101,7 +80,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   const [saved, setSaved] = useState(values)
   const [errors, setErrors] = useState<FormErrors>({})
   const update = useUpdateImpactRatings(projectId, damageScenarioId)
-  const dirty = CATEGORIES.some(({ value }) =>
+  const dirty = IMPACT_CATEGORIES.some(({ value }) =>
     (Object.keys(values[value]) as (keyof CategoryValues)[]).some((key) => values[value][key] !== saved[value][key]),
   )
 
@@ -119,7 +98,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
     update.mutate(
-      CATEGORIES.map(({ value }) => ({
+      IMPACT_CATEGORIES.map(({ value }) => ({
         impact_category: value,
         rating_value: values[value].rating,
         is_omitted_by_pm_15_07: values[value].rating === 'OMITTED',
@@ -140,7 +119,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   return (
     <form onSubmit={handleSubmit} noValidate className="@container grid max-w-3xl gap-4">
       <div className="divide-y justify-self-start rounded-lg border px-4">
-        {CATEGORIES.map((category) => (
+        {IMPACT_CATEGORIES.map((category) => (
           <ImpactCategoryRow
             key={category.value}
             category={category}
@@ -182,7 +161,7 @@ function RatingSegment({ name, option, checked, onSelect, className }: RatingSeg
       className={cn(
         'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
         'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
-        checked ? `z-10 font-medium ${RATING_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+        checked ? `z-10 font-medium ${IMPACT_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
         className,
       )}
     >
@@ -193,7 +172,7 @@ function RatingSegment({ name, option, checked, onSelect, className }: RatingSeg
 }
 
 interface ImpactCategoryRowProps {
-  category: (typeof CATEGORIES)[number]
+  category: (typeof IMPACT_CATEGORIES)[number]
   values: CategoryValues
   error?: string
   onChange: (patch: Partial<CategoryValues>) => void
@@ -227,14 +206,14 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
       <div className="flex items-center gap-3">
         {/* Five equal tracks of at most 6rem, so the segments only depend on the available space. */}
         <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid min-w-0 flex-1 grid-cols-[repeat(5,minmax(0,6rem))]">
-          {SCALE.map((option, index) => (
+          {IMPACT_SCALE.map((option, index) => (
             <RatingSegment
               key={option.value}
               name={name}
               option={option}
               checked={rating === option.value}
               onSelect={() => selectRating(option.value)}
-              className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === SCALE.length - 1 && 'rounded-r-md')}
+              className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === IMPACT_SCALE.length - 1 && 'rounded-r-md')}
             />
           ))}
           <RatingSegment

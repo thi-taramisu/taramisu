@@ -24,6 +24,7 @@ const keys = {
   itemAttackPaths: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'attack-paths'] as const,
   threatScenario: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id] as const,
   threatScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id, 'relations'] as const,
+  threatScenarioRisks: (projectId: string, id: string) => ['projects', projectId, 'threat-scenarios', id, 'risks'] as const,
   attackPath: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id] as const,
   attackPathRating: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'rating'] as const,
   attackPathRelations: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'relations'] as const,
@@ -253,6 +254,14 @@ export function useSetThreatTargets(projectId: string, threatScenarioId: string)
   return useMutation({
     mutationFn: (targets: ThreatTarget[]) => api.threatScenarios.setTargets(projectId, threatScenarioId, targets),
     onSuccess: storeSaved,
+  })
+}
+
+export function useThreatScenarioRisks(projectId: string, threatScenarioId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: keys.threatScenarioRisks(projectId, threatScenarioId),
+    queryFn: () => api.threatScenarios.risks(projectId, threatScenarioId),
   })
 }
 

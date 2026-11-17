@@ -34,7 +34,7 @@ src/
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/threat-scenarios/   # threat scenario pages: Definition with targets and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
   features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/project-settings/   # project settings sections
