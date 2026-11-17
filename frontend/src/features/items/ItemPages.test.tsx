@@ -127,6 +127,28 @@ describe('delete item', () => {
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled()
   })
 
+  it('counts an element shown below several parents once', async () => {
+    const api = createMockItemApi()
+    // DS-01 with TS-01, AP-01 and AP-02 below it is now shown below A-01 and A-02.
+    await api.damageScenarios.linkAsset('headlamp', 'ds-01', 'a-02', ['I'])
+    const { user } = renderApp(`${project}/items/i-01`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    expect(await within(screen.getByRole('alertdialog')).findByText(/4 assets and 7 other elements/)).toBeInTheDocument()
+  })
+
+  it('names the unassigned elements of an item without assets', async () => {
+    const api = createMockItemApi()
+    const extra = await api.items.create('headlamp', { name: 'Extra item', scope_type: 'ITEM' })
+    await api.damageScenarios.create('headlamp', { item_definition_id: extra.id, title: 'Glare', asset_properties: [] })
+    const { user } = renderApp(`${project}/items/${extra.id}`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete "Extra item"?' })
+    expect(await within(dialog).findByText(/This also deletes its 1 element \(damage scenarios/)).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('asset')
+  })
+
   it('deletes an item with nothing below it without a warning', async () => {
     const api = createMockItemApi()
     const extra = await api.items.create('headlamp', { name: 'Extra item', scope_type: 'ITEM' })

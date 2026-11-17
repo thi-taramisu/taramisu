@@ -17,12 +17,25 @@ import type { ItemDefinition } from '../../api/models/item'
 import type { TreeNode } from '../../api/models/tree'
 import { useDeleteItem, useItemChildren, useItemUnassigned } from '../../api/queries/items'
 
-function countBelow(nodes: readonly TreeNode[] = []): number {
-  return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)
+/** Each element once by type and id, also when the tree shows it below several parents. */
+function collectElements(nodes: readonly TreeNode[], found = new Map<string, TreeNode>()) {
+  for (const node of nodes) {
+    found.set(`${node.type}/${node.id}`, node)
+    collectElements(node.children ?? [], found)
+  }
+  return found
 }
 
 function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
+/** What is deleted along with the item; an item can have unassigned elements without any asset. */
+function deletedWithItem(assets: number, others: number) {
+  const elements = '(damage scenarios, threat scenarios, attack paths)'
+  if (assets === 0) return `This also deletes its ${plural(others, 'element')} ${elements}. `
+  if (others === 0) return `This also deletes its ${plural(assets, 'asset')}. `
+  return `This also deletes its ${plural(assets, 'asset')} and ${plural(others, 'other element')} ${elements}. `
 }
 
 /** Confirmation before deleting an item; not in the wireframes, built from the shadcn AlertDialog. */
@@ -37,9 +50,9 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const unassigned = useItemUnassigned(projectId, item.id, { enabled: open })
   const deleteItem = useDeleteItem(projectId, item.id)
 
-  const below = children.data ?? []
-  const assets = below.filter((node) => node.type === 'assets').length
-  const others = countBelow(below) - assets + countBelow(unassigned.data)
+  const elements = [...collectElements([...(children.data ?? []), ...(unassigned.data ?? [])]).values()]
+  const assets = elements.filter((node) => node.type === 'assets').length
+  const others = elements.length - assets
   const loaded = children.isSuccess && unassigned.isSuccess
 
   function handleDelete() {
@@ -65,9 +78,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete "{item.name}"?</AlertDialogTitle>
           <AlertDialogDescription>
-            {assets + others > 0
-              ? `This also deletes its ${plural(assets, 'asset')} and ${plural(others, 'other element')} (damage scenarios, threat scenarios, attack paths). `
-              : ''}
+            {elements.length > 0 ? deletedWithItem(assets, others) : ''}
             This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

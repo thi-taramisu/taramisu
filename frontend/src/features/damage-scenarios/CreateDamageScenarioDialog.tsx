@@ -50,7 +50,8 @@ interface CreateDamageScenarioDialogProps {
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const id = useId()
-  const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
+  const tree = useProjectTree(projectId)
+  const items = (tree.data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
@@ -89,7 +90,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     if (unfinished) return finish(unfinished)
     // Without links nothing waits for the assets anymore, but the owning item still has to be known.
     if (!itemId) {
-      setLinkError('The items are still loading.')
+      setLinkError(tree.isPending ? 'The items are still loading.' : tree.isError ? 'The items could not be loaded.' : 'Create an item first.')
       return undefined
     }
     // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
