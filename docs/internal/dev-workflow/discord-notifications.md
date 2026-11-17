@@ -1,6 +1,6 @@
 # Discord notifications
 
-New issues are summarized at **09:00 and 19:00 UTC** using their current labels.
+New issues are summarized at **09:00 and 19:00 Europe/Berlin** (CET/CEST, adjusting for daylight saving) using their current labels.
 Empty channels stay silent; digests include titles and links without pings.
 The initial lookback is 24 hours; later runs catch up from the last delivery.
 Labels added after an issue has been processed do not send another entry.

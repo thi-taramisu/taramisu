@@ -2,7 +2,8 @@ name: Discord notifications
 
 on:
   schedule:
-    - cron: '0 9,19 * * *' # UTC
+    - cron: '0 9,19 * * *'
+      timezone: Europe/Berlin
   pull_request_target:
     branches: [main]
     types: [opened, labeled, closed]

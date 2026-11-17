@@ -4,6 +4,7 @@ import hashlib
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from discord_notifications import (
     DeliveryError, GitHub, ISSUE_COLOR, LABEL_WEBHOOKS, NO_MENTIONS,
@@ -13,7 +14,7 @@ from discord_notifications import (
 
 def digest_batches(issues, now=None):
     """One compact list per batch, within Discord's description limit."""
-    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    now = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Europe/Berlin"))
     heading = "☀️ Morning issue digest" if now.hour < 12 else "🌙 Evening issue digest"
     pending = list(issues)
     while pending:
