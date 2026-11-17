@@ -17,6 +17,7 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/llm"
 )
 
 // After SIGTERM, shutdownTimeout bounds how long in-flight requests may finish and poolCloseTimeout how long
@@ -70,6 +71,11 @@ func run() error {
 		opts = append(opts, httpapi.WithDirectory(directory))
 	} else {
 		slog.Warn("AUTHENTIK_API_URL or AUTHENTIK_API_TOKEN not set: member names are hidden and adding members is disabled")
+	}
+	if cfg.LLMURL != "" {
+		opts = append(opts, httpapi.WithAssistant(llm.NewHTTPClient(cfg.LLMURL), cfg.LLMModel))
+	} else {
+		slog.Warn("LLM_URL not set: the AI assistant is disabled")
 	}
 	server := &http.Server{Handler: httpapi.New(queries, iam, opts...), ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)

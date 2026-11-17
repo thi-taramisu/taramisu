@@ -11,7 +11,11 @@ import (
 	"time"
 )
 
-const defaultHTTPAddr = ":8080"
+const (
+	defaultHTTPAddr = ":8080"
+	// defaultLLMModel answered the tool-calling test for #229 quickly and correctly.
+	defaultLLMModel = "qwen3-30b-a3b-instruct-2507"
+)
 
 // Config contains the runtime configuration for the API.
 type Config struct {
@@ -24,6 +28,9 @@ type Config struct {
 	AuthentikToken            string
 	IAMUserCacheTTL           time.Duration
 	AuthentikMetadataCacheTTL time.Duration
+	// LLMURL is the base URL of the LLM service (deploy/compose.llm.yaml); empty disables the assistant.
+	LLMURL   string
+	LLMModel string
 }
 
 // Load reads and validates the runtime configuration from the environment.
@@ -88,6 +95,17 @@ func Load() (Config, error) {
 		authentikMetadataCacheTTL = parsed
 	}
 
+	llmURL := os.Getenv("LLM_URL")
+	if llmURL != "" {
+		if err := validateHTTPURL(llmURL); err != nil {
+			return Config{}, fmt.Errorf("invalid LLM_URL: %w", err)
+		}
+	}
+	llmModel := os.Getenv("LLM_MODEL")
+	if llmModel == "" {
+		llmModel = defaultLLMModel
+	}
+
 	return Config{
 		HTTPAddr:                  httpAddr,
 		DatabaseURL:               databaseURL,
@@ -98,6 +116,8 @@ func Load() (Config, error) {
 		AuthentikToken:            authentikToken,
 		IAMUserCacheTTL:           iamUserCacheTTL,
 		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
+		LLMURL:                    llmURL,
+		LLMModel:                  llmModel,
 	}, nil
 }
 

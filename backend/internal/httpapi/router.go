@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
+	"github.com/thi-taramisu/taramisu/backend/internal/llm"
 )
 
 type Queries interface {
@@ -37,11 +38,18 @@ type Option func(*options)
 
 type options struct {
 	directory handlers.Directory
+	llm       llm.Client
+	llmModel  string
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
 func WithDirectory(directory handlers.Directory) Option {
 	return func(o *options) { o.directory = directory }
+}
+
+// WithAssistant enables the AI assistant with the given model client and model name.
+func WithAssistant(client llm.Client, model string) Option {
+	return func(o *options) { o.llm, o.llmModel = client, model }
 }
 
 func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
@@ -100,6 +108,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewDamageScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
+	handlers.NewAssistant(queries, queries, o.llm, o.llmModel).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
