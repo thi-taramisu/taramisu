@@ -16,6 +16,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -53,7 +54,7 @@ func newLangfuseFromEnv() (*langfuse, error) {
 		return nil, nil
 	}
 	if host == "" || publicKey == "" || secretKey == "" {
-		return nil, fmt.Errorf("set LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY together, or none of them")
+		return nil, errors.New("set LANGFUSE_HOST, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY together, or none of them")
 	}
 	return newLangfuse(host, publicKey, secretKey)
 }
@@ -79,9 +80,11 @@ type generation struct {
 }
 
 // report sends the generation in the background; wait blocks until all reports are sent.
-func (l *langfuse) report(g generation) {
+func (l *langfuse) report(ctx context.Context, g generation) {
+	// WithoutCancel: the report runs in the background and must not stop when the model request ends.
+	ctx = context.WithoutCancel(ctx)
 	l.pending.Go(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), langfuseTimeout)
+		ctx, cancel := context.WithTimeout(ctx, langfuseTimeout)
 		defer cancel()
 		if err := l.send(ctx, g); err != nil {
 			// Only the error: the payload contains project data.

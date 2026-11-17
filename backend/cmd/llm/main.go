@@ -136,7 +136,7 @@ func newHandler(upstream *url.URL, apiKey string, tracing *langfuse) http.Handle
 			slog.Info("model request", "method", r.Method, "path", r.URL.Path, "status", rec.status,
 				"duration", end.Sub(start).Round(time.Millisecond))
 			if traced {
-				tracing.report(generation{traceID: traceID, start: start, end: end, status: rec.status,
+				tracing.report(r.Context(), generation{traceID: traceID, start: start, end: end, status: rec.status,
 					request: body, response: rec.body.Bytes()})
 			}
 		}
