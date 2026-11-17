@@ -2,7 +2,8 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES, findNode, formatEntityId } from './entities'
+import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
+import { EntityBreadcrumbs } from './EntityBreadcrumbs'
 
 const RelationGraphView = lazy(() => import('../graph/RelationGraphView').then((module) => ({ default: module.RelationGraphView })))
 
@@ -16,24 +17,30 @@ interface EntityPageProps {
   actions?: ReactNode
   /** Tab labels by tab path, e.g. to show a count. */
   tabLabels?: Record<string, string>
+  /** Numbers shown in a circle after the tab label, by tab path. */
+  tabCounts?: Record<string, number>
 }
 
 /**
  * Page of one element (item, asset, ...) with its tabs as child routes.
  * With `?view=graph` it shows the relation graph instead (Graph Concept wireframes).
  */
-export function EntityPage({ type, name, code, actions, tabLabels = {} }: EntityPageProps) {
+export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCounts = {} }: EntityPageProps) {
   const { projectId = '', entityId = '' } = useParams()
   const [searchParams] = useSearchParams()
-  const { data: tree } = useProjectTree(projectId)
+  const { data: tree, isPending } = useProjectTree(projectId)
   const { label, tabs } = ENTITY_TYPES[type]
-  const node = tree && findNode(type, entityId, tree)
+  const path = tree && findNodePath(type, entityId, tree)
+  const node = path?.at(-1)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
   const displayCode = code || node?.code
   const typeAndId = displayCode ? `${label} ${formatEntityId(displayCode)}` : label
 
   return (
     <div className="flex h-full flex-col gap-4">
+      <EntityBreadcrumbs projectId={projectId} path={path ?? [{
+        type, id: entityId, name: isPending ? 'Loading…' : 'Path unavailable',
+      }]} />
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tabular-nums text-muted-foreground">{typeAndId}</p>
@@ -56,10 +63,15 @@ export function EntityPage({ type, name, code, actions, tabLabels = {} }: Entity
                 to={tab.path}
                 end
                 className={({ isActive }) =>
-                  `-mb-px border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
+                  `-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`
                 }
               >
-                {tabLabels[tab.path] ?? tab.label}
+                {tabLabels[tab.path] ?? tab.label}{' '}
+                {tabCounts[tab.path] !== undefined && (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1 text-xs tabular-nums">
+                    {tabCounts[tab.path]}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>

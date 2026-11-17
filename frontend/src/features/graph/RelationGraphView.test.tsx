@@ -35,7 +35,7 @@ describe('graph view', () => {
     expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
   })
   it('does not invent nodes for an unknown entity', async () => {
-    renderApp('/projects/headlamp/attack-paths/unknown?view=graph')
+    renderApp('/projects/headlamp/assets/unknown?view=graph')
     expect(await screen.findByText('No graph data for this element.')).toBeInTheDocument()
   })
 })

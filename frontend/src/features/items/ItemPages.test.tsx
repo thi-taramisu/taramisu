@@ -104,7 +104,7 @@ describe('delete item', () => {
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete item' }))
 
     expect(await screen.findByText('No project elements yet.')).toBeInTheDocument()
-    expect(location()).toHaveTextContent(new RegExp(`^${project}$`))
+    await waitFor(() => expect(location()).toHaveTextContent(new RegExp(`^${project}$`)))
     expect(await api.items.list('headlamp')).toEqual([])
   })
 

@@ -1,21 +1,17 @@
 import { useId, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty, ItemAsset } from '../../api/models/asset'
+import type { DamageScenario } from '../../api/models/damageScenario'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { useCreateDamageScenario, useItemAssets, useProjectTree } from '../../api/queries/items'
+import { AddAssetMenu } from '../assets/AddAssetMenu'
+import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
-
-const PROPERTIES: { value: CiaProperty; label: string }[] = [
-  { value: 'C', label: 'Confidentiality' },
-  { value: 'I', label: 'Integrity' },
-  { value: 'A', label: 'Availability' },
-]
 
 interface AssetLink {
   assetId: string
@@ -39,24 +35,33 @@ interface CreateDamageScenarioDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   returnFocusTo?: HTMLButtonElement | null
+  initialName?: string
+  /** Fixes the owning item, e.g. when the new damage scenario is linked to an element of that item. */
+  lockedItemId?: string
+  /** Runs after creating, before the dialog goes on; rejecting keeps the dialog open, and trying again only repeats this step. */
+  onCreated?: (scenario: DamageScenario) => Promise<unknown>
+  /** Shown when `onCreated` rejects. */
+  onCreatedError?: (scenario: DamageScenario) => string
 }
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
  * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
  */
-export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo }: CreateDamageScenarioDialogProps) {
+export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
   const [chosenLinks, setChosenLinks] = useState<AssetLink[]>()
-  const itemId = chosenItemId ?? defaults.itemId
+  const itemId = lockedItemId ?? chosenItemId ?? defaults.itemId
   const links = chosenLinks ?? defaults.links
   const [linkError, setLinkError] = useState<string>()
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
+  // Created, but `onCreated` failed; trying again must not create a second one with the same name.
+  const [unfinished, setUnfinished] = useState<DamageScenario>()
 
   const linked = links.flatMap((link) => {
     const asset = assets?.find((a) => a.id === link.assetId)
@@ -69,7 +74,19 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     setLinkError(undefined)
   }
 
+  async function finish(scenario: DamageScenario) {
+    try {
+      await onCreated?.(scenario)
+    } catch (error) {
+      setUnfinished(scenario)
+      throw error
+    }
+    setUnfinished(undefined)
+    return { name: scenario.title, path: entityPath(projectId, 'damage-scenarios', scenario.id) }
+  }
+
   async function create(name: string) {
+    if (unfinished) return finish(unfinished)
     // The links only count once the assets are there, so "Link at least one asset" would be wrong.
     if (!assets) {
       setLinkError('The assets are still loading.')
@@ -89,7 +106,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       title: name,
       asset_properties: linked.flatMap(({ asset, properties }) => properties.map((property) => ({ asset_id: asset.id, property }))),
     })
-    return { name: scenario.title, path: entityPath(projectId, 'damage-scenarios', scenario.id) }
+    return finish(scenario)
   }
 
   return (
@@ -99,11 +116,18 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
+      initialName={initialName}
       namePlaceholder="e.g. Loss of cell balancing"
       hint="Will appear in the tree below each linked asset."
-      errorMessage="The damage scenario could not be created. Please try again."
+      errorMessage={
+        unfinished
+          ? (onCreatedError?.(unfinished) ?? `${unfinished.code} was created, but the next step failed. Please try again.`)
+          : 'The damage scenario could not be created. Please try again.'
+      }
+      locked={Boolean(unfinished)}
       onCreate={create}
       onReset={() => {
+        setUnfinished(undefined)
         setChosenItemId(undefined)
         changeLinks(undefined)
       }}
@@ -113,6 +137,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
         <NativeSelect
           id={`${id}-item`}
           value={itemId}
+          disabled={Boolean(lockedItemId)}
           onChange={(event) => {
             setChosenItemId(event.target.value)
             // Assets belong to one item, so its links do not carry over.
@@ -170,50 +195,10 @@ function AssetLinkChip({ asset, properties, onChange, onRemove }: AssetLinkChipP
       <span>
         <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
       </span>
-      <fieldset className="flex gap-1">
-        <legend className="sr-only">{asset.code} properties</legend>
-        {PROPERTIES.filter((p) => asset.properties.includes(p.value)).map((p) => {
-          const pressed = properties.includes(p.value)
-          return (
-            <Button
-              key={p.value}
-              type="button"
-              variant={pressed ? 'default' : 'outline'}
-              size="icon-xs"
-              className={`font-mono ${pressed ? '' : 'text-muted-foreground'}`}
-              aria-pressed={pressed}
-              aria-label={`${asset.code} ${p.label}`}
-              title={p.label}
-              onClick={() => onChange(pressed ? properties.filter((v) => v !== p.value) : [...properties, p.value])}
-            >
-              {p.value}
-            </Button>
-          )
-        })}
-      </fieldset>
+      <AssetPropertyToggles asset={asset} selected={properties} onChange={onChange} />
       <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${asset.code} ${asset.name}`} onClick={onRemove}>
         <X aria-hidden="true" />
       </Button>
     </li>
-  )
-}
-
-function AddAssetMenu({ assets, onAdd }: { assets: ItemAsset[]; onAdd: (asset: ItemAsset) => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="justify-self-start border-dashed" disabled={assets.length === 0}>
-          <Plus aria-hidden="true" />
-          Add Asset
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {assets.map((asset) => (
-          <DropdownMenuItem key={asset.id} onSelect={() => onAdd(asset)}>
-            <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }

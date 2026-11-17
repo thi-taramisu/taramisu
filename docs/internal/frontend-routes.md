@@ -66,6 +66,16 @@ Items come from the item API in `frontend/src/api/`, an in-memory mock
 (`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
 item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
+The damage scenario Relations tab (#185) links assets (with C / I / A) and threat scenarios of the owning item through the mock API. It is
+built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
+without a link are not in the tree until the "Unassigned" group exists; threat scenarios stay available in "+ Add Threat Scenario".
+
+The threat scenario page (#194) has the Definition tab (name, cause, elicitation, technical notes, targets) and the Relations tab (damage
+scenarios, attack paths), both on the mock API. Its Risks and Treatment tabs are still placeholders.
+
+The attack path page (#195) has the Definition tab (name, analysis approach, partial flag, steps), the Rating tab (attack potential with
+the five factors, total and feasibility) and the Relations tab (threat scenarios), all on the mock API.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:
