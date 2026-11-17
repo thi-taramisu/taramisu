@@ -8,6 +8,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { cn } from '@/lib/utils'
 import type { AnalysisApproach, AttackPath, AttackStep } from '../../api/models/attackPath'
 import { useAttackPath, useUpdateAttackPath } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { AttackStepsField, type StepDraft } from './AttackStepsField'
 
 const APPROACHES: { value: AnalysisApproach; label: string }[] = [
@@ -52,6 +53,7 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
   const [saved, setSaved] = useState(path)
   const [titleError, setTitleError] = useState<string>()
   const update = useUpdateAttackPath(projectId, path.id)
+  const { canEdit } = useProjectAccess(projectId)
   const dirty =
     values.title.trim() !== saved.title ||
     (values.analysis_approach || null) !== saved.analysis_approach ||
@@ -92,66 +94,71 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-title`}>Name *</Label>
-        <Input
-          id={`${id}-title`}
-          value={values.title}
-          required
-          onChange={(event) => change({ title: event.target.value })}
-          aria-invalid={Boolean(titleError)}
-          aria-describedby={titleError ? `${id}-title-error` : undefined}
+      {/* Read-only projects show the fields and steps disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Input
+            id={`${id}-title`}
+            value={values.title}
+            required
+            onChange={(event) => change({ title: event.target.value })}
+            aria-invalid={Boolean(titleError)}
+            aria-describedby={titleError ? `${id}-title-error` : undefined}
+          />
+          {titleError && (
+            <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
+              {titleError}
+            </p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-approach`}>Analysis Approach</Label>
+          <NativeSelect
+            id={`${id}-approach`}
+            value={values.analysis_approach}
+            onChange={(event) => change({ analysis_approach: event.target.value as FormValues['analysis_approach'] })}
+            className={cn('w-full', !values.analysis_approach && 'text-muted-foreground')}
+          >
+            <NativeSelectOption value="">Select…</NativeSelectOption>
+            {APPROACHES.map((approach) => (
+              <NativeSelectOption key={approach.value} value={approach.value}>
+                {approach.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <hr className="border-border" />
+        <AttackStepsField
+          actions={
+            <Label className="font-normal">
+              <Checkbox checked={values.is_partial_early_stage} onCheckedChange={(checked) => change({ is_partial_early_stage: checked === true })} />
+              Partial Attack Path
+            </Label>
+          }
+          steps={steps}
+          onChange={(next) => {
+            setSteps(next)
+            if (!update.isPending) update.reset()
+          }}
         />
-        {titleError && (
-          <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-            {titleError}
-          </p>
-        )}
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-approach`}>Analysis Approach</Label>
-        <NativeSelect
-          id={`${id}-approach`}
-          value={values.analysis_approach}
-          onChange={(event) => change({ analysis_approach: event.target.value as FormValues['analysis_approach'] })}
-          className={cn('w-full', !values.analysis_approach && 'text-muted-foreground')}
-        >
-          <NativeSelectOption value="">Select…</NativeSelectOption>
-          {APPROACHES.map((approach) => (
-            <NativeSelectOption key={approach.value} value={approach.value}>
-              {approach.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
-      <hr className="border-border" />
-      <AttackStepsField
-        actions={
-          <Label className="font-normal">
-            <Checkbox checked={values.is_partial_early_stage} onCheckedChange={(checked) => change({ is_partial_early_stage: checked === true })} />
-            Partial Attack Path
-          </Label>
-        }
-        steps={steps}
-        onChange={(next) => {
-          setSteps(next)
-          if (!update.isPending) update.reset()
-        }}
-      />
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            The attack path could not be saved. Please try again.
-          </p>
-        )}
-      </div>
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            Save
+          </Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && 'Saved.'}
+          </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              The attack path could not be saved. Please try again.
+            </p>
+          )}
+        </div>
+      )}
     </form>
   )
 }

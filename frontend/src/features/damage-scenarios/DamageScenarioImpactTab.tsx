@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/models/damageScenario'
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { IMPACT_CATEGORIES, IMPACT_CLASSES, IMPACT_SCALE } from './impactScale'
 
 interface RatingOption {
@@ -80,6 +81,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   const [saved, setSaved] = useState(values)
   const [errors, setErrors] = useState<FormErrors>({})
   const update = useUpdateImpactRatings(projectId, damageScenarioId)
+  const { canEdit } = useProjectAccess(projectId)
   const dirty = IMPACT_CATEGORIES.some(({ value }) =>
     (Object.keys(values[value]) as (keyof CategoryValues)[]).some((key) => values[value][key] !== saved[value][key]),
   )
@@ -125,23 +127,26 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
             category={category}
             values={values[category.value]}
             error={errors[category.value]}
+            readOnly={!canEdit}
             onChange={(patch) => change(category.value, patch)}
           />
         ))}
       </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            The impact ratings could not be saved. Please try again.
-          </p>
-        )}
-      </div>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            Save
+          </Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && 'Saved.'}
+          </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              The impact ratings could not be saved. Please try again.
+            </p>
+          )}
+        </div>
+      )}
     </form>
   )
 }
@@ -150,22 +155,26 @@ interface RatingSegmentProps {
   name: string
   option: RatingOption
   checked: boolean
+  disabled: boolean
   onSelect: () => void
   className?: string
 }
 
 /** Radio styled as a segment; its width depends on the space only, so selecting or clearing a rating moves nothing. */
-function RatingSegment({ name, option, checked, onSelect, className }: RatingSegmentProps) {
+function RatingSegment({ name, option, checked, disabled, onSelect, className }: RatingSegmentProps) {
   return (
     <label
       className={cn(
-        'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
+        'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors has-[:disabled]:cursor-default',
         'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
-        checked ? `z-10 font-medium ${IMPACT_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+        checked
+          ? `z-10 font-medium ${IMPACT_CLASSES[option.value]}`
+          : 'border-input bg-background text-muted-foreground not-has-[:disabled]:hover:bg-muted not-has-[:disabled]:hover:text-foreground',
         className,
       )}
     >
-      <input type="radio" name={name} value={option.value} checked={checked} onChange={onSelect} className="sr-only" />
+      {/* Disabled ratings keep their colours, so a read-only project still shows them clearly. */}
+      <input type="radio" name={name} value={option.value} checked={checked} disabled={disabled} onChange={onSelect} className="sr-only" />
       <span className="truncate px-1">{option.label}</span>
     </label>
   )
@@ -175,11 +184,13 @@ interface ImpactCategoryRowProps {
   category: (typeof IMPACT_CATEGORIES)[number]
   values: CategoryValues
   error?: string
+  /** Shows the rating and rationale without changing them; the rationale can still be opened. */
+  readOnly: boolean
   onChange: (patch: Partial<CategoryValues>) => void
 }
 
 /** One impact category: the rating, and below it the rationale, collapsed to a preview until opened. */
-function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategoryRowProps) {
+function ImpactCategoryRow({ category, values, error, readOnly, onChange }: ImpactCategoryRowProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const { rating, rationale } = values
@@ -212,6 +223,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
               name={name}
               option={option}
               checked={rating === option.value}
+              disabled={readOnly}
               onSelect={() => selectRating(option.value)}
               className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === IMPACT_SCALE.length - 1 && 'rounded-r-md')}
             />
@@ -220,6 +232,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
             name={name}
             option={OMITTED}
             checked={rating === OMITTED.value}
+            disabled={readOnly}
             onSelect={() => selectRating(OMITTED.value)}
             className="ml-3 rounded-md"
           />
@@ -230,7 +243,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           variant="ghost"
           size="icon-sm"
           className="shrink-0 text-muted-foreground"
-          disabled={!rating && !rationale}
+          disabled={readOnly || (!rating && !rationale)}
           aria-label={`Clear ${category.label}`}
           title="Clear rating and rationale"
           onClick={clear}
@@ -255,6 +268,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           <Textarea
             aria-label={`${category.label} rationale`}
             value={rationale}
+            disabled={readOnly}
             onChange={(event) => onChange({ rationale: event.target.value })}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? `${id}-error` : undefined}

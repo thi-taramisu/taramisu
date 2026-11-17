@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { AttackFeasibilityRating } from '../../api/models/attackPath'
 import { useAttackPathRating, useUpdateAttackPathRating } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { FACTORS, summarize, type Factor, type FactorScores } from './attackFeasibility'
 import { FeasibilityBadge } from './FeasibilityBadge'
 
@@ -59,6 +60,7 @@ function RatingForm({ projectId, attackPathId, rating }: { projectId: string; at
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
   const [saved, setSaved] = useState(values)
   const update = useUpdateAttackPathRating(projectId, attackPathId)
+  const { canEdit } = useProjectAccess(projectId)
   const dirty = JSON.stringify(values) !== JSON.stringify(saved)
   const { open, total, feasibility } = summarize(values.scores)
 
@@ -84,64 +86,69 @@ function RatingForm({ projectId, attackPathId, rating }: { projectId: string; at
 
   return (
     <form onSubmit={handleSubmit} noValidate className="@container grid max-w-3xl gap-4">
-      <div className="overflow-hidden rounded-lg border">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-muted/50 px-4 py-2">
-          <Label htmlFor={`${id}-method`}>Rating Method</Label>
-          <NativeSelect id={`${id}-method`} size="sm" defaultValue="ATTACK_POTENTIAL" className="w-44">
-            {RATING_METHODS.map((method) => (
-              <NativeSelectOption key={method.value} value={method.value}>
-                {method.label}
-              </NativeSelectOption>
+      {/* Read-only projects show the factors and rationale disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <div className="overflow-hidden rounded-lg border">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-muted/50 px-4 py-2">
+            <Label htmlFor={`${id}-method`}>Rating Method</Label>
+            <NativeSelect id={`${id}-method`} size="sm" defaultValue="ATTACK_POTENTIAL" className="w-44">
+              {RATING_METHODS.map((method) => (
+                <NativeSelectOption key={method.value} value={method.value}>
+                  {method.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
+          <div className="grid gap-4 p-4">
+            {FACTORS.map((factor) => (
+              <FactorChoice
+                key={factor.key}
+                factor={factor}
+                score={values.scores[factor.key]}
+                onChange={(score) => change({ scores: { ...values.scores, [factor.key]: score } })}
+              />
             ))}
-          </NativeSelect>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-muted/50 px-4 py-2">
+            <span className="text-sm font-medium">Attack Feasibility</span>
+            <output aria-live="polite" className="flex flex-wrap items-center gap-2 text-sm">
+              {feasibility && total !== null ? (
+                <>
+                  <span className="text-muted-foreground tabular-nums">{points(total)}</span>
+                  <FeasibilityBadge value={feasibility} />
+                </>
+              ) : (
+                <span className="text-muted-foreground">
+                  {open} of {FACTORS.length} factors open
+                </span>
+              )}
+            </output>
+          </div>
         </div>
-        <div className="grid gap-4 p-4">
-          {FACTORS.map((factor) => (
-            <FactorChoice
-              key={factor.key}
-              factor={factor}
-              score={values.scores[factor.key]}
-              onChange={(score) => change({ scores: { ...values.scores, [factor.key]: score } })}
-            />
-          ))}
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-rationale`}>Rationale</Label>
+          <Textarea
+            id={`${id}-rationale`}
+            value={values.rationale}
+            onChange={(event) => change({ rationale: event.target.value })}
+          />
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t bg-muted/50 px-4 py-2">
-          <span className="text-sm font-medium">Attack Feasibility</span>
-          <output aria-live="polite" className="flex flex-wrap items-center gap-2 text-sm">
-            {feasibility && total !== null ? (
-              <>
-                <span className="text-muted-foreground tabular-nums">{points(total)}</span>
-                <FeasibilityBadge value={feasibility} />
-              </>
-            ) : (
-              <span className="text-muted-foreground">
-                {open} of {FACTORS.length} factors open
-              </span>
-            )}
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            Save
+          </Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && 'Saved.'}
           </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              The rating could not be saved. Please try again.
+            </p>
+          )}
         </div>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-rationale`}>Rationale</Label>
-        <Textarea
-          id={`${id}-rationale`}
-          value={values.rationale}
-          onChange={(event) => change({ rationale: event.target.value })}
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            The rating could not be saved. Please try again.
-          </p>
-        )}
-      </div>
+      )}
     </form>
   )
 }
@@ -198,9 +205,11 @@ function FactorChoice({ factor, score, onChange }: FactorChoiceProps) {
               key={option.score}
               title={`${option.label}: ${points(option.score)}`}
               className={cn(
-                'relative flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 border px-2 text-sm transition-colors',
+                'relative flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 border px-2 text-sm transition-colors has-[:disabled]:cursor-default',
                 'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
-                checked ? 'z-10 border-primary bg-primary/10 font-medium text-foreground' : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                checked
+                  ? 'z-10 border-primary bg-primary/10 font-medium text-foreground'
+                  : 'border-input bg-background text-muted-foreground not-has-[:disabled]:hover:bg-muted not-has-[:disabled]:hover:text-foreground',
                 index === 0 ? 'rounded-l-md' : '-ml-px',
                 index === factor.options.length - 1 && 'rounded-r-md',
               )}
