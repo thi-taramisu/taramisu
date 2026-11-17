@@ -119,9 +119,22 @@ class GitHub:
                     raise
             else:
                 raise ValueError("Digest state file is missing from the existing state branch")
-            self.request("/git/refs", {"ref": f"refs/heads/{STATE_BRANCH}", "sha": os.environ["GITHUB_SHA"]})
             state = {"version": 1, "initial_since": initial_since, "channels": {}}
-            self.save(state)
+            # Publish the branch only when its checkpoint file already exists.
+            # Interrupted setup leaves no half-initialized branch and can retry.
+            parent = os.environ["GITHUB_SHA"]
+            base = self.request(f"/git/commits/{parent}")
+            tree = self.request("/git/trees", {
+                "base_tree": base["tree"]["sha"],
+                "tree": [{"path": STATE_PATH, "mode": "100644", "type": "blob",
+                          "content": json.dumps(state, sort_keys=True)}],
+            })
+            commit = self.request("/git/commits", {
+                "message": "Initialize Discord notification checkpoints",
+                "tree": tree["sha"], "parents": [parent],
+            })
+            self.request("/git/refs", {"ref": f"refs/heads/{STATE_BRANCH}", "sha": commit["sha"]})
+            self.sha = next(entry["sha"] for entry in tree["tree"] if entry["path"] == STATE_PATH)
             return state
         self.sha = result["sha"]
         state = json.loads(base64.b64decode(result["content"]))

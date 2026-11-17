@@ -55,8 +55,13 @@ def deliver_pr(github, event, environ):
     sent = state.setdefault("prs", {}).setdefault(f"{number}:{'merged' if merged else 'announced'}", [])
     failed = False
     for webhook, routed_labels in routed.items():
-        key = hashlib.sha256(webhook.encode()).hexdigest()
-        if key in sent:
+        keys = set(LABEL_WEBHOOKS[label] for label in routed_labels)
+        legacy_key = hashlib.sha256(webhook.encode()).hexdigest()
+        if keys.intersection(sent) or legacy_key in sent:
+            # Preserve old receipts and aliases for routes sharing one webhook.
+            if keys.difference(sent):
+                sent.extend(sorted(keys.difference(sent)))
+                github.save(state)
             continue
         try:
             send_webhook(webhook, pr_payload(event))
@@ -64,7 +69,7 @@ def deliver_pr(github, event, environ):
             print("PR delivery failed for: " + ", ".join(routed_labels), file=sys.stderr)
             failed = True
             continue
-        sent.append(key)
+        sent.extend(sorted(keys))
         # Stop immediately if recording a successful delivery fails.
         github.save(state)
     if failed:

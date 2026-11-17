@@ -39,29 +39,39 @@ def deliver_digest(github, environ, now):
     routed = destinations(LABEL_WEBHOOKS, environ)
     channels = []
     for webhook, labels in routed.items():
-        key = hashlib.sha256(webhook.encode()).hexdigest()
-        checkpoint = state["channels"].setdefault(key, {"since": state["initial_since"], "sent": []})
-        channels.append((webhook, labels, checkpoint))
+        # Secret names identify routes even when their webhook URLs change.
+        # Copy any old URL-based checkpoint on the first run after upgrading.
+        legacy = state["channels"].get(hashlib.sha256(webhook.encode()).hexdigest(),
+                                       {"since": state["initial_since"], "sent": []})
+        checkpoints = {}
+        for label in labels:
+            key = LABEL_WEBHOOKS[label]
+            checkpoints[key] = state["channels"].setdefault(
+                key, {"since": legacy["since"], "sent": list(legacy["sent"])})
+        channels.append((webhook, labels, checkpoints))
     if not channels:
         print("No configured digest destinations.")
         return
-    since = min(checkpoint["since"] for _, _, checkpoint in channels)
+    since = min(checkpoint["since"] for _, _, checkpoints in channels for checkpoint in checkpoints.values())
     # Deduplicate API results and exclude PRs defensively, including on retries.
     issues = {item["number"]: item for item in github.issues(since, until) if "pull_request" not in item}
     failed = False
-    for webhook, labels, checkpoint in channels:
+    for webhook, labels, checkpoints in channels:
         pending = sorted((item for item in issues.values()
-                          if checkpoint["since"] <= item["created_at"] < until
-                          and item["number"] not in checkpoint["sent"]
-                          and set(labels).intersection(label["name"] for label in item["labels"])),
+                          if any(label["name"] in labels
+                                 and checkpoints[LABEL_WEBHOOKS[label["name"]]]["since"] <= item["created_at"] < until
+                                 and item["number"] not in checkpoints[LABEL_WEBHOOKS[label["name"]]]["sent"]
+                                 for label in item["labels"])),
                          key=lambda item: (item["created_at"], item["number"]))
         try:
             for batch, payload in digest_batches(pending, now):
                 send_webhook(webhook, payload)
-                checkpoint["sent"].extend(item["number"] for item in batch)
+                for checkpoint in checkpoints.values():
+                    checkpoint["sent"].extend(item["number"] for item in batch)
                 # A state-write failure must stop the run immediately.
                 github.save(state)
-            checkpoint.update(since=until, sent=[])
+            for checkpoint in checkpoints.values():
+                checkpoint.update(since=until, sent=[])
             github.save(state)
             print(f"Delivered {len(pending)} new issues for {', '.join(labels)}.")
         except DeliveryError:

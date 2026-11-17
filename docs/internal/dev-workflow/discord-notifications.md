@@ -26,6 +26,8 @@ Routing is configured in `.github/scripts/discord_notifications.py` and secrets 
 
 Actions needs permission to create/update `automation/discord-issue-digest-state`.
 Keep this branch: it records delivery checkpoints for serialized PR and digest runs.
+Initial setup publishes the branch with its tracking file already in place, so interrupted setup can retry.
+Delivery history follows the secret names in the table above; replacing a webhook URL preserves that history.
 Deleting it resets duplicate suppression. A lost Discord response or failed checkpoint
 write after delivery can still cause a duplicate on retry.
 Labels applied using `GITHUB_TOKEN` do not trigger a notification run; automation must
