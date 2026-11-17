@@ -11,6 +11,8 @@ export interface TreeNode {
   code?: string
   name: string
   children?: TreeNode[]
+  /** Items only: elements of the item without links yet, shown in its "Unassigned" section. */
+  unassigned?: TreeNode[]
 }
 
 /** Reference to an element with its display ID, e.g. in the asset and risk tables. */

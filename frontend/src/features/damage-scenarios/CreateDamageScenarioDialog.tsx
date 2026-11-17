@@ -46,11 +46,12 @@ interface CreateDamageScenarioDialogProps {
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
- * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
+ * Defaults to the item and asset of the current page; without assets it is created in "Unassigned" of the item.
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const id = useId()
-  const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
+  const tree = useProjectTree(projectId)
+  const items = (tree.data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
@@ -87,13 +88,14 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
 
   async function create(name: string) {
     if (unfinished) return finish(unfinished)
-    // The links only count once the assets are there, so "Link at least one asset" would be wrong.
-    if (!assets) {
-      setLinkError('The assets are still loading.')
+    // Without links nothing waits for the assets anymore, but the owning item still has to be known.
+    if (!itemId) {
+      setLinkError(tree.isPending ? 'The items are still loading.' : tree.isError ? 'The items could not be loaded.' : 'Create an item first.')
       return undefined
     }
-    if (linked.length === 0) {
-      setLinkError('Link at least one asset.')
+    // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
+    if (links.length > 0 && !assets) {
+      setLinkError('The assets are still loading.')
       return undefined
     }
     const empty = linked.find((link) => link.properties.length === 0)
@@ -118,7 +120,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder="e.g. Loss of cell balancing"
-      hint="Will appear in the tree below each linked asset."
+      // Matches the asset chips once the assets are there; until then the chosen links say where it will appear.
+      hint={(assets ? linked : links).length > 0 ? 'Will appear in the tree below each linked asset.' : 'Will appear in "Unassigned" of the item until it is linked.'}
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? `${unfinished.code} was created, but the next step failed. Please try again.`)

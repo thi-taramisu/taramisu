@@ -98,7 +98,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">
-        Removing a link does not delete the element. Damage and threat scenarios without links are no longer shown in the tree. An asset link needs at least one property.
+        Removing a link does not delete the element. Without an asset, the damage scenario moves to "Unassigned" of the item; so does a threat scenario without a damage scenario. An asset link needs at least one property.
       </p>
     </div>
   )

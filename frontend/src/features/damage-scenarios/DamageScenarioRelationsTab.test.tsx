@@ -166,14 +166,17 @@ describe('damage scenario relations', () => {
     expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets[0].linkedProperties).toEqual(['I'])
   })
 
-  it('removes the last asset link, keeps the page open and takes the damage scenario out of the tree', async () => {
+  it('removes the last asset link, keeps the page open and moves the damage scenario to "Unassigned"', async () => {
     const { user, api } = renderApp(page)
 
     await remove(user, 'Assets', A01)
 
     expect(await section('Assets').findByText('No assets linked yet.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
-    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-01/ })).not.toBeInTheDocument())
+    const unassigned = within(await within(tree()).findByRole('list', { name: 'Damage scenarios in Headlamp system' }))
+    expect(unassigned.getByRole('link', { name: /DS-01/ })).toHaveAttribute('aria-current', 'page')
+    expect(unassigned.getByRole('link', { name: /TS-01/ })).toBeInTheDocument()
+    expect(within(tree()).getAllByRole('link', { name: /DS-01/ })).toHaveLength(1)
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-01' })
   })
 

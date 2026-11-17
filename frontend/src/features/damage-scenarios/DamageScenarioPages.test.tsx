@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
@@ -92,7 +92,7 @@ describe('create damage scenario', () => {
     expect(within(dialog).queryByRole('group', { name: 'A-04 properties' })).not.toBeInTheDocument()
   })
 
-  it('requires a name, a linked asset and a property per asset', async () => {
+  it('requires a name and a property per linked asset', async () => {
     const { user, api } = renderApp(`${project}/assets/a-02`)
     const dialog = await openNewDamageScenarioDialog(user)
 
@@ -104,11 +104,59 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByRole('button', { name: 'A-02 Integrity' })).toHaveAttribute('aria-pressed', 'false')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Select at least one property of A-02.')
+    expect((await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-02')!.children).toBeUndefined()
+  })
+
+  it('creates a damage scenario without links in "Unassigned" of the item', async () => {
+    const { user, api } = renderApp(`${project}/assets/a-02`)
+    const dialog = await openNewDamageScenarioDialog(user)
+    expect(within(dialog).getByText('Will appear in the tree below each linked asset.')).toBeInTheDocument()
 
     await user.click(within(dialog).getByRole('button', { name: 'Remove A-02 Body control ECU firmware' }))
+    expect(within(dialog).getByText('Will appear in "Unassigned" of the item until it is linked.')).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Link at least one asset.')
-    expect((await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-02')!.children).toBeUndefined()
+
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario #02' })).toBeInTheDocument()
+    const unassigned = within(await within(tree()).findByRole('list', { name: 'Damage scenarios in Headlamp system' }))
+    expect(unassigned.getByRole('link', { name: 'DS-02 Manipulated firmware' })).toHaveAttribute('aria-current', 'page')
+    expect((await api.content.unassigned('headlamp', 'i-01'))[0]).toMatchObject({ code: 'DS-02' })
+  })
+
+  it('does not create without links before the item is known', async () => {
+    const api = createMockItemApi()
+    const list = api.items.list
+    let loadTree!: () => void
+    // Only the first request waits, the refetch after creating answers at once.
+    api.items.list = (projectId) => {
+      api.items.list = list
+      return new Promise((resolve) => {
+        loadTree = () => resolve(list(projectId))
+      })
+    }
+    const { user } = renderApp(project, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('The items are still loading.')
+
+    act(() => loadTree())
+    await waitFor(() => expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system'))
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario #02' })).toBeInTheDocument()
+  })
+
+  it('asks for an item first in a project without items', async () => {
+    const api = createMockItemApi()
+    await api.items.delete('headlamp', 'i-01')
+    const { user } = renderApp(project, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Create an item first.')
+    expect(await api.items.list('headlamp')).toEqual([])
   })
 
   it('does not create before the assets of the item are loaded', async () => {
@@ -125,6 +173,8 @@ describe('create damage scenario', () => {
     }
     const { user } = renderApp(`${project}/assets/a-02`, api)
     const dialog = await openNewDamageScenarioDialog(user)
+    // The asset of the page is linked once it is loaded, so the hint does not announce "Unassigned" meanwhile.
+    expect(within(dialog).getByText('Will appear in the tree below each linked asset.')).toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
