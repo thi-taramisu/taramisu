@@ -26,6 +26,7 @@ test('project image survives dialog close, favoriting, archive and restore', asy
   await expect(favoriteImage).toHaveAttribute('src', source!)
   await row.getByRole('button', { name: 'Actions for Image project' }).click()
   await page.getByRole('menuitem', { name: 'Archive Project' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Archive Project' }).click()
   await page.getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(page.locator('main img')).toHaveAttribute('src', source!)
   await page.getByRole('button', { name: 'Restore Image project' }).click()

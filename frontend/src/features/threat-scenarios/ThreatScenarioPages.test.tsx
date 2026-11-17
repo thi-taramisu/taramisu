@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
@@ -42,13 +43,10 @@ describe('threat scenario page', () => {
     expect(await tabs.findByRole('link', { name: 'Relations 3' })).toHaveAttribute('href', `${page}/relations`)
   })
 
-  it.each([
-    ['risks', 'Risks'],
-    ['treatment', 'Treatment'],
-  ])('keeps the %s tab as a placeholder', async (path, title) => {
-    renderApp(`${page}/${path}`)
+  it('keeps the treatment tab as a placeholder', async () => {
+    renderApp(`${page}/treatment`)
 
-    expect(await screen.findByText(`${title}: not implemented yet`)).toBeInTheDocument()
+    expect(await screen.findByText('Treatment: not implemented yet')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown threat scenarios', async () => {
@@ -84,7 +82,7 @@ describe('threat scenario definition', () => {
     await user.clear(name)
     await user.type(name, ' Forged low beam command ')
     await user.clear(screen.getByLabelText('Cause of Compromise'))
-    await user.selectOptions(screen.getByLabelText('Elicitation'), 'Not set')
+    await user.selectOptions(screen.getByLabelText('Elicitation'), 'Select…')
     await user.clear(screen.getByLabelText('Technical Notes'))
     await user.type(screen.getByLabelText('Technical Notes'), 'Attacker with OBD access')
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -114,6 +112,25 @@ describe('threat scenario definition', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
     expect(screen.getByLabelText('Cause of Compromise')).toHaveDisplayValue('Spoofing of CAN messages via gateway')
+  })
+
+  it('keeps Save disabled while saving the fields and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.threatScenarios.update)
+    api.threatScenarios.update = update.held
+    const { user } = renderApp(page, api)
+    const cause = await screen.findByLabelText('Cause of Compromise')
+    await user.type(cause, ' via gateway')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.type(cause, ' twice')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(cause).toHaveDisplayValue('Spoofing of CAN messages via gateway twice')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    expect((await api.threatScenarios.get('headlamp', 'ts-01')).cause_of_compromise).toBe('Spoofing of CAN messages via gateway')
   })
 
   it('lists the asset properties with the current target and has no damage scenario management', async () => {
@@ -232,6 +249,29 @@ describe('threat scenario definition', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
     expect(field.getByRole('checkbox', { name: /· Availability/ })).toBeChecked()
+  })
+
+  it('keeps Save disabled while saving the targets and keeps the selection made meanwhile', async () => {
+    const api = createMockItemApi()
+    const setTargets = holdRequest(api.threatScenarios.setTargets)
+    api.threatScenarios.setTargets = setTargets.held
+    const { user } = renderApp(page, api)
+    const field = await findTargets()
+    await user.click(field.getByRole('checkbox', { name: /· Availability/ }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.click(field.getByRole('checkbox', { name: /· Integrity/ }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => setTargets.release())
+
+    expect(field.getByRole('checkbox', { name: /· Integrity/ })).not.toBeChecked()
+    expect(field.getByRole('checkbox', { name: /· Availability/ })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(setTargets.calls).toBe(1)
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).targets).toEqual([
+      { assetId: 'a-01', property: 'I' },
+      { assetId: 'a-01', property: 'A' },
+    ])
   })
 
   it('saves only the changed parts, so a notes edit does not fail on the targets', async () => {

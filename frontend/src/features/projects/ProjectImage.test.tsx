@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ProjectImage } from './ProjectImage'
 import { generatedProjectImage } from './projectImageSource'
 
-const project = { projectId: 'headlamp', projectName: 'Headlamp' }
+const project = { projectId: 'headlamp' }
 
 describe('ProjectImage', () => {
   it('displays a local object URL as a decorative image', () => {
@@ -20,7 +20,7 @@ describe('ProjectImage', () => {
     '//example.com/tracker.png',
   ])('uses the generated image for a non-object URL: %s', (image) => {
     render(<ProjectImage {...project} image={image} />)
-    expect(screen.getByAltText('')).toHaveAttribute('src', generatedProjectImage(project.projectId, project.projectName))
+    expect(screen.getByAltText('')).toHaveAttribute('src', generatedProjectImage(project.projectId))
   })
 
   it('encodes HTML meta-characters in an object URL', () => {
@@ -30,12 +30,11 @@ describe('ProjectImage', () => {
 })
 
 describe('generatedProjectImage', () => {
-  it('returns a stable local SVG based on both the project ID and name', () => {
-    const image = generatedProjectImage('project-1', 'Battery Security')
+  it('returns a stable local SVG based on the project ID', () => {
+    const image = generatedProjectImage('project-1')
 
     expect(image).toMatch(/^data:image\/svg\+xml[;,]/)
-    expect(generatedProjectImage('project-1', 'Battery Security')).toBe(image)
-    expect(generatedProjectImage('project-2', 'Battery Security')).not.toBe(image)
-    expect(generatedProjectImage('project-1', 'Vehicle Gateway')).not.toBe(image)
+    expect(generatedProjectImage('project-1')).toBe(image)
+    expect(generatedProjectImage('project-2')).not.toBe(image)
   })
 })

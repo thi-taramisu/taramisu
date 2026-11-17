@@ -23,7 +23,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   return (
     <Card className="w-64 overflow-hidden py-0">
-      <ProjectImage projectId={projectId} projectName={name} image={image} className="h-32 w-full" />
+      <ProjectImage projectId={projectId} image={image} className="h-32 w-full" />
 
       <CardContent className="flex items-center justify-between gap-3 py-4">
         <div className="min-w-0">

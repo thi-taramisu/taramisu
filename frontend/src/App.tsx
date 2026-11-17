@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
+import { AttackPathDefinitionTab } from './features/attack-paths/AttackPathDefinitionTab'
+import { AttackPathPage } from './features/attack-paths/AttackPathPage'
+import { AttackPathRatingTab } from './features/attack-paths/AttackPathRatingTab'
+import { AttackPathRelationsTab } from './features/attack-paths/AttackPathRelationsTab'
 import { DamageScenarioDefinitionTab } from './features/damage-scenarios/DamageScenarioDefinitionTab'
 import { DamageScenarioImpactTab } from './features/damage-scenarios/DamageScenarioImpactTab'
 import { DamageScenarioPage } from './features/damage-scenarios/DamageScenarioPage'
@@ -13,6 +17,7 @@ import { MembersSettings } from './features/project-settings/MembersSettings'
 import { ThreatScenarioDefinitionTab } from './features/threat-scenarios/ThreatScenarioDefinitionTab'
 import { ThreatScenarioPage } from './features/threat-scenarios/ThreatScenarioPage'
 import { ThreatScenarioRelationsTab } from './features/threat-scenarios/ThreatScenarioRelationsTab'
+import { ThreatScenarioRisksTab } from './features/threat-scenarios/ThreatScenarioRisksTab'
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
@@ -29,6 +34,7 @@ const PAGES: Partial<Record<EntityType, ReactNode>> = {
   items: <ItemPage />,
   'damage-scenarios': <DamageScenarioPage />,
   'threat-scenarios': <ThreatScenarioPage />,
+  'attack-paths': <AttackPathPage />,
 }
 
 // Tabs that already have content, everything else renders a placeholder.
@@ -40,7 +46,11 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
   'damage-scenarios/relations': <DamageScenarioRelationsTab />,
   'threat-scenarios/': <ThreatScenarioDefinitionTab />,
+  'threat-scenarios/risks': <ThreatScenarioRisksTab />,
   'threat-scenarios/relations': <ThreatScenarioRelationsTab />,
+  'attack-paths/': <AttackPathDefinitionTab />,
+  'attack-paths/rating': <AttackPathRatingTab />,
+  'attack-paths/relations': <AttackPathRelationsTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md

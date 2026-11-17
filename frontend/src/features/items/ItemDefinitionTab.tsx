@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ItemDefinitionDiagram } from '../item-definition/ItemDefinitionDiagram'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../../api/models/item'
 import { useItem, useUpdateItem } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 
 // The React Flow diagram only exists for the headlamp example so far.
 const EXAMPLE_DIAGRAM_ITEM = 'i-01'
@@ -45,6 +46,7 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
   const [saved, setSaved] = useState(values)
   const [nameError, setNameError] = useState<string>()
   const update = useUpdateItem(item.tara_project_id, item.id)
+  const { canEdit } = useProjectAccess(item.tara_project_id)
   const dirty = (Object.keys(values) as (keyof FormValues)[]).some((key) =>
     // The name is saved trimmed, so surrounding spaces alone are no change.
     key === 'name' ? values.name.trim() !== saved.name : values[key] !== saved[key],
@@ -82,48 +84,53 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
   return (
     <div className="max-w-3xl space-y-6">
       <form onSubmit={handleSubmit} noValidate className="grid gap-4">
-        <p className="text-xs text-muted-foreground">Fields marked * are needed before the item definition is complete.</p>
-        <div className="grid gap-2">
-          <Label htmlFor={`${id}-name`}>Name *</Label>
-          <Input
-            id={`${id}-name`}
-            value={values.name}
-            required
-            maxLength={ITEM_NAME_MAX_LENGTH}
-            onChange={(event) => change('name', event.target.value)}
-            aria-invalid={Boolean(nameError)}
-            aria-describedby={nameError ? `${id}-name-error` : undefined}
-          />
-          {nameError && (
-            <p id={`${id}-name-error`} role="alert" className="text-sm text-destructive">
-              {nameError}
-            </p>
-          )}
-        </div>
-        {TEXT_FIELDS.map((field) => (
-          <div key={field.key} className="grid gap-2">
-            <Label htmlFor={`${id}-${field.key}`}>{field.label} *</Label>
-            <Textarea
-              id={`${id}-${field.key}`}
-              value={values[field.key]}
-              placeholder={field.placeholder}
-              onChange={(event) => change(field.key, event.target.value)}
+        {/* Read-only projects show the fields disabled and no Save. */}
+        <fieldset disabled={!canEdit} className="contents">
+          <p className="text-xs text-muted-foreground">Fields marked * are needed before the item definition is complete.</p>
+          <div className="grid gap-2">
+            <Label htmlFor={`${id}-name`}>Name *</Label>
+            <Input
+              id={`${id}-name`}
+              value={values.name}
+              required
+              maxLength={ITEM_NAME_MAX_LENGTH}
+              onChange={(event) => change('name', event.target.value)}
+              aria-invalid={Boolean(nameError)}
+              aria-describedby={nameError ? `${id}-name-error` : undefined}
             />
+            {nameError && (
+              <p id={`${id}-name-error`} role="alert" className="text-sm text-destructive">
+                {nameError}
+              </p>
+            )}
           </div>
-        ))}
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!dirty || update.isPending}>
-            Save
-          </Button>
-          <output aria-live="polite" className="text-sm text-muted-foreground">
-            {update.isSuccess && !dirty && 'Saved.'}
-          </output>
-          {update.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              The item could not be saved. Please try again.
-            </p>
-          )}
-        </div>
+          {TEXT_FIELDS.map((field) => (
+            <div key={field.key} className="grid gap-2">
+              <Label htmlFor={`${id}-${field.key}`}>{field.label} *</Label>
+              <Textarea
+                id={`${id}-${field.key}`}
+                value={values[field.key]}
+                placeholder={field.placeholder}
+                onChange={(event) => change(field.key, event.target.value)}
+              />
+            </div>
+          ))}
+        </fieldset>
+        {canEdit && (
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={!dirty || update.isPending}>
+              Save
+            </Button>
+            <output aria-live="polite" className="text-sm text-muted-foreground">
+              {update.isSuccess && !dirty && 'Saved.'}
+            </output>
+            {update.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                The item could not be saved. Please try again.
+              </p>
+            )}
+          </div>
+        )}
       </form>
 
       <section aria-labelledby={`${id}-files`} className="overflow-hidden rounded-lg border">

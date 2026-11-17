@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
 import { useAddAsset, useItemAssets } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
 import { AddAssetDialog } from './AddAssetDialog'
 
@@ -10,12 +11,13 @@ export function ItemAssetsTab() {
   const { projectId = '', entityId = '' } = useParams()
   const { data: assets, isError } = useItemAssets(projectId, entityId)
   const addAsset = useAddAsset(projectId, entityId)
+  const { canEdit } = useProjectAccess(projectId)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">Assets belong to this item. Their links are edited on each asset's Relations tab.</p>
-        <AddAssetDialog onAdd={(asset) => addAsset.mutateAsync(asset)} />
+        {canEdit && <AddAssetDialog onAdd={(asset) => addAsset.mutateAsync(asset)} />}
       </div>
       {isError && (
         <p role="alert" className="text-sm text-destructive">

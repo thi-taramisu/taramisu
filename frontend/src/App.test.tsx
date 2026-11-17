@@ -7,11 +7,11 @@ import { renderApp as renderAt } from './test/renderApp'
 const project = '/projects/headlamp'
 
 describe('routing', () => {
-  it('redirects / to the project list', () => {
+  it('redirects / to the project list', async () => {
     renderAt('/')
 
     expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
+    expect(await screen.findByRole('link', { name: /headlamp system \(example\)/i })).toHaveAttribute('href', project)
   })
 
   it('shows the workspace with the element tree', async () => {
@@ -39,7 +39,7 @@ describe('routing', () => {
     ),
   )('routes %s tab "%s"', async (type, path, label) => {
     // Item and scenario pages load the element from the API, so they need an existing one.
-    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01' }
+    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01', 'attack-paths': 'ap-01' }
     renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
 
     const tabs = await screen.findByRole('navigation', { name: `${ENTITY_TYPES[type].label} tabs` })
@@ -58,7 +58,7 @@ describe('routing', () => {
     renderAt(`${project}/damage-scenarios/ds-01?view=graph`)
 
     expect(await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
-    expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
     expect(within(tree).getByRole('link', { name: 'A-01 Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
@@ -68,7 +68,7 @@ describe('routing', () => {
     const { user } = renderAt(`${project}/damage-scenarios/ds-01`)
 
     await user.click(screen.getByRole('switch', { name: 'Graph' }))
-    expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('switch', { name: 'Graph' }))
     expect(screen.getByRole('navigation', { name: 'Damage scenario tabs' })).toBeInTheDocument()

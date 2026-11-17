@@ -8,8 +8,15 @@ import { CreateItemDialog } from '../items/CreateItemDialog'
 // Only items and damage scenarios can be created so far; the other types follow with their own tickets.
 const OTHER_TYPES = ['Asset', 'Threat Scenario', 'Attack Path']
 
+interface NewElementMenuProps {
+  projectId: string
+  projectName: string
+  /** Keeps the button in place, e.g. in a read-only project. */
+  disabled?: boolean
+}
+
 /** "+ New" button above the element tree (Add Items wireframes). */
-export function NewElementMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
+export function NewElementMenu({ projectId, projectName, disabled = false }: NewElementMenuProps) {
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
   // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
@@ -19,7 +26,7 @@ export function NewElementMenu({ projectId, projectName }: { projectId: string; 
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button ref={setNewButton} size="sm">
+          <Button ref={setNewButton} size="sm" disabled={disabled}>
             <Plus aria-hidden="true" />
             New
           </Button>

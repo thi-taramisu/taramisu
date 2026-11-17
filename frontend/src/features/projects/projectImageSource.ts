@@ -3,8 +3,8 @@ import shapes from '@dicebear/styles/shapes.json'
 
 const style = new Style(shapes)
 
-export function generatedProjectImage(projectId: string, projectName: string) {
+export function generatedProjectImage(projectId: string) {
   return new Avatar(style, {
-    seed: JSON.stringify([projectId, projectName.trim()]),
+    seed: projectId,
   }).toDataUri()
 }
