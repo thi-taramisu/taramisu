@@ -106,8 +106,8 @@ These were the open questions in the first draft of this page. The wireframes an
    Concept). This is a view mode, so it is a query parameter (`?view=graph`) and not a separate route. It stays on when you select another
    element in the tree. The item definition diagram (React Flow) is the Definition tab of an item.
 6. **Unassigned elements?** "Flexible Definition" in the wireframes adds an "Unassigned" section to each item in the tree for elements
-   without a link upwards (#258). They keep the same flat URLs, so no extra route is needed; "Unassigned" in the breadcrumbs follows once
-   the breadcrumbs (#226) are merged.
+   without a link upwards (#258). They keep the same flat URLs, so no extra route is needed. The breadcrumbs show
+   "Unassigned" as a step without a link between the item and the element.
 
 ## Open questions
 

@@ -46,6 +46,11 @@ export function nodesBelow(node: TreeNode): TreeNode[] {
   return [...(node.children ?? []), ...(node.unassigned ?? [])]
 }
 
+/** Whether the item's "Unassigned" section lists the element itself, i.e. the element has no link upwards yet. */
+export function isUnassignedIn(item: TreeNode, type: EntityType, id: string): boolean {
+  return item.unassigned?.some((node) => node.type === type && node.id === id) ?? false
+}
+
 /** First occurrence of the entity in the tree, depth-first. */
 export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeNode | undefined {
   return findNodePath(type, id, nodes)?.at(-1)

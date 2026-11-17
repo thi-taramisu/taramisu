@@ -67,6 +67,7 @@ assets start there.
 Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
 Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
 parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
+Elements in an "Unassigned" section get an "Unassigned" step after their item, as in the tree; it has no page, so it is not a link.
 
 ## API client
 
