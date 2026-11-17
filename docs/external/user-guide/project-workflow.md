@@ -71,11 +71,11 @@ Archived projects are not shown in the Favorites section.
 The project is removed from the active overview and appears in
 the Archive view.
 
-### Restoring a project
+### Unarchiving a project
 
 1. Open **Archive** from the sidebar.
 2. Locate the archived project.
-3. Select **Restore Project**.
+3. Select **Unarchive Project**.
 
 The project returns to the active overview.
 

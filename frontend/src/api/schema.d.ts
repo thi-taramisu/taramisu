@@ -527,7 +527,7 @@ export interface paths {
         patch: operations["update-project-member"];
         trace?: never;
     };
-    "/api/v1/projects/{id}/restore": {
+    "/api/v1/projects/{id}/unarchive": {
         parameters: {
             query?: never;
             header?: never;
@@ -536,8 +536,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Restore an archived TARA project (idempotent) */
-        post: operations["restore-tara-project"];
+        /** Unarchive an archived TARA project (idempotent) */
+        post: operations["unarchive-tara-project"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5852,7 +5852,7 @@ export interface operations {
             };
         };
     };
-    "restore-tara-project": {
+    "unarchive-tara-project": {
         parameters: {
             query?: never;
             header?: never;

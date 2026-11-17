@@ -206,7 +206,7 @@ func (a Access) middleware(api huma.API) func(huma.Context, func(huma.Context)) 
 				err = huma.Error404NotFound("project not found")
 			}
 			if err == nil && archived {
-				err = huma.Error409Conflict("project is archived; restore it before making changes")
+				err = huma.Error409Conflict("project is archived; unarchive it before making changes")
 			}
 			if err != nil {
 				writeAccessError(api, ctx, err)

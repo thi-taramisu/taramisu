@@ -29,7 +29,7 @@ The rows follow the features planned in the [wireframe concept](../../concepts/w
 | Apply AI assistant suggestions | – | ✓ | ✓ |
 | Change project settings: name, description, image, default rating method, AI toggle | – | – | ✓ |
 | Add or remove members and groups; change their roles | – | – | ✓ |
-| Archive, restore, or delete the project | – | – | ✓ |
+| Archive, unarchive, or delete the project | – | – | ✓ |
 
 Actions that need no project role:
 
@@ -120,12 +120,12 @@ project is readable by its members. After the normal role check succeeds, all pr
 and analysis-content writes return `409 Conflict`; this includes child-resource writes resolved
 through an item definition or threat scenario. A database error fails closed.
 
-Owners may archive, restore, delete the project, and manage its members while archived. Members may
+Owners may archive, unarchive, delete the project, and manage its members while archived. Members may
 still leave under the existing last-Owner rules. These maintenance operations explicitly declare
 `.AllowArchived()`; all other project writes inherit protection. Archive state is read on each write
 request, without caching. An in-flight request authorized before the archive operation may finish.
 
-Both archive and restore are idempotent. Project responses expose a nullable `archived_at` timestamp;
+Both archive and unarchive are idempotent. Project responses expose a nullable `archived_at` timestamp;
 the project list supports `archived=true` or `archived=false`, with omission returning both states.
 
 ## Permissions

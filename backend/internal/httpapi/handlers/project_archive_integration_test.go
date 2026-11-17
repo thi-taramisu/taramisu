@@ -89,7 +89,7 @@ func TestProjectArchivePostgres(t *testing.T) {
 			want = 401
 		}
 		call(token, "POST", base+"/archive", "", want)
-		call(token, "POST", base+"/restore", "", want)
+		call(token, "POST", base+"/unarchive", "", want)
 	}
 	archived := call(owner, "POST", base+"/archive", "", 200)
 	var first, again handlers.TaraProjectBody
@@ -126,7 +126,7 @@ func TestProjectArchivePostgres(t *testing.T) {
 			}
 			if op.Extensions["x-taramisu-allow-archived"] == true {
 				maintenance := strings.HasPrefix(path, "/api/v1/projects/{id}/members") ||
-					path == "/api/v1/projects/{id}/archive" || path == "/api/v1/projects/{id}/restore" ||
+					path == "/api/v1/projects/{id}/archive" || path == "/api/v1/projects/{id}/unarchive" ||
 					(method == "DELETE" && path == "/api/v1/projects/{id}")
 				if !maintenance {
 					t.Fatalf("unexpected archived-write exception: %s %s", method, path)
@@ -182,20 +182,20 @@ func TestProjectArchivePostgres(t *testing.T) {
 	call(owner, "DELETE", base+"/members/"+groupMember.ID, "", 204)
 	call(owner, "PATCH", base+"/members/"+member.ID, `{"role":"EDITOR"}`, 200)
 	call(viewer, "PATCH", base+"/item-definitions/"+item, `{"name":"Blocked editor"}`, 409)
-	call(viewer, "POST", base+"/restore", "", 403)
+	call(viewer, "POST", base+"/unarchive", "", 403)
 	call(viewer, "DELETE", base+"/members/"+member.ID, "", 204)
-	call(owner, "POST", base+"/restore", "", 200)
-	call(owner, "POST", base+"/restore", "", 200)
-	call(owner, "PATCH", base, `{"name":"Restored"}`, 200)
-	call(owner, "PATCH", base+"/item-definitions/"+item, `{"name":"Restored item"}`, 200)
-	call(owner, "PATCH", "/api/v1/item-definitions/"+item+"/attack-paths/"+attack, `{"title":"Restored attack"}`, 200)
+	call(owner, "POST", base+"/unarchive", "", 200)
+	call(owner, "POST", base+"/unarchive", "", 200)
+	call(owner, "PATCH", base, `{"name":"Unarchived"}`, 200)
+	call(owner, "PATCH", base+"/item-definitions/"+item, `{"name":"Unarchived item"}`, 200)
+	call(owner, "PATCH", "/api/v1/item-definitions/"+item+"/attack-paths/"+attack, `{"title":"Unarchived attack"}`, 200)
 	call(owner, "PATCH", "/api/v1/threat-scenarios/"+threat+"/risk-values/"+risk, `{"risk_score":4}`, 200)
-	var restored handlers.TaraProjectBody
-	if err := json.Unmarshal(call(owner, "GET", base, "", 200), &restored); err != nil {
+	var unarchived handlers.TaraProjectBody
+	if err := json.Unmarshal(call(owner, "GET", base, "", 200), &unarchived); err != nil {
 		t.Fatal(err)
 	}
-	if restored.ArchivedAt != nil {
-		t.Fatal("restore retained timestamp")
+	if unarchived.ArchivedAt != nil {
+		t.Fatal("unarchive retained timestamp")
 	}
 	// An empty archived project remains deletable by its Owner.
 	var empty handlers.TaraProjectBody

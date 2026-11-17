@@ -41,5 +41,5 @@ DELETE FROM tara_project WHERE id = $1;
 -- name: ArchiveTaraProject :one
 UPDATE tara_project SET archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING *;
 
--- name: RestoreTaraProject :one
+-- name: UnarchiveTaraProject :one
 UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING *;

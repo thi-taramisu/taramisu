@@ -8505,9 +8505,9 @@
         "x-taramisu-permission": "manage"
       }
     },
-    "/api/v1/projects/{id}/restore": {
+    "/api/v1/projects/{id}/unarchive": {
       "post": {
-        "operationId": "restore-tara-project",
+        "operationId": "unarchive-tara-project",
         "parameters": [
           {
             "in": "path",
@@ -8576,7 +8576,7 @@
             "bearer": []
           }
         ],
-        "summary": "Restore an archived TARA project (idempotent)",
+        "summary": "Unarchive an archived TARA project (idempotent)",
         "tags": [
           "Tara Project"
         ],

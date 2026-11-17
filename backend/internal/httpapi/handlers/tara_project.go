@@ -16,7 +16,7 @@ import (
 
 type TaraProjectStore interface {
 	ArchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
-	RestoreTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
+	UnarchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	CreateTaraProject(context.Context, db.CreateTaraProjectParams) (db.CreateTaraProjectRow, error)
 	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
@@ -53,7 +53,7 @@ func (h *TaraProject) Register(api huma.API) {
 	Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), project(PermManage), h.Replace)
 	Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), project(PermManage), h.Update)
 	Register(api, op("archive-tara-project", http.MethodPost, member+"/archive", "Archive a TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Archive)
-	Register(api, op("restore-tara-project", http.MethodPost, member+"/restore", "Restore an archived TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Restore)
+	Register(api, op("unarchive-tara-project", http.MethodPost, member+"/unarchive", "Unarchive an archived TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Unarchive)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
 	Register(api, del, project(PermManage).AllowArchived(), h.Delete)
@@ -249,12 +249,12 @@ func (h *TaraProject) Archive(ctx context.Context, _ *TaraProjectIDInput) (*Tara
 	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
-func (h *TaraProject) Restore(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
-	p, err := h.store.RestoreTaraProject(ctx, projectIDFromContext(ctx))
+func (h *TaraProject) Unarchive(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	p, err := h.store.UnarchiveTaraProject(ctx, projectIDFromContext(ctx))
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	audit(ctx, "project.restored", "project", p.ID.String())
+	audit(ctx, "project.unarchived", "project", p.ID.String())
 	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 

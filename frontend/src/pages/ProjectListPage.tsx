@@ -87,7 +87,7 @@ export function ProjectListPage() {
     )
   }
 
-  function handleRestoreProject(projectId: string) {
+  function handleUnarchiveProject(projectId: string) {
     setProjects((previous) =>
       previous.map((project) =>
         project.id === projectId
@@ -290,11 +290,11 @@ export function ProjectListPage() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => handleRestoreProject(project.id)}
-                            aria-label={`Restore ${project.name}`}
+                            onClick={() => handleUnarchiveProject(project.id)}
+                            aria-label={`Unarchive ${project.name}`}
                           >
                             <ArchiveRestore className="size-4" />
-                            Restore Project
+                            Unarchive Project
                           </Button>
                         </CardHeader>
                       </Card>

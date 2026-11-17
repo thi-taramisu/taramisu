@@ -144,8 +144,8 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"list empty", false, http.MethodGet, base, "", http.StatusOK},
 		{"archive", true, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusOK},
 		{"archive missing", false, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusNotFound},
-		{"restore", true, http.MethodPost, base + "/" + projectID + "/restore", "", http.StatusOK},
-		{"restore missing", false, http.MethodPost, base + "/" + projectID + "/restore", "", http.StatusNotFound},
+		{"unarchive", true, http.MethodPost, base + "/" + projectID + "/unarchive", "", http.StatusOK},
+		{"unarchive missing", false, http.MethodPost, base + "/" + projectID + "/unarchive", "", http.StatusNotFound},
 		{"get", true, http.MethodGet, base + "/" + projectID, "", http.StatusOK},
 		{"get missing", false, http.MethodGet, base + "/" + projectID, "", http.StatusNotFound},
 		{"get bad id", true, http.MethodGet, base + "/nope", "", http.StatusUnprocessableEntity},
@@ -345,7 +345,7 @@ func (f *fakeProjects) ArchiveTaraProject(context.Context, pgtype.UUID) (db.Tara
 	}
 	return f.project, nil
 }
-func (f *fakeProjects) RestoreTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
+func (f *fakeProjects) UnarchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
 	if !f.found {
 		return db.TaraProject{}, pgx.ErrNoRows
 	}

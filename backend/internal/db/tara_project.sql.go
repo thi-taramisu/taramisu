@@ -175,12 +175,12 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 	return i, err
 }
 
-const restoreTaraProject = `-- name: RestoreTaraProject :one
+const unarchiveTaraProject = `-- name: UnarchiveTaraProject :one
 UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING id, name, description, archived_at, created_at
 `
 
-func (q *Queries) RestoreTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
-	row := q.db.QueryRow(ctx, restoreTaraProject, id)
+func (q *Queries) UnarchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
+	row := q.db.QueryRow(ctx, unarchiveTaraProject, id)
 	var i TaraProject
 	err := row.Scan(
 		&i.ID,

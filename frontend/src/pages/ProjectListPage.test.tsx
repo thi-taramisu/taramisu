@@ -204,7 +204,7 @@ describe('Main Page project management', () => {
     },
   )
 
-  it('archives and restores a project while preserving its favorite status', async () => {
+  it('archives and unarchives a project while preserving its favorite status', async () => {
     const user = userEvent.setup()
     renderAt('/projects')
 
@@ -253,10 +253,10 @@ describe('Main Page project management', () => {
 
     expect(within(archive).getByText('Battery Security')).toBeInTheDocument()
 
-    // Restore Battery Security.
+    // Unarchive Battery Security.
     await user.click(
       within(archive).getByRole('button', {
-        name: 'Restore Battery Security',
+        name: 'Unarchive Battery Security',
       }),
     )
 
@@ -269,25 +269,25 @@ describe('Main Page project management', () => {
       screen.getByRole('button', { name: 'Projects' }),
     )
 
-    const restoredProjects = screen
+    const unarchivedProjects = screen
       .getByRole('heading', { name: 'All Projects' })
       .closest('section')!
 
-    const restoredFavorites = screen
+    const unarchivedFavorites = screen
       .getByRole('heading', { name: 'Favorites' })
       .closest('section')!
 
     expect(
-      within(restoredProjects).getByText('Battery Security'),
+      within(unarchivedProjects).getByText('Battery Security'),
     ).toBeInTheDocument()
 
     // The favorite status must remain unchanged.
     expect(
-      within(restoredFavorites).getByText('Battery Security'),
+      within(unarchivedFavorites).getByText('Battery Security'),
     ).toBeInTheDocument()
 
     expect(
-      within(restoredProjects).getByRole('button', {
+      within(unarchivedProjects).getByRole('button', {
         name: 'Remove Battery Security from favorites',
       }),
     ).toHaveAttribute('aria-pressed', 'true')
