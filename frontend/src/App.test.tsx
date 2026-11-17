@@ -96,10 +96,10 @@ describe('routing', () => {
     '/item-definition',
   ])(
     'shows the not found page for %s',
-    (path) => {
+    async (path) => {
       renderAt(path)
 
-      expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
     },
   )
 })

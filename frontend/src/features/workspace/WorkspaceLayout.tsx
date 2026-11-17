@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { NotFoundPage } from '../../pages/NotFoundPage'
 import { isNotFound } from '../../api/errors'
-import { exampleProject } from '../../api/mocks/data/headlamp'
 import { useProjectTree } from '../../api/queries/items'
 import { useProject, useProjectAccess } from '../../api/queries/projects'
 import { ArchivedProjectBanner } from '../projects/ArchivedProjectBanner'
@@ -18,16 +17,16 @@ export function WorkspaceLayout() {
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const graphView = searchParams.get('view') === 'graph'
-  const tree = useProjectTree(projectId, { enabled: projectId === exampleProject.id })
   const project = useProject(projectId)
+  const tree = useProjectTree(projectId, { enabled: Boolean(project.data) })
   const { canEdit } = useProjectAccess(projectId)
 
-  // Only the example project has a workspace so far; a deleted project has none.
-  if (projectId !== exampleProject.id || isNotFound(project.error)) return <NotFoundPage />
+  // Deleted and unknown projects have no workspace.
+  if (isNotFound(project.error)) return <NotFoundPage />
 
   return (
     <div className="flex h-screen flex-col">
-      <ProjectHeader projectId={projectId}>
+      <ProjectHeader projectId={projectId} projectName={project.data?.name ?? 'Loading project…'}>
         <Switch
           id="graph-view"
           checked={graphView}
@@ -49,7 +48,7 @@ export function WorkspaceLayout() {
         <ResizableSidebar label="Project elements" className="bg-sidebar p-2 text-sidebar-foreground">
           <div className="mb-1 flex items-center justify-between gap-2 px-1.5">
             <h2 className="text-xs font-medium text-muted-foreground">Project elements</h2>
-            <NewElementMenu projectId={projectId} projectName={exampleProject.name} disabled={!canEdit} />
+            <NewElementMenu projectId={projectId} projectName={project.data?.name ?? 'Project'} disabled={!canEdit} />
           </div>
           {tree.data ? (
             <Filetree nodes={tree.data} projectId={projectId} />
@@ -59,7 +58,7 @@ export function WorkspaceLayout() {
         </ResizableSidebar>
         {/* relative keeps absolutely positioned content such as sr-only text inside the scroll area; it would extend the page otherwise. */}
         <main className="relative min-w-0 flex-1 overflow-y-auto p-6">
-          <Outlet />
+          {project.data ? <Outlet /> : <output>Loading project…</output>}
         </main>
       </div>
     </div>

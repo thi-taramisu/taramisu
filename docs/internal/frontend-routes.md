@@ -103,6 +103,18 @@ These were the open questions in the first draft of this page. The wireframes an
 5. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
    They still get the same flat URLs, so no extra route is needed.
 
+## Global Spotlight search (#193)
+
+Search is a shared overlay, without its own URL. It is available from the project-list sidebar, project workspace/settings header,
+and Ctrl/Cmd + K on any route. Opening within `/projects/:projectId/*` applies a removable project filter; other routes start globally.
+Selecting a result closes the overlay and opens `/projects/:projectId` or the existing `entityPath` for that element. Element URLs stay flat.
+Accessible mock projects can open an empty workspace as well as the Headlamp example; unknown projects show the not-found page.
+Settings are available only for the Headlamp example, so other project headers hide the Settings link.
+
+The search service reads the live mock stores, including unlinked elements. It combines project and entity-type filters, deduplicates
+shared elements and paginates results. Real cross-project authorization/search remains the backend work in #240; display IDs
+depend on #239. The frontend service interface is a proposal for that integration, not an existing OpenAPI endpoint.
+
 ## Local graph prototype (#184)
 
 The graph is centered on the entity in the route. Selecting a node opens its details with **Edit**,

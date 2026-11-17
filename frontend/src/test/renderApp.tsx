@@ -6,7 +6,7 @@ import App from '../App'
 import { ApiProvider } from '../api/ApiProvider'
 import { createApiClient } from '../api/client'
 import { createMockItemApi } from '../api/mocks/mockItemApi'
-import { createMockProjectApi } from '../api/mocks/mockProjectApi'
+import type { ProjectService } from '../api/services/projects'
 import { AuthProvider } from '../auth/AuthContext'
 
 // eslint-disable-next-line react/only-export-components
@@ -16,13 +16,13 @@ function LocationDisplay() {
 }
 
 /** Renders the whole app at `path` with fresh mock item and project APIs and a fresh query cache. */
-export function renderApp(path: string, api = createMockItemApi(), projects = createMockProjectApi()) {
+export function renderApp(path: string, api = createMockItemApi(), projects: ProjectService = api.projects) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const user = userEvent.setup()
   render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ApiProvider api={{ client: createApiClient({ baseUrl: 'http://api.test' }), projects, ...api }}>
+        <ApiProvider api={{ client: createApiClient({ baseUrl: 'http://api.test' }), ...api, projects }}>
           <MemoryRouter initialEntries={[path]}>
             <App />
             <LocationDisplay />

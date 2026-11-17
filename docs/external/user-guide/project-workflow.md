@@ -24,7 +24,25 @@ The page contains three main sections:
 
 The sidebar can be expanded or collapsed.
 
-The Search entry is currently a placeholder.
+## Search projects and elements
+
+Select **Search** in the sidebar or the search icon in the project header.
+You can also press **Ctrl + K** (Windows/Linux) or **Cmd + K** (macOS) from any page.
+
+Type a name or ID, such as `TS-01`. Results show the element's name, type, ID and project.
+Use the arrow keys and Enter, or click a result, to open it. Select **Load more results** if more matches are available.
+Press Escape, select Close or click outside the dialog to dismiss it.
+
+Use the type buttons and project selector to narrow the results. Multiple selected types are included;
+project filters narrow the matches further. Toggle a selected type button to remove it; remove a project using its filter chip.
+Select **Clear filters** to remove all selections.
+The project selector lets you search its list by name or ID without leaving the search dialog. Choose several projects using the
+checkbox marks; use **Show more projects** to browse additional matches. Escape closes the project selector first.
+Opening search from a project starts with that project selected. Remove its filter to search across projects;
+the project overview starts without a project filter.
+
+Search currently uses the same temporary mock data as the other frontend previews, including elements without a tree link.
+Project changes survive navigation but reset on reload. Production search and membership authorization require the backend integration.
 
 ## Creating a project
 
@@ -112,11 +130,9 @@ Deletion currently affects only temporary frontend state.
 
 ## Opening a project workspace
 
-The Headlamp example project provides navigation to the existing
-TARAmisu workspace.
-
-Other mock projects are displayed in the overview but do not
-yet provide functional workspace navigation.
+Open a project from the overview or search results to enter its workspace. The Headlamp example contains
+assessment data; other mock projects start with an empty workspace. Project settings are currently available
+only for the Headlamp example, so other projects do not show a Settings link.
 
 The Headlamp example can be archived and deleted like any other
 project. Reload the page to restore it.
@@ -127,10 +143,10 @@ The current frontend preview has the following limitations:
 
 - Project data is not persisted.
 - Backend project management APIs are not yet connected.
-- Search is not functional.
-- Only the Headlamp example has a functional workspace.
+- Search uses temporary mock data.
+- Only the Headlamp example has seeded assessment data and project settings.
 - The Archive view does not have a dedicated URL.
-- Project management actions use temporary React state.
+- Project management actions use temporary in-memory data.
 
 These limitations do not represent the final intended application behavior.
 

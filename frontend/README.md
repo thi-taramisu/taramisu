@@ -38,6 +38,7 @@ src/
   features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
   features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
@@ -100,6 +101,35 @@ that has no service yet (project settings, example project).
 Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
 instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
 can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
+
+## Global search
+
+Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
+focuses its input, searches names, internal IDs and display IDs (for example `TS-01`), and opens the selected result with Enter.
+Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
+The dialog stays anchored near the top with a fixed-height, scrollable results area. Input is debounced by 250 ms; filters apply
+immediately. While typing, previous results stay visible but cannot be opened until the current search finishes.
+
+Project and element-type filters can be combined. Toggle a selected type button to remove that type; project chips have a remove button.
+Several types or projects are ORed within that filter; project and type filters
+are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
+projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
+Results include the project, type and ID. Further matches are available through **Load more results**.
+
+The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50
+matches initially and offers **Show more projects** for browsing. Arrow keys and Enter work across these batches. Escape closes the
+picker first and returns focus to its trigger; the global query and selected filters stay intact.
+
+The frontend currently uses `SearchService` (`src/api/services/search.ts`) and the live in-memory mock stores. Project list changes
+survive route navigation and are shared with search; a reload still resets all mock data. The project service reuses the structure
+introduced in PR #286. Search reads all stored elements, including unlinked scenarios, rather than indexing only visible Filetree nodes.
+TanStack Query isolates requests by search session, query, filters and user identity and cancels outdated requests.
+Results from another query are never used as placeholder data. Mutations invalidate search results alongside their entity queries.
+
+The real search endpoint, generated API types, pagination contract and membership authorization are pending **#240** and **#239**.
+The mock scopes results to the projects returned by its project service, including when a caller supplies other project IDs. This models
+access restrictions for development; production authorization must be enforced by the backend. Replace the service in `ApiProvider`
+when that contract is available; do not fetch unauthorized project data and filter it in the component.
 
 ## UI components
 
