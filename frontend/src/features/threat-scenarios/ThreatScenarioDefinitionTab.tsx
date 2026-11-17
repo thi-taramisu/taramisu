@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { useSetThreatTargets, useThreatScenario, useThreatScenarioRelations, useUpdateThreatScenario } from '../../api/queries/items'
 import { entityPath } from '../workspace/entities'
@@ -90,9 +91,14 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (!targetsDirty) setTargets(relations.targets)
   }
 
+  // Keeps Save disabled while a request runs.
+  function keepPending() {
+    setStatus((prev) => (prev === 'pending' ? prev : 'idle'))
+  }
+
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    setStatus('idle')
+    keepPending()
     if ('title' in next) setTitleError(undefined)
   }
 
@@ -114,7 +120,8 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           elicitation_method: values.elicitation_method || null,
           technical_notes: values.technical_notes || null,
         })
-        setValues(toValues(result))
+        // Takes over the saved values only where nothing was edited while saving.
+        setValues((current) => (current === values ? toValues(result) : current))
         setSaved(toValues(result))
         setFieldsSaved(true)
       } catch {
@@ -125,7 +132,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (targetsDirty) {
       try {
         const result = await saveTargets.mutateAsync(currentTargets)
-        setTargets(result.targets)
+        setTargets((current) => (current === targets ? result.targets : current))
         setSavedTargets(result.targets)
       } catch {
         setStatus('targets-failed')
@@ -169,9 +176,9 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           id={`${id}-elicitation`}
           value={values.elicitation_method}
           onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
-          className="w-full"
+          className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
         >
-          <NativeSelectOption value="">Not set</NativeSelectOption>
+          <NativeSelectOption value="">Select…</NativeSelectOption>
           {ELICITATION_METHODS.map((method) => (
             <NativeSelectOption key={method.value} value={method.value}>
               {method.label}
@@ -193,7 +200,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
         value={currentTargets}
         onChange={(next) => {
           setTargets(next)
-          setStatus('idle')
+          keepPending()
         }}
         relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
       />

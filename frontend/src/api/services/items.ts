@@ -3,6 +3,7 @@ import type { ItemDefinition, ItemDefinitionBody, PatchItemDefinitionBody } from
 import type { RiskGroup } from '../models/risk'
 import type { EntityRef, TreeNode } from '../models/tree'
 import type { DamageScenarioService } from './damageScenarios'
+import type { AttackPathService } from './attackPaths'
 import type { ThreatScenarioService } from './threatScenarios'
 
 // Services of the item views. Only the mock in `../mocks/mockItemApi.ts` implements them so far; the
@@ -38,4 +39,5 @@ export interface ItemApi {
   content: ItemContentService
   damageScenarios: DamageScenarioService
   threatScenarios: ThreatScenarioService
+  attackPaths: AttackPathService
 }

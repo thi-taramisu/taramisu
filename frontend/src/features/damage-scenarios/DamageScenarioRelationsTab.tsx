@@ -12,6 +12,7 @@ import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
+import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
@@ -33,13 +34,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
   // Both write the full relations into the cache, so only one may run at a time; otherwise an older response could overwrite a newer one.
   const saving = assetLink.isPending || threatLink.isPending
 
-  if (!relations.data) {
-    return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The relations could not be loaded.</p>
-    ) : (
-      <output className="text-sm text-muted-foreground">Loading relations…</output>
-    )
-  }
+  if (!relations.data) return <RelationsQueryStatus query={relations} />
 
   const { assets, threatScenarios: threats } = relations.data
   // A link needs at least one property, so assets without any cannot be linked.
@@ -48,9 +43,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
 
   return (
     <div className="space-y-4">
-      {relations.isError && (
-        <p role="alert" className="text-sm text-destructive">The relations could not be refreshed.</p>
-      )}
+      <RelationsQueryStatus query={relations} />
       <RelationSection
         projectId={projectId}
         type="assets"
@@ -97,8 +90,8 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         candidatesLoading={itemThreats.isPending}
         candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
         error={threatLink.isError ? LINK_SAVE_ERROR : undefined}
-        onAdd={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: true })}
-        onRemove={(threatScenarioId) => threatLink.mutate({ threatScenarioId, linked: false })}
+        onAdd={(id) => threatLink.mutate({ id, linked: true })}
+        onRemove={(id) => threatLink.mutate({ id, linked: false })}
         rows={threats}
       />
       <p className="text-xs text-muted-foreground">
