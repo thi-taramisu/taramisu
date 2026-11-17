@@ -140,32 +140,42 @@ func TestMiddlewareRecoversPanic(t *testing.T) {
 
 // A response that has started cannot become a 500. It must not look complete to the client either.
 func TestMiddlewareAbortsStartedResponseAfterPanic(t *testing.T) {
-	lines := capture(t, slog.LevelInfo)
-	srv := httptest.NewServer(newRouter(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("partial"))
-		_ = http.NewResponseController(w).Flush()
-		panic("boom")
-	}))
-	defer srv.Close()
+	for name, start := range map[string]func(http.ResponseWriter){
+		"body written": func(w http.ResponseWriter) {
+			_, _ = w.Write([]byte("partial"))
+			_ = http.NewResponseController(w).Flush()
+		},
+		// net/http sends the 200 on Flush, although no status or body was written yet.
+		"headers flushed": func(w http.ResponseWriter) { _ = http.NewResponseController(w).Flush() },
+	} {
+		t.Run(name, func(t *testing.T) {
+			lines := capture(t, slog.LevelInfo)
+			srv := httptest.NewServer(newRouter(func(w http.ResponseWriter, r *http.Request) {
+				start(w)
+				panic("boom")
+			}))
+			defer srv.Close()
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/v1/projects/1", http.NoBody)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := srv.Client().Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, err := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err == nil {
-		t.Errorf("read body %q without error, want the truncated response to fail", body)
-	}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/v1/projects/1", http.NoBody)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := srv.Client().Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if err == nil {
+				t.Errorf("read %d %q without error, want the truncated response to fail", resp.StatusCode, body)
+			}
 
-	srv.Close() // waits for the handler, so the log is complete
-	got := lines()
-	if len(got) != 2 || got[0]["panic"] != "boom" || got[1]["msg"] != "request" || got[1]["aborted"] != true {
-		t.Fatalf("log lines = %v, want a panic entry, then the request marked as aborted", got)
+			srv.Close() // waits for the handler, so the log is complete
+			got := lines()
+			if len(got) != 2 || got[0]["panic"] != "boom" || got[1]["msg"] != "request" || got[1]["aborted"] != true {
+				t.Fatalf("log lines = %v, want a panic entry, then the request marked as aborted", got)
+			}
+		})
 	}
 }
 

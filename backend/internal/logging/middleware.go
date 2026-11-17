@@ -62,7 +62,7 @@ func Middleware(next http.Handler) http.Handler {
 		req := &request{id: id}
 		ctx := context.WithValue(r.Context(), requestKey{}, req)
 		w.Header().Set(RequestIDHeader, id)
-		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		ww := &startedWriter{WrapResponseWriter: middleware.NewWrapResponseWriter(w, r.ProtoMajor)}
 
 		defer func() {
 			abort := false
@@ -71,7 +71,7 @@ func Middleware(next http.Handler) http.Handler {
 					panic(recovered)
 				}
 				slog.ErrorContext(ctx, "panic while handling request", "panic", recovered, "stack", string(debug.Stack()))
-				if ww.Status() == 0 {
+				if !ww.started() {
 					// The same problem+json body as every other error of the API.
 					ww.Header().Set("Content-Type", "application/problem+json")
 					ww.WriteHeader(http.StatusInternalServerError)
@@ -90,6 +90,22 @@ func Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(ww, r.WithContext(ctx))
 	})
 }
+
+// startedWriter tells whether the response has started. chi's wrapper does not record a status when
+// a handler flushes before writing, although net/http has then already sent a 200.
+type startedWriter struct {
+	middleware.WrapResponseWriter
+	flushed bool
+}
+
+// Flush flushes the wrapped writer; http.NewResponseController finds it here and other features,
+// such as Hijack, through Unwrap.
+func (w *startedWriter) Flush() {
+	w.flushed = true
+	_ = http.NewResponseController(w.WrapResponseWriter).Flush()
+}
+
+func (w *startedWriter) started() bool { return w.flushed || w.Status() != 0 }
 
 func logRequest(ctx context.Context, r *http.Request, ww middleware.WrapResponseWriter, req *request, duration time.Duration, aborted bool) {
 	status := ww.Status()
