@@ -1,5 +1,6 @@
 import { act, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 
@@ -234,10 +235,10 @@ describe('damage scenario page', () => {
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
-  it('keeps the relations tab as a placeholder', async () => {
-    renderApp(`${page}/relations`)
+  it('shows the number of relations in the tab', async () => {
+    renderApp(page)
 
-    expect(await screen.findByText('Relations: not implemented yet')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Relations 2' })).toHaveAttribute('href', `${page}/relations`)
   })
 })
 
@@ -286,9 +287,48 @@ describe('damage scenario definition', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/Glare\.$/)
   })
+
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.damageScenarios.update)
+    api.damageScenarios.update = update.held
+    const { user } = renderApp(page, api)
+    const name = await screen.findByLabelText(/Name/)
+    await user.type(name, ' 2')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.type(name, '3')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(name).toHaveDisplayValue('Headlamp turns off while driving at night 23')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    expect((await api.damageScenarios.get('headlamp', 'ds-01')).title).toBe('Headlamp turns off while driving at night 2')
+  })
 })
 
 describe('damage scenario impact', () => {
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.damageScenarios.updateImpactRatings)
+    api.damageScenarios.updateImpactRatings = update.held
+    const { user } = renderApp(`${page}/impact`, api)
+    await user.click(within(await screen.findByRole('radiogroup', { name: 'Financial' })).getByRole('radio', { name: 'Major' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.click(radio('Operational', 'Severe'))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(radio('Operational', 'Severe')).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    const ratings = await api.damageScenarios.impactRatings('headlamp', 'ds-01')
+    expect(ratings.find((r) => r.impact_category === 'FINANCIAL')?.rating_value).toBe('MAJOR')
+    expect(ratings.find((r) => r.impact_category === 'OPERATIONAL')?.rating_value).toBe('MODERATE')
+  })
+
   it('shows the stored rating per category', async () => {
     renderApp(`${page}/impact`)
 

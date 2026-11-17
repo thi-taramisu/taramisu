@@ -18,12 +18,16 @@ interface CreateElementDialogProps {
   onOpenChange: (open: boolean) => void
   /** Gets the focus back on close; opened from a menu, the dialog would otherwise drop it after Cancel. */
   returnFocusTo?: HTMLButtonElement | null
+  /** Name to start with, e.g. typed into a search before. */
+  initialName?: string
   namePlaceholder: string
   nameMaxLength?: number
   /** Where the new element shows up, e.g. in the tree. */
   hint: string
   /** Shown when `onCreate` rejects. */
   errorMessage: string
+  /** Keeps the name and the other fields as they are, e.g. when the element exists and only a later step is retried. */
+  locked?: boolean
   /** Creates the element with the trimmed name; resolves to undefined if the other fields are invalid. */
   onCreate: (name: string, form: HTMLFormElement) => Promise<CreatedElement | undefined>
   /** Resets the other fields after "Create & add another" and on close. */
@@ -42,17 +46,19 @@ export function CreateElementDialog({
   open,
   onOpenChange,
   returnFocusTo,
+  initialName = '',
   namePlaceholder,
   nameMaxLength,
   hint,
   errorMessage,
+  locked = false,
   onCreate,
   onReset,
   children,
 }: CreateElementDialogProps) {
   const id = useId()
   const navigate = useNavigate()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [nameError, setNameError] = useState<string>()
   const [created, setCreated] = useState<string>()
   const [pending, setPending] = useState(false)
@@ -133,6 +139,7 @@ export function CreateElementDialog({
               value={name}
               required
               maxLength={nameMaxLength}
+              readOnly={locked}
               placeholder={namePlaceholder}
               onChange={(event) => {
                 setName(event.target.value)
@@ -148,7 +155,9 @@ export function CreateElementDialog({
               </p>
             )}
           </div>
-          {children}
+          <fieldset disabled={locked} className="contents">
+            {children}
+          </fieldset>
           <p className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
             <ListTree aria-hidden="true" className="size-3.5" />
             {hint}
