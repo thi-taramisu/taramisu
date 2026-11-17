@@ -91,6 +91,18 @@ TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
 API logs: `docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml logs api`.
 
+## Item attachments
+
+Use `/api/v1/projects/{project_id}/item-definitions/{item_id}/attachments` to list or upload
+supporting files for an item. Upload one multipart field named `file` per request. Each file
+may be up to 10 MiB and must be PDF, PNG, JPEG, GIF, WebP, or plain text. Listing supports
+`limit` (1–100, default 100) and `offset` (default 0).
+
+GET and DELETE on the same path with `/{attachment_id}` download or remove that attachment.
+List and download require project read permission. Upload and delete require edit permission.
+Item attachments appear only under their own item. Deleting an item queues its objects for
+removal by the same retry worker that handles project and attachment deletion.
+
 ## Database migrations and sqlc drift detection
 
 After editing `db/schema.sql` or `db/queries/`, generate the corresponding Atlas migration and refresh the `sqlc` models:
