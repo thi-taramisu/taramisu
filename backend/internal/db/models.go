@@ -533,6 +533,7 @@ type AttackPath struct {
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
+	InitialRatingMethod      string
 }
 
 type DamageScenario struct {
@@ -617,10 +618,11 @@ type ServiceStatus struct {
 }
 
 type TaraProject struct {
-	ID          pgtype.UUID
-	Name        string
-	Description *string
-	CreatedAt   pgtype.Timestamptz
+	ID                  pgtype.UUID
+	Name                string
+	Description         *string
+	DefaultRatingMethod *string
+	CreatedAt           pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {

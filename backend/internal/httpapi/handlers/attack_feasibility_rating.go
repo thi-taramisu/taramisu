@@ -35,7 +35,7 @@ func (h *AttackFeasibilityRating) Register(api huma.API) {
 	const path = itemPath + "/attack-paths/{attack_path_id}/feasibility-rating"
 	op := func(id, method, summary string, status int) huma.Operation {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary,
-			Description: "Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.",
+			Description: "Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.",
 			Tags:        []string{"Attack Path"}, Security: []map[string][]string{{"bearer": {}}},
 			DefaultStatus: status, Errors: []int{http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity}}
 	}
@@ -109,7 +109,7 @@ type FeasibilityRatingUpdateInput struct {
 type FeasibilityRatingInput struct {
 	FeasibilityRatingPath
 	Body struct {
-		RatingMethod           string                `json:"rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		RatingMethod           Optional[string]      `json:"rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
 		CvssAttackVector       *string               `json:"cvss_attack_vector,omitempty" enum:"NETWORK,ADJACENT,LOCAL,PHYSICAL"`
 		CvssAttackComplexity   *string               `json:"cvss_attack_complexity,omitempty" enum:"LOW,HIGH"`
 		CvssPrivilegesRequired *string               `json:"cvss_privileges_required,omitempty" enum:"NONE,LOW,HIGH"`
@@ -165,15 +165,16 @@ func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRat
 	if err != nil {
 		return nil, err
 	}
-	// Preserve the attack-potential default for clients that omit the method.
-	if in.Body.RatingMethod == "" {
-		in.Body.RatingMethod = "ATTACK_POTENTIAL"
+	if in.Body.RatingMethod.Set && in.Body.RatingMethod.Value == nil {
+		return nil, huma.Error422UnprocessableEntity("rating_method cannot be null")
 	}
+	// SQL resolves an omitted method from the creation-time path snapshot,
+	// never from the project default that may have changed since creation.
 	// Save method and inputs together. SQL derives the result, ignoring a supplied
 	// feasibility_rating; constraints reject missing or incompatible method inputs.
 	r, err := h.store.UpsertAttackFeasibilityRating(ctx, db.UpsertAttackFeasibilityRatingParams{
 		AttackPathID:           id,
-		RatingMethod:           in.Body.RatingMethod,
+		RatingMethod:           in.Body.RatingMethod.Value,
 		CvssAttackVector:       in.Body.CvssAttackVector,
 		CvssAttackComplexity:   in.Body.CvssAttackComplexity,
 		CvssPrivilegesRequired: in.Body.CvssPrivilegesRequired,

@@ -38,6 +38,7 @@ CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     description text,
+    default_rating_method text CHECK (default_rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR')),
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -169,7 +170,8 @@ CREATE TABLE attack_path (
     title text NOT NULL,
     analysis_approach analysis_approach,
     is_partial_early_stage boolean NOT NULL DEFAULT true,
-    attack_steps_and_weaknesses jsonb
+    attack_steps_and_weaknesses jsonb,
+    initial_rating_method text NOT NULL DEFAULT 'ATTACK_POTENTIAL' CHECK (initial_rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR'))
 );
 
 CREATE INDEX attack_path_item_definition_id_idx ON attack_path (item_definition_id);

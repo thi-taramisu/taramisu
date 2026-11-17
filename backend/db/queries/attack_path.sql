@@ -1,6 +1,13 @@
 -- name: CreateAttackPath :one
-INSERT INTO attack_path (item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses)
-VALUES ($1, $2, $3, $4, $5) RETURNING *;
+-- Snapshot the project default in the same statement that creates the path.
+-- Rating inputs are supplied separately, so CVSS/vector constraints remain strict.
+INSERT INTO attack_path (item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method)
+SELECT i.id, sqlc.arg(title), sqlc.narg(analysis_approach)::analysis_approach,
+    sqlc.arg(is_partial_early_stage), sqlc.narg(attack_steps_and_weaknesses)::jsonb,
+    COALESCE(sqlc.narg(initial_rating_method)::text, p.default_rating_method, 'ATTACK_POTENTIAL')
+FROM item_definition i JOIN tara_project p ON p.id = i.tara_project_id
+WHERE i.id = sqlc.arg(item_definition_id)
+RETURNING *;
 
 -- name: GetAttackPath :one
 SELECT * FROM attack_path WHERE id = $1 AND item_definition_id = $2;

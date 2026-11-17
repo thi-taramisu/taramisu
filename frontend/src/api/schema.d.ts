@@ -139,18 +139,18 @@ export interface paths {
         };
         /**
          * Get the attack feasibility rating of an attack path
-         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.
          */
         get: operations["get-attack-feasibility-rating"];
         /**
          * Create or replace the attack feasibility rating of an attack path
-         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.
          */
         put: operations["replace-attack-feasibility-rating"];
         post?: never;
         /**
          * Delete the attack feasibility rating of an attack path
-         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT defaults rating_method to ATTACK_POTENTIAL.
+         * @description Rating method and inputs are stored together. CVSS uses v3.1 exploitability. feasibility_rating is derived; any supplied value is ignored. PUT uses the path initial_rating_method when rating_method is omitted.
          */
         delete: operations["delete-attack-feasibility-rating"];
         options?: never;
@@ -746,6 +746,11 @@ export interface components {
             attack_steps_and_weaknesses?: unknown;
             /** Format: uuid */
             id: string;
+            /**
+             * @description Creation-time method used when rating PUT omits rating_method; unaffected by later project default changes
+             * @enum {string}
+             */
+            initial_rating_method: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             is_partial_early_stage: boolean;
             /** Format: uuid */
             item_definition_id: string;
@@ -755,6 +760,18 @@ export interface components {
             /** @enum {string} */
             analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
             attack_steps_and_weaknesses?: unknown;
+            is_partial_early_stage?: boolean;
+            title: string;
+        };
+        CreateAttackPathInputBody: {
+            /** @enum {string} */
+            analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
+            attack_steps_and_weaknesses?: unknown;
+            /**
+             * @description Overrides the project default for this new path
+             * @enum {string}
+             */
+            initial_rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             is_partial_early_stage?: boolean;
             title: string;
         };
@@ -773,6 +790,8 @@ export interface components {
             role: "VIEWER" | "EDITOR" | "OWNER";
         };
         CreateTaraProjectInputBody: {
+            /** @enum {string} */
+            default_rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             description?: string;
             name: string;
         };
@@ -886,8 +905,8 @@ export interface components {
             cvss_user_interaction?: "NONE" | "REQUIRED";
             /** @enum {string} */
             feasibility_rating?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
-            /** @enum {string} */
-            rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
+            /** @enum {string|null} */
+            rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR" | null;
             rationale?: string;
         };
         FeasibilityRatingUpdateInputBody: {
@@ -1023,6 +1042,8 @@ export interface components {
             status: string;
         };
         ReplaceTaraProjectInputBody: {
+            /** @enum {string} */
+            default_rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR";
             description?: string;
             name: string;
         };
@@ -1072,6 +1093,11 @@ export interface components {
         TaraProjectBody: {
             /** Format: date-time */
             created_at: string;
+            /**
+             * @description Default for new attack paths; null falls back to ATTACK_POTENTIAL
+             * @enum {string|null}
+             */
+            default_rating_method: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR" | null;
             description?: string;
             /** Format: uuid */
             id: string;
@@ -1153,6 +1179,8 @@ export interface components {
             role: "VIEWER" | "EDITOR" | "OWNER";
         };
         UpdateTaraProjectInputBody: {
+            /** @enum {string|null} */
+            default_rating_method?: "ATTACK_POTENTIAL" | "CVSS" | "ATTACK_VECTOR" | null;
             description?: string | null;
             name?: string;
         };
@@ -2244,7 +2272,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AttackPathInputBody"];
+                "application/json": components["schemas"]["CreateAttackPathInputBody"];
             };
         };
         responses: {
