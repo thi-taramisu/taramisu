@@ -228,11 +228,6 @@
   "deleteNamed": "Delete {{name}}",
   "pathUnavailable": "Path unavailable",
   "breadcrumbs": "Breadcrumbs",
-  "entityNotFound": "{{type}} not found",
-  "entityMissing": "The {{type}} does not exist or was deleted.",
-  "loadEntityError": "The {{type}} could not be loaded.",
-  "loadingEntity": "Loading {{type}}…",
-  "refreshEntityError": "The {{type}} could not be refreshed.",
   "targetedAssets": "Targeted Assets and Compromised Properties",
   "targetsSource": "The targets come from the linked damage scenarios.",
   "linkTargetDamage": "Link a damage scenario on the Relations tab",
@@ -267,5 +262,42 @@
     "OTHER": "Other"
   },
   "relationDamageLabel": "Damage Scenario",
-  "relationPathLabel": "Attack Path"
+  "relationPathLabel": "Attack Path",
+  "entityStates": {
+    "items": {
+      "notFound": "Item not found",
+      "missing": "The item does not exist or was deleted.",
+      "loadError": "The item could not be loaded.",
+      "loading": "Loading item…",
+      "refreshError": "The item could not be refreshed."
+    },
+    "assets": {
+      "notFound": "Asset not found",
+      "missing": "The asset does not exist or was deleted.",
+      "loadError": "The asset could not be loaded.",
+      "loading": "Loading asset…",
+      "refreshError": "The asset could not be refreshed."
+    },
+    "damage-scenarios": {
+      "notFound": "Damage scenario not found",
+      "missing": "The damage scenario does not exist or was deleted.",
+      "loadError": "The damage scenario could not be loaded.",
+      "loading": "Loading damage scenario…",
+      "refreshError": "The damage scenario could not be refreshed."
+    },
+    "threat-scenarios": {
+      "notFound": "Threat scenario not found",
+      "missing": "The threat scenario does not exist or was deleted.",
+      "loadError": "The threat scenario could not be loaded.",
+      "loading": "Loading threat scenario…",
+      "refreshError": "The threat scenario could not be refreshed."
+    },
+    "attack-paths": {
+      "notFound": "Attack path not found",
+      "missing": "The attack path does not exist or was deleted.",
+      "loadError": "The attack path could not be loaded.",
+      "loading": "Loading attack path…",
+      "refreshError": "The attack path could not be refreshed."
+    }
+  }
 }

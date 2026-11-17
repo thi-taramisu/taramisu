@@ -228,11 +228,6 @@
   "deleteNamed": "{{name}} löschen",
   "pathUnavailable": "Pfad nicht verfügbar",
   "breadcrumbs": "Navigationspfad",
-  "entityNotFound": "{{type}} nicht gefunden",
-  "entityMissing": "Nicht vorhanden oder bereits gelöscht: {{type}}.",
-  "loadEntityError": "{{type}} konnte nicht geladen werden.",
-  "loadingEntity": "{{type}} wird geladen…",
-  "refreshEntityError": "{{type}} konnte nicht aktualisiert werden.",
   "targetedAssets": "Angegriffene Assets und kompromittierte Eigenschaften",
   "targetsSource": "Die Ziele ergeben sich aus den verknüpften Schadensszenarien.",
   "linkTargetDamage": "Verknüpfe ein Schadensszenario im Tab Verknüpfungen",
@@ -267,5 +262,42 @@
     "OTHER": "Sonstige"
   },
   "relationDamageLabel": "Schadensszenario",
-  "relationPathLabel": "Angriffspfad"
+  "relationPathLabel": "Angriffspfad",
+  "entityStates": {
+    "items": {
+      "notFound": "Item nicht gefunden",
+      "missing": "Das Item existiert nicht oder wurde gelöscht.",
+      "loadError": "Das Item konnte nicht geladen werden.",
+      "loading": "Das Item wird geladen…",
+      "refreshError": "Das Item konnte nicht aktualisiert werden."
+    },
+    "assets": {
+      "notFound": "Asset nicht gefunden",
+      "missing": "Das Asset existiert nicht oder wurde gelöscht.",
+      "loadError": "Das Asset konnte nicht geladen werden.",
+      "loading": "Das Asset wird geladen…",
+      "refreshError": "Das Asset konnte nicht aktualisiert werden."
+    },
+    "damage-scenarios": {
+      "notFound": "Schadensszenario nicht gefunden",
+      "missing": "Das Schadensszenario existiert nicht oder wurde gelöscht.",
+      "loadError": "Das Schadensszenario konnte nicht geladen werden.",
+      "loading": "Das Schadensszenario wird geladen…",
+      "refreshError": "Das Schadensszenario konnte nicht aktualisiert werden."
+    },
+    "threat-scenarios": {
+      "notFound": "Bedrohungsszenario nicht gefunden",
+      "missing": "Das Bedrohungsszenario existiert nicht oder wurde gelöscht.",
+      "loadError": "Das Bedrohungsszenario konnte nicht geladen werden.",
+      "loading": "Das Bedrohungsszenario wird geladen…",
+      "refreshError": "Das Bedrohungsszenario konnte nicht aktualisiert werden."
+    },
+    "attack-paths": {
+      "notFound": "Angriffspfad nicht gefunden",
+      "missing": "Der Angriffspfad existiert nicht oder wurde gelöscht.",
+      "loadError": "Der Angriffspfad konnte nicht geladen werden.",
+      "loading": "Der Angriffspfad wird geladen…",
+      "refreshError": "Der Angriffspfad konnte nicht aktualisiert werden."
+    }
+  }
 }

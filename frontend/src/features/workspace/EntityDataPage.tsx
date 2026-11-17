@@ -14,15 +14,13 @@ interface EntityDataPageProps {
 
 /** Page of an element loaded from its API, with the not-found, loading and error states around `EntityPage`. */
 export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDataPageProps) {
-  const { t, i18n } = useTranslation()
-  const label = t(`entities.${type}`)
-  const noun = i18n.resolvedLanguage === 'de' ? label : label.toLowerCase()
+  const { t } = useTranslation()
 
   if (isNotFound(entity.error)) {
     return (
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">{t('ui:entityNotFound', { type: label })}</h1>
-        <p className="text-sm text-muted-foreground">{t('ui:entityMissing', { type: noun })}</p>
+        <h1 className="text-xl font-semibold">{t(`ui:entityStates.${type}.notFound`)}</h1>
+        <p className="text-sm text-muted-foreground">{t(`ui:entityStates.${type}.missing`)}</p>
         <Link to={`/projects/${projectId}`} className="text-sm hover:underline">
           {t('navigation.backToProject')}
         </Link>
@@ -31,9 +29,9 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
   }
   if (!entity.data) {
     return entity.isError ? (
-      <p role="alert" className="text-sm text-destructive">{t('ui:loadEntityError', { type: noun })}</p>
+      <p role="alert" className="text-sm text-destructive">{t(`ui:entityStates.${type}.loadError`)}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">{t('ui:loadingEntity', { type: noun })}</output>
+      <output className="text-sm text-muted-foreground">{t(`ui:entityStates.${type}.loading`)}</output>
     )
   }
 
@@ -47,7 +45,7 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
         // A failed refetch keeps the loaded element, so unsaved edits in the tabs survive.
         entity.isError && (
           <p role="alert" className="self-center text-sm text-destructive">
-            {t('ui:refreshEntityError', { type: noun })}
+            {t(`ui:entityStates.${type}.refreshError`)}
           </p>
         )
       }
