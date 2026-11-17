@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import { FEASIBILITY } from '../attack-paths/attackFeasibility'
 import { IMPACT_SCALE } from '../damage-scenarios/impactScale'
 import { RISK_CLASSES } from '../items/riskClasses'
-import { FEASIBILITY_ORDER, RISK_MATRIX, type RatedImpact } from './riskCalculation'
+import { FEASIBILITY_ORDER, RISK_MATRIX, type RatedImpact } from '../../api/riskMatrix'
 
 // Impact rises from the bottom, so Severe is the lowest row and the highest risk sits at the bottom right.
 const IMPACT_ROWS = IMPACT_SCALE.toReversed()

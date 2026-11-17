@@ -164,6 +164,26 @@ describe('threat scenario risks', () => {
     expect(notes().getByText(/is a partial attack path, so the feasibility can still change/)).toBeInTheDocument()
   })
 
+  it('lists no unrated attack path once the feasibility is High', async () => {
+    const api = createMockItemApi()
+    await api.threatScenarios.linkAttackPath('headlamp', 'ts-01', 'ap-03')
+    await api.attackPaths.updateRating('headlamp', 'ap-01', {
+      ap_elapsed_time: 1,
+      ap_specialist_expertise: 0,
+      ap_knowledge_of_item: 0,
+      ap_window_of_opportunity: 0,
+      ap_equipment: 0,
+      ap_total_score: 1,
+      feasibility_rating: 'HIGH',
+      rationale: null,
+    })
+    renderApp(risks, api)
+
+    await screen.findByRole('region', { name: 'Risk overview' })
+    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-01$/)
+    expect(screen.queryByRole('list', { name: 'Notes on the risk values' })).not.toBeInTheDocument()
+  })
+
   it('flags a damage scenario that none of the targets leads to', async () => {
     const api = createMockItemApi()
     await api.threatScenarios.setTargets('headlamp', 'ts-01', [])
@@ -231,7 +251,7 @@ describe('threat scenario risks', () => {
 
   it('shows an error when the risks cannot be loaded', async () => {
     const api = createMockItemApi()
-    api.threatScenarios.riskInputs = () => Promise.reject(new ApiError(500, 'Server error'))
+    api.threatScenarios.risks = () => Promise.reject(new ApiError(500, 'Server error'))
     renderApp(risks, api)
 
     expect(await screen.findByText('The risks could not be loaded.')).toBeInTheDocument()
@@ -239,7 +259,7 @@ describe('threat scenario risks', () => {
 
   it('shows a loading state until the risks arrive', async () => {
     const api = createMockItemApi()
-    api.threatScenarios.riskInputs = () => new Promise(() => undefined)
+    api.threatScenarios.risks = () => new Promise(() => undefined)
     renderApp(risks, api)
 
     expect(await screen.findByText('Loading risks…')).toBeInTheDocument()

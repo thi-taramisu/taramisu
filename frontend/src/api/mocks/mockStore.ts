@@ -4,7 +4,7 @@ import type { AttackFeasibilityRating, AttackPath } from '../models/attackPath'
 import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../models/damageScenario'
 import type { ItemDefinition } from '../models/item'
 import type { RiskGroup } from '../models/risk'
-import type { ThreatAttackPathLink, ThreatDamageLink, ThreatScenario, ThreatScenarioAssetProperty } from '../models/threatScenario'
+import type { RiskValue, ThreatAttackPathLink, ThreatDamageLink, ThreatScenario, ThreatScenarioAssetProperty } from '../models/threatScenario'
 import type { EntityRef, TreeNode } from '../models/tree'
 
 // MOCK: stored data of the in-memory item API and the helpers its services share.
@@ -23,6 +23,8 @@ export interface StoredItem {
   attackPaths: AttackPath[]
   threatAttackPathLinks: ThreatAttackPathLink[]
   attackFeasibilityRatings: AttackFeasibilityRating[]
+  /** Risk values as the backend stores them, so their ids stay the same across recalculations. */
+  riskValues: RiskValue[]
 }
 
 export function validateTitle(title: string | undefined) {

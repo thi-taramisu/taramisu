@@ -2,6 +2,7 @@ import type { AttackFeasibility } from './attackPath'
 import type { CiaProperty } from './asset'
 import type { ImpactRating } from './damageScenario'
 import type { EntityRef } from './tree'
+import type { components } from '../schema'
 
 // Threat scenarios and their links follow `THREAT_SCENARIO`, `THREAT_DAMAGE_LINK`, `THREAT_ATTACK_PATH_LINK`
 // and `THREAT_SCENARIO_ASSET_PROPERTY` of the data model. Not in the backend spec yet.
@@ -59,12 +60,22 @@ export interface ThreatScenarioRelations {
   targets: ThreatTarget[]
 }
 
-/** What the risk values of a threat scenario are calculated from: the impact of its damage scenarios and its rated attack paths. */
-export interface ThreatScenarioRiskInputs {
+/** Risk value of a threat scenario for one impact rating, as `GET /threat-scenarios/{id}/risk-values` returns it. */
+export type RiskValue = components['schemas']['RiskValue']
+
+/**
+ * Risks of a threat scenario as the backend calculates them, with the ratings they are calculated from.
+ * Only `riskValues` is in the backend spec yet.
+ */
+export interface ThreatScenarioRisks {
   damageScenarios: (EntityRef & {
     /** The threat's targets that lead to the damage scenario; empty if none does (RQ-15-03). */
     targetedCauses: ThreatCause[]
-    impactRatings: Pick<ImpactRating, 'impact_category' | 'rating_value'>[]
+    impactRatings: Pick<ImpactRating, 'id' | 'impact_category' | 'rating_value'>[]
   })[]
   attackPaths: (EntityRef & { feasibility: AttackFeasibility | null; isPartial: boolean })[]
+  /** Aggregated attack feasibility: that of the most feasible rated attack path (15.8.2 NOTE 2); null while none is rated. */
+  feasibility: { rating: AttackFeasibility; attackPathId: string } | null
+  /** One per rated impact rating of a linked damage scenario once the feasibility is known [RQ-15-15]. */
+  riskValues: RiskValue[]
 }

@@ -276,16 +276,66 @@ describe('createMockItemApi', () => {
     it('returns the impact ratings and attack path feasibilities the risks are calculated from', async () => {
       const { threatScenarios } = createMockItemApi()
 
-      const inputs = await threatScenarios.riskInputs(project, 'ts-01')
+      const risks = await threatScenarios.risks(project, 'ts-01')
 
-      expect(inputs.damageScenarios).toMatchObject([{ code: 'DS-01', targetedCauses: [{ asset: { code: 'A-01' }, property: 'I' }], impactRatings: [{ impact_category: 'SAFETY', rating_value: 'SEVERE' }, {}, {}] }])
-      expect(inputs.attackPaths.map((path) => [path.code, path.feasibility, path.isPartial])).toEqual([
+      expect(risks.damageScenarios).toMatchObject([{ code: 'DS-01', targetedCauses: [{ asset: { code: 'A-01' }, property: 'I' }], impactRatings: [{ id: 'ir-01', impact_category: 'SAFETY', rating_value: 'SEVERE' }, {}, {}] }])
+      expect(risks.attackPaths.map((path) => [path.code, path.feasibility, path.isPartial])).toEqual([
         ['AP-01', 'LOW', false],
         ['AP-02', 'MEDIUM', false],
       ])
       await threatScenarios.setTargets(project, 'ts-01', [])
-      expect((await threatScenarios.riskInputs(project, 'ts-01')).damageScenarios[0].targetedCauses).toEqual([])
-      expect((await threatScenarios.riskInputs(project, 'ts-02')).damageScenarios).toEqual([])
+      expect((await threatScenarios.risks(project, 'ts-01')).damageScenarios[0].targetedCauses).toEqual([])
+      expect((await threatScenarios.risks(project, 'ts-02')).damageScenarios).toEqual([])
+    })
+
+    it('calculates the risk values with the risk matrix and the most feasible attack path', async () => {
+      const { threatScenarios } = createMockItemApi()
+
+      const risks = await threatScenarios.risks(project, 'ts-01')
+
+      expect(risks.feasibility).toEqual({ rating: 'MEDIUM', attackPathId: 'ap-02' })
+      // Severe × Medium and Moderate × Medium; the omitted Privacy rating gets none.
+      expect(risks.riskValues.map((value) => [value.impact_rating_id, value.risk_score, value.determination_method, value.threat_scenario_id])).toEqual([
+        ['ir-01', 4, 'RISK_MATRIX', 'ts-01'],
+        ['ir-02', 2, 'RISK_MATRIX', 'ts-01'],
+      ])
+    })
+
+    it('recalculates the risk values on a new rating and keeps their ids', async () => {
+      const api = createMockItemApi()
+      const before = await api.threatScenarios.risks(project, 'ts-01')
+      const rate = (feasibility_rating: 'MEDIUM' | 'HIGH') =>
+        api.attackPaths.updateRating(project, 'ap-01', {
+          ap_elapsed_time: 1,
+          ap_specialist_expertise: 0,
+          ap_knowledge_of_item: 0,
+          ap_window_of_opportunity: 0,
+          ap_equipment: 0,
+          ap_total_score: 1,
+          feasibility_rating,
+          rationale: null,
+        })
+
+      await rate('MEDIUM')
+      // On a tie, the first linked attack path decides.
+      expect((await api.threatScenarios.risks(project, 'ts-01')).feasibility).toEqual({ rating: 'MEDIUM', attackPathId: 'ap-01' })
+
+      await rate('HIGH')
+      const after = await api.threatScenarios.risks(project, 'ts-01')
+      expect(after.feasibility).toEqual({ rating: 'HIGH', attackPathId: 'ap-01' })
+      expect(after.riskValues.map((value) => [value.id, value.risk_score])).toEqual([
+        [before.riskValues[0].id, 5],
+        [before.riskValues[1].id, 3],
+      ])
+    })
+
+    it('has no feasibility and no risk values while no attack path is rated', async () => {
+      const api = createMockItemApi()
+      await api.threatScenarios.unlinkAttackPath(project, 'ts-01', 'ap-01')
+      await api.threatScenarios.unlinkAttackPath(project, 'ts-01', 'ap-02')
+      await api.threatScenarios.linkAttackPath(project, 'ts-01', 'ap-03')
+
+      expect(await api.threatScenarios.risks(project, 'ts-01')).toMatchObject({ feasibility: null, riskValues: [] })
     })
 
     it('drops a target when its cause is no longer linked', async () => {

@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { ThreatScenarioRiskInputs } from '../../api/models/threatScenario'
-import { useThreatScenarioRiskInputs } from '../../api/queries/items'
+import type { ThreatScenarioRisks } from '../../api/models/threatScenario'
+import { useThreatScenarioRisks } from '../../api/queries/items'
 import { FEASIBILITY, FEASIBILITY_DOT_CLASSES } from '../attack-paths/attackFeasibility'
 import { FeasibilityBadge } from '../attack-paths/FeasibilityBadge'
 import { IMPACT_DOT_CLASSES, categoryLabel, impactLabel } from '../damage-scenarios/impactScale'
@@ -15,25 +15,25 @@ import { RISK_DOT_CLASSES, riskBadgeClasses } from '../items/riskClasses'
 import { entityPath } from '../workspace/entities'
 import { EntityLink } from '../workspace/EntityLink'
 import { RiskMatrix } from './RiskMatrix'
-import { calculateRisks, isRated, type RatedFeasibility, type RatedRiskRow, type RiskBlocker, type RiskResult } from './riskCalculation'
+import { isRated, riskView, type RatedFeasibility, type RatedRiskRow, type RiskBlocker, type RiskResult } from './riskView'
 
 /** Risks tab of a threat scenario ("TS Risks" wireframe): the risk values from impact and attack feasibility. */
 export function ThreatScenarioRisksTab() {
   const { projectId = '', entityId = '' } = useParams()
-  const inputs = useThreatScenarioRiskInputs(projectId, entityId)
+  const risks = useThreatScenarioRisks(projectId, entityId)
 
-  if (!inputs.data) {
-    return inputs.isError ? (
+  if (!risks.data) {
+    return risks.isError ? (
       <p role="alert" className="text-sm text-destructive">The risks could not be loaded.</p>
     ) : (
       <output className="text-sm text-muted-foreground">Loading risks…</output>
     )
   }
-  const result = calculateRisks(inputs.data)
+  const result = riskView(risks.data)
   return result.missing === null ? (
     <RiskValues projectId={projectId} threatScenarioId={entityId} result={result} />
   ) : (
-    <Blocked projectId={projectId} threatScenarioId={entityId} missing={result.missing} inputs={inputs.data} />
+    <Blocked projectId={projectId} threatScenarioId={entityId} missing={result.missing} risks={risks.data} />
   )
 }
 
@@ -287,7 +287,9 @@ function RiskCalculationPopover({ row, feasibility, isHighest }: { row: RatedRis
 
 /** What the risk values still depend on: attack paths that can change the feasibility. */
 function RiskNotes({ projectId, result }: { projectId: string; result: RiskResult }) {
-  const { decisive, unrated } = result.feasibility
+  const { feasibility, decisive } = result.feasibility
+  // A rating can only raise the feasibility, so unrated paths no longer matter once it is High.
+  const unrated = feasibility === 'HIGH' ? [] : result.feasibility.unrated
   if (unrated.length === 0 && !decisive?.isPartial) return null
 
   return (
@@ -316,7 +318,7 @@ interface BlockedProps {
   projectId: string
   threatScenarioId: string
   missing: RiskBlocker[]
-  inputs: ThreatScenarioRiskInputs
+  risks: ThreatScenarioRisks
 }
 
 const MISSING_MESSAGES: Record<RiskBlocker, string> = {
@@ -326,7 +328,7 @@ const MISSING_MESSAGES: Record<RiskBlocker, string> = {
 }
 
 /** Says everything that is missing for any risk value and where to add it. */
-function Blocked({ projectId, threatScenarioId, missing, inputs }: BlockedProps) {
+function Blocked({ projectId, threatScenarioId, missing, risks }: BlockedProps) {
   const unlinked = missing.filter((item) => item !== 'NO_RATED_ATTACK_PATH')
 
   return (
@@ -339,7 +341,7 @@ function Blocked({ projectId, threatScenarioId, missing, inputs }: BlockedProps)
       </ul>
       {missing.includes('NO_RATED_ATTACK_PATH') && (
         <ul className="grid gap-1">
-          {inputs.attackPaths.map((path) => (
+          {risks.attackPaths.map((path) => (
             <li key={path.id}>
               Rate <EntityLink projectId={projectId} type="attack-paths" entity={path} tab="rating" />
             </li>
