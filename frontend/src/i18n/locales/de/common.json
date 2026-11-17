@@ -23,7 +23,6 @@
     "projectElements": "Projektelemente",
     "resizeProjectElements": "Breite der Seitenleiste ändern",
     "new": "Neu",
-    "newDamageScenario": "Schadensszenario",
     "entityTabs": "Registerkarten: {{type}}",
     "expandElement": "{{name}} ausklappen",
     "collapseElement": "{{name}} einklappen",

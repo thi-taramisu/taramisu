@@ -92,7 +92,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         direction="down"
         title={t('ui:relationThreatsTitle')}
         pluralLabel={t('ui:relationThreatsPlural')}
-        elementLabel={t('ui:relationThreatLabel')}
+        elementLabel={t('entities.threat-scenarios')}
         candidates={threatCandidates}
         removeEffect={t('ui:removeLinkWithTargets')}
         pending={saving}

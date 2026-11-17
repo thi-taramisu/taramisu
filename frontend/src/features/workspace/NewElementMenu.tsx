@@ -30,7 +30,7 @@ export function NewElementMenu({ projectId, projectName }: { projectId: string; 
           <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
           {/* A new key per opening, so the dialog starts from the item and asset of the current page. */}
           <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            {t('navigation.newDamageScenario')}
+            {t('entities.damage-scenarios')}
           </DropdownMenuItem>
           {OTHER_TYPES.map((label) => (
             <DropdownMenuItem key={label} disabled>

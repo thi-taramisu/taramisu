@@ -42,7 +42,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
         direction="down"
         title={t('ui:relationPathsTitle')}
         pluralLabel={t('ui:relationPathsPlural')}
-        elementLabel={t('ui:relationPathLabel')}
+        elementLabel={t('entities.attack-paths')}
         candidates={itemPaths.data?.filter((path) => !attackPaths.some((linked) => linked.id === path.id)) ?? []}
         candidatesLoading={itemPaths.isPending}
         candidatesError={itemPaths.isLoadingError ? t('ui:loadItemPathsError') : undefined}

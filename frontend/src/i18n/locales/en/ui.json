@@ -186,7 +186,6 @@
   "relationAssetsPlural": "assets",
   "relationThreatsTitle": "Threat Scenarios",
   "relationThreatsPlural": "threat scenarios",
-  "relationThreatLabel": "Threat Scenario",
   "loadItemAssetsError": "The assets of this item could not be loaded.",
   "loadItemThreatsError": "The threat scenarios of this item could not be loaded.",
   "saveRelationError": "The link could not be changed. Please try again.",
@@ -261,8 +260,6 @@
     "STRIDE": "STRIDE",
     "OTHER": "Other"
   },
-  "relationDamageLabel": "Damage Scenario",
-  "relationPathLabel": "Attack Path",
   "entityStates": {
     "items": {
       "notFound": "Item not found",

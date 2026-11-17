@@ -186,7 +186,6 @@
   "relationAssetsPlural": "Assets",
   "relationThreatsTitle": "Bedrohungsszenarien",
   "relationThreatsPlural": "Bedrohungsszenarien",
-  "relationThreatLabel": "Bedrohungsszenario",
   "loadItemAssetsError": "Die Assets dieses Items konnten nicht geladen werden.",
   "loadItemThreatsError": "Die Bedrohungsszenarien dieses Items konnten nicht geladen werden.",
   "saveRelationError": "Die Verknüpfung konnte nicht geändert werden. Bitte versuche es erneut.",
@@ -261,8 +260,6 @@
     "STRIDE": "STRIDE",
     "OTHER": "Sonstige"
   },
-  "relationDamageLabel": "Schadensszenario",
-  "relationPathLabel": "Angriffspfad",
   "entityStates": {
     "items": {
       "notFound": "Item nicht gefunden",

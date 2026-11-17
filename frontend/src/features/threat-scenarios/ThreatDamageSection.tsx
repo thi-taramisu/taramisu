@@ -26,7 +26,7 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
       title={t('ui:relationDamageTitle')}
       pluralLabel={t('ui:relationDamagePlural')}
       removeEffect={t('ui:removeLinkWithTargets')}
-      elementLabel={t('ui:relationDamageLabel')}
+      elementLabel={t('entities.damage-scenarios')}
       rows={linked}
       candidates={itemScenarios.data?.filter((ds) => !linked.some((l) => l.id === ds.id)) ?? []}
       candidatesLoading={itemScenarios.isPending}

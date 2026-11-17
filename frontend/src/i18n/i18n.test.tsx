@@ -203,3 +203,14 @@ it('keeps the threat definition and relations translated when switching with an 
   expect(await screen.findByRole('region', { name: 'Schadensszenarien' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Angriffspfad hinzufügen' })).toBeInTheDocument()
 })
+
+it.each([
+  ['en', 'New', ['Item', 'Damage Scenario', 'Asset', 'Threat Scenario', 'Attack Path']],
+  ['de', 'Neu', ['Item', 'Schadensszenario', 'Asset', 'Bedrohungsszenario', 'Angriffspfad']],
+] as const)('uses consistent glossary labels in the %s new-element menu', async (language, button, labels) => {
+  await i18n.changeLanguage(language)
+  const { user } = renderApp('/projects/headlamp/items/i-01')
+  await screen.findByRole('heading', { name: 'Headlamp system' })
+  await user.click(screen.getByRole('button', { name: button }))
+  expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(labels)
+})

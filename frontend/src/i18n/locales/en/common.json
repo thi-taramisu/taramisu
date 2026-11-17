@@ -23,7 +23,6 @@
     "projectElements": "Project elements",
     "resizeProjectElements": "Resize project elements",
     "new": "New",
-    "newDamageScenario": "Damage Scenario",
     "entityTabs": "{{type}} tabs",
     "expandElement": "Expand {{name}}",
     "collapseElement": "Collapse {{name}}",
@@ -42,8 +41,8 @@
   "entities": {
     "items": "Item",
     "assets": "Asset",
-    "damage-scenarios": "Damage scenario",
-    "threat-scenarios": "Threat scenario",
-    "attack-paths": "Attack path"
+    "damage-scenarios": "Damage Scenario",
+    "threat-scenarios": "Threat Scenario",
+    "attack-paths": "Attack Path"
   }
 }

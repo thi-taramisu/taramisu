@@ -42,7 +42,8 @@ describe('routing', () => {
     const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01' }
     renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
 
-    const tabs = await screen.findByRole('navigation', { name: `${ENTITY_TYPES[type].label} tabs` })
+    const labels = { items: 'Item', assets: 'Asset', 'damage-scenarios': 'Damage Scenario', 'threat-scenarios': 'Threat Scenario', 'attack-paths': 'Attack Path' }
+    const tabs = await screen.findByRole('navigation', { name: `${labels[type]} tabs` })
     expect(within(tabs).getByRole('link', { name: new RegExp(`^${label}`) })).toHaveAttribute('aria-current', 'page')
   })
 
@@ -57,9 +58,9 @@ describe('routing', () => {
   it('shows the graph view with ?view=graph and keeps it in the tree links', async () => {
     renderAt(`${project}/damage-scenarios/ds-01?view=graph`)
 
-    expect(await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario #01' })).toBeInTheDocument()
     expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
-    expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Damage Scenario tabs' })).not.toBeInTheDocument()
     const tree = screen.getByRole('navigation', { name: 'Project elements' })
     expect(within(tree).getByRole('link', { name: 'A-01 Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01?view=graph`)
   })
@@ -71,7 +72,7 @@ describe('routing', () => {
     expect(screen.getByText('Graph view: not implemented yet')).toBeInTheDocument()
 
     await user.click(screen.getByRole('switch', { name: 'Graph' }))
-    expect(screen.getByRole('navigation', { name: 'Damage scenario tabs' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Damage Scenario tabs' })).toBeInTheDocument()
   })
 
   it('routes the project settings sections', async () => {
