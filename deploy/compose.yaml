@@ -6,6 +6,7 @@ include:
   - ./compose.frontend.yaml
   - ./compose.proxy.yaml
   - ./compose.docs.yaml
+  - ./compose.llm.yaml
 
 # Network segmentation from the architecture overview (#87).
 # Only edge has published ports and internet access; the others are internal.
@@ -18,3 +19,8 @@ networks:
     internal: true
   iam-db:
     internal: true
+  llm:
+    internal: true
+  # Only the LLM service joins this network, so it is the one container that reaches the model API (#229).
+  # Not edge: the proxy is there, and it must not reach the service that holds the API key.
+  llm-egress:
