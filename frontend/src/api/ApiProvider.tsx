@@ -1,7 +1,9 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { createApiClient, type ApiClient } from './client'
 import { createMockItemApi } from './mocks/mockItemApi'
-import { createMockProjectApi } from './mocks/mockProjectApi'
+import { createExampleProjectApi } from './mocks/mockProjectApi'
+import { createMockProjectExtras } from './mocks/mockProjectExtras'
+import { createProjectApi } from './projects'
 import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
@@ -10,8 +12,8 @@ import type { ThreatScenarioService } from './services/threatScenarios'
 import { useAuth } from '@/auth/useAuth'
 
 /**
- * Everything the app reads from the backend. `client` always talks to the real backend; the services
- * are mocks until their routes are in `backend/openapi.json` (see `main.tsx`).
+ * Everything the app reads from the backend. `client` and `projects` talk to the real backend; the other
+ * services are mocks until their routes are in `backend/openapi.json`. Tests pass mocks through `api`.
  */
 export interface Api {
   client: ApiClient
@@ -34,7 +36,11 @@ export function ApiProvider({
 }) {
   const { accessToken, signOut } = useAuth()
   const defaultMocks = useMemo(() => createMockItemApi(), [])
-  const defaultProjects = useMemo(() => createMockProjectApi(), [])
+  // Created once, so the mocked parts of the projects survive a new token (and with it a new client).
+  const projectMocks = useMemo(
+    () => ({ extras: createMockProjectExtras(), example: createExampleProjectApi() }),
+    [],
+  )
 
   const client = useMemo(
     () =>
@@ -47,6 +53,7 @@ export function ApiProvider({
       }),
     [accessToken, api?.client, signOut],
   )
+  const defaultProjects = useMemo(() => createProjectApi(client, projectMocks), [client, projectMocks])
 
   const value = useMemo<Api>(
     () => ({

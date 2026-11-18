@@ -169,6 +169,7 @@ export function ProjectListPage() {
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
                             <ProjectImage projectId={project.id} image={project.image} className="size-14 rounded-md" />
+                            {/* Only the example project has a workspace so far (#250); the others open their settings. */}
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
@@ -178,7 +179,13 @@ export function ProjectListPage() {
                                 {projectDetails}
                               </Link>
                             ) : (
-                              projectDetails
+                              <Link
+                                to={`/projects/${project.id}/settings`}
+                                aria-label={`${project.name} settings`}
+                                className="min-w-0 flex-1 hover:opacity-80"
+                              >
+                                {projectDetails}
+                              </Link>
                             )}
 
                             <Button

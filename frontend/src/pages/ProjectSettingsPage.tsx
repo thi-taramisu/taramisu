@@ -15,8 +15,9 @@ const SECTIONS = [
 export function ProjectSettingsPage() {
   const { projectId = '' } = useParams()
   const project = useProject(projectId)
-  // Settings data exists only for the example project; a deleted project has no settings.
-  if (projectId !== exampleProject.id || isNotFound(project.error)) return <NotFoundPage />
+  if (isNotFound(project.error)) return <NotFoundPage />
+  // Only the example project has a workspace so far (#250).
+  const back = projectId === exampleProject.id ? `/projects/${projectId}` : '/projects'
 
   return (
     <div className="flex h-screen flex-col">
@@ -24,7 +25,7 @@ export function ProjectSettingsPage() {
       <ArchivedProjectBanner projectId={projectId} />
       <div className="flex min-h-0 flex-1">
         <nav aria-label="Settings" className="w-56 shrink-0 space-y-1 border-r p-3">
-          <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
+          <Link to={back} className="mb-3 block text-sm text-muted-foreground hover:underline">
             ← Back
           </Link>
           <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">Settings</h2>
