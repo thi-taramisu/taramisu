@@ -58,12 +58,17 @@ services:
         condition: service_healthy
 
   api:
-    networks: [proxy, app-db]
+    networks: [proxy, app-db, taramisu-storage]
     image: ghcr.io/thi-taramisu/taramisu-api:${TARAMISU_VERSION:-latest}
     build:
       context: ../backend
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
+      S3_ENDPOINT: http://storage:8333
+      S3_REGION: us-east-1
+      S3_BUCKET: ${S3_BUCKET:-taramisu-uploads}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
       APP_URL: ${APP_URL:-http://localhost}
       OIDC_ISSUER: ${OIDC_ISSUER:-${APP_URL:-http://localhost}/auth/application/o/taramisu/}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://authentik-server:9000/auth/application/o/taramisu/jwks/}
@@ -71,6 +76,8 @@ services:
       AUTHENTIK_API_URL: http://authentik-server:9000/auth
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}
     depends_on:
+      storage-init:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
     # Docker's default, made explicit: the API drains for shutdownTimeout and closes its pool within

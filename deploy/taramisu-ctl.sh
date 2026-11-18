@@ -65,7 +65,7 @@ ensure_env() {
 }
 
 # Server stack: compose.yaml only (no dev ports), images from GHCR instead of local builds.
-compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
+compose() { docker compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml "$@"; }
 
 # Waits until all given services report healthy. Unlike "compose up --wait" it keeps waiting
 # when a service is briefly unhealthy, e.g. while Authentik migrates its database on first start.
@@ -206,7 +206,11 @@ log "Release $target"
 export TARAMISU_VERSION="${TARAMISU_IMAGE_TAG:-$target}"
 ensure_env
 log 'Pulling images'
-compose pull --quiet
+compose pull --quiet --ignore-buildable
+# These services also have local build definitions, but servers use their release images.
+compose pull --quiet api frontend docs
+log 'Building storage provisioning jobs from the selected release'
+compose build storage-config storage-init
 start_stack
 if $prune; then
     prune_images
