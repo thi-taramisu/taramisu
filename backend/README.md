@@ -78,6 +78,24 @@ The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-gro
 host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
 omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
 
+## Logging
+
+The API writes JSON log lines to stderr; `LOG_LEVEL` sets the minimum level (`debug`, `info`, `warn`, `error`; default `info`).
+
+- Every request gets an ID: NGINX sets `X-Request-ID` to its `$request_id`, which also appears in its access log, and the API
+  returns it in the response. Log lines written with the request context carry it as `request_id`. Without NGINX (for
+  example `make run`), the API keeps an ID the client sends, so such IDs are only trustworthy behind the proxy.
+- One `request` line per request with method, path, route, status, duration, and the caller's internal user ID (`actor`).
+  Health checks are logged at `debug`.
+- Security entries: `authentication failed` (with `reason`) and `access denied` (with `operation`, `status`, and `actor`;
+  `warn` for 403, `info` for 404, which also covers records that no longer exist).
+- Errors that a handler does not map to an HTTP status are logged as `unexpected error` (or `request cancelled` at `info` if
+  the client went away); the client gets a plain 500 without the error text. That text can contain input values, for
+  example from PostgreSQL errors. Panics are logged with their stack trace.
+- In the Compose stack, set `LOG_LEVEL` in `iam/.env`.
+
+What is logged and what is stored as audit history is described in [Audit and logging](../docs/internal/architecture/audit.md).
+
 ## Checks
 
 ```sh
@@ -181,6 +199,7 @@ db/                            schema, Atlas migrations, sqlc queries
 internal/db/                   sqlc-generated query code
 internal/httpapi/              router, OpenAPI
 internal/httpapi/handlers/     HTTP handlers
+internal/logging/              JSON logger, request IDs, request log
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
