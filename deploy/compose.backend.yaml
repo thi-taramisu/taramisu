@@ -44,6 +44,23 @@ services:
       db:
         condition: service_healthy
 
+  db-backup:
+    image: postgres:17-alpine
+    entrypoint: ["/bin/sh", "/backup_restore.sh"]
+    networks: [app-db]
+    environment:
+      POSTGRES_USER: taramisu
+      POSTGRES_PASSWORD: taramisu
+      POSTGRES_DB: taramisu
+      DB_HOST: db
+    volumes:
+      - ../backend/backup_restore.sh:/backup_restore.sh:ro
+      - ../backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    
   migrate:
     image: arigaio/atlas:1.3.0
     networks: [app-db]
@@ -54,8 +71,9 @@ services:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
     command: ["migrate", "apply", "--env", "local"]
     depends_on:
-      db:
-        condition: service_healthy
+      db-backup:
+        condition:
+          service_completed_successfully
 
   api:
     networks: [proxy, app-db]
