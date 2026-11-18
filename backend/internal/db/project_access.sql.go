@@ -15,6 +15,7 @@ const getProjectRole = `-- name: GetProjectRole :one
 
 SELECT a.project_role
 FROM project_role_assignment a
+JOIN tara_project p ON p.id = a.tara_project_id AND p.deleted_at IS NULL
 LEFT JOIN iam_group g ON g.id = a.group_id
 WHERE a.tara_project_id = $1
   AND (a.user_id = $2 OR g.external_iam_group_id = ANY($3::text[]))
@@ -30,7 +31,9 @@ type GetProjectRoleParams struct {
 
 // Project authorization (see docs/internal/architecture/iam/project-roles.md).
 // Highest role of the caller in a project, from a direct assignment or one of the caller's
-// Authentik groups (taramisu_groups claim). Returns no row when the caller has no role.
+// Authentik groups (taramisu_groups claim). Returns no row when the caller has no role or the
+// project is marked as deleted, so a deleted project is hidden from every operation that checks
+// access, like a project that does not exist.
 func (q *Queries) GetProjectRole(ctx context.Context, arg GetProjectRoleParams) (ProjectRole, error) {
 	row := q.db.QueryRow(ctx, getProjectRole, arg.ProjectID, arg.UserID, arg.GroupIds)
 	var project_role ProjectRole

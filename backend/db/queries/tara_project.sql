@@ -12,19 +12,21 @@ WITH project AS (
 SELECT id, name, description, created_at FROM project;
 
 -- name: GetTaraProject :one
-SELECT * FROM tara_project WHERE id = $1;
+SELECT * FROM tara_project WHERE id = $1 AND deleted_at IS NULL;
 
 -- The project before a settings change, locked until the transaction ends (see LockTaraProject).
 -- name: GetTaraProjectForUpdate :one
-SELECT * FROM tara_project WHERE id = $1 FOR NO KEY UPDATE;
+SELECT * FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE;
 
--- List only projects the caller has a role in, with the caller's highest role.
+-- List only projects the caller has a role in, with the caller's highest role. Projects marked as
+-- deleted are left out.
 -- name: ListTaraProjects :many
 SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
-WHERE a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[])
+WHERE p.deleted_at IS NULL
+  AND (a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[]))
 GROUP BY p.id
 ORDER BY p.created_at DESC, p.id;
 
@@ -38,7 +40,24 @@ SET name = COALESCE(sqlc.narg('name'), name),
 WHERE id = @id
 RETURNING *;
 
--- Returns the deleted project's settings for the audit history; no row if it does not exist.
--- name: DeleteTaraProject :one
-DELETE FROM tara_project WHERE id = $1
+-- Marks the project as deleted: it is hidden from everyone at once and deleted for good after the
+-- grace period (PurgeDeletedTaraProjects). Returns the project's name for the audit history; no row
+-- if it does not exist or is already marked (the Store's lock on the project finds that first).
+-- name: MarkTaraProjectDeleted :one
+UPDATE tara_project SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
 RETURNING id, name;
+
+-- Takes the mark back; no row if the project does not exist or is not marked as deleted.
+-- name: RestoreTaraProject :one
+UPDATE tara_project SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL
+RETURNING id, name;
+
+-- Lets one replica at a time delete projects for good; released when the transaction ends.
+-- name: TryProjectPurgeLock :one
+SELECT pg_try_advisory_xact_lock(236001);
+
+-- Deletes the projects that were marked as deleted before the cutoff, with all their content
+-- (ON DELETE CASCADE). A project restored in the meantime no longer matches.
+-- name: PurgeDeletedTaraProjects :many
+DELETE FROM tara_project WHERE deleted_at < sqlc.arg(cutoff)::timestamptz
+RETURNING id;

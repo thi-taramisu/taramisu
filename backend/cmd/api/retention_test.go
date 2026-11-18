@@ -28,7 +28,7 @@ func (f *fakePurger) PurgeExpiredAuditEvents(ctx context.Context, cutoff pgtype.
 	return 3, f.err
 }
 
-func TestPurgeAuditEventsRunsAtStartAndThenPeriodically(t *testing.T) {
+func TestCleanupRunsAtStartAndThenPeriodically(t *testing.T) {
 	for _, failing := range []bool{false, true} {
 		purger := &fakePurger{called: make(chan struct{})}
 		if failing {
@@ -42,7 +42,7 @@ func TestPurgeAuditEventsRunsAtStartAndThenPeriodically(t *testing.T) {
 			if failing {
 				interval, retry = time.Hour, 10*time.Millisecond // a failure retries after retry, not after interval
 			}
-			purgeAuditEvents(ctx, purger, time.Hour, interval, retry)
+			runCleanup(ctx, "audit retention", purgeAuditEvents(purger, time.Hour), interval, retry)
 			close(done)
 		}()
 		for range 2 {
@@ -64,5 +64,30 @@ func TestPurgeAuditEventsRunsAtStartAndThenPeriodically(t *testing.T) {
 		if want := start.Add(-time.Hour); first.Before(want.Add(-time.Second)) || first.After(want.Add(time.Second)) {
 			t.Errorf("cutoff = %v, want about %v", first, want)
 		}
+	}
+}
+
+type fakeProjectPurger struct {
+	cutoff time.Time
+	err    error
+}
+
+func (f *fakeProjectPurger) PurgeDeletedProjects(_ context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
+	f.cutoff = cutoff.Time
+	return []pgtype.UUID{{Bytes: [16]byte{0x23, 0x60}, Valid: true}}, f.err
+}
+
+func TestPurgeDeletedProjectsUsesTheGracePeriod(t *testing.T) {
+	purger := &fakeProjectPurger{}
+	start := time.Now()
+	if err := purgeDeletedProjects(purger, 720*time.Hour)(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if want := start.Add(-720 * time.Hour); purger.cutoff.Before(want.Add(-time.Second)) || purger.cutoff.After(want.Add(time.Second)) {
+		t.Errorf("cutoff = %v, want about %v", purger.cutoff, want)
+	}
+	purger.err = errors.New("database down")
+	if err := purgeDeletedProjects(purger, time.Hour)(t.Context()); !errors.Is(err, purger.err) {
+		t.Errorf("error = %v, want the store's error, so the loop retries", err)
 	}
 }

@@ -27,6 +27,7 @@ type Config struct {
 	AuthentikMetadataCacheTTL time.Duration
 	LogLevel                  slog.Level
 	AuditRetentionAfterDelete time.Duration
+	ProjectDeleteGracePeriod  time.Duration
 }
 
 // Load reads and validates the runtime configuration from the environment.
@@ -91,14 +92,15 @@ func Load() (Config, error) {
 		authentikMetadataCacheTTL = parsed
 	}
 
-	// Audit events of a deleted project are kept this long after its deletion (one year).
-	auditRetentionAfterDelete := 8760 * time.Hour
-	if raw := os.Getenv("AUDIT_RETENTION_AFTER_DELETE"); raw != "" {
-		parsed, err := time.ParseDuration(raw)
-		if err != nil || parsed <= 0 {
-			return Config{}, fmt.Errorf("invalid AUDIT_RETENTION_AFTER_DELETE: must be a positive duration: %q", raw)
-		}
-		auditRetentionAfterDelete = parsed
+	// Audit events of a deleted project are kept this long after its deletion was requested (one year).
+	auditRetentionAfterDelete, err := positiveDuration("AUDIT_RETENTION_AFTER_DELETE", 8760*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	// A deleted project can be restored this long, then it is deleted for good (30 days).
+	projectDeleteGracePeriod, err := positiveDuration("PROJECT_DELETE_GRACE_PERIOD", 720*time.Hour)
+	if err != nil {
+		return Config{}, err
 	}
 
 	logLevel := slog.LevelInfo
@@ -120,6 +122,7 @@ func Load() (Config, error) {
 		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
 		LogLevel:                  logLevel,
 		AuditRetentionAfterDelete: auditRetentionAfterDelete,
+		ProjectDeleteGracePeriod:  projectDeleteGracePeriod,
 	}, nil
 }
 
@@ -172,4 +175,18 @@ func validateHTTPURL(rawURL string) error {
 		return errors.New("must not contain credentials, query parameters, or fragments")
 	}
 	return nil
+}
+
+// positiveDuration reads a duration such as "720h" from the environment variable name, or returns
+// fallback if it is not set.
+func positiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid %s: must be a positive duration: %q", name, raw)
+	}
+	return parsed, nil
 }

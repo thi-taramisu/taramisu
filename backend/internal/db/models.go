@@ -627,6 +627,7 @@ type TaraProject struct {
 	Name        string
 	Description *string
 	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {

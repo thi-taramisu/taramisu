@@ -95,8 +95,11 @@ The API writes JSON log lines to stderr; `LOG_LEVEL` sets the minimum level (`de
 - In the Compose stack, set `LOG_LEVEL` in `iam/.env`.
 
 What is logged and what is stored as audit history is described in [Audit and logging](../docs/internal/architecture/audit.md).
-At start and once a day, the API deletes the audit history of a deleted project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`,
-one year); in the Compose stack, set it in `iam/.env`.
+Deleting a project only marks it and hides it from all members. At start and once a day, the API deletes projects for good
+that were marked more than `PROJECT_DELETE_GRACE_PERIOD` ago (default `720h`, 30 days), and the audit history of a deleted
+project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`, one year). In the Compose stack, set both in `iam/.env`.
+Until the grace period ends, operators can restore a project with `cmd/restore-project`
+([deployment guide](../deploy/README.md#restoring-a-deleted-project)).
 
 ## Checks
 
@@ -197,6 +200,7 @@ fails. Missing or empty domain coverage fails the check. The raw profile still c
 ```text
 cmd/api/                       entrypoint
 cmd/openapi/                   offline OpenAPI JSON export (stdout)
+cmd/restore-project/           operator command: restore a deleted project
 db/                            schema, Atlas migrations, sqlc queries
 internal/db/                   sqlc-generated query code
 internal/httpapi/              router, OpenAPI
