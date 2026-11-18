@@ -59,6 +59,10 @@ Auth values: public means no login, user means logged in, and read, write and ma
 [project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
+Projects (#248): the list, creating, renaming (Settings, General) and deleting use `/api/v1/projects`. Favorites, archive, owner and
+image are mocked in memory until the backend has them. Only the example project (`headlamp`) has a workspace; other projects link to
+their settings until their items come from the backend (#250), and the settings' Back link leads to the project list for them.
+
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
 `&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.

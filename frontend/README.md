@@ -47,6 +47,8 @@ src/
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
 `/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
+The project list comes from the backend (`/api/v1/projects`) plus the example project; projects from the backend open their settings,
+since their workspace needs the item routes (#250).
 The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
@@ -84,6 +86,7 @@ forwards the full URI. So the base URL is only the origin: same origin by defaul
 src/api/
   client.ts, schema.d.ts   # REAL: openapi-fetch client, types generated from backend/openapi.json
   queries/backend.ts       # REAL: hooks on the client (health, current user)
+  projects.ts              # REAL: ProjectService on /api/v1/projects, with mocked extras (see below)
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
   services/                # service interfaces the views use (e.g. ItemService, ProjectService)
@@ -92,9 +95,15 @@ src/api/
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
 
-`src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
-`ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
-model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
+`ApiProvider` is the only place that decides between real and mock: by default it provides the real client and project service and the
+mock item services; tests pass mocks through its `api` prop. Once a route is in the spec, implement its service on the client (rejecting
+with `ApiError` and the HTTP status), derive the model from `components['schemas']` in `schema.d.ts`, and use it as the default in
+`ApiProvider`.
+
+Project fields the backend does not have yet (`favorite`, `archived`, `owner`, `image`) come from `mocks/mockProjectExtras.ts`, kept in
+memory by project ID and reset on reload; each is marked with the issue that moves it to the backend. The example project (`headlamp`) is
+served by the mock project API until it exists in the backend. The E2E tests run without a backend and stub `/api/v1/projects` with
+`e2e/support/projectsApi.ts`. Components never import from `mocks/` except for data
 that has no service yet (project settings, example project).
 
 Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it

@@ -4,7 +4,6 @@ import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
-import { isNotFound } from '../../api/errors'
 import {
   resetFailed,
   useArchiveProject,
@@ -45,20 +44,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
     if (!isOpen) setOpenDialog(null)
   }
 
-  // A 404 is handled by the settings page; other errors must not look like missing rights.
-  if (project.isError && !isNotFound(project.error)) {
-    return (
-      <div className="flex items-center justify-between gap-2">
-        <p role="alert" className="text-sm text-destructive">
-          The archive and delete options could not be loaded.
-        </p>
-        <Button variant="outline" size="sm" onClick={() => void project.refetch()}>
-          Retry
-        </Button>
-      </div>
-    )
-  }
-
+  // Load errors are shown by the General section (`GeneralSettings.tsx`); without the project nothing is offered.
   if (project.data?.role !== 'OWNER') return null
 
   const { name, archived } = project.data

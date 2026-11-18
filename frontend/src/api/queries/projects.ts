@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
-import type { NewProject, Project } from '../models/project'
+import type { NewProject, Project, ProjectUpdate } from '../models/project'
 
 // The list has its own key: everything below a project uses the prefix ['projects', projectId] (see
 // `items.ts`), and refreshing the list must not refetch every project's tree.
@@ -58,6 +58,16 @@ export function useCreateProject() {
   const api = useApi()
   const store = useStoreProject()
   return useMutation({ mutationFn: (body: NewProject) => api.projects.create(body), onSuccess: store })
+}
+
+/** Renames a project, i.e. changes its name and description. */
+export function useUpdateProject() {
+  const api = useApi()
+  const store = useStoreProject()
+  return useMutation({
+    mutationFn: ({ projectId, ...body }: ProjectUpdate & { projectId: string }) => api.projects.update(projectId, body),
+    onSuccess: store,
+  })
 }
 
 /** Shows the new favorite state at once, so quick clicks toggle back and forth; undone on failure. */

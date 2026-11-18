@@ -17,6 +17,8 @@ import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
+import { isUnauthorized } from '@/api/errors'
+import { SignInPrompt } from '@/auth/SignInPrompt'
 import type { Project } from '@/api/models/project'
 import {
   useArchiveProject,
@@ -103,7 +105,10 @@ export function ProjectListPage() {
             {projectsQuery.isPending && (
               <p className="text-sm text-muted-foreground">Loading projects…</p>
             )}
-            {projectsQuery.isError && (
+            {isUnauthorized(projectsQuery.error) && (
+              <SignInPrompt>Sign in to see your projects.</SignInPrompt>
+            )}
+            {projectsQuery.isError && !isUnauthorized(projectsQuery.error) && (
               <div className="flex items-center justify-between gap-2">
                 <p role="alert" className="text-sm text-destructive">
                   The projects could not be loaded.
@@ -169,6 +174,7 @@ export function ProjectListPage() {
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
                             <ProjectImage projectId={project.id} image={project.image} className="size-14 rounded-md" />
+                            {/* Only the example project has a workspace so far (#250); the others open their settings. */}
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
@@ -178,7 +184,13 @@ export function ProjectListPage() {
                                 {projectDetails}
                               </Link>
                             ) : (
-                              projectDetails
+                              <Link
+                                to={`/projects/${project.id}/settings`}
+                                aria-label={`${project.name} settings`}
+                                className="min-w-0 flex-1 hover:opacity-80"
+                              >
+                                {projectDetails}
+                              </Link>
                             )}
 
                             <Button

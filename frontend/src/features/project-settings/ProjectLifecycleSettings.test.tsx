@@ -191,20 +191,4 @@ describe('ProjectLifecycleSettings', () => {
     expect(await within(lifecycle).findByRole('button', { name: 'Restore Project' })).toBeInTheDocument()
     expect(within(lifecycle).queryByRole('alert')).not.toBeInTheDocument()
   })
-
-  it('shows an error with a retry when the project cannot be loaded', async () => {
-    const projects = createMockProjectApi()
-    const get = projects.get
-    let fail = true
-    projects.get = (projectId) => (fail ? Promise.reject(new ApiError(500, 'Server error.')) : get(projectId))
-    const { user } = renderSettings(projects)
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('The archive and delete options could not be loaded.')
-
-    fail = false
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
-
-    expect(await section()).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
 })
