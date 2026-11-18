@@ -173,20 +173,20 @@ blueprint). Revoking access faster would need a check against Authentik on every
 
 ## Audit
 
-The API writes one structured log entry (`audit` message) for each of these events:
+Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): the API stores one event in the audit history for each
+of these changes, in the same transaction as the change. Rejected changes (for example the `409` for the last Owner) store
+nothing.
 
 | Event | Recorded values |
 | --- | --- |
-| Member added | Actor, project, member ID, user or group, role |
-| Role changed, including ownership transfer | Actor, project, member ID, user or group, role before and after |
-| Member removed or left the project | Actor, project, member ID, user or group, role before; whether the actor removed themselves |
-| Project deleted | Actor, project |
+| `member.added` | Actor, project, member ID; after: role, user or group |
+| `member.role_changed`, including ownership transfer | Actor, project, member ID; role before and after, user or group |
+| `member.removed`, including leaving the project | Actor, project, member ID; before: role, user or group. When someone left, the actor is that user |
+| `project.deleted` | Actor, project; before: name and role assignments (role, user or group) |
 
-Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp.
-
-Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): these events are also stored in the database,
-in the same transaction as the change. Events are kept for the project's lifetime and one year after its deletion. At first
-only operators read them. The table, retention, readers, and further events are described in [Audit and logging](../audit.md).
+Actor, user, and group are internal IDs, never names or email addresses. Events are kept for the project's lifetime and one
+year after its deletion; at first only operators read them. Each event is also written as an `audit` log line with IDs and
+roles only. The table, retention, readers, and further events are described in [Audit and logging](../audit.md).
 
 ## User interface
 

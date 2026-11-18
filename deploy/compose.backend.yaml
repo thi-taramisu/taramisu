@@ -71,6 +71,7 @@ services:
       AUTHENTIK_API_URL: http://authentik-server:9000/auth
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      AUDIT_RETENTION_AFTER_DELETE: ${AUDIT_RETENTION_AFTER_DELETE:-8760h}
     depends_on:
       migrate:
         condition: service_completed_successfully
