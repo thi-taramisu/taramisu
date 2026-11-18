@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,18 +11,20 @@ import (
 )
 
 // Audit history events. The catalog, including events still to be added, is in
-// docs/internal/architecture/audit.md.
+// docs/internal/architecture/audit.md. Record changes use "<target type>.created", ".updated" and
+// ".deleted" (see Created, Updated and Deleted).
 const (
 	EventMemberAdded       = "member.added"
 	EventMemberRoleChanged = "member.role_changed"
 	EventMemberRemoved     = "member.removed"
-	EventProjectDeleted    = "project.deleted"
+	EventProjectDeleted    = TargetProject + ".deleted"
 )
 
 // Target types of audit events.
 const (
-	TargetProject       = "project"
-	TargetProjectMember = "project_member"
+	TargetProject        = "project"
+	TargetProjectMember  = "project_member"
+	TargetItemDefinition = "item_definition"
 )
 
 // Actor is who makes a change. Every audit event records it.
@@ -30,15 +33,37 @@ type Actor struct {
 	RequestID string      // links the event to the request's log lines; may be empty
 }
 
-// auditEntry is one event of the audit history. Before and After are stored as JSON; nil stores NULL.
-// A zero auditEntry (no Event) means that the change was a no-op and nothing is recorded.
-type auditEntry struct {
+// Change is one event of the audit history, as returned by the function passed to Store.Audit.
+// Before and After are stored as JSON; nil stores NULL. A zero Change (no Event) means that the
+// change was a no-op and nothing is recorded.
+type Change struct {
 	Event      string
 	ProjectID  pgtype.UUID
 	TargetType string
 	TargetID   pgtype.UUID
 	Before     any
 	After      any
+}
+
+// Created describes a new record; after is the record as the API returns it.
+func Created(targetType string, projectID, id pgtype.UUID, after any) Change {
+	return Change{Event: targetType + ".created", ProjectID: projectID, TargetType: targetType, TargetID: id, After: after}
+}
+
+// Updated describes a changed record, or returns a zero Change if before and after are stored as the
+// same JSON.
+func Updated(targetType string, projectID, id pgtype.UUID, before, after any) Change {
+	b, errBefore := json.Marshal(before)
+	a, errAfter := json.Marshal(after)
+	if errBefore == nil && errAfter == nil && bytes.Equal(b, a) {
+		return Change{}
+	}
+	return Change{Event: targetType + ".updated", ProjectID: projectID, TargetType: targetType, TargetID: id, Before: before, After: after}
+}
+
+// Deleted describes a deleted record; before is the record as the API returned it.
+func Deleted(targetType string, projectID, id pgtype.UUID, before any) Change {
+	return Change{Event: targetType + ".deleted", ProjectID: projectID, TargetType: targetType, TargetID: id, Before: before}
 }
 
 // MemberState is a role assignment as recorded in member events. Exactly one of UserID (iam_user.id)
@@ -62,12 +87,12 @@ type DeletedProjectState struct {
 	Members []AssignmentState `json:"members"`
 }
 
-func insertEvent(ctx context.Context, q *Queries, actor Actor, e auditEntry) error {
-	before, err := encodeState(e.Before)
+func insertEvent(ctx context.Context, q *Queries, actor Actor, c Change) error {
+	before, err := encodeState(c.Before)
 	if err != nil {
 		return err
 	}
-	after, err := encodeState(e.After)
+	after, err := encodeState(c.After)
 	if err != nil {
 		return err
 	}
@@ -76,11 +101,11 @@ func insertEvent(ctx context.Context, q *Queries, actor Actor, e auditEntry) err
 		requestID = &actor.RequestID
 	}
 	return q.InsertAuditEvent(ctx, InsertAuditEventParams{
-		ProjectID:   e.ProjectID,
+		ProjectID:   c.ProjectID,
 		ActorUserID: actor.UserID,
-		Event:       e.Event,
-		TargetType:  e.TargetType,
-		TargetID:    e.TargetID,
+		Event:       c.Event,
+		TargetType:  c.TargetType,
+		TargetID:    c.TargetID,
 		Before:      before,
 		After:       after,
 		RequestID:   requestID,
@@ -101,18 +126,18 @@ func encodeState(state any) ([]byte, error) {
 // logEvent writes a stored event as an "audit" log line, as an operations signal; the database is
 // the record. Logs are read by a wider group than the database and kept under other rules, so the
 // line carries IDs and roles only, never project data such as names.
-func logEvent(ctx context.Context, actor Actor, e auditEntry) {
+func logEvent(ctx context.Context, actor Actor, c Change) {
 	attrs := []any{
-		"event", e.Event,
+		"event", c.Event,
 		"actor", actor.UserID.String(),
-		"project", e.ProjectID.String(),
-		"target_type", e.TargetType,
-		"target", e.TargetID.String(),
+		"project", c.ProjectID.String(),
+		"target_type", c.TargetType,
+		"target", c.TargetID.String(),
 	}
-	if before, ok := e.Before.(MemberState); ok {
+	if before, ok := c.Before.(MemberState); ok {
 		attrs = append(attrs, "before_role", before.Role)
 	}
-	if after, ok := e.After.(MemberState); ok {
+	if after, ok := c.After.(MemberState); ok {
 		attrs = append(attrs, "after_role", after.Role)
 	}
 	slog.InfoContext(ctx, "audit", attrs...)

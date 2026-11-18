@@ -71,7 +71,7 @@ Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specifi
 [project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
 `internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
 `handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
-`/api/v1/projects/{id}/members`; member changes and project deletion are stored in the audit history (`audit_event`).
+`/api/v1/projects/{id}/members`; changes to projects, members, and item definitions are stored in the audit history (`audit_event`).
 
 Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
 The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
