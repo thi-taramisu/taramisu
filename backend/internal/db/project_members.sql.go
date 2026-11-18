@@ -50,13 +50,20 @@ func (q *Queries) CreateUserMember(ctx context.Context, arg CreateUserMemberPara
 }
 
 const deleteProjectMember = `-- name: DeleteProjectMember :one
-DELETE FROM project_role_assignment a
-WHERE a.tara_project_id = $1 AND a.id = $2
-  AND (a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
-      SELECT 1 FROM project_role_assignment o
-      WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
-        AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id, a.project_role
+WITH removed AS (
+    DELETE FROM project_role_assignment a
+    WHERE a.tara_project_id = $1 AND a.id = $2
+      AND (a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
+          SELECT 1 FROM project_role_assignment o
+          WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
+            AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
+    RETURNING a.id, a.project_role, a.user_id, a.tara_project_id
+), favorite AS (
+    DELETE FROM project_favorite f
+    USING removed r
+    WHERE f.user_id = r.user_id AND f.tara_project_id = r.tara_project_id
+)
+SELECT id, project_role FROM removed
 `
 
 type DeleteProjectMemberParams struct {
@@ -70,6 +77,8 @@ type DeleteProjectMemberRow struct {
 }
 
 // Remove an assignment unless it is the last user Owner (same rule as UpdateProjectMemberRole).
+// Removing a user assignment also removes that user's favourite of the project (#232).
+// Group assignments leave favourites alone: group membership is not stored in the database.
 func (q *Queries) DeleteProjectMember(ctx context.Context, arg DeleteProjectMemberParams) (DeleteProjectMemberRow, error) {
 	row := q.db.QueryRow(ctx, deleteProjectMember, arg.ProjectID, arg.ID)
 	var i DeleteProjectMemberRow

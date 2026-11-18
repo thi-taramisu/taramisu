@@ -20,6 +20,9 @@ type TaraProjectStore interface {
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
 	DeleteTaraProject(context.Context, pgtype.UUID) (int64, error)
+	AddProjectFavorite(context.Context, db.AddProjectFavoriteParams) error
+	RemoveProjectFavorite(context.Context, db.RemoveProjectFavoriteParams) error
+	IsProjectFavorite(context.Context, db.IsProjectFavoriteParams) (bool, error)
 }
 
 type TaraProject struct {
@@ -34,6 +37,7 @@ func NewTaraProject(store TaraProjectStore, access ProjectAccessStore) *TaraProj
 func (h *TaraProject) Register(api huma.API) {
 	const collection = "/api/v1/projects"
 	const member = collection + "/{id}"
+	const favorite = member + "/favorite"
 	api.OpenAPI().Tags = append(api.OpenAPI().Tags, &huma.Tag{
 		Name: "Tara Project", Description: "Create, read, replace, update and delete TARA projects.",
 	})
@@ -52,6 +56,13 @@ func (h *TaraProject) Register(api huma.API) {
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
 	Register(api, del, project(PermManage), h.Delete)
+	// Favourites are personal, so every role may set them (PermRead).
+	addFavorite := op("add-tara-project-favorite", http.MethodPut, favorite, "Mark a TARA project as a favourite of the caller")
+	addFavorite.DefaultStatus = http.StatusNoContent
+	Register(api, addFavorite, project(PermRead), h.AddFavorite)
+	removeFavorite := op("remove-tara-project-favorite", http.MethodDelete, favorite, "Remove a TARA project from the caller's favourites")
+	removeFavorite.DefaultStatus = http.StatusNoContent
+	Register(api, removeFavorite, project(PermRead), h.RemoveFavorite)
 }
 
 type TaraProjectBody struct {
@@ -61,6 +72,8 @@ type TaraProjectBody struct {
 	CreatedAt   time.Time `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
+	// IsFavorite tells whether the caller marked the project as a favourite.
+	IsFavorite bool `json:"is_favorite"`
 }
 
 type TaraProjectOutput struct {
@@ -69,6 +82,10 @@ type TaraProjectOutput struct {
 
 type TaraProjectListOutput struct {
 	Body []TaraProjectBody
+}
+
+type ListTaraProjectsInput struct {
+	Favorite bool `query:"favorite" doc:"Return only the caller's favourite projects."`
 }
 
 type TaraProjectIDInput struct {
@@ -112,16 +129,18 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return toTaraProjectOutput(db.TaraProject(p), db.ProjectRoleOWNER), nil
+	return toTaraProjectOutput(db.TaraProject(p), db.ProjectRoleOWNER, false), nil
 }
 
 // List returns only projects the caller has a role in.
-func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOutput, error) {
+func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*TaraProjectListOutput, error) {
 	userID, err := callerID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{UserID: userID, GroupIds: callerGroups(ctx)})
+	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{
+		UserID: userID, GroupIds: callerGroups(ctx), OnlyFavorites: in.Favorite,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +148,7 @@ func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOu
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
 			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt,
-		}, p.Role))
+		}, p.Role, p.IsFavorite))
 	}
 	return out, nil
 }
@@ -139,7 +158,7 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
+	return h.output(ctx, p)
 }
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
@@ -151,7 +170,7 @@ func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) 
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
+	return h.output(ctx, p)
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
@@ -164,7 +183,7 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
+	return h.output(ctx, p)
 }
 
 func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
@@ -178,6 +197,37 @@ func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struc
 	}
 	audit(ctx, "project.deleted", "project", id.String())
 	return nil, nil
+}
+
+// AddFavorite marks the project as a favourite of the caller. Repeating it changes nothing.
+func (h *TaraProject) AddFavorite(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return nil, h.store.AddProjectFavorite(ctx, db.AddProjectFavoriteParams{UserID: userID, ProjectID: projectIDFromContext(ctx)})
+}
+
+// RemoveFavorite removes the project from the caller's favourites. Repeating it changes nothing.
+func (h *TaraProject) RemoveFavorite(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return nil, h.store.RemoveProjectFavorite(ctx, db.RemoveProjectFavoriteParams{UserID: userID, ProjectID: projectIDFromContext(ctx)})
+}
+
+// output adds the caller's role and favourite flag to a single project.
+func (h *TaraProject) output(ctx context.Context, p db.TaraProject) (*TaraProjectOutput, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	favorite, err := h.store.IsProjectFavorite(ctx, db.IsProjectFavoriteParams{UserID: userID, ProjectID: p.ID})
+	if err != nil {
+		return nil, err
+	}
+	return toTaraProjectOutput(p, RoleFromContext(ctx), favorite), nil
 }
 
 func parseUUID(s string) (pgtype.UUID, error) {
@@ -199,16 +249,17 @@ func mapTaraProjectError(err error) error {
 	return err
 }
 
-func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
+func toTaraProjectBody(p db.TaraProject, role db.ProjectRole, favorite bool) TaraProjectBody {
 	return TaraProjectBody{
 		ID:          p.ID.String(),
 		Name:        p.Name,
 		Description: p.Description,
 		CreatedAt:   p.CreatedAt.Time,
 		Role:        role,
+		IsFavorite:  favorite,
 	}
 }
 
-func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole) *TaraProjectOutput {
-	return &TaraProjectOutput{Body: toTaraProjectBody(p, role)}
+func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole, favorite bool) *TaraProjectOutput {
+	return &TaraProjectOutput{Body: toTaraProjectBody(p, role, favorite)}
 }
