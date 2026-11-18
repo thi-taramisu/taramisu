@@ -1,4 +1,5 @@
 import type { ItemAsset } from '../../models/asset'
+import type { StoredAsset } from '../mockStore'
 import type { ItemDefinition } from '../../models/item'
 import type { RiskGroup } from '../../models/risk'
 import type { TreeNode } from '../../models/tree'
@@ -71,6 +72,18 @@ export const headlampAssets: ItemAsset[] = [
   { id: 'a-03', code: 'A-03', name: 'Camera image data', component: 'Camera ECU', properties: ['I', 'A'], damageScenarios: 0, threatScenarios: 0, maxRisk: null },
   { id: 'a-04', code: 'A-04', name: 'Diagnostic session key', component: 'Gateway ECU', properties: ['C', 'I'], damageScenarios: 0, threatScenarios: 0, maxRisk: null },
 ]
+
+/** Fields of the asset page that the asset table does not show, by asset id. */
+export const headlampAssetDetails: Record<string, Pick<StoredAsset, 'description' | 'identification_source' | 'propertyDescriptions'>> = {
+  'a-01': {
+    description: 'CAN message from the body control ECU that switches the low beam on and off.',
+    identification_source: 'ITEM_DEF',
+    propertyDescriptions: { I: 'A forged command switches the headlamp off.', A: 'A suppressed command leaves the headlamp off.' },
+  },
+  'a-02': { description: 'Software of the body control ECU that controls the headlamp.', identification_source: 'ITEM_DEF', propertyDescriptions: { I: null } },
+  'a-03': { description: null, identification_source: 'ITEM_DEF', propertyDescriptions: { I: null, A: null } },
+  'a-04': { description: null, identification_source: 'CATALOGUE', propertyDescriptions: { C: null, I: null } },
+}
 
 const ds01 = { id: 'ds-01', code: 'DS-01', name: 'Headlamp turns off while driving at night', impact: 'S·Sev' }
 const ts01 = { id: 'ts-01', code: 'TS-01', name: 'Spoofed headlamp command on the CAN bus' }
