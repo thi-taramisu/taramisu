@@ -26,6 +26,12 @@ The sidebar can be expanded or collapsed.
 
 The Search entry is currently a placeholder.
 
+## Display mode
+
+Use the sun or moon button in the header to switch between light and dark mode. Open **Colour schemes**
+to apply **Neutral**, **Ocean** or **Iris** throughout the app. The browser saves both choices independently.
+The default is light mode with Neutral. The mode button also works with Tab followed by Space or Enter.
+
 ## Creating a project
 
 1. Open the Projects page.
