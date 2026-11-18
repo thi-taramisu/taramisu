@@ -87,6 +87,17 @@ describe('GeneralSettings', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('asks to sign in instead of showing an error when the backend answers 401', async () => {
+    const projects = createMockProjectApi()
+    projects.get = () => Promise.reject(new ApiError(401, 'Unauthorized.'))
+    renderApp('/projects/battery-security/settings', createMockItemApi(), projects)
+
+    const main = screen.getByRole('main')
+    expect(await within(main).findByText('Sign in to see this project.')).toBeInTheDocument()
+    expect(within(main).getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('shows Not found for an unknown project', async () => {
     renderApp('/projects/unknown/settings', createMockItemApi(), createMockProjectApi())
 

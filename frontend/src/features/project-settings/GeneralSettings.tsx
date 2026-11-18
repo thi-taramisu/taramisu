@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { generatedProjectImage } from '../projects/projectImageSource'
-import { ApiError, isNotFound } from '../../api/errors'
+import { ApiError, isNotFound, isUnauthorized } from '../../api/errors'
+import { SignInPrompt } from '../../auth/SignInPrompt'
 import type { Project } from '../../api/models/project'
 import { resetFailed, useProject, useProjectAccess, useUpdateProject } from '../../api/queries/projects'
 import { ProjectImageInput } from './ProjectImageInput'
@@ -82,8 +83,9 @@ export function GeneralSettings() {
   return (
     <div className="grid gap-8">
       {project.isPending && <p className="text-sm text-muted-foreground">Loading project…</p>}
+      {isUnauthorized(project.error) && <SignInPrompt>Sign in to see this project.</SignInPrompt>}
       {/* A 404 is handled by the settings page. */}
-      {project.isError && !isNotFound(project.error) && (
+      {project.isError && !isNotFound(project.error) && !isUnauthorized(project.error) && (
         <div className="flex items-center justify-between gap-2">
           <p role="alert" className="text-sm text-destructive">
             The project could not be loaded.

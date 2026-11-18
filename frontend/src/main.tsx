@@ -5,10 +5,10 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { ApiProvider } from './api/ApiProvider'
-import { retryUnlessNotFound } from './api/errors'
+import { retryTransient } from './api/errors'
 import { AuthProvider } from './auth/AuthContext'
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryUnlessNotFound } } })
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryTransient } } })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

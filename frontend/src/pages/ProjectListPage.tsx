@@ -17,6 +17,8 @@ import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { exampleProject } from '@/api/mocks/data/headlamp'
+import { isUnauthorized } from '@/api/errors'
+import { SignInPrompt } from '@/auth/SignInPrompt'
 import type { Project } from '@/api/models/project'
 import {
   useArchiveProject,
@@ -103,7 +105,10 @@ export function ProjectListPage() {
             {projectsQuery.isPending && (
               <p className="text-sm text-muted-foreground">Loading projects…</p>
             )}
-            {projectsQuery.isError && (
+            {isUnauthorized(projectsQuery.error) && (
+              <SignInPrompt>Sign in to see your projects.</SignInPrompt>
+            )}
+            {projectsQuery.isError && !isUnauthorized(projectsQuery.error) && (
               <div className="flex items-center justify-between gap-2">
                 <p role="alert" className="text-sm text-destructive">
                   The projects could not be loaded.

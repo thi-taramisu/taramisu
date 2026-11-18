@@ -356,6 +356,17 @@ describe('Main Page project management', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('asks to sign in instead of showing an error when the backend answers 401', async () => {
+    const projects = createMockProjectApi()
+    projects.list = () => Promise.reject(new ApiError(401, 'Unauthorized.'))
+    renderApp('/projects', createMockItemApi(), projects)
+
+    const main = screen.getByRole('main')
+    expect(await within(main).findByText('Sign in to see your projects.')).toBeInTheDocument()
+    expect(within(main).getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('toggles a favorite back and forth on quick clicks, before the requests finish', async () => {
     const user = userEvent.setup()
     const projects = createMockProjectApi()
