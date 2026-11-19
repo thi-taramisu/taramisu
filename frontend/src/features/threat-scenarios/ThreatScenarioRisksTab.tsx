@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { useId } from 'react'
 import { ChevronDown, Pencil, TriangleAlert } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
@@ -61,7 +62,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
             <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Attack Feasibility</dt>
             <dd className="flex flex-wrap items-center gap-2 text-sm">
               <FeasibilityBadge value={feasibility.feasibility} withWord={false} />
-              <span className="text-muted-foreground">via {decisive.code}</span>
+              <span className="text-muted-foreground">via {formatEntityId(decisive.code)}</span>
             </dd>
           </div>
           <div className="grid gap-2 px-4 py-3">
@@ -75,7 +76,7 @@ function RiskValues({ projectId, threatScenarioId, result }: { projectId: string
                 <>
                   <RiskBadge value={top.risk} size="lg" />
                   <span className="text-muted-foreground">
-                    in {top.damageScenario.code} · {categoryLabel(top.category)}
+                    in {formatEntityId(top.damageScenario.code)} · {categoryLabel(top.category)}
                     {tops.length > 1 && ` and ${tops.length - 1} more`}
                   </span>
                 </>
@@ -125,7 +126,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
         <div className="min-w-48 flex-1">
           <h3 id={headingId} className="text-sm font-medium">
             {/* Plain text: the pens in the rows lead to where the damage scenario is rated. */}
-            <span className="font-mono text-xs text-muted-foreground">{group.damageScenario.code}</span> {group.damageScenario.name}
+            <span className="font-mono text-xs text-muted-foreground">{formatEntityId(group.damageScenario.code)}</span> {group.damageScenario.name}
           </h3>
         </div>
         {group.max !== null && (
@@ -174,7 +175,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                     <span>
                       {impactLabel(row.impact)} <span className="sr-only">impact</span>
                     </span>
-                    <EditLink to={impactPath} label={`Edit the ${category} impact on the Impact tab of ${row.damageScenario.code}`} />
+                    <EditLink to={impactPath} label={`Edit the ${category} impact on the Impact tab of ${formatEntityId(row.damageScenario.code)}`} />
                   </span>
                 </TableCell>
                 <TableCell>
@@ -185,7 +186,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                     </span>
                     <EditLink
                       to={`${entityPath(projectId, 'attack-paths', feasibility.decisive.id)}/rating`}
-                      label={`Edit the rating of ${feasibility.decisive.code}, the most feasible attack path`}
+                      label={`Edit the rating of ${formatEntityId(feasibility.decisive.code)}, the most feasible attack path`}
                     />
                   </span>
                 </TableCell>
@@ -216,7 +217,7 @@ function DamageScenarioRisks({ projectId, threatScenarioId, group, feasibility, 
                   <span className="flex items-center gap-2">
                     <span aria-hidden="true" className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground" />
                     Not rated
-                    <EditLink to={impactPath} label={`Rate the ${category} impact on the Impact tab of ${row.damageScenario.code}`} />
+                    <EditLink to={impactPath} label={`Rate the ${category} impact on the Impact tab of ${formatEntityId(row.damageScenario.code)}`} />
                   </span>
                 </TableCell>
               </TableRow>
@@ -263,7 +264,7 @@ function RiskCalculationPopover({ row, feasibility, isHighest }: { row: RatedRis
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Risk ${row.risk}${isHighest ? ', highest' : ''}, calculation of ${row.damageScenario.code} ${categoryLabel(row.category)}`}
+          aria-label={`Risk ${row.risk}${isHighest ? ', highest' : ''}, calculation of ${formatEntityId(row.damageScenario.code)} ${categoryLabel(row.category)}`}
           title="Show the calculation"
           className={cn(
             riskBadgeClasses(row.risk),
@@ -275,7 +276,7 @@ function RiskCalculationPopover({ row, feasibility, isHighest }: { row: RatedRis
         </button>
       </PopoverTrigger>
       {/* The title is short, so the dialog's name says which risk value it explains. */}
-      <PopoverContent align="start" aria-label={`Calculation of ${row.damageScenario.code} ${categoryLabel(row.category)}`} className="w-auto gap-2 p-3">
+      <PopoverContent align="start" aria-label={`Calculation of ${formatEntityId(row.damageScenario.code)} ${categoryLabel(row.category)}`} className="w-auto gap-2 p-3">
         <PopoverHeader>
           <PopoverTitle>Calculation</PopoverTitle>
         </PopoverHeader>

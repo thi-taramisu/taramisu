@@ -47,7 +47,7 @@ describe('archived project', () => {
 
     await screen.findByRole('region', { name: 'Assets' })
     expect(section('Assets').getByRole('link', { name: 'Headlamp on/off command' })).toBeInTheDocument()
-    expect(section('Assets').getByRole('button', { name: 'A-01 Integrity', pressed: true })).toBeDisabled()
+    expect(section('Assets').getByRole('button', { name: 'AS-1 Integrity', pressed: true })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Add Asset' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Threat Scenario' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Remove link to/ })).not.toBeInTheDocument()

@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { MarkerType, type Edge, type XYPosition } from '@xyflow/react'
@@ -130,7 +131,7 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
           <aside aria-label="Selected graph element" className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100%-1.5rem)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{ENTITY_TYPES[inspected.type].label} · {inspected.code}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{ENTITY_TYPES[inspected.type].label} · {formatEntityId(inspected.code)}</p>
                 <h2 className="mt-1 text-sm font-semibold">{inspected.name}</h2>
               </div>
               <Button variant="ghost" size="icon-xs" aria-label="Close element details" onClick={() => setSelected(null)}><X aria-hidden="true" /></Button>
@@ -144,7 +145,7 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
             <div className="mt-2 flex flex-wrap gap-1.5">
               {related.map((element) => (
                 <Link key={element.key} to={destination(element)} className="rounded-full border bg-muted px-2 py-1 text-xs hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring" title={element.name}>
-                  {element.code ?? element.name}
+                  {formatEntityId(element.code) ?? element.name}
                 </Link>
               ))}
               {related.length === 0 && <span className="text-xs text-muted-foreground">No linked elements.</span>}

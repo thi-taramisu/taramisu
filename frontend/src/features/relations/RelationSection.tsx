@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -95,7 +96,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
           {rows.map((row) => (
             <li key={row.id} className="px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{row.code}</span>
+                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(row.code)}</span>
                 <div className="min-w-0 flex-1 truncate text-sm">
                   <Link to={entityPath(projectId, type, row.id)} title={row.name} className="hover:underline">
                     {row.name}

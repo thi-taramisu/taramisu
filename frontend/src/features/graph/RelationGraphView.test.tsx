@@ -11,7 +11,7 @@ describe('graph view', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('link', { name: /AP-02 Malicious/ })).toHaveAttribute('href', expect.stringContaining('graphMode=minimal'))
+    expect(screen.getByRole('link', { name: /AP-2 Malicious/ })).toHaveAttribute('href', expect.stringContaining('graphMode=minimal'))
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'false')
   })

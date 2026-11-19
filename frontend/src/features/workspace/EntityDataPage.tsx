@@ -2,7 +2,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { isNotFound } from '../../api/errors'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES } from './entities'
+import { ENTITY_TYPES, formatEntityId } from './entities'
 import { EntityPage } from './EntityPage'
 
 interface EntityDataPageProps {
@@ -40,7 +40,7 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
     <EntityPage
       type={type}
       name={entity.data.title}
-      code={entity.data.code}
+      code={formatEntityId(entity.data.code)}
       tabCounts={tabCounts}
       actions={
         // A failed refetch keeps the loaded element, so unsaved edits in the tabs survive.

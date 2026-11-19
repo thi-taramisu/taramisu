@@ -125,3 +125,11 @@ React Flow out of the initial bundle.
 Build with Node 24 and `npm run build`, then serve the static `dist/` directory. Configure the web server to serve `index.html` for
 application routes so direct links and browser refreshes work. Unknown application routes show the React not-found page; the static SPA
 fallback can still return HTTP 200. `npm run preview` is for local verification of this build.
+
+## Element display IDs
+
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3 and AP-100.
+The shared formatter also displays legacy asset codes such as A-01 as AS-1.
+Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
+Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
+by the tree; no code is invented from an item's internal UUID.
