@@ -45,3 +45,15 @@ Automated scanning is enabled to maintain high security standards and prevent se
 ## 3. Branch Hygiene
 
 * **Automatic Branch Cleanup:** Head branches are automatically deleted once a PR is merged into `main`.
+
+---
+
+## 4. Issue Templates
+
+Templates are in `.github/ISSUE_TEMPLATE/`: Task / Feature, Bug Report and Draft (blocked).
+
+* **Draft (blocked):** Use it for work that is planned but cannot be started yet, for example because it needs another issue or PR first.
+  It has the fields of the task template plus a required "Blocked by" field and gets the `draft` label.
+* **Blocked by relation:** Also set GitHub's "blocked by" relation on the issue when the blocker is an issue. PRs can only be named in the text.
+* **Turn a draft into a normal issue:** When the blocker is done, check the criteria, remove the `draft` label,
+  change the title prefix from `[Draft]` to the fitting one (e.g. `[Task]`, `[Frontend]`, `[Backend]`) and assign someone.
