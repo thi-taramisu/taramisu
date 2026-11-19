@@ -462,6 +462,26 @@ export interface paths {
         patch: operations["update-tara-project"];
         trace?: never;
     };
+    "/api/v1/projects/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export a TARA project
+         * @description Returns the project with all item definitions and everything below them as one JSON document. Members and uploaded files are not included.
+         */
+        get: operations["export-tara-project"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}/members": {
         parameters: {
             query?: never;
@@ -951,6 +971,101 @@ export interface components {
             impact_rating_id?: string;
             /** Format: int32 */
             risk_score?: number;
+        };
+        ProjectExportAsset: {
+            cybersecurity_properties: components["schemas"]["AssetCybersecurityProperty"][] | null;
+            description: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @enum {string|null} */
+            identification_source: "ITEM_DEF" | "IMPACT_RATING" | "THREAT_DERIVED" | "CATALOGUE" | null;
+            /** Format: uuid */
+            item_definition_id: string;
+            name: string;
+        };
+        ProjectExportAttackPath: {
+            /** @enum {string} */
+            analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
+            attack_steps_and_weaknesses?: unknown;
+            feasibility_rating?: components["schemas"]["AttackFeasibilityRatingBody"];
+            /** Format: uuid */
+            id: string;
+            is_partial_early_stage: boolean;
+            /** Format: uuid */
+            item_definition_id: string;
+            title: string;
+        };
+        ProjectExportBody: {
+            /** Format: date-time */
+            exported_at: string;
+            /**
+             * Format: int64
+             * @example 1
+             */
+            format_version: number;
+            items: components["schemas"]["ProjectExportItem"][] | null;
+            project: components["schemas"]["ProjectExportInfo"];
+        };
+        ProjectExportDamageScenario: {
+            asset_property_links: components["schemas"]["DamagePropertyLink"][] | null;
+            functionality_adverse_relation?: string;
+            /** Format: uuid */
+            id: string;
+            impact_ratings: components["schemas"]["ImpactRatingBody"][] | null;
+            /** Format: uuid */
+            item_definition_id: string;
+            road_user_harm_description?: string;
+            title: string;
+        };
+        ProjectExportInfo: {
+            /** Format: date-time */
+            created_at: string;
+            description: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        ProjectExportItem: {
+            architectural_design?: string | null;
+            assets: components["schemas"]["ProjectExportAsset"][] | null;
+            attack_paths: components["schemas"]["ProjectExportAttackPath"][] | null;
+            boundary?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            cybersecurity_specs_wp_10_01?: string | null;
+            damage_scenarios: components["schemas"]["ProjectExportDamageScenario"][] | null;
+            functions?: string | null;
+            /** Format: uuid */
+            id: string;
+            item_definition_wp_09_01?: string | null;
+            lifecycle_phase?: string | null;
+            name: string;
+            operational_environment?: string | null;
+            /** @enum {string} */
+            scope_type: "ITEM" | "COMPONENT";
+            /** Format: uuid */
+            tara_project_id: string;
+            threat_scenarios: components["schemas"]["ProjectExportThreatScenario"][] | null;
+        };
+        ProjectExportThreatScenario: {
+            /** @enum {string|null} */
+            aggregated_attack_feasibility: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW" | null;
+            asset_property_links: components["schemas"]["ThreatPropertyLink"][] | null;
+            attack_path_links: components["schemas"]["ThreatAttackPathLinkBody"][] | null;
+            cause_of_compromise: string | null;
+            damage_scenario_links: components["schemas"]["ThreatDamageLinkBody"][] | null;
+            /** @enum {string|null} */
+            elicitation_method: "GROUP_DISCUSSION" | "MALICIOUS_USE_CASE" | "EVITA" | "TVRA" | "PASTA" | "STRIDE" | "OTHER" | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            item_definition_id: string;
+            /** Format: int32 */
+            max_risk_score: number | null;
+            risk_treatment_decisions: components["schemas"]["RiskTreatmentDecision"][] | null;
+            risk_values: components["schemas"]["RiskValue"][] | null;
+            technical_notes: string | null;
+            title: string;
         };
         ProjectMember: {
             /** Format: date-time */
@@ -5417,6 +5532,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectExportBody"];
                 };
             };
             /** @description Forbidden */
