@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
@@ -6,7 +7,7 @@ import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
 const risks = `${project}/threat-scenarios/ts-01/risks`
-const DS01 = 'DS-01 Headlamp turns off while driving at night'
+const DS01 = 'DS-1 Headlamp turns off while driving at night'
 
 const overview = () => within(screen.getByRole('region', { name: 'Risk overview' }))
 const damageScenario = (name: string) => within(screen.getByRole('region', { name }))
@@ -22,9 +23,9 @@ describe('threat scenario risks', () => {
     renderApp(risks)
 
     await screen.findByRole('region', { name: 'Risk overview' })
-    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^Medium\s*via AP-02$/)
+    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^Medium\s*via AP-2$/)
     expect(overview().queryByRole('link')).not.toBeInTheDocument()
-    expect(valueOf('Highest Risk')).toHaveTextContent(/^Risk 4\s*in DS-01 · Safety$/)
+    expect(valueOf('Highest Risk')).toHaveTextContent(/^Risk 4\s*in DS-1 · Safety$/)
     expect(screen.queryByRole('list', { name: 'Notes on the risk values' })).not.toBeInTheDocument()
   })
 
@@ -40,9 +41,9 @@ describe('threat scenario risks', () => {
     ])
     expect(block.getByText('Privacy').parentElement).toHaveTextContent(/^Omitted:Privacy$/)
     expect(block.queryByText('No personal data is involved.')).not.toBeInTheDocument()
-    expect(block.getByRole('link', { name: 'Edit the Safety impact on the Impact tab of DS-01' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
-    expect(block.getAllByRole('link', { name: 'Edit the rating of AP-02, the most feasible attack path' })[0]).toHaveAttribute('href', `${project}/attack-paths/ap-02/rating`)
-    expect(block.getByRole('link', { name: 'Rate the Financial impact on the Impact tab of DS-01' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
+    expect(block.getByRole('link', { name: 'Edit the Safety impact on the Impact tab of DS-1' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
+    expect(block.getAllByRole('link', { name: 'Edit the rating of AP-2, the most feasible attack path' })[0]).toHaveAttribute('href', `${project}/attack-paths/ap-02/rating`)
+    expect(block.getByRole('link', { name: 'Rate the Financial impact on the Impact tab of DS-1' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
     expect(block.queryByText(/None of the targets/)).not.toBeInTheDocument()
     expect(within(block.getByRole('heading', { name: DS01 })).queryByRole('link')).not.toBeInTheDocument()
   })
@@ -71,8 +72,8 @@ describe('threat scenario risks', () => {
 
     await findDamageScenario(DS01)
     expect(damageScenario(DS01).getAllByText('Highest')).toHaveLength(1)
-    expect(rowsOf(damageScenario(`${ds.code} Glare`))[0]).toHaveTextContent(/^FinancialSevere impactMedium feasibility4Highest$/)
-    expect(valueOf('Highest Risk')).toHaveTextContent(/^Risk 4\s*in DS-01 · Safety and 1 more$/)
+    expect(rowsOf(damageScenario(`${formatEntityId(ds.code)} Glare`))[0]).toHaveTextContent(/^FinancialSevere impactMedium feasibility4Highest$/)
+    expect(valueOf('Highest Risk')).toHaveTextContent(/^Risk 4\s*in DS-1 · Safety and 1 more$/)
   })
 
   it('marks no row as highest while all risk values are equal', async () => {
@@ -87,7 +88,7 @@ describe('threat scenario risks', () => {
     await api.threatScenarios.linkAttackPath('headlamp', 'ts-02', 'ap-01')
     renderApp(`${project}/threat-scenarios/ts-02/risks`, api)
 
-    const block = await findDamageScenario(`${ds.code} Glare`)
+    const block = await findDamageScenario(`${formatEntityId(ds.code)} Glare`)
     expect(block.getAllByRole('button', { name: /^Risk \d, calculation of/ })).toHaveLength(2)
     expect(block.queryByText('Highest')).not.toBeInTheDocument()
     expect(valueOf('Highest Risk')).toHaveTextContent(/and 1 more$/)
@@ -98,11 +99,11 @@ describe('threat scenario risks', () => {
     const block = await findDamageScenario(DS01)
     expect(screen.queryByRole('table', { name: /Risk matrix/ })).not.toBeInTheDocument()
 
-    const safety = block.getByRole('button', { name: 'Risk 4, highest, calculation of DS-01 Safety' })
+    const safety = block.getByRole('button', { name: 'Risk 4, highest, calculation of DS-1 Safety' })
     expect(safety).toHaveTextContent(/^4$/)
     await user.click(safety)
 
-    const popover = within(screen.getByRole('dialog', { name: 'Calculation of DS-01 Safety' }))
+    const popover = within(screen.getByRole('dialog', { name: 'Calculation of DS-1 Safety' }))
     expect(popover.getByText('Calculation')).toBeInTheDocument()
     const matrix = popover.getByRole('table', { name: /Risk matrix/ })
     expect(within(matrix).getByText('(this risk value)').parentElement).toHaveTextContent('4')
@@ -115,7 +116,7 @@ describe('threat scenario risks', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(safety).toHaveFocus()
 
-    await user.click(block.getByRole('button', { name: 'Risk 2, calculation of DS-01 Operational' }))
+    await user.click(block.getByRole('button', { name: 'Risk 2, calculation of DS-1 Operational' }))
     expect(within(within(screen.getByRole('dialog')).getByRole('table', { name: /Risk matrix/ })).getByText('(this risk value)').parentElement).toHaveTextContent('2')
   })
 
@@ -134,7 +135,7 @@ describe('threat scenario risks', () => {
     renderApp(risks, api)
 
     await screen.findByRole('region', { name: 'Risk overview' })
-    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-01$/)
+    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-1$/)
     expect(rowsOf(damageScenario(DS01))[0]).toHaveTextContent(/^SafetySevere impactHigh feasibility5/)
   })
 
@@ -145,10 +146,10 @@ describe('threat scenario risks', () => {
     renderApp(risks, api)
 
     await findDamageScenario(DS01)
-    const second = damageScenario(`${ds.code} Glare`)
+    const second = damageScenario(`${formatEntityId(ds.code)} Glare`)
     expect(second.getByText(/None of the targets of this threat scenario leads to this damage scenario/)).toBeInTheDocument()
     expect(second.getAllByRole('link', { name: /^Rate the / }).map((link) => link.getAttribute('aria-label'))).toEqual(
-      ['Safety', 'Financial', 'Operational', 'Privacy'].map((category) => `Rate the ${category} impact on the Impact tab of ${ds.code}`),
+      ['Safety', 'Financial', 'Operational', 'Privacy'].map((category) => `Rate the ${category} impact on the Impact tab of ${formatEntityId(ds.code)}`),
     )
   })
 
@@ -160,7 +161,7 @@ describe('threat scenario risks', () => {
 
     await screen.findByRole('region', { name: 'Risk overview' })
     expect(notes().getByText(/is not rated yet and can raise the feasibility/)).toBeInTheDocument()
-    expect(notes().getByRole('link', { name: /AP-03/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
+    expect(notes().getByRole('link', { name: /AP-3/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
     expect(notes().getByText(/is a partial attack path, so the feasibility can still change/)).toBeInTheDocument()
   })
 
@@ -180,7 +181,7 @@ describe('threat scenario risks', () => {
     renderApp(risks, api)
 
     await screen.findByRole('region', { name: 'Risk overview' })
-    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-01$/)
+    expect(valueOf('Attack Feasibility')).toHaveTextContent(/^High\s*via AP-1$/)
     expect(screen.queryByRole('list', { name: 'Notes on the risk values' })).not.toBeInTheDocument()
   })
 
@@ -193,7 +194,7 @@ describe('threat scenario risks', () => {
     expect(block.getByRole('link', { name: 'Check the targets' })).toHaveAttribute('href', `${project}/threat-scenarios/ts-01`)
     expect(block.getByText(/so its risk values do not count for the threat scenario/)).toBeInTheDocument()
     // Its values stay visible, but neither raise nor mark the highest risk of the threat scenario.
-    expect(block.getByRole('button', { name: 'Risk 4, calculation of DS-01 Safety' })).toBeInTheDocument()
+    expect(block.getByRole('button', { name: 'Risk 4, calculation of DS-1 Safety' })).toBeInTheDocument()
     expect(block.queryByText('Highest')).not.toBeInTheDocument()
     expect(valueOf('Highest Risk')).toHaveTextContent('Not determined yet')
   })
@@ -235,7 +236,7 @@ describe('threat scenario risks', () => {
 
     expect(await screen.findByText('No damage scenario is linked yet.')).toBeInTheDocument()
     expect(screen.getByText('None of the linked attack paths is rated yet.')).toBeInTheDocument()
-    expect(main().getByRole('link', { name: /AP-03/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
+    expect(main().getByRole('link', { name: /AP-3/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
     expect(screen.getByRole('link', { name: 'Link it on the Relations tab' })).toBeInTheDocument()
   })
 
@@ -246,7 +247,7 @@ describe('threat scenario risks', () => {
     renderApp(`${project}/threat-scenarios/ts-02/risks`, api)
 
     expect(await screen.findByText('None of the linked attack paths is rated yet.')).toBeInTheDocument()
-    expect(main().getByRole('link', { name: /AP-03/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
+    expect(main().getByRole('link', { name: /AP-3/ })).toHaveAttribute('href', `${project}/attack-paths/ap-03/rating`)
   })
 
   it('shows an error when the risks cannot be loaded', async () => {

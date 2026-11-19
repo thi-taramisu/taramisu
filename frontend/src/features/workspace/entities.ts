@@ -22,14 +22,20 @@ export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[]
   'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
 }
 
-/** Code and name for the hierarchy's accessible names, e.g. "A-01 Firmware"; the visible tree label shows the name only. */
+/** Code and name for the hierarchy's accessible names, e.g. "AS-1 Firmware"; the visible tree label shows the name only. */
 export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
-  return code ? `${code} ${name}` : name
+  return code ? `${formatEntityId(code)} ${name}` : name
 }
 
-/** Element ID as shown in the detail view header: the number of the code with a hash, e.g. "A-01" → "#01". */
-export function formatEntityId(code: string) {
-  return `#${code.replace(/^[A-Z]+-/, '')}`
+/** Display IDs retain their type prefix and have no padding. Legacy asset prefix A becomes AS. */
+export function formatEntityId(code: string): string
+export function formatEntityId(code: string | undefined): string | undefined
+export function formatEntityId(code: string | undefined) {
+  if (code === undefined) return undefined
+  const match = /^(AS|A|DS|TS|AP|I)-?(\d+)$/.exec(code)
+  if (!match) return code
+  const prefix = match[1] === 'A' ? 'AS' : match[1]
+  return `${prefix}-${match[2].replace(/^0+(?=\d)/, '')}`
 }
 
 export function entityPath(projectId: string, type: EntityType, id: string) {

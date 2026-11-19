@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { exampleProject } from '../../api/mocks/data/headlamp'
 import type { ThreatScenario, ThreatScenarioRelations } from '../../api/models/threatScenario'
 import { useItemDamageScenarios, useSetThreatDamageLink } from '../../api/queries/items'
@@ -40,7 +41,7 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
           projectName={exampleProject.name}
           lockedItemId={scenario.item_definition_id}
           onCreated={(created) => link.mutateAsync({ id: created.id, linked: true })}
-          onCreatedError={(created) => `${created.code} was created, but it could not be linked. Please try again to link it.`}
+          onCreatedError={(created) => `${formatEntityId(created.code)} was created, but it could not be linked. Please try again to link it.`}
         />
       )}
     />

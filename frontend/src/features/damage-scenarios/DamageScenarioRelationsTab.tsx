@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { useParams } from 'react-router-dom'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import {
@@ -66,7 +67,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         onRemove={(assetId) => assetLink.mutate({ assetId, properties: [] })}
         rows={assets.map((asset) => ({
           id: asset.id,
-          code: asset.code,
+          code: formatEntityId(asset.code),
           name: asset.name,
           details: (
             <AssetPropertyToggles

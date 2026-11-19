@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { Link, useParams } from 'react-router-dom'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
@@ -46,7 +47,7 @@ export function ItemAssetsTab() {
           )}
           {assets?.map((asset) => (
             <TableRow key={asset.id}>
-              <TableCell className="font-mono text-xs text-muted-foreground">{asset.code}</TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</TableCell>
               <TableCell className="font-medium">
                 <Link to={entityPath(projectId, 'assets', asset.id)} className="hover:underline">
                   {asset.name}

@@ -11,7 +11,7 @@ interface EntityPageProps {
   type: EntityType
   /** Heading; defaults to the name of the element in the project tree. */
   name?: string
-  /** Display ID such as DS-01, shown as #01 next to the type; defaults to the code in the project tree. */
+  /** Display ID such as DS-1, shown next to the type; defaults to the code in the project tree. */
   code?: string
   /** Buttons on the right of the header, e.g. delete. */
   actions?: ReactNode

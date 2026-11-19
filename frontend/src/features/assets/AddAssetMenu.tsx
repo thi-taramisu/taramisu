@@ -1,3 +1,4 @@
+import { formatEntityId } from '../workspace/entities'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -16,7 +17,7 @@ export function AddAssetMenu({ assets, onAdd }: { assets: ItemAsset[]; onAdd: (a
       <DropdownMenuContent align="start">
         {assets.map((asset) => (
           <DropdownMenuItem key={asset.id} onSelect={() => onAdd(asset)}>
-            <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
+            <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
