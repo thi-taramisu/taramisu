@@ -239,6 +239,8 @@ worker = services['authentik-worker']
 server = services['authentik-server']
 assert server['environment']['AUTHENTIK_WEB__PATH'] == '/auth/'
 assert worker['environment']['AUTHENTIK_WEB__PATH'] == '/auth/'
+assert worker['depends_on']['authentik-server']['condition'] == 'service_started'
+assert worker['depends_on']['authentik-db']['condition'] == 'service_healthy'
 assert api['environment']['APP_URL'] == 'http://127.0.0.1:8080'
 assert worker['environment']['OIDC_REDIRECT_URI'] == 'http://127.0.0.1:8080/auth/callback'
 assert api['environment']['OIDC_CLIENT_ID'] == worker['environment']['OIDC_CLIENT_ID'] == 'review-client'
