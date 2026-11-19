@@ -1,0 +1,39 @@
+name: Draft (blocked)
+description: Plan work that cannot be started yet because it is blocked
+title: "[Draft]: "
+labels: ["draft"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Objective
+      description: What needs to be done and why? (1-2 sentences)
+    validations:
+      required: true
+  - type: textarea
+    id: blocked-by
+    attributes:
+      label: Blocked by
+      description: Issues or PRs that must be finished first, and what exactly is missing.
+      placeholder: |
+        - #123 (needs the new endpoint)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Acceptance Criteria / Scope
+      description: Checklist defining the Definition of Done (DoD). It can be rough until the blocker is solved.
+      placeholder: |
+        - [ ] Deliverable A completed
+        - [ ] Deliverable B completed
+        - [ ] Review conducted
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Context / References
+      description: Links to specs, standards (e.g. ISO 21434), or related items.
+    validations:
+      required: false
