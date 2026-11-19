@@ -20,6 +20,7 @@ type TaraProjectStore interface {
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
 	DeleteTaraProject(context.Context, pgtype.UUID) (int64, error)
+	ExportProject(context.Context, pgtype.UUID) (db.ProjectExport, error)
 }
 
 type TaraProject struct {
