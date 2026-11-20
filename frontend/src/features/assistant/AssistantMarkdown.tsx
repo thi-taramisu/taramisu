@@ -6,6 +6,9 @@ const components: Components = {
   a: ({ node: _node, children, ...props }) => (
     <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary underline">{children}</a>
   ),
+  // Images are not loaded: the browser would request the URL without a click, and text in the project can make
+  // the model put project data into that URL. The alt text is shown instead.
+  img: ({ alt }) => <>{alt}</>,
   table: ({ node: _node, ...props }) => (
     <div className="overflow-x-auto">
       <table {...props} className="border-collapse text-xs" />
@@ -15,7 +18,8 @@ const components: Components = {
 
 /**
  * Renders an assistant answer as Markdown (GitHub flavour: lists, tables, code). The text comes from the model,
- * so raw HTML is not rendered and unsafe link targets are dropped (react-markdown defaults).
+ * so raw HTML is not rendered and unsafe link targets are dropped (react-markdown defaults), and images are
+ * replaced by their alt text.
  */
 export function AssistantMarkdown({ children }: { children: string }) {
   return (

