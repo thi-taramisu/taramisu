@@ -13,7 +13,27 @@ const PROJECT_KEY = 'taramisu.assistant.project'
 const MAX_HISTORY = 20
 const SUGGESTIONS = ['What is this project about?', 'Which item definitions are there?']
 
-type ChatEntry = AssistantMessage & { toolsUsed?: string[] }
+type Usage = { input_tokens: number; output_tokens: number }
+type ChatEntry = AssistantMessage & { toolsUsed?: string[]; usage?: Usage }
+
+// Plain names for the backend's tools, so the panel does not show function names.
+const TOOL_LABELS: Record<string, string> = {
+  get_project: 'project',
+  list_item_definitions: 'item definitions',
+}
+
+const numberFormat = new Intl.NumberFormat('en')
+
+/** "Read: project, item definitions · 1,240 tokens in / 180 out"; parts without data are left out. */
+function answerDetails(entry: ChatEntry): string {
+  const parts: string[] = []
+  const read = [...new Set((entry.toolsUsed ?? []).map((name) => TOOL_LABELS[name] ?? name))]
+  if (read.length) parts.push(`Read: ${read.join(', ')}`)
+  if (entry.usage && (entry.usage.input_tokens || entry.usage.output_tokens)) {
+    parts.push(`${numberFormat.format(entry.usage.input_tokens)} tokens in / ${numberFormat.format(entry.usage.output_tokens)} out`)
+  }
+  return parts.join(' · ')
+}
 
 function loadProjectId(): string {
   try {
@@ -66,7 +86,7 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
       { projectId: activeProjectId, messages: history.slice(-MAX_HISTORY).map((m) => ({ role: m.role, content: m.content })) },
       {
         onSuccess: (answer) =>
-          setMessages((current) => [...current, { role: 'assistant', content: answer.answer, toolsUsed: answer.tools_used ?? [] }]),
+          setMessages((current) => [...current, { role: 'assistant', content: answer.answer, toolsUsed: answer.tools_used ?? [], usage: answer.usage }]),
       },
     )
   }
@@ -145,8 +165,8 @@ function Bubble({ entry }: { entry: ChatEntry }) {
         user ? 'bg-primary text-primary-foreground whitespace-pre-wrap' : 'bg-muted text-foreground')}>
         {user ? entry.content : <AssistantMarkdown>{entry.content}</AssistantMarkdown>}
       </div>
-      {!!entry.toolsUsed?.length && (
-        <p className="mt-0.5 text-xs text-muted-foreground">Read: {entry.toolsUsed.join(', ')}</p>
+      {!user && answerDetails(entry) && (
+        <p className="mt-0.5 text-xs text-muted-foreground">{answerDetails(entry)}</p>
       )}
     </div>
   )

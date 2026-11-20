@@ -12,3 +12,7 @@ services:
     environment:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_UPSTREAM_URL: ${LLM_UPSTREAM_URL:-https://chat-ai.academiccloud.de}
+      # Optional tracing to a self-hosted Langfuse; all three or none (see deploy/README.md).
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}

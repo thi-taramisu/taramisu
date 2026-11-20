@@ -13,6 +13,11 @@ services:
       - "127.0.0.1:5050:80"
     networks: [dev-app]
 
+  # Lets the LLM service reach a Langfuse running on this machine (LANGFUSE_HOST=http://host.docker.internal:3000).
+  llm:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   # An API started on the host (make -C backend run) fetches JWKS from localhost:9000.
   authentik-server:
     ports:

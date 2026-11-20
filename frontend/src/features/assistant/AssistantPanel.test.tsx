@@ -53,7 +53,11 @@ describe('AssistantPanel', () => {
     server.use(
       http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, async ({ params, request }) => {
         requests.push({ projectId: String(params.projectId), body: await request.json() })
-        return HttpResponse.json({ answer: 'Demo ECU has one item.', tools_used: ['list_item_definitions'] })
+        return HttpResponse.json({
+          answer: 'Demo ECU has one item.',
+          tools_used: ['get_project', 'list_item_definitions', 'list_item_definitions'],
+          usage: { input_tokens: 1240, output_tokens: 180 },
+        })
       }),
     )
     const user = renderPanel()
@@ -62,7 +66,8 @@ describe('AssistantPanel', () => {
     await user.type(screen.getByRole('textbox', { name: 'Message to the assistant' }), 'Which items?{Enter}')
 
     expect(await screen.findByText('Demo ECU has one item.')).toBeInTheDocument()
-    expect(screen.getByText('Read: list_item_definitions')).toBeInTheDocument()
+    // Plain names instead of tool names, each once, and the tokens of the question.
+    expect(screen.getByText('Read: project, item definitions · 1,240 tokens in / 180 out')).toBeInTheDocument()
     expect(screen.getByText('Which items?')).toBeInTheDocument()
     expect(requests).toEqual([{ projectId: projectA.id, body: { messages: [{ role: 'user', content: 'Which items?' }] } }])
   })
@@ -72,7 +77,7 @@ describe('AssistantPanel', () => {
     server.use(
       http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, async ({ request }) => {
         bodies.push(await request.json())
-        return HttpResponse.json({ answer: `Answer ${bodies.length}`, tools_used: [] })
+        return HttpResponse.json({ answer: `Answer ${bodies.length}`, tools_used: [], usage: { input_tokens: 0, output_tokens: 0 } })
       }),
     )
     const user = renderPanel()
@@ -99,7 +104,7 @@ describe('AssistantPanel', () => {
     server.use(
       http.post(`${baseUrl}/api/v1/projects/:projectId/assistant`, ({ params }) => {
         projectIds.push(String(params.projectId))
-        return HttpResponse.json({ answer: 'ok', tools_used: [] })
+        return HttpResponse.json({ answer: 'ok', tools_used: [], usage: { input_tokens: 0, output_tokens: 0 } })
       }),
     )
     const user = renderPanel()

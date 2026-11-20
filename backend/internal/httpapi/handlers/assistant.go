@@ -6,6 +6,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +29,9 @@ const maxToolItems = 100
 const assistantSystemPrompt = `You are the assistant of Taramisu, a tool for threat analysis and risk assessment (TARA)
 according to ISO/SAE 21434. Answer questions about the current project. Use the tools to read project data and
 never invent data that the tools did not return. You can only read; if the user asks you to change something,
-explain how to do it in the tool. Answer in the language of the user's last message.`
+explain how to do it in the tool. Never mention tool or function names; when asked what you can do, describe it in
+plain words, for example that you can read the project's name and description and list its item definitions.
+Answer in the language of the user's last message.`
 
 // AssistantStore is the read access the assistant's tools need; it is implemented by the sqlc-generated queries.
 type AssistantStore interface {
@@ -65,7 +69,15 @@ type AssistantOutput struct {
 		Answer string `json:"answer"`
 		// ToolsUsed lists the tools the model called, so the user can see where the answer comes from.
 		ToolsUsed []string `json:"tools_used"`
+		// Usage sums the tokens of all model calls for this question, so the cost of a question is visible.
+		Usage AssistantUsage `json:"usage"`
 	}
+}
+
+// AssistantUsage counts tokens as reported by the model API; zero when it reports none.
+type AssistantUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 func (h *Assistant) Register(api huma.API) {
@@ -90,12 +102,13 @@ func (h *Assistant) Ask(ctx context.Context, in *AssistantInput) (*AssistantOutp
 	for _, m := range in.Body.Messages {
 		messages = append(messages, llm.Message{Role: m.Role, Content: m.Content})
 	}
-	answer, toolsUsed, err := runToolLoop(ctx, h.client, h.model, messages, h.tools(projectIDFromContext(ctx)))
+	result, err := runToolLoop(ctx, h.client, h.model, messages, h.tools(projectIDFromContext(ctx)))
 	if err != nil {
 		return nil, assistantError(err)
 	}
 	out := &AssistantOutput{}
-	out.Body.Answer, out.Body.ToolsUsed = answer, toolsUsed
+	out.Body.Answer, out.Body.ToolsUsed = result.answer, result.toolsUsed
+	out.Body.Usage = AssistantUsage{InputTokens: result.usage.InputTokens, OutputTokens: result.usage.OutputTokens}
 	return out, nil
 }
 
@@ -138,9 +151,15 @@ func (h *Assistant) tools(projectID pgtype.UUID) map[string]assistantTool {
 
 var errToolRoundsExceeded = errors.New("assistant did not answer within the tool round limit")
 
+// toolLoopResult is the model's answer, the names of the tools it used and the tokens of all model calls.
+type toolLoopResult struct {
+	answer    string
+	toolsUsed []string
+	usage     llm.Usage
+}
+
 // runToolLoop asks the model until it answers without tool calls, running the requested tools in between.
-// It returns the answer and the names of the tools used.
-func runToolLoop(ctx context.Context, client llm.Client, model string, messages []llm.Message, tools map[string]assistantTool) (string, []string, error) {
+func runToolLoop(ctx context.Context, client llm.Client, model string, messages []llm.Message, tools map[string]assistantTool) (toolLoopResult, error) {
 	definitions := make([]llm.Tool, 0, len(tools))
 	for name, tool := range tools {
 		definitions = append(definitions, llm.Tool{Type: "function", Function: llm.Function{
@@ -149,26 +168,37 @@ func runToolLoop(ctx context.Context, client llm.Client, model string, messages 
 		}})
 	}
 
-	toolsUsed := []string{}
+	result := toolLoopResult{toolsUsed: []string{}}
+	traceID := newTraceID() // one trace for all model calls of this question
 	for range maxToolRounds {
-		reply, err := client.Complete(ctx, llm.Request{Model: model, Messages: messages, Tools: definitions})
+		completion, err := client.Complete(ctx, llm.Request{Model: model, Messages: messages, Tools: definitions, TraceID: traceID})
 		if err != nil {
-			return "", nil, err
+			return toolLoopResult{}, err
 		}
+		result.usage = result.usage.Add(completion.Usage)
+		reply := completion.Message
 		if len(reply.ToolCalls) == 0 {
-			return reply.Content, toolsUsed, nil
+			result.answer = reply.Content
+			return result, nil
 		}
 		messages = append(messages, reply)
 		for _, call := range reply.ToolCalls {
-			result, err := runTool(ctx, tools, call)
+			output, err := runTool(ctx, tools, call)
 			if err != nil {
-				return "", nil, err
+				return toolLoopResult{}, err
 			}
-			toolsUsed = append(toolsUsed, call.Function.Name)
-			messages = append(messages, llm.Message{Role: "tool", ToolCallID: call.ID, Content: result})
+			result.toolsUsed = append(result.toolsUsed, call.Function.Name)
+			messages = append(messages, llm.Message{Role: "tool", ToolCallID: call.ID, Content: output})
 		}
 	}
-	return "", nil, errToolRoundsExceeded
+	return toolLoopResult{}, errToolRoundsExceeded
+}
+
+// newTraceID returns 32 random hex characters, the format the LLM service accepts in X-Trace-Id.
+func newTraceID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // runTool runs one tool call and returns its result as JSON. An unknown tool is reported to the model,
