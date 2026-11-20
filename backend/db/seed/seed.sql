@@ -4,12 +4,53 @@
 -- are merged; the rest is transferred as is, including gaps in the Excel.
 -- Load with: make -C deploy seed (never runs automatically).
 -- Safe to run more than once: existing rows are skipped (ON CONFLICT DO NOTHING).
+--
+-- The project needs an Owner, because the API only shows a project to users who have a role in it.
+-- make -C deploy seed SEED_OWNER_SUB=<subject> names the Owner by the subject (sub) of their access token.
+-- Without it, the only user who has signed in so far becomes Owner; otherwise the seed stops and loads nothing.
+
+-- owner_sub is the psql variable behind SEED_OWNER_SUB; empty when the file is run without it.
+\if :{?owner_sub}
+\else
+    \set owner_sub ''
+\endif
 
 BEGIN;
 
 INSERT INTO tara_project (id, name, description) VALUES
     ('7045b747-acd4-5124-888e-1c29ae0bd42c', 'REBORN', 'Reusable battery module and management system development for reliable 2nd life (imported from TARA_WorkingSheet (2).xlsx)')
 ON CONFLICT DO NOTHING;
+
+-- A named Owner may not have signed in yet; the API creates the same row on the first sign-in.
+INSERT INTO iam_user (external_iam_sub)
+SELECT :'owner_sub' WHERE :'owner_sub' <> ''
+ON CONFLICT (external_iam_sub) DO NOTHING;
+
+-- A user who already has a lower role in the project is raised to Owner.
+INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
+SELECT '7045b747-acd4-5124-888e-1c29ae0bd42c'::uuid, id, 'OWNER'::project_role
+FROM iam_user
+WHERE external_iam_sub = :'owner_sub'
+   OR (:'owner_sub' = '' AND (SELECT count(*) FROM iam_user) = 1)
+ON CONFLICT (tara_project_id, user_id) DO UPDATE SET project_role = 'OWNER';
+
+-- Stop before loading anything when the project would have no Owner. An Owner from an earlier run counts.
+DO $$
+DECLARE
+    users bigint := (SELECT count(*) FROM iam_user);
+BEGIN
+    IF EXISTS (
+        SELECT FROM project_role_assignment
+        WHERE tara_project_id = '7045b747-acd4-5124-888e-1c29ae0bd42c' AND project_role = 'OWNER'
+    ) THEN
+        RETURN;
+    END IF;
+    IF users = 0 THEN
+        RAISE EXCEPTION 'The sample project needs an Owner, but nobody has signed in yet. Sign in once and run the seed again, or pass SEED_OWNER_SUB=<subject>.';
+    END IF;
+    RAISE EXCEPTION 'The sample project needs an Owner, but % users have signed in. Pass SEED_OWNER_SUB=<subject> to name one.', users;
+END
+$$;
 
 INSERT INTO item_definition (id, tara_project_id, name, scope_type, lifecycle_phase, item_definition_wp_09_01) VALUES
     ('085d8499-f196-5fda-a83d-c863c9d8d89d', '7045b747-acd4-5124-888e-1c29ae0bd42c', 'Battery pack (First life)', 'ITEM', NULL, 'Item functions

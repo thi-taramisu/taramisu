@@ -66,7 +66,9 @@ services:
       - ../backend/db/seed:/seed:ro
     environment:
       DATABASE_URL: postgres://taramisu:taramisu@db:5432/taramisu?sslmode=disable
-    command: ["sh", "-c", "psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f /seed/seed.sql"]
+      # Subject (sub) of the user who becomes Owner of the sample project; empty picks the only user who has signed in.
+      SEED_OWNER_SUB: ${SEED_OWNER_SUB:-}
+    command: ["sh", "-c", "psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -v owner_sub=\"$$SEED_OWNER_SUB\" -f /seed/seed.sql"]
     depends_on:
       migrate:
         condition: service_completed_successfully

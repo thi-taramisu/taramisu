@@ -26,6 +26,19 @@ remain backend-specific. Both `down` commands now stop frontend and proxy as wel
 > **Warning:** `make -C deploy reset` (or `make -C backend reset`) deletes all four stack data volumes,
 > including Authentik accounts and pgAdmin settings. Use `down` for a normal stop. Reset keeps `iam/.env`.
 
+## Dummy data
+
+`make -C deploy seed` loads the sample project REBORN. The API only shows a project to users who have a role in it,
+so the seed makes one user its Owner:
+
+- Sign in once at <http://localhost> as `dev`, then run `make -C deploy seed`. The only user who has signed in becomes Owner.
+- When several users have signed in, or to name the Owner before anyone has, pass the user's subject:
+  `make -C deploy seed SEED_OWNER_SUB=<subject>`. The subject is the `subject` field of `GET /api/v1/me`, which the
+  browser's network tab shows after signing in.
+
+Without an Owner the seed stops and loads nothing. Running it again is safe: existing rows are kept, and a named user
+with a lower role in the project is raised to Owner.
+
 ## Configuration and startup
 
 `dev.sh` generates missing secrets in ignored `iam/.env` with mode 600. Docker must be running so it can first check for existing IAM data.
