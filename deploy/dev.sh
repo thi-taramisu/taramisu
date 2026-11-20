@@ -24,6 +24,7 @@ if [ ! -e ../iam/.env ]; then
     authentik_key=$(openssl rand -hex 48)
     dev_password=$(openssl rand -hex 16)
     admin_password=$(openssl rand -hex 24)
+    api_token=$(openssl rand -hex 32)
     (
         set -C
         sed \
@@ -31,9 +32,18 @@ if [ ! -e ../iam/.env ]; then
             -e "s/^AUTHENTIK_SECRET_KEY=$/AUTHENTIK_SECRET_KEY=$authentik_key/" \
             -e "s/^DEV_PASSWORD=$/DEV_PASSWORD=$dev_password/" \
             -e "s/^AUTHENTIK_BOOTSTRAP_PASSWORD=$/AUTHENTIK_BOOTSTRAP_PASSWORD=$admin_password/" \
+            -e "s/^AUTHENTIK_API_TOKEN=$/AUTHENTIK_API_TOKEN=$api_token/" \
             ../iam/.env.example > ../iam/.env
     )
     echo 'Generated local secrets in iam/.env (ignored by Git).'
+fi
+
+# iam/.env files created before #186 lack the API token. Provisioning sets the token from this
+# value, so generating it for existing data is safe. An empty value still fails below.
+if ! grep -q '^AUTHENTIK_API_TOKEN=' ../iam/.env; then
+    printf '\n# Token of the taramisu-api service account; the API reads users and groups with it.\nAUTHENTIK_API_TOKEN=%s\n' \
+        "$(openssl rand -hex 32)" >> ../iam/.env
+    echo 'Added AUTHENTIK_API_TOKEN to iam/.env.'
 fi
 
 compose() { docker compose --env-file ../iam/.env -f compose.yaml -f compose.dev.yaml "$@"; }

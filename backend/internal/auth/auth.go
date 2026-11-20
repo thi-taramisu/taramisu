@@ -31,6 +31,9 @@ type User struct {
 	Subject string `json:"subject"`
 	Name    string `json:"name"`
 	Email   string `json:"email" format:"email"`
+	// Groups holds the caller's assignable Authentik group UUIDs from the taramisu_groups claim.
+	// It is used for project authorization only and is not part of the API response.
+	Groups []string `json:"-"`
 }
 
 // UserStore resolves an external IAM subject identifier (sub) to an internal iam_user UUID.
@@ -150,8 +153,9 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 		}
 
 		var claims struct {
-			Name  string `json:"name"`
-			Email string `json:"email"`
+			Name   string   `json:"name"`
+			Email  string   `json:"email"`
+			Groups []string `json:"taramisu_groups"`
 		}
 		if err := token.Claims(&claims); err != nil {
 			slog.Warn("JWT claims decode failed", "error", err)
@@ -187,6 +191,7 @@ func (m *Manager) Require(next http.Handler) http.Handler {
 			Subject: token.Subject,
 			Name:    claims.Name,
 			Email:   claims.Email,
+			Groups:  claims.Groups,
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey{}, user)))
 	})

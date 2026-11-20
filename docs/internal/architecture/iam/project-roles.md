@@ -81,7 +81,7 @@ The request flow including token refresh is described in [request flows](../requ
 
 ## Protecting a new endpoint
 
-> The function names below are planned in #186 and may still change. This section will be updated with the merged code.
+The helpers live in [`project_access.go`](../../../../backend/internal/httpapi/handlers/project_access.go) (#186).
 
 Access is **denied by default**. Every operation under `/api/` declares, when it is registered, which permission it needs and
 which record leads to its project. The check then runs centrally before the handler, so a handler cannot forget it. If an
@@ -134,6 +134,12 @@ permission instead of a place in the order (see [Open questions](#open-questions
 - Only Authentik groups with the attribute `taramisu_assignable: true` can be assigned. This keeps administrator and system
   groups out of the selection.
 - Group membership is read from the token claim `taramisu_groups` (group UUIDs). It is not copied into the database.
+- Owners add users by the email address of their active Authentik account; case does not matter. Because every user can
+  create a project, every user can find out whether an email address has an active account (`201` or `422`). This is
+  accepted for an internal tool whose users are approved in Authentik.
+- Authentik does not enforce unique email addresses (see [Identifier collisions](registration-flow.md#identifier-collisions)).
+  If several active accounts share the email, the request fails with `409` until an administrator fixes it, like login
+  by that email.
 
 ### Leaving a project
 
@@ -176,8 +182,11 @@ The API writes one structured log entry (`audit` message) for each of these even
 | Member removed or left the project | Actor, project, member ID, user or group, role before; whether the actor removed themselves |
 | Project deleted | Actor, project |
 
-Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp. A persistent audit
-history in the database is not part of this specification.
+Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp.
+
+Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): these events are also stored in the database,
+in the same transaction as the change. Events are kept for the project's lifetime and one year after its deletion. At first
+only operators read them. The table, retention, readers, and further events are described in [Audit and logging](../audit.md).
 
 ## User interface
 

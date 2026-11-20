@@ -1,5 +1,6 @@
 import { act, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 
@@ -29,11 +30,11 @@ describe('create damage scenario', () => {
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await screen.findByRole('heading', { name: 'DS-02 Diagnostic key leaked' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
-    expect(within(tree()).getByRole('link', { name: /DS-02 Diagnostic key leaked/ })).toHaveAttribute('aria-current', 'page')
+    expect(within(tree()).getByRole('link', { name: 'DS-02 Diagnostic key leaked' })).toHaveAttribute('aria-current', 'page')
     expect((await api.content.assets('headlamp', 'i-01')).find((asset) => asset.id === 'a-04')).toMatchObject({ damageScenarios: 1 })
   })
 
@@ -57,7 +58,7 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'DS-02 Diagnostic key leaked' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
   })
 
   it('links further assets with the properties they have', async () => {
@@ -132,7 +133,7 @@ describe('create damage scenario', () => {
     act(() => loadAssets())
     await within(dialog).findByRole('button', { name: 'A-02 Integrity' })
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'DS-02 Manipulated firmware' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario #02' })).toBeInTheDocument()
   })
 
   it('keeps the dialog open with "Create & add another"', async () => {
@@ -173,11 +174,41 @@ describe('create damage scenario', () => {
 })
 
 describe('damage scenario page', () => {
-  it('shows the type label, code and title in the header', async () => {
+  it('shows the type label with the ID as #number above the title', async () => {
     renderApp(page)
 
-    const header = (await screen.findByRole('heading', { name: 'DS-01 Headlamp turns off while driving at night' })).parentElement!
-    expect(within(header).getByText('Damage scenario')).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
+    expect(heading.parentElement).not.toHaveTextContent('DS-01')
+  })
+
+  it('shows the ID of the newly opened damage scenario right after switching', async () => {
+    const api = createMockItemApi()
+    const second = await api.damageScenarios.create('headlamp', {
+      item_definition_id: 'i-01',
+      title: 'Diagnostic key leaked',
+      asset_properties: [{ asset_id: 'a-04', property: 'C' }],
+    })
+    const { user } = renderApp(page, api)
+
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
+    await user.click(await within(tree()).findByRole('link', { name: 'DS-02 Diagnostic key leaked' }))
+
+    expect(location()).toHaveTextContent(`${project}/damage-scenarios/${second.id}`)
+    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })
+    expect(screen.getByText('Damage scenario #02')).toBeInTheDocument()
+    expect(screen.queryByText('Damage scenario #01')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the tree code when the API returns an empty code', async () => {
+    const api = createMockItemApi()
+    const get = api.damageScenarios.get
+    api.damageScenarios.get = async (...args) => ({ ...(await get(...args)), code: '' })
+    renderApp(page, api)
+
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
+    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown damage scenarios', async () => {
@@ -200,14 +231,14 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be refreshed')
-    expect(screen.getByRole('heading', { name: 'DS-01 Headlamp turns off while driving at night' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
-  it('keeps the relations tab as a placeholder', async () => {
-    renderApp(`${page}/relations`)
+  it('shows the number of relations in the tab', async () => {
+    renderApp(page)
 
-    expect(await screen.findByText('Relations: not implemented yet')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Relations 2' })).toHaveAttribute('href', `${page}/relations`)
   })
 })
 
@@ -227,8 +258,8 @@ describe('damage scenario definition', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
-    expect(within(tree()).getByRole('link', { name: /DS-01 Low beam fails at night/ })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage scenario #01' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({
       title: 'Low beam fails at night',
       road_user_harm_description: null,
@@ -256,9 +287,48 @@ describe('damage scenario definition', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved')
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/Glare\.$/)
   })
+
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.damageScenarios.update)
+    api.damageScenarios.update = update.held
+    const { user } = renderApp(page, api)
+    const name = await screen.findByLabelText(/Name/)
+    await user.type(name, ' 2')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.type(name, '3')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(name).toHaveDisplayValue('Headlamp turns off while driving at night 23')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    expect((await api.damageScenarios.get('headlamp', 'ds-01')).title).toBe('Headlamp turns off while driving at night 2')
+  })
 })
 
 describe('damage scenario impact', () => {
+  it('keeps Save disabled while saving and keeps the edits made meanwhile', async () => {
+    const api = createMockItemApi()
+    const update = holdRequest(api.damageScenarios.updateImpactRatings)
+    api.damageScenarios.updateImpactRatings = update.held
+    const { user } = renderApp(`${page}/impact`, api)
+    await user.click(within(await screen.findByRole('radiogroup', { name: 'Financial' })).getByRole('radio', { name: 'Major' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await user.click(radio('Operational', 'Severe'))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await act(() => update.release())
+
+    expect(radio('Operational', 'Severe')).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(update.calls).toBe(1)
+    const ratings = await api.damageScenarios.impactRatings('headlamp', 'ds-01')
+    expect(ratings.find((r) => r.impact_category === 'FINANCIAL')?.rating_value).toBe('MAJOR')
+    expect(ratings.find((r) => r.impact_category === 'OPERATIONAL')?.rating_value).toBe('MODERATE')
+  })
+
   it('shows the stored rating per category', async () => {
     renderApp(`${page}/impact`)
 

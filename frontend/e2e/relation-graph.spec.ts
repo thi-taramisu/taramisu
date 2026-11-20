@@ -1,0 +1,108 @@
+import { expect, test } from '@playwright/test'
+
+test('explores risk-colored paths, switches display modes and jumps to related elements', async ({ page }) => {
+  await page.goto('/projects/headlamp/threat-scenarios/ts-01?view=graph')
+  const graph = page.getByRole('region', { name: 'Relation graph' })
+  await expect(graph).toBeVisible()
+  const rated = graph.getByRole('button', { name: /Attack path AP-02 Malicious.*Risk 4/ })
+  const unrated = graph.getByRole('button', { name: /Attack path AP-01 Compromised.*Not rated/ })
+  await expect(rated).toBeVisible()
+  await expect(unrated).toBeVisible()
+  await expect(graph.locator('.react-flow__edge')).toHaveCount(4)
+  await page.getByRole('switch', { name: 'Minimal view' }).click()
+  await expect(page).toHaveURL(/graphMode=minimal/)
+  await expect(rated).not.toContainText('Malicious device')
+  await rated.click()
+  const details = page.getByRole('complementary', { name: 'Selected graph element' })
+  await expect(details).toContainText('Malicious device on the OBD-II connector')
+  await details.getByRole('link', { name: 'Jump to' }).click()
+  await expect(page).toHaveURL(/attack-paths\/ap-02\?view=graph&graphMode=minimal/)
+  await expect(graph.locator('.react-flow__node')).toHaveCount(2)
+  await graph.getByRole('button', { name: /Threat scenario TS-01 Spoofed/ }).click()
+  await details.getByRole('link', { name: 'Jump to' }).click()
+  await expect(graph.locator('.react-flow__node')).toHaveCount(5)
+  await graph.getByRole('button', { name: /Damage scenario DS-01 Headlamp/ }).click()
+  await details.getByRole('link', { name: 'Edit', exact: true }).click()
+  await expect(page).toHaveURL(/damage-scenarios\/ds-01$/)
+  await expect(page.getByLabel('Harm To Road User')).toBeVisible()
+})
+
+test('new mock damage scenarios appear in the graph after creation', async ({ page }) => {
+  await page.goto('/projects/headlamp/assets/a-02')
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Damage Scenario', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name', { exact: false }).fill('Firmware disables lighting')
+  await dialog.getByRole('button', { name: 'Create & open' }).click()
+  await page.getByRole('switch', { name: 'Graph', exact: true }).click()
+  const graph = page.getByRole('region', { name: 'Relation graph' })
+  await expect(graph.getByRole('button', { name: /Damage scenario DS-02 Firmware disables lighting, Not rated/ })).toBeVisible()
+  await expect(graph.getByRole('button', { name: /Asset A-02 Body control ECU firmware, Not rated/ })).toBeVisible()
+})
+
+test('moves individual nodes, preserves positions across display modes and resets the layout', async ({ page }) => {
+  await page.goto('/projects/headlamp/threat-scenarios/ts-01?view=graph')
+  const graph = page.getByRole('region', { name: 'Relation graph' })
+  const node = graph.locator('.react-flow__node[data-id="attack-paths:ap-02"]')
+  const sibling = graph.locator('.react-flow__node[data-id="attack-paths:ap-01"]')
+  const button = node.getByRole('button')
+  await expect(button).toBeVisible()
+  const original = await node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)
+  const siblingOriginal = await sibling.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)
+  const edge = graph.locator('.react-flow__edge[data-id="attack-paths:ap-02->threat-scenarios:ts-01"] .react-flow__edge-path')
+  const originalEdge = await edge.getAttribute('d')
+  const box = (await button.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 55, box.y + box.height / 2 - 30, { steps: 10 })
+  await page.mouse.up()
+  await expect.poll(() => node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)).not.toBe(original)
+  const moved = await node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)
+  expect(await sibling.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)).toBe(siblingOriginal)
+  await expect(edge).not.toHaveAttribute('d', originalEdge!)
+  await expect(page.getByRole('complementary', { name: 'Selected graph element' })).toHaveCount(0)
+  await page.getByRole('switch', { name: 'Minimal view' }).click()
+  expect(await node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)).toBe(moved)
+  await button.click()
+  await expect(page.getByRole('complementary', { name: 'Selected graph element' })).toBeVisible()
+  await page.getByRole('button', { name: 'Close element details' }).click()
+  await page.getByRole('button', { name: 'Reset graph layout' }).click()
+  await expect.poll(() => node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)).toBe(original)
+})
+
+test('retains connection ports and moves smoothly when dragging past the connected node', async ({ page }) => {
+  await page.goto('/projects/headlamp/threat-scenarios/ts-01?view=graph')
+  const graph = page.getByRole('region', { name: 'Relation graph' })
+  const node = graph.locator('.react-flow__node[data-id="attack-paths:ap-02"]')
+  const button = node.getByRole('button')
+  const edge = graph.locator('.react-flow__edge[data-id="attack-paths:ap-02->threat-scenarios:ts-01"] .react-flow__edge-path')
+  await expect(button).toBeVisible()
+  const edgeIds = await graph.locator('.react-flow__edge').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id')))
+  async function portOffset() {
+    const transform = await node.evaluate((element) => (element as unknown as { style: { transform: string } }).style.transform)
+    const position = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/)!
+    const start = (await edge.getAttribute('d'))!.match(/^M\s*([-\d.]+)[ ,]([-\d.]+)/)!
+    return { x: Number(position[1]), offsetX: Number(start[1]) - Number(position[1]), offsetY: Number(start[2]) - Number(position[2]) }
+  }
+  const initial = await portOffset()
+  const box = (await button.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  let previousX = initial.x
+  for (let step = 1; step <= 12; step++) {
+    await page.mouse.move(box.x + box.width / 2 + step * 40, box.y + box.height / 2 - step * 4, { steps: 3 })
+    const position = await portOffset()
+    expect(position.x).toBeGreaterThan(previousX)
+    expect(position.offsetX).toBeCloseTo(initial.offsetX, 0)
+    expect(position.offsetY).toBeCloseTo(initial.offsetY, 0)
+    previousX = position.x
+  }
+  await page.mouse.up()
+  const final = await portOffset()
+  expect(final.x).toBeGreaterThan(380)
+  expect(final.offsetX).toBeCloseTo(initial.offsetX, 0)
+  expect(final.offsetY).toBeCloseTo(initial.offsetY, 0)
+  expect(await graph.locator('.react-flow__edge').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-id')))).toEqual(edgeIds)
+  await expect(graph.getByRole('button', { name: /Attack path AP-02 Malicious.*Risk 4/ })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Selected graph element' })).toHaveCount(0)
+})
