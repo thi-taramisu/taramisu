@@ -78,6 +78,10 @@ project.
 | Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Stored |
 | Members | `member.removed`, including leaving | Before: role, user or group. The actor equals the user when someone left | Stored |
 | Item definitions | `item_definition.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Assets | `asset.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Asset cybersecurity properties | `asset_cybersecurity_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Damage scenario asset properties | `damage_scenario_asset_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Threat scenario asset properties | `threat_scenario_asset_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | Other analysis content | `<record>.created`, `<record>.updated`, `<record>.deleted` | API representation before and after | Planned |
 | AI assistant | `ai_suggestion.applied` | Target record, applied fields, model | With the AI assistant |
 | Review | `review.requested`, `review.approved`, `review.rejected` | Reviewed state | With the review workflow |

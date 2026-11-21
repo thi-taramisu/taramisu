@@ -1,0 +1,172 @@
+package handlers_test
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/thi-taramisu/taramisu/backend/internal/db"
+)
+
+type auditRequest func(http.Handler, string, string, string, string, int) map[string]any
+
+// rejectAuditInsert forces PostgreSQL to reject the audit event after the handler's mutation.
+type rejectAuditInsert struct{ *db.Store }
+
+func (f rejectAuditInsert) Audit(ctx context.Context, actor db.Actor, change func(context.Context) (db.Change, error)) error {
+	return f.Store.Audit(ctx, actor, func(ctx context.Context) (db.Change, error) {
+		event, err := change(ctx)
+		if err == nil && event.Event != "" {
+			event.Event += "\x00"
+		}
+		return event, err
+	})
+}
+
+type resourceAuditFixture struct {
+	t                  *testing.T
+	ctx                context.Context
+	pool               *pgxpool.Pool
+	serve              auditRequest
+	handler, failing   http.Handler
+	project, actor     string
+	rollbackOperations map[string]bool
+}
+
+func (f resourceAuditFixture) seed(query string, args ...any) string {
+	f.t.Helper()
+	var id string
+	if err := f.pool.QueryRow(f.ctx, query, args...).Scan(&id); err != nil {
+		f.t.Fatal(err)
+	}
+	return id
+}
+
+type auditResource struct {
+	target, operation, path string
+	parentColumn, parentID  string
+	create, replace, patch  string
+	unavailableOnFailure    bool
+}
+
+func (f resourceAuditFixture) exercise(r auditResource) {
+	f.t.Helper()
+	// These table and column names are constants supplied by the test cases below.
+	snapshot := func() string {
+		return f.seed(fmt.Sprintf(`SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.id), '[]'::jsonb)::text FROM %s r WHERE %s = $1`, r.target, r.parentColumn), r.parentID)
+	}
+	history := func() []storedEvent { return auditEvents(f.t, f.ctx, f.pool, f.project) }
+	request := func(operation, method, path, body string, status int) map[string]any {
+		return f.serve(f.handler, operation, method, path, body, status)
+	}
+	rollback := func(operation, method, path, body string) {
+		f.t.Helper()
+		beforeRows, beforeEvents := snapshot(), history()
+		status, message := http.StatusInternalServerError, "unexpected error"
+		if r.unavailableOnFailure {
+			status, message = http.StatusServiceUnavailable, "asset property database operation failed"
+		}
+		logged := captureLog(f.t, message, func() {
+			f.serve(f.failing, operation, method, path, body, status)
+		})
+		if len(logged) != 1 || !strings.Contains(fmt.Sprint(logged[0]["error"]), "22021") {
+			f.t.Fatalf("%s: expected PostgreSQL to reject the audit insert, got %v", operation, logged)
+		}
+		if snapshot() != beforeRows || !reflect.DeepEqual(history(), beforeEvents) {
+			f.t.Fatalf("%s: failed audit insert changed the resource or its audit history", operation)
+		}
+		f.rollbackOperations[operation] = true
+	}
+	checkEvent := func(count int, operation, action, id string, before, after any) {
+		f.t.Helper()
+		events := history()
+		want := storedEvent{f.actor, r.target + "." + action, r.target, id, before, after, operation}
+		if len(events) != count+1 {
+			f.t.Fatalf("%s: expected one new event, got %d", operation, len(events)-count)
+		}
+		if got := events[count]; !reflect.DeepEqual(got, want) {
+			f.t.Fatalf("%s: expected new event %+v, got %+v", operation, want, got)
+		}
+	}
+	checkNoEvent := func(operation, method, path, body string, status int) {
+		f.t.Helper()
+		before := history()
+		request(operation, method, path, body, status)
+		if !reflect.DeepEqual(history(), before) {
+			f.t.Fatalf("%s %s: unchanged or rejected request wrote an audit event", method, path)
+		}
+	}
+
+	createOperation := "create-" + r.operation
+	rollback(createOperation, http.MethodPost, r.path, r.create)
+	count := len(history())
+	current := request(createOperation, http.MethodPost, r.path, r.create, http.StatusCreated)
+	id := current["id"].(string)
+	checkEvent(count, createOperation, "created", id, nil, current)
+	member := r.path + "/" + id
+	updates := []struct{ operation, method, body string }{
+		{"replace-" + r.operation, http.MethodPut, r.replace},
+		{"update-" + r.operation, http.MethodPatch, r.patch},
+	}
+	for _, update := range updates {
+		if update.body == "" {
+			continue
+		}
+		rollback(update.operation, update.method, member, update.body)
+		count = len(history())
+		next := request(update.operation, update.method, member, update.body, http.StatusOK)
+		checkEvent(count, update.operation, "updated", id, current, next)
+		checkNoEvent(update.operation, update.method, member, update.body, http.StatusOK)
+		current = next
+	}
+	deleteOperation := "delete-" + r.operation
+	rollback(deleteOperation, http.MethodDelete, member, "")
+	count = len(history())
+	request(deleteOperation, http.MethodDelete, member, "", http.StatusNoContent)
+	checkEvent(count, deleteOperation, "deleted", id, current, nil)
+	checkNoEvent(deleteOperation, http.MethodDelete, member, "", http.StatusNotFound)
+	for _, update := range updates {
+		if update.body != "" {
+			checkNoEvent(update.operation, update.method, member, update.body, http.StatusNotFound)
+		}
+	}
+}
+
+func (f resourceAuditFixture) exerciseAssetAudit(itemID string) {
+	item := "/api/v1/item-definitions/" + itemID
+	f.exercise(auditResource{
+		target: "asset", operation: "asset", path: item + "/assets",
+		parentColumn: "item_definition_id", parentID: itemID,
+		create: "{\"name\":\"Controller\"}", replace: "{\"name\":\"Gateway\",\"description\":\"Vehicle network\"}",
+		patch: "{\"description\":null}",
+	})
+	assetID := f.seed("INSERT INTO asset (item_definition_id, name) VALUES ($1, 'Link asset') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		unavailableOnFailure: true, target: "asset_cybersecurity_property", operation: "asset-cybersecurity-property",
+		path: item + "/assets/" + assetID + "/cybersecurity-properties", parentColumn: "asset_id", parentID: assetID,
+		create: "{\"property_type\":\"INTEGRITY\"}", replace: "{\"property_type\":\"AVAILABILITY\",\"description\":\"Required\"}",
+		patch: "{\"description\":null}",
+	})
+	propertyID := f.seed("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'INTEGRITY') RETURNING id::text", assetID)
+	otherProperty := f.seed("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'CONFIDENTIALITY') RETURNING id::text", assetID)
+	damageID := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		unavailableOnFailure: true, target: "damage_scenario_asset_property", operation: "damage-scenario-asset-property",
+		path: item + "/damage-scenario-asset-properties", parentColumn: "damage_scenario_id", parentID: damageID,
+		create:  fmt.Sprintf("{\"damage_scenario_id\":%q,\"asset_cybersecurity_property_id\":%q}", damageID, propertyID),
+		replace: fmt.Sprintf("{\"damage_scenario_id\":%q,\"asset_cybersecurity_property_id\":%q,\"compromise_mechanism_note\":\"Tampering\"}", damageID, propertyID),
+		patch:   "{\"compromise_mechanism_note\":null}",
+	})
+	threatID := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		unavailableOnFailure: true, target: "threat_scenario_asset_property", operation: "threat-scenario-asset-property",
+		path: item + "/threat-scenario-asset-properties", parentColumn: "threat_scenario_id", parentID: threatID,
+		create:  fmt.Sprintf("{\"threat_scenario_id\":%q,\"asset_cybersecurity_property_id\":%q}", threatID, propertyID),
+		replace: fmt.Sprintf("{\"threat_scenario_id\":%q,\"asset_cybersecurity_property_id\":%q}", threatID, otherProperty),
+		patch:   fmt.Sprintf("{\"asset_cybersecurity_property_id\":%q}", propertyID),
+	})
+}
