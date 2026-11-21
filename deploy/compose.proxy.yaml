@@ -9,6 +9,9 @@ services:
     # edge is the only network with published ports and internet access; proxy reaches frontend, api and Authentik.
     networks: [edge, proxy]
     depends_on:
-      - api
-      - frontend
-      - docs
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      docs:
+        condition: service_healthy
