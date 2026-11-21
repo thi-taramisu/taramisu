@@ -25,14 +25,13 @@ var auditedOperations = []string{
 	"replace-attack-feasibility-rating", "update-attack-feasibility-rating", "delete-attack-feasibility-rating",
 	"create-threat-damage-link", "delete-threat-damage-link",
 	"create-threat-attack-path-link", "delete-threat-attack-path-link",
+	"create-risk-value", "replace-risk-value", "update-risk-value", "delete-risk-value",
+	"create-risk-treatment-decision", "replace-risk-treatment-decision", "update-risk-treatment-decision", "delete-risk-treatment-decision",
 }
 
 // notAuditedYet change analysis content without an audit event. Move an operation to
 // auditedOperations when its changes are recorded; new operations must go into one of the lists.
-var notAuditedYet = []string{
-	"create-risk-value", "replace-risk-value", "update-risk-value", "delete-risk-value",
-	"create-risk-treatment-decision", "replace-risk-treatment-decision", "update-risk-treatment-decision", "delete-risk-treatment-decision",
-}
+var notAuditedYet = []string{}
 
 // TestEveryChangeIsDeclaredForAudit makes adding a mutating operation a conscious decision about its
 // audit events, like the access declaration in handlers.Register.
