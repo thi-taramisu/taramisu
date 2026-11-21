@@ -59,13 +59,33 @@ ensure_env() {
         echo 'PROXY_BIND=0.0.0.0' >> ../iam/.env
         log 'Proxy will listen on all interfaces (PROXY_BIND=0.0.0.0 in iam/.env)'
     fi
+    # The server will be using ssl (HTTPS)
+    if grep -q '^APP_URL=http://' ../iam/.env; then
+        sed -i 's|^APP_URL=http://|APP_URL=https://|' ../iam/.env
+    fi
     empty=$(grep -E '^[A-Z_]+=$' ../iam/.env | cut -d= -f1 | tr '\n' ' ')
     [ -z "$empty" ] || die "empty variables in iam/.env: $empty"
     log "iam/.env ok ($(stat -c %a ../iam/.env))"
 }
 
+# Temporary certificate for compose.tls.yaml until a production cert is available.
+# A real certificate is a follow-up, see PR #275 (last update: 21.11.2026)
+# until then a self-signed one is generated.
+ensure_tls_cert() {
+    if [ -e ../proxy/certs/cert.pem ] && [ -e ../proxy/certs/key.pem ]; then
+        log 'Keeping existing TLS certificate'
+        return
+    fi
+    log 'Generating a self signed TLS certificate'
+    mkdir -p certs
+    openssl req -x509 -newkey rsa:4096 -nodes -days 365 \
+        -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+        -keyout ../proxy/certs/key.pem -out ../proxy/certs/cert.pem
+    chmod 600 certs/key.pem
+}
+
 # Server stack: compose.yaml only (no dev ports), images from GHCR instead of local builds.
-compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
+compose() { docker compose --env-file ../iam/.env -f compose.yaml -f compose.tls.yaml "$@"; }
 
 # Waits until all given services report healthy. Unlike "compose up --wait" it keeps waiting
 # when a service is briefly unhealthy, e.g. while Authentik migrates its database on first start.
@@ -81,7 +101,7 @@ wait_healthy() {
             case "$status" in
                 'running healthy') break ;;
                 running*) ;;
-                *) die "$service stopped ($status); see: docker compose -f deploy/compose.yaml logs $service" ;;
+                *) die "$service stopped ($status); see: docker compose -f deploy/compose.yaml -f deploy/compose.tls.yaml logs $service" ;;
             esac
             [ "$waited" -lt "$timeout" ] || die "$service not healthy after ${timeout}s ($status)"
             sleep 5
@@ -112,8 +132,8 @@ start_stack() {
     # nginx reports even a successful reload on stderr, so show its output only on failure.
     reload_output=$(compose exec -T proxy nginx -s reload 2>&1) || die "nginx reload failed: $reload_output"
     if ! curl --fail --silent --max-time 2 --retry 15 --retry-connrefused --retry-delay 1 \
-        --retry-max-time 30 http://localhost/health/ready > /dev/null; then
-        die 'API not ready through the proxy; see: docker compose -f deploy/compose.yaml logs api proxy'
+        --retry-max-time 30 https://localhost/health/ready > /dev/null; then
+        die 'API not ready through the proxy; see: docker compose -f deploy/compose.yaml -f deploy/compose.tls.yaml logs api proxy'
     fi
 }
 
@@ -205,6 +225,7 @@ log "Release $target"
 # whose test release has no published images.
 export TARAMISU_VERSION="${TARAMISU_IMAGE_TAG:-$target}"
 ensure_env
+ensure_tls_cert
 log 'Pulling images'
 compose pull --quiet
 start_stack

@@ -10,7 +10,7 @@ mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend" "$scratch/deploy" "$scrat
 cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
 cp ../backend/Makefile "$scratch/backend/"
-cp ../proxy/nginx.conf "$scratch/proxy/"
+cp ../proxy/*.conf "$scratch/proxy/"
 cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
@@ -197,7 +197,7 @@ APP_URL=http://127.0.0.1:8080 OIDC_CLIENT_ID=review-client \
 "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
     -f "$scratch/deploy/compose.yaml" -f "$scratch/deploy/compose.dev.yaml" --profile tools config --format json > "$scratch/dev.json"
 "$REAL_DOCKER" compose --env-file "$scratch/iam/.env" \
-    -p isolated-check -f "$scratch/deploy/compose.yaml" config --format json > "$scratch/isolated.json"
+    -p isolated-check -f "$scratch/deploy/compose.yaml" config --format json > "$scratch/tls.json"
 python3 - "$scratch" <<'PY'
 import json
 import sys
@@ -224,6 +224,15 @@ assert {key: bool(value.get('internal')) for key, value in model['networks'].ite
 assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
 # Without the dev override only the proxy publishes a port.
 assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}
+def published(service):
+    return {port['published'] for port in service.get('ports', [])}
+
+def mounts(service):
+    return {v['target']: v for v in service['volumes']}
+
+# Default model: HTTP only, no TLS material.
+assert published(services['proxy']) == {'80'}
+assert not any(t.startswith('/etc/ssl/') for t in mounts(services['proxy']))
 dev = json.loads((root / 'dev.json').read_text())
 assert not any(dev['networks'][network].get('internal') for network in ('dev-app', 'dev-iam'))
 expected_ports = {'proxy': '80', 'db': '5432', 'pgadmin': '5050', 'authentik-server': '9000'}
@@ -286,6 +295,33 @@ assert isolated['services']['api']['environment']['OIDC_ISSUER'] == 'http://loca
 assert isolated['services']['authentik-worker']['environment']['OIDC_REDIRECT_URI'] == 'http://localhost/auth/callback'
 assert all(v['name'].startswith('isolated-check-') for v in isolated['volumes'].values())
 assert all(n['name'].startswith('isolated-check_') for n in isolated['networks'].values())
+
+def published(service):
+    return {port['published'] for port in service.get('ports', [])}
+
+def mounts(service):
+    return {v['target']: v for v in service['volumes']}
+
+# Default model: HTTP only, no TLS
+assert published(services['proxy']) == {'80'}
+assert not any(t.startswith('/etc/ssl/') for t in mounts(services['proxy']))
+
+# TLS model (compose.yaml + compose.tls.yaml)
+tls = json.loads((root / 'tls.json').read_text())
+tls_services = tls['services']
+assert set(tls_services) == set(services)
+assert {n for n, s in tls_services.items() if s.get('ports')} == {'proxy'}
+proxy_tls = tls_services['proxy']
+assert published(proxy_tls) == {'80', '443'}
+assert len({p['host_ip'] for p in proxy_tls['ports']}) == 1
+assert set(proxy_tls['networks']) == expected_networks['proxy']
+tls_mounts = mounts(proxy_tls)
+conf = tls_mounts['/etc/nginx/conf.d/default.conf']
+assert Path(conf['source']).resolve() == root / 'proxy/nginx.tls.conf'
+assert (root / 'proxy/nginx_secure.conf').exists()
+for target in ('/etc/ssl/certs/cert.pem', '/etc/ssl/private/key.pem'):
+    assert tls_mounts[target]['read_only'] is True, target
+assert set(mounts(services['proxy'])) - {'/etc/nginx/conf.d/default.conf'} <= set(tls_mounts)
 PY
 
 # Verify NGINX starts without Authentik present and recovers dynamically when Authentik starts.
@@ -301,7 +337,10 @@ if [ -n "$REAL_DOCKER" ] && "$REAL_DOCKER" info >/dev/null 2>&1; then
 
     "$REAL_DOCKER" run -d --name "frontend-$$" --network "$TEST_NET" --network-alias frontend nginx:1.28-alpine >/dev/null
     "$REAL_DOCKER" run -d --name "docs-$$" --network "$TEST_NET" --network-alias docs nginx:1.28-alpine >/dev/null
-    "$REAL_DOCKER" run -d --name "proxy-$$" --network "$TEST_NET" -v "$scratch/proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.28-alpine >/dev/null
+    "$REAL_DOCKER" run -d --name "proxy-$$" --network "$TEST_NET" \
+      -v "$scratch/proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+      -v "$scratch/proxy/locations.conf:/etc/nginx/locations.conf:ro" \
+      nginx:1.28-alpine >/dev/null
 
     sleep 2
     test "$("$REAL_DOCKER" inspect -f '{{.State.Running}}' "proxy-$$")" = "true"
