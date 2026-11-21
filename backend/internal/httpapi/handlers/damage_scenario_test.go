@@ -336,3 +336,7 @@ func (f *fakeDamage) GetImpactRatingForUpdate(ctx context.Context, p db.GetImpac
 func (f *fakeDamage) GetImpactRatingForDelete(ctx context.Context, p db.GetImpactRatingForDeleteParams) (db.ImpactRating, error) {
 	return f.GetImpactRating(ctx, db.GetImpactRatingParams(p))
 }
+
+func (f *fakeDamage) GetThreatDamageLinkForDelete(ctx context.Context, p db.GetThreatDamageLinkForDeleteParams) (db.ThreatDamageLink, error) {
+	return db.ThreatDamageLink{ID: dmgUUID(dmgRatingID), ThreatScenarioID: dmgUUID(dmgThreatID), DamageScenarioID: dmgUUID(dmgScenarioID)}, f.lookup()
+}

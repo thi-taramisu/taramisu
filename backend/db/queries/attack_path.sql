@@ -28,3 +28,11 @@ RETURNING *;
 
 -- name: DeleteAttackPath :execrows
 DELETE FROM attack_path WHERE id = $1 AND item_definition_id = $2;
+
+-- name: GetAttackPathForUpdate :one
+SELECT * FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE;
+
+-- name: GetAttackPathForDelete :one
+SELECT * FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE;

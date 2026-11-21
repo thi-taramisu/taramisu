@@ -50,6 +50,7 @@ type auditResource struct {
 	target, operation, path string
 	parentColumn, parentID  string
 	create, replace, patch  string
+	upsert                  bool
 	unavailableOnFailure    bool
 }
 
@@ -101,13 +102,19 @@ func (f resourceAuditFixture) exercise(r auditResource) {
 		}
 	}
 
-	createOperation := "create-" + r.operation
-	rollback(createOperation, http.MethodPost, r.path, r.create)
+	createMethod, createOperation, createStatus := http.MethodPost, "create-"+r.operation, http.StatusCreated
+	if r.upsert {
+		createMethod, createOperation, createStatus = http.MethodPut, "replace-"+r.operation, http.StatusOK
+	}
+	rollback(createOperation, createMethod, r.path, r.create)
 	count := len(history())
-	current := request(createOperation, http.MethodPost, r.path, r.create, http.StatusCreated)
+	current := request(createOperation, createMethod, r.path, r.create, createStatus)
 	id := current["id"].(string)
 	checkEvent(count, createOperation, "created", id, nil, current)
-	member := r.path + "/" + id
+	member := r.path
+	if !r.upsert {
+		member += "/" + id
+	}
 	updates := []struct{ operation, method, body string }{
 		{"replace-" + r.operation, http.MethodPut, r.replace},
 		{"update-" + r.operation, http.MethodPatch, r.patch},
@@ -130,7 +137,7 @@ func (f resourceAuditFixture) exercise(r auditResource) {
 	checkEvent(count, deleteOperation, "deleted", id, current, nil)
 	checkNoEvent(deleteOperation, http.MethodDelete, member, "", http.StatusNotFound)
 	for _, update := range updates {
-		if update.body != "" {
+		if update.body != "" && (!r.upsert || update.method != http.MethodPut) {
 			checkNoEvent(update.operation, update.method, member, update.body, http.StatusNotFound)
 		}
 	}
@@ -186,5 +193,34 @@ func (f resourceAuditFixture) exerciseDamageAudit(itemID string) {
 		create:  "{\"impact_category\":\"SAFETY\",\"rating_value\":\"MAJOR\"}",
 		replace: "{\"impact_category\":\"SAFETY\",\"rating_value\":\"SEVERE\"}",
 		patch:   "{\"omission_or_rating_rationale\":\"Potential injury\"}",
+	})
+}
+
+func (f resourceAuditFixture) exerciseAttackAudit(itemID string) {
+	item := "/api/v1/item-definitions/" + itemID
+	f.exercise(auditResource{
+		target: "attack_path", operation: "attack-path", path: item + "/attack-paths",
+		parentColumn: "item_definition_id", parentID: itemID,
+		create: "{\"title\":\"Access interface\"}", replace: "{\"title\":\"Access debug interface\",\"analysis_approach\":\"BOTTOM_UP\"}",
+		patch: "{\"is_partial_early_stage\":false}",
+	})
+	attackPath := f.seed("INSERT INTO attack_path (item_definition_id, title) VALUES ($1, 'Rated path') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		target: "attack_feasibility_rating", operation: "attack-feasibility-rating", path: item + "/attack-paths/" + attackPath + "/feasibility-rating",
+		parentColumn: "attack_path_id", parentID: attackPath, upsert: true,
+		create: "{\"rationale\":\"Physical access\"}", replace: "{\"rationale\":\"Debug connector\"}",
+		patch: "{\"rationale\":null}",
+	})
+	threat := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
+	damage := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		target: "threat_damage_link", operation: "threat-damage-link", path: item + "/threat-damage-links",
+		parentColumn: "threat_scenario_id", parentID: threat,
+		create: fmt.Sprintf("{\"threat_scenario_id\":%q,\"damage_scenario_id\":%q}", threat, damage),
+	})
+	f.exercise(auditResource{
+		target: "threat_attack_path_link", operation: "threat-attack-path-link", path: item + "/threat-attack-path-links",
+		parentColumn: "threat_scenario_id", parentID: threat,
+		create: fmt.Sprintf("{\"threat_scenario_id\":%q,\"attack_path_id\":%q}", threat, attackPath),
 	})
 }

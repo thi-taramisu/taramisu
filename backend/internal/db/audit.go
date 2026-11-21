@@ -32,6 +32,11 @@ const (
 
 	TargetDamageScenario = "damage_scenario"
 	TargetImpactRating   = "impact_rating"
+
+	TargetAttackPath              = "attack_path"
+	TargetAttackFeasibilityRating = "attack_feasibility_rating"
+	TargetThreatDamageLink        = "threat_damage_link"
+	TargetThreatAttackPathLink    = "threat_attack_path_link"
 )
 
 // Actor is who makes a change. Every audit event records it.
