@@ -4,6 +4,7 @@ import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
 import { DamageScenarioDefinitionTab } from './features/damage-scenarios/DamageScenarioDefinitionTab'
 import { DamageScenarioImpactTab } from './features/damage-scenarios/DamageScenarioImpactTab'
 import { DamageScenarioPage } from './features/damage-scenarios/DamageScenarioPage'
+import { DamageScenarioRelationsTab } from './features/damage-scenarios/DamageScenarioRelationsTab'
 import { ItemDefinitionTab } from './features/items/ItemDefinitionTab'
 import { ItemPage } from './features/items/ItemPage'
 import { ItemRisksTab } from './features/items/ItemRisksTab'
@@ -33,6 +34,7 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/risks': <ItemRisksTab />,
   'damage-scenarios/': <DamageScenarioDefinitionTab />,
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
+  'damage-scenarios/relations': <DamageScenarioRelationsTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md

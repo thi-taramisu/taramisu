@@ -58,5 +58,5 @@ func (h *Attachments) finishDeletion(ctx context.Context, a db.Attachment) error
 	if err := h.objects.Delete(ctx, uuid.UUID(a.S3ObjectKey.Bytes).String()); err != nil {
 		return err
 	}
-	return h.queries.DeleteAttachment(ctx, db.DeleteAttachmentParams{ProjectID: a.ProjectID, ID: a.ID})
+	return h.queries.DeleteAttachment(ctx, a.ID)
 }

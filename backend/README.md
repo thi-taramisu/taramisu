@@ -115,6 +115,18 @@ TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
 API logs: `docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml logs api`.
 
+## Item attachments
+
+Use `/api/v1/projects/{project_id}/item-definitions/{item_id}/attachments` to list or upload
+supporting files for an item. Upload one multipart field named `file` per request. Each file
+may be up to 10 MiB and must be PDF, PNG, JPEG, GIF, WebP, or plain text. Listing supports
+`limit` (1–100, default 100) and `offset` (default 0).
+
+GET and DELETE on the same path with `/{attachment_id}` download or remove that attachment.
+List and download require project read permission. Upload and delete require edit permission.
+Item attachments appear only under their own item. Deleting an item queues its objects for
+removal by the same retry worker that handles project and attachment deletion.
+
 ## Database migrations and sqlc drift detection
 
 After editing `db/schema.sql` or `db/queries/`, generate the corresponding Atlas migration and refresh the `sqlc` models:
@@ -258,6 +270,13 @@ Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `m
 for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database
 for PostgreSQL CRUD, pagination, role, token-group access, and cascade-deletion tests. Database tests
 roll back their fixtures and do not require a live Authentik instance.
+
+## Asset cybersecurity properties and scenario links
+
+[API contract and request examples](../docs/internal/dev-workflow/asset-properties-api.md)
+cover assets, cybersecurity properties, and damage/threat scenario links. All routes require a
+Bearer JWT and a project role: Viewers can read; Editors and Owners can write. The shared
+project check runs before the handler, and SQL restricts records and references to the URL item.
 
 ## Risk values and treatment decisions
 

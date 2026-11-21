@@ -1,11 +1,13 @@
 ﻿
-import { FolderKanban, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ProjectImage } from './ProjectImage'
 
 type ProjectCardProps = {
   name: string
   description: string
+  image?: string
   favorite: boolean
   onToggleFavorite: () => void
 }
@@ -13,14 +15,13 @@ type ProjectCardProps = {
 export function ProjectCard({
   name,
   description,
+  image,
   favorite,
   onToggleFavorite,
 }: ProjectCardProps) {
   return (
     <Card className="w-64 overflow-hidden py-0">
-      <div className="flex h-32 items-center justify-center bg-muted">
-        <FolderKanban className="size-12 text-muted-foreground" />
-      </div>
+      <ProjectImage image={image} className="h-32 w-full" />
 
       <CardContent className="flex items-center justify-between gap-3 py-4">
         <div className="min-w-0">

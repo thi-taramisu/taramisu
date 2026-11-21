@@ -81,7 +81,6 @@ func TestAttachmentPersistence(t *testing.T) {
 		{"oversized file", "UPDATE attachment SET size_bytes=10485761 WHERE id=$1", "23514", []any{attachment.ID}},
 		{"invalid hash", "UPDATE attachment SET sha256='invalid' WHERE id=$1", "23514", []any{attachment.ID}},
 		{"missing project", "UPDATE attachment SET project_id=gen_random_uuid() WHERE id=$1", "23503", []any{attachment.ID}},
-		{"delete project", "DELETE FROM tara_project WHERE id=$1", "23503", []any{project}},
 		{"delete uploader", "DELETE FROM iam_user WHERE id=$1", "23503", []any{user}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -102,7 +101,7 @@ func TestAttachmentPersistence(t *testing.T) {
 	exec("ROLLBACK TO SAVEPOINT duplicate_key")
 	exec("RELEASE SAVEPOINT duplicate_key")
 
-	deletion := db.DeleteAttachmentParams{ProjectID: project, ID: attachment.ID}
+	deletion := attachment.ID
 	if err = queries.DeleteAttachment(ctx, deletion); err != nil {
 		t.Fatal(err)
 	}
@@ -137,6 +136,28 @@ func TestAttachmentPersistence(t *testing.T) {
 	if _, err = queries.GetAttachment(ctx, db.GetAttachmentParams{ProjectID: project, ID: attachment.ID}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("deleted metadata still available: %v", err)
 	}
+	attachment, err = queries.CreateAttachment(ctx, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A rolled-back project deletion must not leave a file queued for cleanup.
+	exec("SAVEPOINT project_deletion")
 	exec("DELETE FROM tara_project WHERE id=$1", project)
+	exec("ROLLBACK TO SAVEPOINT project_deletion")
+	exec("RELEASE SAVEPOINT project_deletion")
+	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("rolled-back deletion queued attachments: %v %v", rows, err)
+	}
+	if affected, err = queries.DeleteTaraProject(ctx, project); err != nil || affected != 1 {
+		t.Fatalf("delete project with attachment: %d %v", affected, err)
+	}
+	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
+	if err != nil || len(rows) != 1 || rows[0].ProjectID.Valid || rows[0].S3ObjectKey != attachment.S3ObjectKey {
+		t.Fatalf("deleted project's object key was not retained for cleanup: %v %v", rows, err)
+	}
+	if err = queries.DeleteAttachment(ctx, attachment.ID); err != nil {
+		t.Fatal(err)
+	}
 	exec("DELETE FROM iam_user WHERE id=$1", user)
 }

@@ -67,7 +67,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"title-images", "flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch"} {
+	for _, scenario := range []string{"title-images", "flow", "item-flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -166,6 +166,121 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 			}
 			data := []byte("attachment content\n")
+			if scenario == "item-flow" {
+				item, sibling, foreignItem, foreignProject := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+				exec("INSERT INTO tara_project(id,name) VALUES($1,'other attachment project')", foreignProject)
+				exec(`INSERT INTO item_definition(id,tara_project_id,name,scope_type)
+					VALUES($1,$3,'item','ITEM'),($2,$3,'sibling','ITEM'),($4,$5,'foreign item','ITEM')`,
+					item, sibling, project, foreignItem, foreignProject)
+				itemPath := func(id string) string {
+					return "/api/v1/projects/" + project + "/item-definitions/" + id
+				}
+				items := itemPath(item) + "/attachments"
+				check(request("GET", items, "", nil, ""), 401)
+				check(request("POST", items, other, data, ""), 404)
+				check(request("GET", itemPath("invalid")+"/attachments", user, nil, ""), 422)
+				check(request("GET", itemPath(uuid.NewString())+"/attachments", user, nil, ""), 404)
+				check(request("POST", itemPath(foreignItem)+"/attachments", user, data, ""), 404)
+				check(request("POST", items, user, []byte("<html>unsafe</html>"), ""), 415)
+				check(request("POST", items, user, bytes.Repeat([]byte("x"), maxAttachmentSize+1), ""), 413)
+				if tracked.key != "" {
+					t.Fatal("rejected item uploads reached storage")
+				}
+
+				create := func(target string) (attachmentMetadata, string, string) {
+					t.Helper()
+					w := request("POST", target, user, data, "")
+					check(w, 201)
+					var meta attachmentMetadata
+					if err := json.Unmarshal(w.Body.Bytes(), &meta); err != nil {
+						t.Fatal(err)
+					}
+					if location := w.Header().Get("Location"); location != target+"/"+meta.ID {
+						t.Fatalf("incorrect attachment location: %s", location)
+					}
+					return meta, w.Header().Get("Location"), tracked.key
+				}
+				projectMeta, projectLocation, projectKey := create(base)
+				exec("UPDATE project_role_assignment SET project_role='EDITOR' WHERE tara_project_id=$1", project)
+				first, firstLocation, firstKey := create(items)
+				second, secondLocation, secondKey := create(items)
+				if projectMeta.ItemID != "" || first.ItemID != item || second.ItemID != item {
+					t.Fatal("incorrect attachment scope in metadata")
+				}
+				check(request("GET", base+"/"+first.ID, user, nil, ""), 404)
+				check(request("DELETE", base+"/"+first.ID, user, nil, ""), 404)
+				check(request("GET", items+"/"+projectMeta.ID, user, nil, ""), 404)
+				check(request("GET", itemPath(sibling)+"/attachments/"+first.ID, user, nil, ""), 404)
+				check(request("DELETE", itemPath(sibling)+"/attachments/"+first.ID, user, nil, ""), 404)
+
+				exec("UPDATE project_role_assignment SET project_role='VIEWER' WHERE tara_project_id=$1", project)
+				check(request("POST", items, user, data, ""), 403)
+				check(request("DELETE", firstLocation, user, nil, ""), 403)
+				check(request("GET", firstLocation, other, nil, ""), 404)
+				download := request("GET", firstLocation, user, nil, "")
+				check(download, 200)
+				if !bytes.Equal(download.Body.Bytes(), data) {
+					t.Fatal("item attachment download changed the file")
+				}
+				for target, expected := range map[string][]attachmentMetadata{
+					items: {first, second}, base: {projectMeta}, itemPath(sibling) + "/attachments": {},
+				} {
+					list := request("GET", target, user, nil, "")
+					check(list, 200)
+					var entries []attachmentMetadata
+					if err := json.Unmarshal(list.Body.Bytes(), &entries); err != nil || len(entries) != len(expected) {
+						t.Fatalf("incorrect listing for %s: %s (%v)", target, list.Body.String(), err)
+					}
+					ids := make(map[string]bool, len(expected))
+					for _, want := range expected {
+						ids[want.ID] = true
+					}
+					for _, entry := range entries {
+						if !ids[entry.ID] {
+							t.Fatalf("unexpected attachment %s in %s", entry.ID, target)
+						}
+						delete(ids, entry.ID)
+					}
+				}
+
+				requireDeleted := func(key string) {
+					t.Helper()
+					if body, err := objects.Get(ctx, key); err == nil {
+						_ = body.Close()
+						t.Fatalf("object %s still exists", key)
+					}
+				}
+				exec("UPDATE project_role_assignment SET project_role='EDITOR' WHERE tara_project_id=$1", project)
+				check(request("DELETE", firstLocation, user, nil, ""), 204)
+				requireDeleted(firstKey)
+				check(request("GET", firstLocation, user, nil, ""), 404)
+				check(request("DELETE", itemPath(item), user, nil, ""), 204)
+				check(request("GET", secondLocation, user, nil, ""), 404)
+				check(request("GET", base+"/"+second.ID, user, nil, ""), 404)
+				check(request("GET", projectLocation, user, nil, ""), 200)
+
+				tracked.failDelete = true
+				if err := h.cleanupPending(ctx); err != nil {
+					t.Fatal(err)
+				}
+				var queuedKey string
+				if err := tx.QueryRow(ctx, "SELECT s3_object_key::text FROM attachment WHERE id=$1 AND project_id IS NULL AND item_definition_id IS NULL", second.ID).Scan(&queuedKey); err != nil || queuedKey != secondKey {
+					t.Fatalf("item deletion lost the pending storage key: %q %v", queuedKey, err)
+				}
+				exec("UPDATE project_role_assignment SET project_role='OWNER' WHERE tara_project_id=$1", project)
+				check(request("DELETE", itemPath(sibling), user, nil, ""), 204)
+				check(request("DELETE", "/api/v1/projects/"+project, user, nil, ""), 204)
+				if err := NewAttachments(db.New(database), objects).cleanupPending(ctx); err != nil {
+					t.Fatal(err)
+				}
+				requireDeleted(secondKey)
+				requireDeleted(projectKey)
+				var count int
+				if err := tx.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE id IN ($1,$2,$3)", first.ID, second.ID, projectMeta.ID).Scan(&count); err != nil || count != 0 {
+					t.Fatalf("attachment metadata was not removed: %d %v", count, err)
+				}
+				return
+			}
 			if scenario != "flow" && !strings.HasPrefix(scenario, "delete-") {
 				if scenario == "insert-failure" {
 					tracked.afterPut = func() { _ = tx.Rollback(ctx) }
@@ -246,12 +361,16 @@ func TestAttachmentsIntegration(t *testing.T) {
 			}
 			check(request("GET", strings.Replace(location, project, uuid.NewString(), 1), user, nil, ""), 404)
 			if strings.HasPrefix(scenario, "delete-") {
+				projectDeletion := strings.HasPrefix(scenario, "delete-project-")
 				// Commit the fixture: a fresh handler must recover using persisted state.
 				if e = tx.Commit(ctx); e != nil {
 					t.Fatal(e)
 				}
 				database.DBTX = pool
 				t.Cleanup(func() {
+					if _, e := pool.Exec(ctx, "DELETE FROM attachment WHERE id=$1", meta.ID); e != nil {
+						t.Error(e)
+					}
 					for _, q := range []string{"DELETE FROM attachment WHERE project_id=$1", "DELETE FROM tara_project WHERE id=$1"} {
 						if _, e := pool.Exec(ctx, q, project); e != nil {
 							t.Error(e)
@@ -261,9 +380,9 @@ func TestAttachmentsIntegration(t *testing.T) {
 						t.Error(e)
 					}
 				})
-				database.fail = scenario == "delete-db-failure"
+				database.fail = scenario == "delete-db-failure" || scenario == "delete-project-db-failure"
 				database.failMark = scenario == "delete-marker-failure"
-				tracked.failDelete = scenario == "delete-storage-failure"
+				tracked.failDelete = scenario == "delete-storage-failure" || scenario == "delete-project-storage-failure"
 				if scenario == "delete-marker-failure" {
 					check(request("DELETE", location, user, nil, ""), 503)
 					check(request("GET", location, user, nil, ""), 200)
@@ -273,6 +392,13 @@ func TestAttachmentsIntegration(t *testing.T) {
 					database.failMark = false
 				}
 				switch scenario {
+				case "delete-project-storage-failure", "delete-project-db-failure":
+					// Permanent project deletion queues the file without contacting S3.
+					check(request("DELETE", "/api/v1/projects/"+project, other, nil, ""), 404)
+					check(request("DELETE", "/api/v1/projects/"+project, user, nil, ""), 204)
+					if tracked.deletes != 0 {
+						t.Fatal("project deletion contacted storage before cleanup")
+					}
 				case "delete-restart", "delete-replicas":
 					// Simulate a process dying after the durable marker, before S3 deletion.
 					if _, e = pool.Exec(ctx, "UPDATE attachment SET delete_pending=true WHERE id=$1", meta.ID); e != nil {
@@ -285,8 +411,12 @@ func TestAttachmentsIntegration(t *testing.T) {
 					check(request("DELETE", location, user, nil, ""), 202)
 				}
 				listed := request("GET", base, user, nil, "")
-				check(listed, 200)
-				if listed.Body.String() != "[]\n" {
+				if projectDeletion {
+					check(listed, 404)
+				} else {
+					check(listed, 200)
+				}
+				if !projectDeletion && listed.Body.String() != "[]\n" {
 					t.Fatalf("pending attachment visible: %s", listed.Body.String())
 				}
 				check(request("GET", location, user, nil, ""), 404)
@@ -295,6 +425,19 @@ func TestAttachmentsIntegration(t *testing.T) {
 				if scenario != "delete-restart" && scenario != "delete-replicas" {
 					if e = h.cleanupPending(ctx); e != nil {
 						t.Fatal(e)
+					}
+				}
+				if projectDeletion {
+					var key string
+					if e = pool.QueryRow(ctx, "SELECT s3_object_key::text FROM attachment WHERE id=$1 AND project_id IS NULL", meta.ID).Scan(&key); e != nil || key != tracked.key {
+						t.Fatalf("failed cleanup lost the object's key: %q %v", key, e)
+					}
+					if tracked.failDelete {
+						body, err := objects.Get(ctx, key)
+						if err != nil {
+							t.Fatalf("object missing before successful cleanup: %v", err)
+						}
+						_ = body.Close()
 					}
 				}
 				database.fail = false
@@ -441,7 +584,7 @@ func TestRejectMalformedAttachmentUploads(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 			r.Header.Set("Content-Type", writer.FormDataContentType())
 			w := httptest.NewRecorder()
-			(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{})
+			(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{}, pgtype.UUID{})
 			if w.Code != 400 {
 				t.Fatalf("got %d: %s", w.Code, w.Body.String())
 			}
@@ -451,7 +594,7 @@ func TestRejectMalformedAttachmentUploads(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("not multipart"))
 		r.Header.Set("Content-Type", contentType)
 		w := httptest.NewRecorder()
-		(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{})
+		(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{}, pgtype.UUID{})
 		if w.Code != 400 {
 			t.Fatalf("got %d for %s", w.Code, contentType)
 		}
@@ -483,7 +626,7 @@ func TestRejectUnsupportedDeclaredAttachmentType(t *testing.T) {
 		r := httptest.NewRequest(http.MethodPost, "/", &body)
 		r.Header.Set("Content-Type", writer.FormDataContentType())
 		w := httptest.NewRecorder()
-		(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{})
+		(&Attachments{}).upload(w, r, pgtype.UUID{}, pgtype.UUID{}, pgtype.UUID{})
 		if w.Code != http.StatusUnsupportedMediaType {
 			t.Fatalf("%s: got %d", declared, w.Code)
 		}
