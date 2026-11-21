@@ -421,6 +421,7 @@ func TestAuditContentPostgres(t *testing.T) {
 	content.exerciseAssetAudit(auditItemID)
 	content.exerciseDamageAudit(auditItemID)
 	content.exerciseAttackAudit(auditItemID)
+	content.exerciseRiskAudit(auditItemID)
 	call("teardown-audit-item", http.MethodDelete, items+"/"+auditItemID, "", http.StatusNoContent)
 
 	// Every operation declared as audited writes an event.

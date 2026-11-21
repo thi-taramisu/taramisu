@@ -224,3 +224,25 @@ func (f resourceAuditFixture) exerciseAttackAudit(itemID string) {
 		create: fmt.Sprintf("{\"threat_scenario_id\":%q,\"attack_path_id\":%q}", threat, attackPath),
 	})
 }
+
+func (f resourceAuditFixture) exerciseRiskAudit(itemID string) {
+	threat := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
+	damage := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	impact := f.seed("INSERT INTO impact_rating (damage_scenario_id, impact_category) VALUES ($1, 'SAFETY') RETURNING id::text", damage)
+	scenario := "/api/v1/threat-scenarios/" + threat
+	f.exercise(auditResource{
+		target: "risk_value", operation: "risk-value", path: scenario + "/risk-values",
+		parentColumn: "threat_scenario_id", parentID: threat,
+		create:  fmt.Sprintf("{\"impact_rating_id\":%q,\"risk_score\":3,\"determination_method\":\"RISK_MATRIX\"}", impact),
+		replace: fmt.Sprintf("{\"impact_rating_id\":%q,\"risk_score\":4,\"determination_method\":\"RISK_MATRIX\"}", impact),
+		patch:   "{\"risk_score\":5}",
+	})
+	value := f.seed("INSERT INTO risk_value (threat_scenario_id, impact_rating_id, risk_score, determination_method) VALUES ($1, $2, 3, 'RISK_MATRIX') RETURNING id::text", threat, impact)
+	f.exercise(auditResource{
+		target: "risk_treatment_decision", operation: "risk-treatment-decision", path: scenario + "/risk-treatment-decisions",
+		parentColumn: "threat_scenario_id", parentID: threat,
+		create:  "{\"treatment_option\":\"REDUCING\"}",
+		replace: fmt.Sprintf("{\"risk_value_id\":%q,\"treatment_option\":\"RETAINING\",\"decision_rationale\":\"Accepted\",\"is_cybersecurity_claim\":true}", value),
+		patch:   "{\"risk_value_id\":null,\"decision_rationale\":null,\"is_cybersecurity_claim\":false,\"treatment_option\":\"REDUCING\"}",
+	})
+}
