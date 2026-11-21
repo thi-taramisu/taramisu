@@ -74,7 +74,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "/busybox", "wget", "-qO-", "http://127.0.0.1:8080/health/live"]
+      test: ["CMD", "/busybox", "wget", "-qO-", "http://127.0.0.1:8080/health/ready"]
       interval: 10s
       timeout: 3s
       retries: 3
