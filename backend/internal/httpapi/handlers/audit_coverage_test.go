@@ -19,6 +19,8 @@ var auditedOperations = []string{
 	"create-asset-cybersecurity-property", "replace-asset-cybersecurity-property", "update-asset-cybersecurity-property", "delete-asset-cybersecurity-property",
 	"create-damage-scenario-asset-property", "replace-damage-scenario-asset-property", "update-damage-scenario-asset-property", "delete-damage-scenario-asset-property",
 	"create-threat-scenario-asset-property", "replace-threat-scenario-asset-property", "update-threat-scenario-asset-property", "delete-threat-scenario-asset-property",
+	"create-damage-scenario", "replace-damage-scenario", "update-damage-scenario", "delete-damage-scenario",
+	"create-impact-rating", "replace-impact-rating", "update-impact-rating", "delete-impact-rating",
 }
 
 // notAuditedYet change analysis content without an audit event. Move an operation to
@@ -26,8 +28,6 @@ var auditedOperations = []string{
 var notAuditedYet = []string{
 	"create-attack-path", "replace-attack-path", "update-attack-path", "delete-attack-path",
 	"replace-attack-feasibility-rating", "update-attack-feasibility-rating", "delete-attack-feasibility-rating",
-	"create-damage-scenario", "replace-damage-scenario", "update-damage-scenario", "delete-damage-scenario",
-	"create-impact-rating", "replace-impact-rating", "update-impact-rating", "delete-impact-rating",
 	"create-threat-damage-link", "delete-threat-damage-link",
 	"create-threat-attack-path-link", "delete-threat-attack-path-link",
 	"create-risk-value", "replace-risk-value", "update-risk-value", "delete-risk-value",

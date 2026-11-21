@@ -29,6 +29,9 @@ const (
 	TargetAssetCybersecurityProperty  = "asset_cybersecurity_property"
 	TargetDamageScenarioAssetProperty = "damage_scenario_asset_property"
 	TargetThreatScenarioAssetProperty = "threat_scenario_asset_property"
+
+	TargetDamageScenario = "damage_scenario"
+	TargetImpactRating   = "impact_rating"
 )
 
 // Actor is who makes a change. Every audit event records it.

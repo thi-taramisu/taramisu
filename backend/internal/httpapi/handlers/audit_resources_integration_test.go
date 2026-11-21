@@ -170,3 +170,21 @@ func (f resourceAuditFixture) exerciseAssetAudit(itemID string) {
 		patch:   fmt.Sprintf("{\"asset_cybersecurity_property_id\":%q}", propertyID),
 	})
 }
+
+func (f resourceAuditFixture) exerciseDamageAudit(itemID string) {
+	collection := "/api/v1/item-definitions/" + itemID + "/damage-scenarios"
+	f.exercise(auditResource{
+		target: "damage_scenario", operation: "damage-scenario", path: collection,
+		parentColumn: "item_definition_id", parentID: itemID,
+		create: "{\"title\":\"Control loss\"}", replace: "{\"title\":\"Steering loss\",\"road_user_harm_description\":\"Injury\"}",
+		patch: "{\"road_user_harm_description\":null}",
+	})
+	damageID := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Rated damage') RETURNING id::text", itemID)
+	f.exercise(auditResource{
+		target: "impact_rating", operation: "impact-rating", path: collection + "/" + damageID + "/impact-ratings",
+		parentColumn: "damage_scenario_id", parentID: damageID,
+		create:  "{\"impact_category\":\"SAFETY\",\"rating_value\":\"MAJOR\"}",
+		replace: "{\"impact_category\":\"SAFETY\",\"rating_value\":\"SEVERE\"}",
+		patch:   "{\"omission_or_rating_rationale\":\"Potential injury\"}",
+	})
+}
