@@ -12,23 +12,27 @@ import (
 )
 
 const createAttachment = `-- name: CreateAttachment :one
-INSERT INTO attachment (project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at
+INSERT INTO attachment (project_id, item_definition_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by)
+VALUES ($1, $2, $3, $4,
+        $5, $6, $7, $8)
+RETURNING id, project_id, item_definition_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at
 `
 
 type CreateAttachmentParams struct {
-	ProjectID   pgtype.UUID
-	FileName    string
-	ContentType string
-	SizeBytes   int64
-	Sha256      string
-	S3ObjectKey pgtype.UUID
-	UploadedBy  pgtype.UUID
+	ProjectID        pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+	FileName         string
+	ContentType      string
+	SizeBytes        int64
+	Sha256           string
+	S3ObjectKey      pgtype.UUID
+	UploadedBy       pgtype.UUID
 }
 
 func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
 	row := q.db.QueryRow(ctx, createAttachment,
 		arg.ProjectID,
+		arg.ItemDefinitionID,
 		arg.FileName,
 		arg.ContentType,
 		arg.SizeBytes,
@@ -40,6 +44,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
+		&i.ItemDefinitionID,
 		&i.FileName,
 		&i.ContentType,
 		&i.SizeBytes,
@@ -62,20 +67,24 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE project_id = $1 AND id = $2
+SELECT id, project_id, item_definition_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment
+WHERE project_id = $1 AND id = $2
+  AND item_definition_id IS NOT DISTINCT FROM $3::uuid
 `
 
 type GetAttachmentParams struct {
-	ProjectID pgtype.UUID
-	ID        pgtype.UUID
+	ProjectID        pgtype.UUID
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
 }
 
 func (q *Queries) GetAttachment(ctx context.Context, arg GetAttachmentParams) (Attachment, error) {
-	row := q.db.QueryRow(ctx, getAttachment, arg.ProjectID, arg.ID)
+	row := q.db.QueryRow(ctx, getAttachment, arg.ProjectID, arg.ID, arg.ItemDefinitionID)
 	var i Attachment
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
+		&i.ItemDefinitionID,
 		&i.FileName,
 		&i.ContentType,
 		&i.SizeBytes,
@@ -89,17 +98,27 @@ func (q *Queries) GetAttachment(ctx context.Context, arg GetAttachmentParams) (A
 }
 
 const listAttachments = `-- name: ListAttachments :many
-SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE project_id = $1 AND NOT delete_pending ORDER BY created_at, id LIMIT $2 OFFSET $3
+SELECT id, project_id, item_definition_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment
+WHERE project_id = $1
+  AND item_definition_id IS NOT DISTINCT FROM $2::uuid
+  AND NOT delete_pending
+ORDER BY created_at, id LIMIT $4 OFFSET $3
 `
 
 type ListAttachmentsParams struct {
-	ProjectID pgtype.UUID
-	Limit     int32
-	Offset    int32
+	ProjectID        pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+	Offset           int32
+	Limit            int32
 }
 
 func (q *Queries) ListAttachments(ctx context.Context, arg ListAttachmentsParams) ([]Attachment, error) {
-	rows, err := q.db.Query(ctx, listAttachments, arg.ProjectID, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listAttachments,
+		arg.ProjectID,
+		arg.ItemDefinitionID,
+		arg.Offset,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +129,7 @@ func (q *Queries) ListAttachments(ctx context.Context, arg ListAttachmentsParams
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
+			&i.ItemDefinitionID,
 			&i.FileName,
 			&i.ContentType,
 			&i.SizeBytes,
@@ -130,7 +150,7 @@ func (q *Queries) ListAttachments(ctx context.Context, arg ListAttachmentsParams
 }
 
 const listPendingAttachmentDeletions = `-- name: ListPendingAttachmentDeletions :many
-SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE (delete_pending OR project_id IS NULL) AND id > $1 ORDER BY id LIMIT 100
+SELECT id, project_id, item_definition_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE (delete_pending OR project_id IS NULL) AND id > $1 ORDER BY id LIMIT 100
 `
 
 func (q *Queries) ListPendingAttachmentDeletions(ctx context.Context, id pgtype.UUID) ([]Attachment, error) {
@@ -145,6 +165,7 @@ func (q *Queries) ListPendingAttachmentDeletions(ctx context.Context, id pgtype.
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
+			&i.ItemDefinitionID,
 			&i.FileName,
 			&i.ContentType,
 			&i.SizeBytes,
@@ -165,16 +186,19 @@ func (q *Queries) ListPendingAttachmentDeletions(ctx context.Context, id pgtype.
 }
 
 const markAttachmentDeleting = `-- name: MarkAttachmentDeleting :execrows
-UPDATE attachment SET delete_pending = true WHERE project_id = $1 AND id = $2
+UPDATE attachment SET delete_pending = true
+WHERE project_id = $1 AND id = $2
+  AND item_definition_id IS NOT DISTINCT FROM $3::uuid
 `
 
 type MarkAttachmentDeletingParams struct {
-	ProjectID pgtype.UUID
-	ID        pgtype.UUID
+	ProjectID        pgtype.UUID
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
 }
 
 func (q *Queries) MarkAttachmentDeleting(ctx context.Context, arg MarkAttachmentDeletingParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markAttachmentDeleting, arg.ProjectID, arg.ID)
+	result, err := q.db.Exec(ctx, markAttachmentDeleting, arg.ProjectID, arg.ID, arg.ItemDefinitionID)
 	if err != nil {
 		return 0, err
 	}

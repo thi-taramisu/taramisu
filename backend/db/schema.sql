@@ -74,6 +74,7 @@ CREATE TABLE item_definition (
 );
 
 CREATE INDEX item_definition_tara_project_id_idx ON item_definition (tara_project_id);
+ALTER TABLE item_definition ADD CONSTRAINT item_definition_project_id_id_key UNIQUE (tara_project_id, id);
 
 CREATE TABLE asset (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -242,6 +243,7 @@ CREATE INDEX risk_treatment_decision_risk_value_id_idx
 CREATE TABLE attachment (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id uuid REFERENCES tara_project (id) ON DELETE SET NULL,
+    item_definition_id uuid,
     file_name text NOT NULL CHECK (length(file_name) BETWEEN 1 AND 255),
     content_type text NOT NULL,
     size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
@@ -249,7 +251,12 @@ CREATE TABLE attachment (
     s3_object_key uuid NOT NULL UNIQUE,
     uploaded_by uuid NOT NULL REFERENCES iam_user (id),
     delete_pending boolean NOT NULL DEFAULT false,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    -- Keep the object key after item deletion so the cleanup worker can retry.
+    CONSTRAINT attachment_item_definition_fkey FOREIGN KEY (project_id, item_definition_id)
+        REFERENCES item_definition (tara_project_id, id) ON DELETE SET NULL
 );
 CREATE INDEX attachment_project_id_created_at_id_idx ON attachment (project_id, created_at, id);
+CREATE INDEX attachment_item_definition_id_idx ON attachment (project_id, item_definition_id, created_at, id)
+    WHERE item_definition_id IS NOT NULL;
 CREATE INDEX attachment_pending_deletion_idx ON attachment (id) WHERE delete_pending OR project_id IS NULL;
