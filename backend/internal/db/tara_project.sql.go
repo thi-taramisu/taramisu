@@ -15,12 +15,12 @@ const createTaraProject = `-- name: CreateTaraProject :one
 WITH project AS (
     INSERT INTO tara_project (name, description)
     VALUES ($1, $2)
-    RETURNING id, name, description, created_at
+    RETURNING id, name, description, title_image_id, created_at
 ), owner AS (
     INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
     SELECT id, $3, 'OWNER' FROM project
 )
-SELECT id, name, description, created_at FROM project
+SELECT id, name, description, title_image_id, created_at FROM project
 `
 
 type CreateTaraProjectParams struct {
@@ -30,10 +30,11 @@ type CreateTaraProjectParams struct {
 }
 
 type CreateTaraProjectRow struct {
-	ID          pgtype.UUID
-	Name        string
-	Description *string
-	CreatedAt   pgtype.Timestamptz
+	ID           pgtype.UUID
+	Name         string
+	Description  *string
+	TitleImageID pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
 }
 
 // Create the project and make its creator the first Owner in one statement,
@@ -45,6 +46,7 @@ func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectPa
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.TitleImageID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -63,7 +65,7 @@ func (q *Queries) DeleteTaraProject(ctx context.Context, id pgtype.UUID) (int64,
 }
 
 const getTaraProject = `-- name: GetTaraProject :one
-SELECT id, name, description, created_at FROM tara_project WHERE id = $1
+SELECT id, name, description, title_image_id, created_at FROM tara_project WHERE id = $1
 `
 
 func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -73,13 +75,14 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.TitleImageID,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listTaraProjects = `-- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.title_image_id, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
@@ -94,11 +97,12 @@ type ListTaraProjectsParams struct {
 }
 
 type ListTaraProjectsRow struct {
-	ID          pgtype.UUID
-	Name        string
-	Description *string
-	CreatedAt   pgtype.Timestamptz
-	Role        ProjectRole
+	ID           pgtype.UUID
+	Name         string
+	Description  *string
+	TitleImageID pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	Role         ProjectRole
 }
 
 // List only projects the caller has a role in, with the caller's highest role.
@@ -115,6 +119,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 			&i.ID,
 			&i.Name,
 			&i.Description,
+			&i.TitleImageID,
 			&i.CreatedAt,
 			&i.Role,
 		); err != nil {
@@ -129,7 +134,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 }
 
 const replaceTaraProject = `-- name: ReplaceTaraProject :one
-UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, created_at
+UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, title_image_id, created_at
 `
 
 type ReplaceTaraProjectParams struct {
@@ -145,6 +150,7 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.TitleImageID,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -155,7 +161,7 @@ UPDATE tara_project
 SET name = COALESCE($1, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END
 WHERE id = $4
-RETURNING id, name, description, created_at
+RETURNING id, name, description, title_image_id, created_at
 `
 
 type UpdateTaraProjectParams struct {
@@ -177,6 +183,7 @@ func (q *Queries) UpdateTaraProject(ctx context.Context, arg UpdateTaraProjectPa
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.TitleImageID,
 		&i.CreatedAt,
 	)
 	return i, err

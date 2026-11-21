@@ -67,7 +67,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "item-flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
+	for _, scenario := range []string{"title-images", "flow", "item-flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -90,6 +90,10 @@ func TestAttachmentsIntegration(t *testing.T) {
 			h := NewAttachments(db.New(database), tracked)
 			fixture := authtest.NewFixture(t, db.New(database))
 			mux := New(db.New(database), fixture.Manager, WithAttachments(h))
+			if scenario == "title-images" {
+				testProjectTitleImages(t, mux, fixture, h, tracked, project, user, other, exec)
+				return
+			}
 			var groups []string
 			if scenario == "cleanup-batch" {
 				exec(`INSERT INTO attachment(id,project_id,file_name,content_type,size_bytes,sha256,s3_object_key,uploaded_by,delete_pending)

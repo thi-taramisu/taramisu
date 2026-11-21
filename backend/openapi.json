@@ -1082,6 +1082,18 @@
         ],
         "type": "object"
       },
+      "ProjectTitleImageResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
       "ReadyOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1294,6 +1306,10 @@
               "EDITOR",
               "OWNER"
             ],
+            "type": "string"
+          },
+          "title_image_url": {
+            "description": "Authenticated download endpoint for the project title image",
             "type": "string"
           }
         },
@@ -9661,6 +9677,198 @@
         ],
         "summary": "Download an attachment",
         "x-taramisu-permission": "read"
+      }
+    },
+    "/api/v1/projects/{project_id}/title-image": {
+      "delete": {
+        "operationId": "delete-project-title-image",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Image removed; object cleanup is retried automatically"
+          },
+          "400": {
+            "description": "Invalid multipart file"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner role required for writes"
+          },
+          "404": {
+            "description": "Project or image not found"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "503": {
+            "description": "Storage or database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels)",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-permission": "manage"
+      },
+      "get": {
+        "operationId": "get-project-title-image",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Image bytes; authenticated project read access required"
+          },
+          "400": {
+            "description": "Invalid multipart file"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner role required for writes"
+          },
+          "404": {
+            "description": "Project or image not found"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "503": {
+            "description": "Storage or database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels)",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-permission": "read"
+      },
+      "put": {
+        "operationId": "replace-project-title-image",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "contentMediaType": "application/octet-stream",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTitleImageResponse"
+                }
+              }
+            },
+            "description": "Image replaced; old object cleanup is retried automatically"
+          },
+          "400": {
+            "description": "Invalid multipart file"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Owner role required for writes"
+          },
+          "404": {
+            "description": "Project or image not found"
+          },
+          "413": {
+            "description": "Image exceeds size or pixel limit"
+          },
+          "415": {
+            "description": "Not a valid PNG or JPEG image"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "503": {
+            "description": "Storage or database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Project title image (PNG or JPEG, up to 5 MiB and 20 million pixels)",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-permission": "manage"
       }
     },
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions": {
