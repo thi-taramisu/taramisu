@@ -138,6 +138,17 @@ const accessMetadataKey = "taramisu.access"
 // Register registers op with its access declaration. For InProject, the caller's role is checked
 // before the handler runs; the handler can read it with RoleFromContext.
 func Register[I, O any](api huma.API, op huma.Operation, access Access, handler func(context.Context, *I) (*O, error)) {
+	huma.Register(api, declareAccess(api, op, access), handler)
+}
+
+// RegisterRaw registers a streaming handler with the same project access checks as typed handlers.
+func RegisterRaw(api huma.API, op huma.Operation, access Access, handler func(huma.Context)) {
+	op = declareAccess(api, op, access)
+	api.OpenAPI().AddOperation(&op)
+	api.Adapter().Handle(&op, api.Middlewares().Handler(op.Middlewares.Handler(handler)))
+}
+
+func declareAccess(api huma.API, op huma.Operation, access Access) huma.Operation {
 	if op.Metadata == nil {
 		op.Metadata = map[string]any{}
 	}
@@ -156,7 +167,7 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 		op.Errors = appendMissing(op.Errors, http.StatusForbidden, http.StatusNotFound)
 		op.Middlewares = append(op.Middlewares, access.middleware(api))
 	}
-	huma.Register(api, op, handler)
+	return op
 }
 
 func appendMissing(codes []int, add ...int) []int {
