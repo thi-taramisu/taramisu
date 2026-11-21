@@ -74,3 +74,21 @@ DELETE FROM damage_scenario_asset_property l USING damage_scenario d, asset_cybe
 WHERE l.id = sqlc.arg(id) AND d.id = l.damage_scenario_id AND p.id = l.asset_cybersecurity_property_id AND a.id = p.asset_id
     AND d.item_definition_id = sqlc.arg(item_definition_id) AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING l.id;
+
+-- name: GetDamageScenarioAssetPropertyForUpdate :one
+SELECT l.* FROM damage_scenario_asset_property l
+JOIN damage_scenario d ON d.id = l.damage_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = sqlc.arg(id) AND d.item_definition_id = sqlc.arg(item_definition_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR NO KEY UPDATE OF l;
+
+-- name: GetDamageScenarioAssetPropertyForDelete :one
+SELECT l.* FROM damage_scenario_asset_property l
+JOIN damage_scenario d ON d.id = l.damage_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = sqlc.arg(id) AND d.item_definition_id = sqlc.arg(item_definition_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR UPDATE OF l;

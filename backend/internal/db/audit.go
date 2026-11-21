@@ -22,9 +22,13 @@ const (
 
 // Target types of audit events.
 const (
-	TargetProject        = "project"
-	TargetProjectMember  = "project_member"
-	TargetItemDefinition = "item_definition"
+	TargetProject                     = "project"
+	TargetProjectMember               = "project_member"
+	TargetItemDefinition              = "item_definition"
+	TargetAsset                       = "asset"
+	TargetAssetCybersecurityProperty  = "asset_cybersecurity_property"
+	TargetDamageScenarioAssetProperty = "damage_scenario_asset_property"
+	TargetThreatScenarioAssetProperty = "threat_scenario_asset_property"
 )
 
 // Actor is who makes a change. Every audit event records it.
