@@ -1,20 +1,25 @@
 package handlers
 
 // AI assistant prototype (#229). The API runs the tool loop: the model asks for a tool, the API runs it and sends
-// the result back, until the model answers. Tools only read the project from the URL, which the access check has
-// already authorized, so the model cannot reach other projects: no tool takes a project ID.
+// the result back, until the model answers.
+//
+// A tool is a GET route of this API. The API sends the request to its own router with the caller's token, so a
+// tool passes the same authentication and access check as a request from the browser and the assistant needs no
+// database access of its own. The routes are fixed to the project from the URL and no tool takes parameters, so
+// the model cannot reach other projects.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/llm"
 )
 
@@ -29,22 +34,17 @@ according to ISO/SAE 21434. Answer questions about the current project. Use the 
 never invent data that the tools did not return. You can only read; if the user asks you to change something,
 explain how to do it in the tool. Answer in the language of the user's last message.`
 
-// AssistantStore is the read access the assistant's tools need; it is implemented by the sqlc-generated queries.
-type AssistantStore interface {
-	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
-	ListItemDefinitions(context.Context, db.ListItemDefinitionsParams) ([]db.ItemDefinition, error)
-}
-
 type Assistant struct {
-	store  AssistantStore
 	access ProjectAccessStore
+	routes http.Handler
 	client llm.Client
 	model  string
 }
 
-// NewAssistant returns the assistant handler. Without a client, every question gets 503.
-func NewAssistant(store AssistantStore, access ProjectAccessStore, client llm.Client, model string) *Assistant {
-	return &Assistant{store: store, access: access, client: client, model: model}
+// NewAssistant returns the assistant handler. routes serves this API's routes; the tools read through it.
+// Without a client, every question gets 503.
+func NewAssistant(access ProjectAccessStore, routes http.Handler, client llm.Client, model string) *Assistant {
+	return &Assistant{access: access, routes: routes, client: client, model: model}
 }
 
 type AssistantMessage struct {
@@ -54,7 +54,10 @@ type AssistantMessage struct {
 
 type AssistantInput struct {
 	ProjectPath
-	Body struct {
+	// Authorization is the caller's bearer token, which the tools send along when they call this API's routes.
+	// It is hidden because the operation's security scheme already documents it.
+	Authorization string `header:"Authorization" hidden:"true"`
+	Body          struct {
 		// Messages is the conversation so far; the last one is the new question.
 		Messages []AssistantMessage `json:"messages" minItems:"1" maxItems:"20"`
 	}
@@ -90,7 +93,8 @@ func (h *Assistant) Ask(ctx context.Context, in *AssistantInput) (*AssistantOutp
 	for _, m := range in.Body.Messages {
 		messages = append(messages, llm.Message{Role: m.Role, Content: m.Content})
 	}
-	answer, toolsUsed, err := runToolLoop(ctx, h.client, h.model, messages, h.tools(projectIDFromContext(ctx)))
+	tools := h.tools(projectIDFromContext(ctx), in.Authorization)
+	answer, toolsUsed, err := runToolLoop(ctx, h.client, h.model, messages, tools)
 	if err != nil {
 		return nil, assistantError(err)
 	}
@@ -105,36 +109,85 @@ type assistantTool struct {
 	run         func(context.Context) (any, error)
 }
 
-// tools returns the tools bound to the authorized project.
-func (h *Assistant) tools(projectID pgtype.UUID) map[string]assistantTool {
+// tools returns the tools bound to the authorized project. Each one reads a route of this API as the caller.
+func (h *Assistant) tools(projectID pgtype.UUID, authorization string) map[string]assistantTool {
+	project := "/api/v1/projects/" + projectID.String()
 	return map[string]assistantTool{
 		"get_project": {
-			description: "Returns the current TARA project: name and description.",
-			run: func(ctx context.Context) (any, error) {
-				p, err := h.store.GetTaraProject(ctx, projectID)
-				if err != nil {
-					return nil, err
-				}
-				return map[string]any{"name": p.Name, "description": p.Description}, nil
-			},
+			description: "Returns the current TARA project: name, description and the user's role in it.",
+			run:         h.route(authorization, project),
 		},
 		"list_item_definitions": {
 			description: "Lists the item definitions of the current project (items and components with boundary, " +
 				"functions, operational environment and lifecycle phase).",
-			run: func(ctx context.Context) (any, error) {
-				rows, err := h.store.ListItemDefinitions(ctx, db.ListItemDefinitionsParams{ProjectID: projectID, PageLimit: maxToolItems})
-				if err != nil {
-					return nil, err
-				}
-				items := make([]ItemDefinitionBody, 0, len(rows))
-				for _, row := range rows {
-					items = append(items, itemDefinition(row).ItemDefinitionBody)
-				}
-				return items, nil
-			},
+			run: h.route(authorization, project+"/item-definitions?limit="+strconv.Itoa(maxToolItems)),
 		},
 	}
 }
+
+// route returns a tool that reads path with a GET request to this API's own router and passes the route's JSON
+// on to the model. The request carries the caller's token, so the route authenticates and authorizes it like a
+// request from outside.
+func (h *Assistant) route(authorization, path string) func(context.Context) (any, error) {
+	return func(ctx context.Context) (any, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, http.NoBody)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", authorization)
+		res := &routeResponse{header: http.Header{}}
+		h.routes.ServeHTTP(res, req)
+
+		switch res.status {
+		case http.StatusOK:
+			return json.RawMessage(res.body.Bytes()), nil
+		case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+			return nil, &routeDeniedError{status: res.status, detail: res.detail()}
+		default:
+			return nil, fmt.Errorf("GET %s: status %d: %s", path, res.status, res.detail())
+		}
+	}
+}
+
+// routeResponse collects a route's response in memory.
+type routeResponse struct {
+	header http.Header
+	status int
+	body   bytes.Buffer
+}
+
+func (r *routeResponse) Header() http.Header { return r.header }
+
+func (r *routeResponse) WriteHeader(status int) {
+	if r.status == 0 {
+		r.status = status
+	}
+}
+
+func (r *routeResponse) Write(p []byte) (int, error) {
+	r.WriteHeader(http.StatusOK)
+	return r.body.Write(p)
+}
+
+// detail returns the message of an error response (RFC 9457 problem details).
+func (r *routeResponse) detail() string {
+	var problem struct {
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(r.body.Bytes(), &problem); err != nil || problem.Detail == "" {
+		return http.StatusText(r.status)
+	}
+	return problem.Detail
+}
+
+// routeDeniedError is a route refusing a tool's request: the caller's token expired or they lost access to the
+// project while the model was working. The caller gets the same response as for a direct request to the route.
+type routeDeniedError struct {
+	status int
+	detail string
+}
+
+func (e *routeDeniedError) Error() string { return fmt.Sprintf("status %d: %s", e.status, e.detail) }
 
 var errToolRoundsExceeded = errors.New("assistant did not answer within the tool round limit")
 
@@ -190,7 +243,10 @@ func runTool(ctx context.Context, tools map[string]assistantTool, call llm.ToolC
 }
 
 func assistantError(err error) error {
+	var denied *routeDeniedError
 	switch {
+	case errors.As(err, &denied):
+		return huma.NewError(denied.status, denied.detail)
 	case errors.Is(err, llm.ErrRateLimited):
 		return huma.Error429TooManyRequests("the assistant is busy; try again in a few seconds")
 	case errors.Is(err, llm.ErrUnavailable):
