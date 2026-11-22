@@ -13,13 +13,14 @@ import { ProjectImageInput } from './ProjectImageInput'
 import { ProjectLifecycleSettings } from './ProjectLifecycleSettings'
 
 function saveError(error: unknown) {
-  if (error instanceof ApiError && error.status === 403) return 'Only editors and owners can change the project.'
+  if (error instanceof ApiError && error.status === 403) return 'Only owners can change the project.'
   return 'The project could not be saved. Please try again.'
 }
 
 /** Name, description and image; Save sends name and description, the image is not uploaded yet (#231). */
 function DetailsForm({ project }: { project: Project }) {
-  const { canEdit } = useProjectAccess(project.id)
+  // The backend lets only owners change the project settings (`update-tara-project`).
+  const canEdit = useProjectAccess(project.id).canEdit && project.role === 'OWNER'
   const updateProject = useUpdateProject()
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -44,7 +45,7 @@ function DetailsForm({ project }: { project: Project }) {
       className="grid gap-4"
     >
       <h1 className="text-lg font-semibold">General</h1>
-      {/* Read-only projects show the details disabled and no Save; members stay editable until #233 decides. */}
+      {/* Archived projects and members other than owners see the details disabled and no Save. */}
       <fieldset disabled={!canEdit} className="contents">
         <div className="grid gap-2">
           <Label htmlFor="project-name">Name</Label>

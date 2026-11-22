@@ -13,7 +13,7 @@ export interface ProjectService {
   list(): Promise<Project[]>
   get(projectId: string): Promise<Project>
   create(body: NewProject): Promise<Project>
-  /** Changes the name and the description. */
+  /** Owners only: changes the name and the description. */
   update(projectId: string, body: ProjectUpdate): Promise<Project>
   setFavorite(projectId: string, favorite: boolean): Promise<Project>
   /** Owners only: makes the project read-only for all members. */

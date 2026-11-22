@@ -1,9 +1,11 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/errors'
+import { mockProjects } from '@/api/mocks/data/projects'
 import { createMockItemApi } from '@/api/mocks/mockItemApi'
 import { createMockProjectApi } from '@/api/mocks/mockProjectApi'
+import type { ProjectRole } from '@/api/models/project'
 import { renderApp } from '@/test/renderApp'
 import { MAX_IMAGE_SIZE } from '@/lib/imageUpload'
 
@@ -62,11 +64,23 @@ describe('GeneralSettings', () => {
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
 
     act(() => reject?.(new ApiError(403, 'Forbidden.')))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Only editors and owners can change the project.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only owners can change the project.')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
 
     await user.type(screen.getByLabelText('Name'), 'x')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it.each<ProjectRole>(['EDITOR', 'REVIEWER', 'VIEWER'])('shows the details read-only and no Save to the role %s', async (role) => {
+    // Only owners may change the project settings in the backend.
+    const projects = createMockProjectApi(mockProjects.map((project) => (project.id === 'headlamp' ? { ...project, role } : project)))
+    renderApp('/projects/headlamp/settings', createMockItemApi(), projects)
+
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('Headlamp System'))
+    expect(screen.getByLabelText('Name')).toBeDisabled()
+    expect(screen.getByLabelText('Description')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    await expect(projects.update('headlamp', { name: 'Headlamp', description: '' })).rejects.toMatchObject({ status: 403 })
   })
 
   it('shows an error with a retry when the project cannot be loaded', async () => {

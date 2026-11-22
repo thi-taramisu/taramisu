@@ -55,8 +55,7 @@ export function createMockProjectApi(seed: Project[] = mockProjects): ProjectSer
       }),
     update: (projectId, { name, description }) =>
       run(() => {
-        const project = find(projectId)
-        if (project.role === 'VIEWER' || project.role === 'REVIEWER') throw new ApiError(403, 'Viewers cannot change the project.')
+        const project = findOwned(projectId)
         project.name = validateName(name)
         project.description = description
         return project
