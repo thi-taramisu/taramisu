@@ -9,6 +9,8 @@ export REAL_DOCKER="$(command -v docker)" COMMAND_LOG="$scratch/commands"
 mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend" "$scratch/deploy" "$scratch/frontend" "$scratch/proxy"
 cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
+mkdir -p "$scratch/frontend/public"
+cp ../frontend/public/theme-init.js "$scratch/frontend/public/"
 cp ../backend/Makefile "$scratch/backend/"
 cp ../proxy/nginx.conf "$scratch/proxy/"
 cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
@@ -267,6 +269,8 @@ for service, target, source in [
     ('migrate', '/app', root / 'backend'),
     ('authentik-worker', '/blueprints/custom', root / 'iam/blueprints'),
     ('authentik-server', '/web/dist/assets/icons/blank.svg', root / 'iam/branding/blank.svg'),
+    ('authentik-server', '/templates/if/flow.html', root / 'iam/branding/templates/if/flow.html'),
+    ('authentik-server', '/web/dist/taramisu-theme.js', root / 'frontend/public/theme-init.js'),
     ('proxy', '/etc/nginx/conf.d/default.conf', root / 'proxy/nginx.conf'),
 ]:
     mount = next(v for v in services[service]['volumes'] if v['target'] == target)

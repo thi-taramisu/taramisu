@@ -1,0 +1,10 @@
+{% extends "if/flow.html" %}
+{% load static %}
+
+{% block head %}
+{{ block.super }}
+{% if not safe_mode %}
+<link rel="stylesheet" href="/theme-font.css">
+<script src="{% static 'dist/taramisu-theme.js' %}" data-authentik></script>
+{% endif %}
+{% endblock %}
