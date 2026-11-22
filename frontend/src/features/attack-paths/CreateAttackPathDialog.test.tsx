@@ -68,3 +68,22 @@ describe('create attack path', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('The attack path could not be created. Please try again.')
   })
 })
+
+describe('create attack path from a Relations tab', () => {
+  it('creates it linked to the threat scenario of the page', async () => {
+    const { user, api } = renderApp(`${project}/threat-scenarios/ts-01/relations`)
+    await user.click(within(await screen.findByRole('region', { name: 'Attack Paths' })).getByRole('button', { name: 'Add Attack Path' }))
+    const picker = within(await screen.findByRole('dialog', { name: 'Add Attack Path' }))
+    await user.type(picker.getByRole('textbox'), 'Replay via the OBD port')
+    await user.click(picker.getByRole('button', { name: 'Create "Replay via the OBD port" as new Attack Path…' }))
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'New Attack Path' }))
+    expect(dialog.getByLabelText('Item')).toBeDisabled()
+    expect(await dialog.findByRole('button', { name: `Remove ${TS01}` })).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+
+    expect(await screen.findByRole('heading', { name: 'Replay via the OBD port, Attack Path AP-4' })).toBeInTheDocument()
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).attackPaths.map((ap) => ap.code)).toEqual(['AP-1', 'AP-2', 'AP-4'])
+  })
+})
+

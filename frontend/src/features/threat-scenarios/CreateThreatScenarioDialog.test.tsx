@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react'
+import { ApiError } from '../../api/errors'
 import { describe, expect, it } from 'vitest'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import { renderApp } from '../../test/renderApp'
@@ -98,5 +99,49 @@ describe('create threat scenario', () => {
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('The threat scenario could not be created. Please try again.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+async function createFromRelations(user: ReturnType<typeof renderApp>['user'], name: string) {
+  await user.click(within(await screen.findByRole('region', { name: 'Threat Scenarios' })).getByRole('button', { name: 'Add Threat Scenario' }))
+  const picker = within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' }))
+  await user.type(picker.getByRole('textbox'), name)
+  await user.click(picker.getByRole('button', { name: `Create "${name}" as new Threat Scenario…` }))
+  return within(await screen.findByRole('dialog', { name: 'New Threat Scenario' }))
+}
+
+describe('create threat scenario from a Relations tab', () => {
+  it('creates it linked to the damage scenario of the page', async () => {
+    const { user, api } = renderApp(`${project}/damage-scenarios/ds-01/relations`)
+    const dialog = await createFromRelations(user, 'Forged dimming command')
+
+    expect(dialog.getByLabelText(/Name/)).toHaveDisplayValue('Forged dimming command')
+    // Links only work within the item of the damage scenario.
+    expect(dialog.getByLabelText('Item')).toBeDisabled()
+    expect(await dialog.findByRole('button', { name: `Remove ${DS01}` })).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+
+    expect(await screen.findByRole('heading', { name: 'Forged dimming command, Threat Scenario TS-4' })).toBeInTheDocument()
+    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((ts) => ts.code)).toEqual(['TS-1', 'TS-4'])
+  })
+
+  it('links it to the attack path of the page after creating, and only links on retry when that fails', async () => {
+    const api = createMockItemApi()
+    const linkThreatScenario = api.attackPaths.linkThreatScenario
+    api.attackPaths.linkThreatScenario = () => Promise.reject(new ApiError(500, 'Server error'))
+    const { user } = renderApp(`${project}/attack-paths/ap-01/relations`, api)
+    const dialog = await createFromRelations(user, 'Forged dimming command')
+    await user.click(dialog.getByRole('button', { name: 'Add Damage Scenario' }))
+    await user.click(await screen.findByRole('menuitem', { name: DS01 }))
+
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+    expect(await dialog.findByRole('alert')).toHaveTextContent('TS-4 was created, but it could not be linked.')
+
+    api.attackPaths.linkThreatScenario = linkThreatScenario
+    await user.click(dialog.getByRole('button', { name: 'Create & open' }))
+
+    expect(await screen.findByRole('heading', { name: 'Forged dimming command, Threat Scenario TS-4' })).toBeInTheDocument()
+    expect((await api.attackPaths.relations('headlamp', 'ap-01')).threatScenarios.map((ts) => ts.code)).toEqual(['TS-1', 'TS-4'])
+    expect(await api.content.threatScenarios('headlamp', 'i-01')).toHaveLength(4)
   })
 })

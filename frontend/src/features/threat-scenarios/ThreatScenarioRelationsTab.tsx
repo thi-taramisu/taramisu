@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
+import { exampleProject } from '../../api/mocks/data/headlamp'
 import type { ThreatScenario } from '../../api/models/threatScenario'
 import { useItemAttackPaths, useSetThreatAttackPathLink, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
+import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 import { ThreatDamageSection } from './ThreatDamageSection'
@@ -44,6 +46,10 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
         onAdd={(id) => pathLink.mutate({ id, linked: true })}
         onRemove={(id) => pathLink.mutate({ id, linked: false })}
         rows={attackPaths}
+        // Opened on this threat scenario's page, the dialog starts linked to it.
+        renderCreateDialog={(dialog) => (
+          <CreateAttackPathDialog {...dialog} projectId={projectId} projectName={exampleProject.name} lockedItemId={scenario.item_definition_id} />
+        )}
       />
       <p className="text-xs text-muted-foreground">
         {t('ui:threatRelationsHint')}
