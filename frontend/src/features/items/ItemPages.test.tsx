@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import { i18n } from '../../i18n'
+import { ApiError } from '../../api/errors'
 
 const project = '/projects/headlamp'
 
@@ -24,6 +25,23 @@ describe('sidebar tree', () => {
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
     expect(within(tree()).getByRole('link', { name: 'AP-2 Malicious device on the OBD-II connector' })).toBeInTheDocument()
+  })
+
+  it('shows an error instead of an empty "Unassigned" when its elements cannot be loaded', async () => {
+    const api = createMockItemApi()
+    api.content.unassigned = () => Promise.reject(new ApiError(500, 'server'))
+    renderApp(project, api)
+
+    expect(await screen.findByText('The elements could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('shows the item without "Unassigned" when the item is gone meanwhile', async () => {
+    const api = createMockItemApi()
+    api.content.unassigned = () => Promise.reject(new ApiError(404, 'gone'))
+    renderApp(project, api)
+
+    expect(await within(tree()).findByRole('link', { name: 'Headlamp system' })).toBeInTheDocument()
+    expect(within(tree()).queryByRole('button', { name: /^Unassigned in/ })).not.toBeInTheDocument()
   })
 })
 
@@ -120,6 +138,8 @@ describe('delete item', () => {
     const dialog = screen.getByRole('alertdialog')
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be loaded')
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeDisabled()
+    // The unassigned elements are loaded, but counting only them would leave out the assets and the rest.
+    expect(within(dialog).queryByText(/This also deletes/)).not.toBeInTheDocument()
 
     failing = false
     await user.click(within(dialog).getByRole('button', { name: 'Retry' }))

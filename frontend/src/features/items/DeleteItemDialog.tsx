@@ -88,7 +88,8 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
         <AlertDialogHeader>
           <AlertDialogTitle>{t('ui:deleteItemTitle', { name: item.name })}</AlertDialogTitle>
           <AlertDialogDescription>
-            {deletedWithItem(t, i18n.resolvedLanguage ?? 'en', elements)}
+            {/* Counts from only one of the two requests would leave out part of what is deleted. */}
+            {loaded && deletedWithItem(t, i18n.resolvedLanguage ?? 'en', elements)}
             {t('ui:cannotUndo')}
           </AlertDialogDescription>
         </AlertDialogHeader>

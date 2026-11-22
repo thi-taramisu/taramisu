@@ -62,6 +62,7 @@
   "damageNamePlaceholder": "e.g. Loss of cell balancing",
   "damageTreeHint": "Will appear in the tree below each linked asset.",
   "damageUnassignedHint": "Will appear in \"Unassigned\" of the item until it is linked.",
+  "damageItemNeededHint": "Needs an item to belong to.",
   "createDamageError": "The damage scenario could not be created. Please try again.",
   "newThreatScenario": "New Threat Scenario",
   "threatContext": "in project {{name}} · targets, cause and attack paths follow on the threat scenario page",

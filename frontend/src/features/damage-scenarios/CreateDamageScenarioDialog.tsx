@@ -53,6 +53,11 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const itemId = lockedItemId ?? chosenItemId ?? defaults.itemId
   const links = chosenLinks ?? defaults.links
   const [linkError, setLinkError] = useState<{ key: string; code?: string }>()
+  // Create was tried without an item; the message is derived, so it goes away once the items are there.
+  const [itemMissing, setItemMissing] = useState(false)
+  const itemError = itemMissing && !itemId
+    ? (tree.isPending ? 'ui:itemsLoading' : tree.isError ? 'ui:loadItemsError' : 'ui:itemRequired')
+    : undefined
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
@@ -84,7 +89,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     if (unfinished) return finish(unfinished)
     // Without links nothing waits for the assets anymore, but the owning item still has to be known.
     if (!itemId) {
-      setLinkError({ key: tree.isPending ? 'ui:itemsLoading' : tree.isError ? 'ui:loadItemsError' : 'ui:itemRequired' })
+      setItemMissing(true)
       return undefined
     }
     // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
@@ -115,7 +120,14 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       initialName={initialName}
       namePlaceholder={t('ui:damageNamePlaceholder')}
       // Matches the asset chips once the assets are there; until then the chosen links say where it will appear.
-      hint={(assets ? linked : links).length > 0 ? t('ui:damageTreeHint') : t('ui:damageUnassignedHint')}
+      // Without an item (none in the project, or they could not be loaded) it cannot appear anywhere yet.
+      hint={
+        !itemId && !tree.isPending
+          ? t('ui:damageItemNeededHint')
+          : (assets ? linked : links).length > 0
+            ? t('ui:damageTreeHint')
+            : t('ui:damageUnassignedHint')
+      }
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
@@ -125,6 +137,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       onCreate={create}
       onReset={() => {
         setUnfinished(undefined)
+        setItemMissing(false)
         setChosenItemId(undefined)
         changeLinks(undefined)
       }}
@@ -133,6 +146,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
         items={items}
         value={itemId}
         locked={Boolean(lockedItemId)}
+        error={itemError && t(itemError)}
         onChange={(next) => {
           setChosenItemId(next)
           // Assets belong to one item, so its links do not carry over.

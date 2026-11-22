@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
+import { isNotFound } from '../errors'
 import type { CiaProperty, NewAsset } from '../models/asset'
 import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
@@ -44,7 +45,11 @@ export function useProjectTree(projectId: string, { enabled = true } = {}) {
           // One item failing (e.g. deleted meanwhile) must not hide the whole tree.
           const [children, unassigned] = await Promise.all([
             api.content.children(projectId, item.id).catch(() => []),
-            api.content.unassigned(projectId, item.id).catch(() => []),
+            // Other failures must not look like "nothing unassigned", which would hide the unlinked elements.
+            api.content.unassigned(projectId, item.id).catch((error: unknown) => {
+              if (isNotFound(error)) return []
+              throw error
+            }),
           ])
           return { type: 'items' as const, id: item.id, name: item.name, children, unassigned }
         }),

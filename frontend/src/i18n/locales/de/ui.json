@@ -62,6 +62,7 @@
   "damageNamePlaceholder": "z. B. Ausfall des Zellenausgleichs",
   "damageTreeHint": "Erscheint in der Baumansicht unter jedem verknüpften Asset.",
   "damageUnassignedHint": "Erscheint unter „Nicht zugeordnet“ des Items, bis es verknüpft wird.",
+  "damageItemNeededHint": "Benötigt ein Item, zu dem es gehört.",
   "createDamageError": "Das Schadensszenario konnte nicht erstellt werden. Bitte versuche es erneut.",
   "newThreatScenario": "Neues Bedrohungsszenario",
   "threatContext": "im Projekt {{name}} · Ziele, Ursache und Angriffspfade werden auf der Seite des Bedrohungsszenarios ergänzt",

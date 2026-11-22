@@ -37,7 +37,8 @@ export function buildRelationGraph(items: { tree: TreeNode; risks: RiskGroup[] }
   }
   function visit(node: TreeNode, parent: TreeNode | undefined, paths: Set<string>) {
     const key = add(node)
-    if (node.type === 'attack-paths') paths.add(key)
+    // Only paths below a threat can carry its rating; an unassigned path is not linked to the threat a risk row names.
+    if (node.type === 'attack-paths' && parent) paths.add(key)
     if (parent) {
       const parentKey = elementKey(parent.type, parent.id)
       // Attack paths lead to threats; threats lead to damage. The tree is ordered the other way.

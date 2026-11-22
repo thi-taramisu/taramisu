@@ -140,9 +140,11 @@ describe('create damage scenario', () => {
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
     expect(within(dialog).getByRole('alert')).toHaveTextContent('The items are still loading.')
+    expect(within(dialog).getByLabelText('Item')).toHaveAccessibleDescription('The items are still loading.')
 
     act(() => loadTree())
     await waitFor(() => expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system'))
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
     expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage Scenario DS-2' })).toBeInTheDocument()
   })
@@ -152,10 +154,13 @@ describe('create damage scenario', () => {
     await api.items.delete('headlamp', 'i-01')
     const { user } = renderApp(project, api)
     const dialog = await openNewDamageScenarioDialog(user)
+    expect(await within(dialog).findByText('Needs an item to belong to.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Will appear/)).not.toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Create an item first.')
+    expect(within(dialog).getByLabelText('Item')).toHaveAccessibleDescription('Create an item first.')
     expect(await api.items.list('headlamp')).toEqual([])
   })
 
