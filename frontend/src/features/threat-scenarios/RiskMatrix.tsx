@@ -37,8 +37,8 @@ export function RiskMatrix({ impact, feasibility }: { impact: RatedImpact; feasi
           <tr key={row.value}>
             {/* The axis label runs up the left side; the row headers already name each impact level. */}
             {index === 0 && (
-              <td rowSpan={IMPACT_ROWS.length} aria-hidden="true" className={cn(axis, 'pr-1 text-center align-middle')}>
-                <span className="inline-block rotate-180 [writing-mode:vertical-rl]">Impact</span>
+              <td rowSpan={IMPACT_ROWS.length} aria-hidden="true" className={cn(axis, 'w-4 min-w-4 pr-1 text-center align-middle')}>
+                <span className="inline-block rotate-180 leading-none [writing-mode:vertical-rl]">Impact</span>
               </td>
             )}
             <th scope="row" className={cn('pr-2 text-right font-normal', row.value === impact ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
