@@ -40,6 +40,9 @@ interface DialogTexts {
   linksLoading: string
   linkRequired: string
   createError: string
+  /** The project has no item, so there is nothing to link to. */
+  noItem: string
+  linksLoadError: string
   /** Elements of the item that cannot be linked because they are not in the tree. */
   notInTree: (count: number) => string
 }
@@ -75,7 +78,8 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
 }: CreateLinkedElementDialogProps<T> & { config: Config<T> }) {
   const { t } = useTranslation()
   const { type, link, texts } = config
-  const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
+  const tree = useProjectTree(projectId)
+  const items = (tree.data ?? []).filter((node) => node.type === 'items')
   const context = usePageContext(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
@@ -83,13 +87,16 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
   const itemId = lockedItemId ?? chosenItemId ?? context.itemId
   const linkIds = chosenLinkIds ?? (context.type === link.type && context.itemId === itemId ? [context.entityId] : [])
   const [linkError, setLinkError] = useState<string>()
-  const { data: itemElements } = useItemScenarios(projectId, itemId, link.type)
+  const itemScenarios = useItemScenarios(projectId, itemId, link.type)
+  const itemElements = itemScenarios.data
   // Below an element that is not in the tree, the new one would not be in the tree either.
   const itemNode = items.find((item) => item.id === itemId)
   const candidates = itemElements?.filter((element) => Boolean(itemNode && findNode(link.type, element.id, itemNode.children ?? [])))
   const hidden = (itemElements?.length ?? 0) - (candidates?.length ?? 0)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
   const [unfinished, setUnfinished] = useState<T>()
+  const noItem = tree.isSuccess && items.length === 0
+  const loadError = noItem ? texts.noItem : itemScenarios.isError ? texts.linksLoadError : undefined
 
   const linked = linkIds.flatMap((id) => candidates?.filter((candidate) => candidate.id === id) ?? [])
 
@@ -112,6 +119,10 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
 
   async function create(name: string) {
     if (unfinished) return finish(unfinished)
+    if (loadError) {
+      setLinkError(loadError)
+      return undefined
+    }
     // The links only count once the candidates are there, so "Link at least one …" would be wrong.
     if (!candidates) {
       setLinkError(texts.linksLoading)
@@ -163,7 +174,7 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
         candidates={candidates?.filter((candidate) => !linkIds.includes(candidate.id)) ?? []}
         onAdd={(element) => changeLinks([...linkIds, element.id])}
         onRemove={(element) => changeLinks(linkIds.filter((id) => id !== element.id))}
-        error={linkError}
+        error={linkError ?? loadError}
       />
       {hidden > 0 && (
         <p className="-mt-2 text-xs text-muted-foreground">

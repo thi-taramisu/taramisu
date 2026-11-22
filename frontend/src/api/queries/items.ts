@@ -83,6 +83,8 @@ export function useItemScenarios(projectId: string, itemId: string, type: 'damag
   return useQuery<EntityRef[]>({
     queryKey: damage ? keys.itemDamageScenarios(projectId, itemId) : keys.threatScenarios(projectId, itemId),
     queryFn: () => (damage ? api.content.damageScenarios(projectId, itemId) : api.content.threatScenarios(projectId, itemId)),
+    // No item to ask for, e.g. while the tree loads or in a project without items.
+    enabled: Boolean(itemId),
   })
 }
 

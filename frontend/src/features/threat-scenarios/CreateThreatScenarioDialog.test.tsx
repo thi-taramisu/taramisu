@@ -87,6 +87,29 @@ describe('create threat scenario', () => {
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/ds-01`)
   })
 
+  it('says so when the damage scenarios of the item cannot be loaded', async () => {
+    const api = createMockItemApi()
+    api.content.damageScenarios = () => Promise.reject(new ApiError(500, 'Server error'))
+    const { user } = renderApp(`${project}/damage-scenarios/ds-01`, api)
+    const dialog = await openDialog(user)
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The damage scenarios of this item could not be loaded.')
+    await user.type(within(dialog).getByLabelText(/Name/), 'Forged dimming command')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('The damage scenarios of this item could not be loaded.')
+    expect(await api.content.threatScenarios('headlamp', 'i-01')).toHaveLength(3)
+  })
+
+  it('asks for an item first in a project without items', async () => {
+    const api = createMockItemApi()
+    await api.items.delete('headlamp', 'i-01')
+    const { user } = renderApp(project, api)
+    const dialog = await openDialog(user)
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Create an item first; damage scenarios belong to an item.')
+  })
+
   it('shows an error and keeps the dialog open when creating fails', async () => {
     const api = createMockItemApi()
     api.threatScenarios.create = () => Promise.reject(new Error('network'))
