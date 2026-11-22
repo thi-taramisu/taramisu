@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { EntityType } from '../../api/models/tree'
 import { useItemScenarios, useProjectTree } from '../../api/queries/items'
 import { CreateElementDialog } from './CreateElementDialog'
-import { entityPath, formatEntityId } from './entities'
+import { entityPath, findNode, formatEntityId } from './entities'
 import { ItemSelectField } from './ItemSelectField'
 import { LinkToField } from './LinkToField'
 import { usePageContext } from './usePageContext'
@@ -40,6 +40,8 @@ interface DialogTexts {
   linksLoading: string
   linkRequired: string
   createError: string
+  /** Elements of the item that cannot be linked because they are not in the tree. */
+  notInTree: (count: number) => string
 }
 
 interface Config<T extends CreatedEntity> {
@@ -57,7 +59,8 @@ interface Config<T extends CreatedEntity> {
 /**
  * "+ New → …" dialog for elements that hang below other elements (interactive wireframe): name, owning item
  * and the elements one level up. Defaults to the item and, on the page of such an element, to that element.
- * At least one link is needed, as the tree has no place for unlinked elements yet.
+ * At least one link is needed, as the tree has no place for unlinked elements yet; for the same reason only
+ * elements that are in the tree themselves can be linked.
  */
 export function CreateLinkedElementDialog<T extends CreatedEntity>({
   config,
@@ -80,7 +83,11 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
   const itemId = lockedItemId ?? chosenItemId ?? context.itemId
   const linkIds = chosenLinkIds ?? (context.type === link.type && context.itemId === itemId ? [context.entityId] : [])
   const [linkError, setLinkError] = useState<string>()
-  const { data: candidates } = useItemScenarios(projectId, itemId, link.type)
+  const { data: itemElements } = useItemScenarios(projectId, itemId, link.type)
+  // Below an element that is not in the tree, the new one would not be in the tree either.
+  const itemNode = items.find((item) => item.id === itemId)
+  const candidates = itemElements?.filter((element) => Boolean(itemNode && findNode(link.type, element.id, itemNode.children ?? [])))
+  const hidden = (itemElements?.length ?? 0) - (candidates?.length ?? 0)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
   const [unfinished, setUnfinished] = useState<T>()
 
@@ -158,6 +165,11 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
         onRemove={(element) => changeLinks(linkIds.filter((id) => id !== element.id))}
         error={linkError}
       />
+      {hidden > 0 && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          {texts.notInTree(hidden)}
+        </p>
+      )}
     </CreateElementDialog>
   )
 }

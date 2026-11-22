@@ -43,6 +43,26 @@ describe('create attack path', () => {
     expect(await screen.findByRole('heading', { name: 'Replay via the OBD port, Attack Path AP-4' })).toBeInTheDocument()
   })
 
+  it('offers only threat scenarios that are in the tree, so the new attack path is shown there too', async () => {
+    const { user } = renderApp(`${project}/items/i-01`)
+    const dialog = await openDialog(user)
+
+    await user.click(await within(dialog).findByRole('button', { name: 'Add Threat Scenario' }))
+
+    expect(await screen.findByRole('menuitem', { name: TS01 })).toBeInTheDocument()
+    // TS-2 and TS-3 lead to no damage scenario, so they are not in the tree.
+    expect(screen.queryByRole('menuitem', { name: /TS-2|TS-3/ })).not.toBeInTheDocument()
+    expect(within(dialog).getByText('2 threat scenarios are not in the tree yet and cannot be linked here.')).toBeInTheDocument()
+  })
+
+  it('does not start linked to a threat scenario of the page that is not in the tree', async () => {
+    const { user } = renderApp(`${project}/threat-scenarios/ts-02`)
+    const dialog = await openDialog(user)
+
+    await within(dialog).findByText('2 threat scenarios are not in the tree yet and cannot be linked here.')
+    expect(within(dialog).queryByRole('button', { name: /^Remove TS-2/ })).not.toBeInTheDocument()
+  })
+
   it('requires a linked threat scenario', async () => {
     const { user, api } = renderApp(`${project}/items/i-01`)
     const dialog = await openDialog(user)
