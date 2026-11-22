@@ -57,6 +57,17 @@ jobs:
               - 'backend/**'
               - '.github/workflows/lint.yml'
 
+  branding:
+    name: Authentik branding
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check generated login theme
+        run: python3 iam/branding/generate.py --check
+
   markdown:
     name: Markdown
     needs: changes
@@ -137,6 +148,7 @@ jobs:
     if: always()
     needs:
       - changes
+      - branding
       - markdown
       - frontend
       - backend
@@ -151,6 +163,7 @@ jobs:
           | Component | Status | Tool |
           | :--- | :---: | :--- |
           | **Changes Detection** | ${{ needs.changes.result == 'success' && '✅ Succeeded' || '❌ Failed' }} | `dorny/paths-filter` |
+          | **Authentik branding** | ${{ needs.branding.result == 'success' && '✅ Passed' || '❌ Failed' }} | Branding generator |
           | **Markdown** | ${{ needs.markdown.result == 'success' && '✅ Passed' || (needs.markdown.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `markdownlint-cli2` |
           | **Frontend** | ${{ needs.frontend.result == 'success' && '✅ Passed' || (needs.frontend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `oxlint` |
           | **Backend** | ${{ needs.backend.result == 'success' && '✅ Passed' || (needs.backend.result == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} | `golangci-lint` |
@@ -160,7 +173,8 @@ jobs:
         if: |
           contains(needs.*.result, 'failure') ||
           contains(needs.*.result, 'cancelled') ||
-          needs.changes.result != 'success'
+          needs.changes.result != 'success' ||
+          needs.branding.result != 'success'
         run: |
           echo "At least one lint job failed or was cancelled, or changes detection did not succeed."
           exit 1
