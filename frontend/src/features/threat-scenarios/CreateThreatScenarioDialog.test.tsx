@@ -17,6 +17,24 @@ async function openDialog(user: ReturnType<typeof renderApp>['user']) {
 }
 
 describe('create threat scenario', () => {
+  it('loads the damage scenarios of the item only once the dialog is opened', async () => {
+    const api = createMockItemApi()
+    const damageScenarios = api.content.damageScenarios
+    let calls = 0
+    api.content.damageScenarios = (...args) => {
+      calls += 1
+      return damageScenarios(...args)
+    }
+    const { user } = renderApp(`${project}/items/i-01`, api)
+    await within(tree()).findByRole('button', { name: 'New' })
+    expect(calls).toBe(0)
+
+    const dialog = await openDialog(user)
+
+    await within(dialog).findByRole('button', { name: 'Add Damage Scenario' })
+    expect(calls).toBe(1)
+  })
+
   it('starts with the item and damage scenario of the current page and creates the threat scenario below it', async () => {
     const { user, api } = renderApp(`${project}/damage-scenarios/ds-01`)
     const dialog = await openDialog(user)

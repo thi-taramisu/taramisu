@@ -63,30 +63,37 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         onOpenChange={setItemDialogOpen}
         returnFocusTo={newButton}
       />
-      <CreateDamageScenarioDialog
-        key={`damage-scenario-${damageScenarioDialog.key}`}
-        projectId={projectId}
-        projectName={projectName}
-        open={damageScenarioDialog.open}
-        onOpenChange={(open) => setDamageScenarioDialog((prev) => ({ ...prev, open }))}
-        returnFocusTo={newButton}
-      />
-      <CreateThreatScenarioDialog
-        key={`threat-scenario-${threatScenarioDialog.key}`}
-        projectId={projectId}
-        projectName={projectName}
-        open={threatScenarioDialog.open}
-        onOpenChange={(open) => setThreatScenarioDialog((prev) => ({ ...prev, open }))}
-        returnFocusTo={newButton}
-      />
-      <CreateAttackPathDialog
-        key={`attack-path-${attackPathDialog.key}`}
-        projectId={projectId}
-        projectName={projectName}
-        open={attackPathDialog.open}
-        onOpenChange={(open) => setAttackPathDialog((prev) => ({ ...prev, open }))}
-        returnFocusTo={newButton}
-      />
+      {/* Mounted from the first opening on, so closed dialogs load nothing on every page. */}
+      {damageScenarioDialog.key > 0 && (
+        <CreateDamageScenarioDialog
+          key={`damage-scenario-${damageScenarioDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={damageScenarioDialog.open}
+          onOpenChange={(open) => setDamageScenarioDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
+      {threatScenarioDialog.key > 0 && (
+        <CreateThreatScenarioDialog
+          key={`threat-scenario-${threatScenarioDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={threatScenarioDialog.open}
+          onOpenChange={(open) => setThreatScenarioDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
+      {attackPathDialog.key > 0 && (
+        <CreateAttackPathDialog
+          key={`attack-path-${attackPathDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={attackPathDialog.open}
+          onOpenChange={(open) => setAttackPathDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
     </>
   )
 }
