@@ -39,6 +39,7 @@
   "reviewer": "Reviewer",
   "viewer": "Viewer",
   "addAsset": "Add Asset",
+  "addElement": "Add {{element}}",
   "component": "Component",
   "cybersecurityProperties": "Cybersecurity properties",
   "confidentiality": "Confidentiality",
