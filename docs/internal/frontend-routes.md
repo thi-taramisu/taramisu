@@ -84,9 +84,10 @@ the five factors, total and feasibility) and the Relations tab (threat scenarios
 
 Threat scenarios and attack paths are created in the "New Threat Scenario" and "New Attack Path" dialogs (#332), from "+ New" or from
 "Create new …" on a Relations tab (with the item fixed). Both ask for the name, the item and the elements one level up: damage scenarios for
-a threat scenario, threat scenarios for an attack path. On the page of such an element, the dialog starts linked to it. At least one link
-is required, as for damage scenarios, because the tree has no place for unlinked elements yet. The other fields follow on the element's
-page. The dialogs share `CreateLinkedElementDialog` and the item and "Link to" fields in `frontend/src/features/workspace/`.
+a threat scenario, threat scenarios for an attack path. On the page of such an element, the dialog starts linked to it. At least one link is
+required, as for damage scenarios, because the tree has no place for unlinked elements yet; for the same reason, only elements that are in
+the tree can be linked. The other fields follow on the element's page. The dialogs share `CreateLinkedElementDialog` and the item and "Link
+to" fields in `frontend/src/features/workspace/`.
 
 ## Decisions
 
