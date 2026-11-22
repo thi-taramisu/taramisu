@@ -5,7 +5,7 @@ import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody }
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { PatchThreatScenarioBody, ThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
-import type { TreeNode } from '../models/tree'
+import type { EntityRef, TreeNode } from '../models/tree'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
 // views together.
@@ -74,6 +74,16 @@ export function useItemAssets(projectId: string, itemId: string) {
 export function useItemRisks(projectId: string, itemId: string) {
   const api = useApi()
   return useQuery({ queryKey: keys.risks(projectId, itemId), queryFn: () => api.content.risks(projectId, itemId) })
+}
+
+/** Damage or threat scenarios of an item, e.g. the elements a new one can be linked to; shares the cache with the hooks per type. */
+export function useItemScenarios(projectId: string, itemId: string, type: 'damage-scenarios' | 'threat-scenarios') {
+  const api = useApi()
+  const damage = type === 'damage-scenarios'
+  return useQuery<EntityRef[]>({
+    queryKey: damage ? keys.itemDamageScenarios(projectId, itemId) : keys.threatScenarios(projectId, itemId),
+    queryFn: () => (damage ? api.content.damageScenarios(projectId, itemId) : api.content.threatScenarios(projectId, itemId)),
+  })
 }
 
 export function useItemThreatScenarios(projectId: string, itemId: string) {

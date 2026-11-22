@@ -27,14 +27,15 @@ describe('sidebar tree', () => {
 })
 
 describe('create item', () => {
-  it('offers only Item and Damage Scenario in the "+ New" menu for now', async () => {
+  it('offers Item, Damage Scenario and Threat Scenario in the "+ New" menu for now', async () => {
     const { user } = renderApp(project)
 
     await user.click(await within(tree()).findByRole('button', { name: 'New' }))
 
-    expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
-    expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
+    for (const name of ['Item', 'Damage Scenario', 'Threat Scenario']) {
+      expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('aria-disabled')
+    }
+    for (const name of ['Asset', 'Attack Path']) {
       expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
     }
   })

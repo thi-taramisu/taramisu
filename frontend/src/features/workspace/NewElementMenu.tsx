@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
+import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
 
-// Only items and damage scenarios can be created so far; the other types follow with their own tickets.
-const OTHER_TYPES = ['assets', 'threat-scenarios', 'attack-paths']
+// Assets and attack paths cannot be created here yet; they follow with their own tickets.
+const OTHER_TYPES = ['assets', 'attack-paths']
 
 interface NewElementMenuProps {
   projectId: string
@@ -21,6 +22,7 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
   const { t } = useTranslation()
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
+  const [threatScenarioDialog, setThreatScenarioDialog] = useState({ open: false, key: 0 })
   // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
   const [newButton, setNewButton] = useState<HTMLButtonElement | null>(null)
 
@@ -35,9 +37,12 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
-          {/* A new key per opening, so the dialog starts from the item and asset of the current page. */}
+          {/* A new key per opening, so the dialogs start from the item and element of the current page. */}
           <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.damage-scenarios')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+            {t('entities.threat-scenarios')}
           </DropdownMenuItem>
           {OTHER_TYPES.map((label) => (
             <DropdownMenuItem key={label} disabled>
@@ -54,11 +59,19 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         returnFocusTo={newButton}
       />
       <CreateDamageScenarioDialog
-        key={damageScenarioDialog.key}
+        key={`damage-scenario-${damageScenarioDialog.key}`}
         projectId={projectId}
         projectName={projectName}
         open={damageScenarioDialog.open}
         onOpenChange={(open) => setDamageScenarioDialog((prev) => ({ ...prev, open }))}
+        returnFocusTo={newButton}
+      />
+      <CreateThreatScenarioDialog
+        key={`threat-scenario-${threatScenarioDialog.key}`}
+        projectId={projectId}
+        projectName={projectName}
+        open={threatScenarioDialog.open}
+        onOpenChange={(open) => setThreatScenarioDialog((prev) => ({ ...prev, open }))}
         returnFocusTo={newButton}
       />
     </>
