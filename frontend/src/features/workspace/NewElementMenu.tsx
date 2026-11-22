@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
 import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
 
-// Assets and attack paths cannot be created here yet; they follow with their own tickets.
-const OTHER_TYPES = ['assets', 'attack-paths']
+// Assets cannot be created here yet; they follow with their own ticket.
+const OTHER_TYPES = ['assets']
 
 interface NewElementMenuProps {
   projectId: string
@@ -23,6 +24,7 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
   const [threatScenarioDialog, setThreatScenarioDialog] = useState({ open: false, key: 0 })
+  const [attackPathDialog, setAttackPathDialog] = useState({ open: false, key: 0 })
   // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
   const [newButton, setNewButton] = useState<HTMLButtonElement | null>(null)
 
@@ -43,6 +45,9 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.threat-scenarios')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+            {t('entities.attack-paths')}
           </DropdownMenuItem>
           {OTHER_TYPES.map((label) => (
             <DropdownMenuItem key={label} disabled>
@@ -72,6 +77,14 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         projectName={projectName}
         open={threatScenarioDialog.open}
         onOpenChange={(open) => setThreatScenarioDialog((prev) => ({ ...prev, open }))}
+        returnFocusTo={newButton}
+      />
+      <CreateAttackPathDialog
+        key={`attack-path-${attackPathDialog.key}`}
+        projectId={projectId}
+        projectName={projectName}
+        open={attackPathDialog.open}
+        onOpenChange={(open) => setAttackPathDialog((prev) => ({ ...prev, open }))}
         returnFocusTo={newButton}
       />
     </>
