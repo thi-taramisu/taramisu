@@ -64,7 +64,7 @@ describe('createMockItemApi', () => {
   it('adds an asset with the next code and shows it below the item', async () => {
     const api = createMockItemApi()
 
-    const asset = await api.content.addAsset(project, 'i-01', { name: 'LED driver', component: 'Lamp ECU', properties: ['I'] })
+    const asset = await api.content.addAsset(project, 'i-01', { name: 'LED driver', properties: ['I'] })
 
     expect(asset).toMatchObject({ code: 'A-05', name: 'LED driver', damageScenarios: 0, threatScenarios: 0, maxRisk: null })
     expect((await api.content.children(project, 'i-01')).at(-1)).toMatchObject({ type: 'assets', id: asset.id, code: 'A-05' })
@@ -482,7 +482,7 @@ describe('mock asset creation', () => {
   it('trims the name and rejects a blank one with 422', async () => {
     const api = createMockItemApi()
 
-    expect(await api.content.addAsset(project, 'i-01', { name: '  Relay ', component: '', properties: [] })).toMatchObject({ code: 'A-05', name: 'Relay' })
-    await expect(api.content.addAsset(project, 'i-01', { name: '  ', component: '', properties: [] })).rejects.toMatchObject({ status: 422 })
+    expect(await api.content.addAsset(project, 'i-01', { name: '  Relay ', properties: [] })).toMatchObject({ code: 'A-05', name: 'Relay' })
+    await expect(api.content.addAsset(project, 'i-01', { name: '  ', properties: [] })).rejects.toMatchObject({ status: 422 })
   })
 })

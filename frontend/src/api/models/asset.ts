@@ -15,7 +15,7 @@ export interface ItemAsset extends EntityRef {
   maxRisk: number | null
 }
 
-export type NewAsset = Pick<ItemAsset, 'name' | 'component' | 'properties'>
+export type NewAsset = Pick<ItemAsset, 'name' | 'properties'>
 
 /** How the asset was identified (15.3.2 NOTE 2). */
 export type IdentificationSource = 'ITEM_DEF' | 'IMPACT_RATING' | 'THREAT_DERIVED' | 'CATALOGUE'

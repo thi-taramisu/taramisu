@@ -191,7 +191,7 @@ export function createMockItemApi(): ItemApi {
           // Same rule as the non-blank name of `asset` in backend/db/schema.sql.
           const name = newAsset.name.trim()
           if (!name) throw new ApiError(422, 'Name is required.')
-          const asset: ItemAsset = { ...newAsset, name, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
+          const asset: ItemAsset = { ...newAsset, name, component: '', id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
           entry.assets.push({
             ...asset,
             description: null,

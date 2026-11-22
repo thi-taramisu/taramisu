@@ -33,7 +33,7 @@ describe('Entity breadcrumbs', () => {
   it('shows a newly created item by name while keeping its UUID in parent navigation', async () => {
     const api = createMockItemApi()
     const item = await api.items.create('headlamp', { name: 'New headlamp', scope_type: 'ITEM' })
-    const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', component: 'ECU', properties: ['I'] })
+    const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', properties: ['I'] })
     const user = userEvent.setup()
     renderPage(`assets/${asset.id}`, api)
     await breadcrumbs().findByText(`${asset.code} Firmware`)

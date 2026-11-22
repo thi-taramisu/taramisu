@@ -85,7 +85,7 @@ so it is left out. A property that leads to a damage scenario can only be remove
 treatment column yet, as treatment decisions are still a placeholder.
 
 Assets are created in the "New Asset" dialog ("+ New → Asset", or "Add Asset" on the item's Assets tab with the item fixed): only the name
-is required; item, component / interface and C / I / A properties are optional, and a similar existing asset of the item is pointed out.
+is required; item and C / I / A properties are optional (the wireframe's "Component / Interface" is not in the data model either), and a similar existing asset of the item is pointed out.
 "Create & open" opens the new asset's Definition tab.
 
 ## Decisions

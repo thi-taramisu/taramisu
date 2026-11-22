@@ -23,7 +23,6 @@ describe('ItemAssetsTab', () => {
     // The tab belongs to one item, so the item cannot be changed here.
     expect(within(dialog).getByLabelText('Item')).toBeDisabled()
     await user.type(within(dialog).getByLabelText(/Name/), 'LED driver config')
-    await user.type(within(dialog).getByLabelText('Component / Interface'), 'Power switch actuator')
     await user.click(within(dialog).getByRole('checkbox', { name: 'Integrity' }))
     await user.click(within(dialog).getByRole('button', { name: 'Create & add another' }))
 
@@ -34,7 +33,6 @@ describe('ItemAssetsTab', () => {
     expect(screen.getByRole('button', { name: 'Add Asset' })).toHaveFocus()
     const row = (await screen.findByRole('cell', { name: 'LED driver config' })).closest('tr')!
     expect(within(row).getByText('A-05')).toBeInTheDocument()
-    expect(within(row).getByText('Power switch actuator')).toBeInTheDocument()
     expect(within(row).getByLabelText('Properties I')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets (5)' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'A-05 LED driver config' })).toBeInTheDocument()

@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty } from '../../api/models/asset'
@@ -33,7 +32,6 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
   // Only the user's choice is stored, so a default that arrives later (the tree loads after opening) still applies.
   const [chosenItemId, setChosenItemId] = useState<string>()
   const itemId = lockedItemId ?? chosenItemId ?? context.itemId
-  const [component, setComponent] = useState('')
   const [properties, setProperties] = useState<CiaProperty[]>([])
   const [name, setName] = useState('')
   const { data: assets } = useItemAssets(projectId, itemId)
@@ -44,7 +42,7 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
     const asset = await createAsset.mutateAsync({
       itemId,
       // Kept in C / I / A order, whatever order they were ticked in.
-      asset: { name: trimmedName, component: component.trim(), properties: CIA_PROPERTIES.map((p) => p.value).filter((p) => properties.includes(p)) },
+      asset: { name: trimmedName, properties: CIA_PROPERTIES.map((p) => p.value).filter((p) => properties.includes(p)) },
     })
     return { name: `${asset.code} ${asset.name}`, path: entityPath(projectId, 'assets', asset.id) }
   }
@@ -63,7 +61,6 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
       onNameChange={setName}
       onReset={() => {
         setChosenItemId(undefined)
-        setComponent('')
         setProperties([])
       }}
     >
@@ -90,15 +87,6 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
             </NativeSelectOption>
           ))}
         </NativeSelect>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-component`}>Component / Interface</Label>
-        <Input
-          id={`${id}-component`}
-          value={component}
-          placeholder="Where the asset lives, e.g. Body control ECU"
-          onChange={(event) => setComponent(event.target.value)}
-        />
       </div>
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">Cybersecurity Properties</legend>
