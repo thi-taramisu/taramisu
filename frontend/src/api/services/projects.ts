@@ -15,7 +15,7 @@ export interface ProjectService {
   create(body: NewProject): Promise<Project>
   /** Owners only: changes the name and the description. */
   update(projectId: string, body: ProjectUpdate): Promise<Project>
-  setFavorite(projectId: string, favorite: boolean): Promise<Project>
+  setFavorite(projectId: string, favorite: boolean): Promise<void>
   /** Owners only: makes the project read-only for all members. */
   archive(projectId: string): Promise<Project>
   /** Owners only. */

@@ -62,9 +62,7 @@ export function createMockProjectApi(seed: Project[] = mockProjects): ProjectSer
       }),
     setFavorite: (projectId, favorite) =>
       run(() => {
-        const project = find(projectId)
-        project.favorite = favorite
-        return project
+        find(projectId).favorite = favorite
       }),
     archive: (projectId) =>
       run(() => {

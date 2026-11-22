@@ -87,8 +87,9 @@ export function useSetFavorite() {
     onError: (_error, _variables, context) => {
       queryClient.setQueryData(keys.list, context?.previous)
     },
-    // The list already shows the new state; writing the response into it could undo a later click.
-    onSuccess: (project) => queryClient.setQueryData(keys.project(project.id), project),
+    // The list already shows the new state; only the project's own query still needs it.
+    onSuccess: (_, { projectId, favorite }) =>
+      queryClient.setQueryData<Project>(keys.project(projectId), (project) => project && { ...project, favorite }),
   })
 }
 

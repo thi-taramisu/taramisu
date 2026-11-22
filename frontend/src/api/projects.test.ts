@@ -138,7 +138,7 @@ describe('createProjectApi', () => {
     serveProjects(battery)
     const api = createApi()
 
-    expect(await api.setFavorite(battery.id, true)).toMatchObject({ favorite: true, archived: false })
+    await api.setFavorite(battery.id, true)
     expect(await api.archive(battery.id)).toMatchObject({ favorite: true, archived: true })
     expect(await api.get(battery.id)).toMatchObject({ favorite: true, archived: true })
     expect(await api.restore(battery.id)).toMatchObject({ archived: false })
@@ -152,12 +152,6 @@ describe('createProjectApi', () => {
     expect((await rejection(api.archive(shared.id))).status).toBe(403)
     expect((await rejection(api.restore(shared.id))).status).toBe(403)
     expect(await api.get(shared.id)).toMatchObject({ archived: false })
-  })
-
-  it('rejects favorites of unknown projects with 404', async () => {
-    serveProjects()
-
-    expect((await rejection(createApi().setFavorite(battery.id, true))).status).toBe(404)
   })
 
   it('deletes a project and forgets its extras and image', async () => {
@@ -199,7 +193,8 @@ describe('createProjectApi', () => {
 
     expect(await api.get('headlamp')).toMatchObject({ name: 'Headlamp System' })
     expect(await api.update('headlamp', { name: 'Headlamp', description: '' })).toMatchObject({ name: 'Headlamp' })
-    expect(await api.setFavorite('headlamp', false)).toMatchObject({ favorite: false })
+    await api.setFavorite('headlamp', false)
+    expect(await api.get('headlamp')).toMatchObject({ favorite: false })
     expect(await api.archive('headlamp')).toMatchObject({ archived: true })
     expect(await api.restore('headlamp')).toMatchObject({ archived: false })
     await api.delete('headlamp')

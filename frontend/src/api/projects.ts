@@ -92,9 +92,8 @@ export function createProjectApi(
     },
     setFavorite: async (projectId, favorite) => {
       if (isExample(projectId)) return example.setFavorite(projectId, favorite)
-      const body = await fetchProject(projectId)
+      // Favorites have no backend route yet, so nothing is sent.
       extras.set(projectId, { favorite })
-      return toProject(body)
     },
     archive: (projectId) => (isExample(projectId) ? example.archive(projectId) : setOwnedExtras(projectId, true)),
     restore: (projectId) => (isExample(projectId) ? example.restore(projectId) : setOwnedExtras(projectId, false)),
