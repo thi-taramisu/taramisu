@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
 import type { CiaProperty, NewAsset } from '../models/asset'
-import type { AttackFeasibilityRatingBody, PatchAttackPathBody } from '../models/attackPath'
+import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { PatchThreatScenarioBody, ThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
@@ -302,6 +302,12 @@ export function useSetThreatAttackPathLink(projectId: string, threatScenarioId: 
 export function useAttackPath(projectId: string, attackPathId: string) {
   const api = useApi()
   return useQuery({ queryKey: keys.attackPath(projectId, attackPathId), queryFn: () => api.attackPaths.get(projectId, attackPathId) })
+}
+
+export function useCreateAttackPath(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: AttackPathBody) => api.attackPaths.create(projectId, body), onSuccess: invalidate })
 }
 
 export function useUpdateAttackPath(projectId: string, attackPathId: string) {

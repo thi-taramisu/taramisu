@@ -399,6 +399,27 @@ describe('createMockItemApi', () => {
       await expect(api.attackPaths.update(project, 'ap-01', { title: ' ' })).rejects.toMatchObject({ status: 422 })
     })
 
+    it('creates an attack path with the next code below each linked threat scenario', async () => {
+      const api = createMockItemApi()
+
+      const created = await api.attackPaths.create(project, { item_definition_id: 'i-01', title: ' Replay via OBD ', threat_scenario_ids: ['ts-01'] })
+
+      expect(created).toMatchObject({ code: 'AP-4', title: 'Replay via OBD', analysis_approach: null, is_partial_early_stage: true, attack_steps_and_weaknesses: null })
+      expect((await treeBelow(api, 'a-01'))![0].children![0].children!.map((node) => node.code)).toEqual(['AP-1', 'AP-2', 'AP-4'])
+      expect((await api.attackPaths.relations(project, created.id)).threatScenarios.map((ts) => ts.code)).toEqual(['TS-1'])
+      expect(await api.attackPaths.rating(project, created.id)).toBeNull()
+    })
+
+    it('rejects a new attack path with a blank title, a threat scenario of another item or a duplicate link with 422', async () => {
+      const { attackPaths } = createMockItemApi()
+      const body = { item_definition_id: 'i-01', title: 'X', threat_scenario_ids: ['ts-01'] }
+
+      await expect(attackPaths.create(project, { ...body, title: ' ' })).rejects.toMatchObject({ status: 422 })
+      await expect(attackPaths.create(project, { ...body, threat_scenario_ids: ['nope'] })).rejects.toMatchObject({ status: 422 })
+      await expect(attackPaths.create(project, { ...body, threat_scenario_ids: ['ts-01', 'ts-01'] })).rejects.toMatchObject({ status: 422 })
+      await expect(attackPaths.create('other', body)).rejects.toMatchObject({ status: 404 })
+    })
+
     it('returns 404 for unknown attack paths and other projects', async () => {
       const { attackPaths } = createMockItemApi()
 
