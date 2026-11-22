@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth/authtest"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
@@ -18,10 +19,22 @@ import (
 const assistantPath = "/api/v1/projects/" + itemProjectID + "/assistant"
 const askQuestion = `{"messages":[{"role":"user","content":"Which items does the project have?"}]}`
 
-// assistantStore adds the project read to the item definition fake.
+// assistantStore adds the project read to the item definition fake and counts the access checks.
 type assistantStore struct {
 	*itemStore
 	projectRequests []pgtype.UUID
+	roleChecks      int
+	listLimit       int32
+	// keepRoleFor is how many access checks pass before the caller loses the role; zero keeps the role.
+	keepRoleFor int
+}
+
+func (s *assistantStore) GetProjectRole(ctx context.Context, p db.GetProjectRoleParams) (db.ProjectRole, error) {
+	s.roleChecks++
+	if s.keepRoleFor > 0 && s.roleChecks > s.keepRoleFor {
+		return "", pgx.ErrNoRows
+	}
+	return s.itemStore.GetProjectRole(ctx, p)
 }
 
 func (s *assistantStore) GetTaraProject(_ context.Context, id pgtype.UUID) (db.TaraProject, error) {
@@ -30,7 +43,11 @@ func (s *assistantStore) GetTaraProject(_ context.Context, id pgtype.UUID) (db.T
 	return db.TaraProject{ID: id, Name: "Demo ECU", Description: &description}, nil
 }
 
-func (s *assistantStore) ListItemDefinitions(context.Context, db.ListItemDefinitionsParams) ([]db.ItemDefinition, error) {
+func (s *assistantStore) ListItemDefinitions(_ context.Context, p db.ListItemDefinitionsParams) ([]db.ItemDefinition, error) {
+	s.listLimit = p.PageLimit
+	if s.err != nil {
+		return nil, s.err
+	}
 	return []db.ItemDefinition{s.row}, nil
 }
 
@@ -129,6 +146,50 @@ func TestAssistantRunsToolsAndAnswers(t *testing.T) {
 	}
 	if itemsResult.ToolCallID != "call_2" || !strings.Contains(itemsResult.Content, `"Headlamp"`) {
 		t.Errorf("item tool result = %+v", itemsResult)
+	}
+	// The tools read the API's own routes as the caller: the results are the routes' responses, and the access
+	// check ran for the question and again for each tool.
+	if !strings.Contains(projectResult.Content, `"role":"VIEWER"`) || !strings.Contains(itemsResult.Content, `"id":"`+itemDefinitionID+`"`) {
+		t.Errorf("tool results = %s and %s, want the responses of the project and item definition routes", projectResult.Content, itemsResult.Content)
+	}
+	if store.roleChecks != 3 {
+		t.Errorf("access checks = %d, want 3", store.roleChecks)
+	}
+	if store.listLimit != 100 {
+		t.Errorf("item definition limit = %d, want 100", store.listLimit)
+	}
+}
+
+func TestAssistantToolIsRefusedWhenCallerLosesAccess(t *testing.T) {
+	model := &fakeModel{replies: []llm.Message{toolCall("call_1", "get_project"), {Role: "assistant", Content: "Demo ECU"}}}
+	handler, token, store := assistantAPI(t, db.ProjectRoleVIEWER, model)
+	store.keepRoleFor = 1 // the question passes the check, then the caller is removed from the project
+
+	w := request(handler, http.MethodPost, assistantPath, askQuestion, token)
+
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "project not found") {
+		t.Errorf("status = %d, body = %s; want the route's 404", w.Code, w.Body)
+	}
+	if len(store.projectRequests) != 0 {
+		t.Errorf("project reads = %d, want 0 after the caller lost access", len(store.projectRequests))
+	}
+	if len(model.requests) != 1 {
+		t.Errorf("model calls = %d, want 1: the model must not be asked again", len(model.requests))
+	}
+}
+
+func TestAssistantFailsWhenRouteFails(t *testing.T) {
+	model := &fakeModel{replies: []llm.Message{toolCall("call_1", "list_item_definitions"), {Role: "assistant", Content: "No items."}}}
+	handler, token, store := assistantAPI(t, db.ProjectRoleVIEWER, model)
+	store.err = errors.New("database unavailable")
+
+	w := request(handler, http.MethodPost, assistantPath, askQuestion, token)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500; body = %s", w.Code, w.Body)
+	}
+	if len(model.requests) != 1 {
+		t.Errorf("model calls = %d, want 1: a failed read must not become an answer", len(model.requests))
 	}
 }
 
