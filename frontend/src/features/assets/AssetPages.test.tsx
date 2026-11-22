@@ -1,7 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
@@ -175,6 +176,21 @@ describe('asset risks', () => {
     expect(within(row).getByText('via AP-02')).toBeInTheDocument()
     expect(within(row).getByText('Risk 4')).toBeInTheDocument()
     expect(screen.getByText('max Risk 4')).toBeInTheDocument()
+  })
+
+  it('shows the risk as loading, not as not rated, while the risks of the threat scenario are pending', async () => {
+    const api = createMockItemApi()
+    const risks = holdRequest(api.threatScenarios.risks)
+    api.threatScenarios.risks = risks.held
+    renderApp(`${page}/risks`, api)
+
+    const [, row] = within(await screen.findByRole('table')).getAllByRole('row')
+    expect(within(row).getAllByText('Loading…')).toHaveLength(2)
+    expect(within(row).queryByText('Not rated')).not.toBeInTheDocument()
+    await act(() => risks.release())
+
+    expect(await within(row).findByText('Risk 4')).toBeInTheDocument()
+    expect(within(row).queryByText('Loading…')).not.toBeInTheDocument()
   })
 
   it('lists damage scenarios without a threat scenario as open', async () => {
