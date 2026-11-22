@@ -1,4 +1,9 @@
 {
+  "colourScheme": "Colour scheme",
+  "backendPending": "Checking backend…",
+  "backendError": "Backend error: {{detail}}",
+  "backendStatus": "Backend: {{status}}",
+  "id": "ID",
   "close": "Close",
   "save": "Save",
   "saved": "Saved.",

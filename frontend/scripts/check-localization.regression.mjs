@@ -16,7 +16,7 @@ test('reports actionable catalog and source errors and keeps UI warnings advisor
     write('src/i18n/locales/' + lang + '/common.json', '{"hello":"Hi {{name}}"}')
     write('src/i18n/locales/' + lang + '/ui.json', '{}')
   }
-  write('src/App.tsx', '<main>\n{/* i18n-allow-next-line: brand */}\n<b>ExampleBrand</b>\n<p title="Visible title">{t("hello")}</p></main>')
+  write('src/App.tsx', '<main>\n{/* i18n-allow-next-line */}\n<b>ExampleBrand</b>\n<p title="Visible title">{t("hello")}</p></main>')
   write('src/App.test.tsx', '<p>{t("ignored")}</p>')
   const valid = run()
   assert.equal(valid.status, 0, valid.stderr)

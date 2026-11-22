@@ -1,4 +1,9 @@
 {
+  "colourScheme": "Farbschema",
+  "backendPending": "Backend wird geprüft…",
+  "backendError": "Backend-Fehler: {{detail}}",
+  "backendStatus": "Backend: {{status}}",
+  "id": "ID",
   "close": "Schließen",
   "save": "Speichern",
   "saved": "Gespeichert.",

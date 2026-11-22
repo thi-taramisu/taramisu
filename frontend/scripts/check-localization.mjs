@@ -77,7 +77,7 @@ function inspect(file) {
     if (ts.isJsxExpression(node) && !ts.isJsxAttribute(node.parent) &&
         node.expression && ts.isStringLiteralLike(node.expression)) literal = node.expression.text
     if (literal && /\p{L}/u.test(literal.replace(/&(?:#\d+|#x[\da-f]+|\w+);/gi, '')) &&
-        !/^\s*(?:\/\/|\{?\/\*)\s*i18n-allow-next-line:\s*\w/.test(lines[line - 1] ?? '')) {
+        !/^\s*(?:\/\/|\{?\/\*)\s*i18n-allow-next-line(?:\s*:\s*\w.*)?\s*(?:\*\/\}?)?\s*$/.test(lines[line - 1] ?? '')) {
       console.warn(location + ': warning: hardcoded UI text: ' + literal.trim().replace(/\s+/g, ' '))
     }
     ts.forEachChild(node, visit)

@@ -144,5 +144,5 @@ verify computed keys, variable-based lookups and translation quality.
 
 Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
 Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
-such as `{/* i18n-allow-next-line: product name */}` immediately above the line reported in the warning.
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
 The exception applies only to hardcoded text on that line.
