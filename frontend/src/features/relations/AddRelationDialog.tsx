@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { EntityRef } from '../../api/models/tree'
+import { formatEntityId } from '../workspace/entities'
 
 // Names creating as in the wireframe; element types without a create dialog follow with their tickets.
 const SEARCH_LABEL = 'Search by name, ID, or type a new name'
@@ -40,7 +41,7 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
   const [search, setSearch] = useState('')
   const title = `Add ${elementLabel}`
   const term = search.trim().toLowerCase()
-  const matches = options.filter((option) => `${option.code} ${option.name}`.toLowerCase().includes(term))
+  const matches = options.filter((option) => `${formatEntityId(option.code)} ${option.name}`.toLowerCase().includes(term))
 
   function handleOpenChange(next: boolean) {
     setOpen(next && !pending)
@@ -89,7 +90,7 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
                         onAdd(option.id)
                       }}
                     >
-                      <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{option.code}</span>{' '}
+                      <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{formatEntityId(option.code)}</span>{' '}
                       <span className="text-left">{option.name}</span>{' '}
                       {option.details && <span className="ml-auto shrink-0">{option.details}</span>}
                     </Button>

@@ -17,6 +17,7 @@ import type { EntityType } from '../../api/models/tree'
 import { useProjectAccess } from '../../api/queries/projects'
 import { ENTITY_TYPES, entityPath, entityTitle } from '../workspace/entities'
 import { AddRelationDialog, type RelationEntry } from './AddRelationDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** What the section passes to its dialog for creating an element. */
 export interface RelationCreateDialogProps {
@@ -95,7 +96,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
           {rows.map((row) => (
             <li key={row.id} className="px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{row.code}</span>
+                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(row.code)}</span>
                 <div className="min-w-0 flex-1 truncate text-sm">
                   <Link to={entityPath(projectId, type, row.id)} title={row.name} className="hover:underline">
                     {row.name}

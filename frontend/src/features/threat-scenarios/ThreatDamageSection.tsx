@@ -4,6 +4,7 @@ import { useItemDamageScenarios, useSetThreatDamageLink } from '../../api/querie
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatDamageSectionProps {
   projectId: string
@@ -40,7 +41,7 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
           projectName={exampleProject.name}
           lockedItemId={scenario.item_definition_id}
           onCreated={(created) => link.mutateAsync({ id: created.id, linked: true })}
-          onCreatedError={(created) => `${created.code} was created, but it could not be linked. Please try again to link it.`}
+          onCreatedError={(created) => `${formatEntityId(created.code)} was created, but it could not be linked. Please try again to link it.`}
         />
       )}
     />

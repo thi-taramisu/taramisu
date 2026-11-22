@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ComponentType, type KeyboardEventHandler } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { TreeNode } from '../../api/models/tree'
-import { ENTITY_TYPES, entityPath } from './entities'
+import { ENTITY_TYPES, entityPath, formatEntityId } from './entities'
 
 interface FiletreeLinkProps {
   node: TreeNode
@@ -12,6 +12,7 @@ interface FiletreeLinkProps {
 }
 
 export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }: FiletreeLinkProps) {
+  const displayCode = formatEntityId(node.code)
   const label = useRef<HTMLSpanElement>(null)
   const animation = useRef<Animation | null>(null)
   const interaction = useRef({ hovered: false, focused: false })
@@ -62,8 +63,8 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
       }
     >
       <Icon aria-hidden={true} className="size-3.5 shrink-0 text-muted-foreground" />
-      {/* The space sits outside the span so the accessible name reads "A-01 Firmware"; flex layout does not render it. */}
-      {node.code && <><span className="sr-only">{node.code}</span>{' '}</>}
+      {/* The space sits outside the span so the accessible name reads "AS-1 Firmware"; flex layout does not render it. */}
+      {displayCode && <><span className="sr-only">{displayCode}</span>{' '}</>}
       <span className="min-w-0 truncate motion-safe:group-hover/filetree-link:text-clip motion-safe:group-focus-visible/filetree-link:text-clip">
         <span ref={label} className="inline-block whitespace-nowrap">
           {node.name}

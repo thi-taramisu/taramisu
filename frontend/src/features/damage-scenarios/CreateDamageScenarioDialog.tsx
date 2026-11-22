@@ -12,6 +12,7 @@ import { AddAssetMenu } from '../assets/AddAssetMenu'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetLink {
   assetId: string
@@ -98,7 +99,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     }
     const empty = linked.find((link) => link.properties.length === 0)
     if (empty) {
-      setLinkError(`Select at least one property of ${empty.asset.code}.`)
+      setLinkError(`Select at least one property of ${formatEntityId(empty.asset.code)}.`)
       return undefined
     }
     const scenario = await createDamageScenario.mutateAsync({
@@ -121,7 +122,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       hint="Will appear in the tree below each linked asset."
       errorMessage={
         unfinished
-          ? (onCreatedError?.(unfinished) ?? `${unfinished.code} was created, but the next step failed. Please try again.`)
+          ? (onCreatedError?.(unfinished) ?? `${formatEntityId(unfinished.code)} was created, but the next step failed. Please try again.`)
           : 'The damage scenario could not be created. Please try again.'
       }
       locked={Boolean(unfinished)}
@@ -193,10 +194,10 @@ function AssetLinkChip({ asset, properties, onChange, onRemove }: AssetLinkChipP
   return (
     <li className="flex items-center gap-3 rounded-full border bg-muted/50 py-1 pr-1 pl-3 text-sm">
       <span>
-        <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
+        <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}
       </span>
       <AssetPropertyToggles asset={asset} selected={properties} onChange={onChange} />
-      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${asset.code} ${asset.name}`} onClick={onRemove}>
+      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${formatEntityId(asset.code)} ${asset.name}`} onClick={onRemove}>
         <X aria-hidden="true" />
       </Button>
     </li>

@@ -5,6 +5,7 @@ import { useAddAsset, useItemAssets } from '../../api/queries/items'
 import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
 import { AddAssetDialog } from './AddAssetDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** Assets tab of an item (interactive wireframe): table of the item's assets and "Add Asset". */
 export function ItemAssetsTab() {
@@ -46,7 +47,7 @@ export function ItemAssetsTab() {
           )}
           {assets?.map((asset) => (
             <TableRow key={asset.id}>
-              <TableCell className="font-mono text-xs text-muted-foreground">{asset.code}</TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</TableCell>
               <TableCell className="font-medium">
                 <Link to={entityPath(projectId, 'assets', asset.id)} className="hover:underline">
                   {asset.name}

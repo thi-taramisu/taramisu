@@ -4,6 +4,7 @@ import type { CiaProperty } from '../../api/models/asset'
 import type { ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { CIA_PROPERTIES } from '../assets/ciaProperties'
 import { isSameTarget, toggleTarget } from './targetSelection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatTargetsFieldProps {
   damageScenarios: ThreatScenarioRelations['damageScenarios']
@@ -49,10 +50,10 @@ function DamageScenarioTargets({ scenario, value, onChange }: DamageScenarioTarg
   return (
     <fieldset className="overflow-hidden rounded-lg border">
       <legend className="sr-only">
-        {scenario.code} {scenario.name}
+        {formatEntityId(scenario.code)} {scenario.name}
       </legend>
       <div aria-hidden="true" className="flex items-center gap-3 border-b bg-muted/50 px-4 py-2 text-sm">
-        <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{scenario.code}</span>
+        <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(scenario.code)}</span>
         <span className="min-w-0 flex-1 truncate font-medium" title={scenario.name}>
           {scenario.name}
         </span>
@@ -75,7 +76,7 @@ function DamageScenarioTargets({ scenario, value, onChange }: DamageScenarioTarg
                 {property}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}{' '}
+                <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}{' '}
                 <span className="text-muted-foreground">· {propertyLabel(property)}</span>
               </span>
             </label>

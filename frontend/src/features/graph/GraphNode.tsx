@@ -5,6 +5,7 @@ import { ENTITY_TYPES } from '../workspace/entities'
 import type { GraphElement } from './graphModel'
 
 import { riskClasses, riskText } from './riskStyles'
+import { formatEntityId } from '../workspace/entities'
 
 export type RelationNode = Node<{
   element: GraphElement
@@ -30,14 +31,14 @@ export function GraphNode({ data }: NodeProps<RelationNode>) {
           riskClasses[element.risk ?? 0] ?? 'border-rating-unknown-border bg-rating-unknown text-rating-unknown-foreground',
           active && 'ring-2 ring-foreground/50 ring-offset-4 ring-offset-background',
         )}
-        aria-label={`${ENTITY_TYPES[element.type].label} ${element.code ?? ''} ${element.name}, ${riskText(element.risk)}`}
+        aria-label={`${ENTITY_TYPES[element.type].label} ${formatEntityId(element.code) ?? ''} ${element.name}, ${riskText(element.risk)}`}
         aria-pressed={active}
         onClick={() => inspect(element.key)}
       >
         <Icon aria-hidden="true" className="size-7 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block text-[9px] font-medium uppercase tracking-wider opacity-75">{ENTITY_TYPES[element.type].label}</span>
-          <span className="block text-sm font-semibold">{element.code ?? (minimal ? element.name : '')}</span>
+          <span className="block text-sm font-semibold">{formatEntityId(element.code) ?? (minimal ? element.name : '')}</span>
           {!minimal && <span className="block text-xs leading-snug">{element.name}</span>}
           <span className="mt-1 block text-[10px] font-medium opacity-80">{riskText(element.risk)}</span>
         </span>

@@ -6,8 +6,8 @@ import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
 const page = `${project}/damage-scenarios/ds-01/relations`
-const TS01 = 'TS-01 Spoofed headlamp command on the CAN bus'
-const A01 = 'A-01 Headlamp on/off command'
+const TS01 = 'TS-1 Spoofed headlamp command on the CAN bus'
+const A01 = 'AS-1 Headlamp on/off command'
 
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
 const section = (name: string) => within(screen.getByRole('region', { name }))
@@ -29,10 +29,10 @@ describe('damage scenario relations', () => {
 
     const assets = await findSection('Assets')
     expect(assets.getByRole('link', { name: 'Headlamp on/off command' })).toHaveAttribute('href', `${project}/assets/a-01`)
-    const properties = assets.getByRole('group', { name: 'A-01 properties' })
+    const properties = assets.getByRole('group', { name: 'AS-1 properties' })
     expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['I', 'A'])
     // The asset has no C, so it is shown as not available instead of being a toggle.
-    expect(within(properties).queryByRole('button', { name: 'A-01 Confidentiality' })).not.toBeInTheDocument()
+    expect(within(properties).queryByRole('button', { name: 'AS-1 Confidentiality' })).not.toBeInTheDocument()
     expect(within(properties).getByText('Confidentiality: not a property of this asset')).toBeInTheDocument()
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toHaveAttribute(
       'href',
@@ -50,12 +50,12 @@ describe('damage scenario relations', () => {
   it('adds further threat scenarios and shows them in the tree and tab count', async () => {
     const { user, api } = renderApp(page)
 
-    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-02 Replayed headlamp command/)
+    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-2 Replayed headlamp command/)
 
     expect(await section('Threat Scenarios').findByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
-    expect(await within(tree()).findByRole('link', { name: /TS-02 Replayed headlamp command/ })).toBeInTheDocument()
+    expect(await within(tree()).findByRole('link', { name: /TS-2 Replayed headlamp command/ })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Relations 3' })).toBeInTheDocument()
-    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-01', 'TS-02'])
+    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-1', 'TS-2'])
   })
 
   it('offers only threat scenarios that are not linked yet', async () => {
@@ -64,9 +64,9 @@ describe('damage scenario relations', () => {
     await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: 'Add Threat Scenario' }))
 
     const dialog = within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' }))
-    expect(dialog.queryByRole('button', { name: /TS-01/ })).not.toBeInTheDocument()
-    expect(dialog.getByRole('button', { name: /TS-02/ })).toBeInTheDocument()
-    expect(dialog.getByRole('button', { name: /TS-03/ })).toBeInTheDocument()
+    expect(dialog.queryByRole('button', { name: /TS-1/ })).not.toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: /TS-2/ })).toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: /TS-3/ })).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeDisabled()
   })
 
@@ -79,11 +79,11 @@ describe('damage scenario relations', () => {
     })
     const { user } = renderApp(`${project}/damage-scenarios/${second.id}/relations`, api)
 
-    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-01 Spoofed/)
+    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-1 Spoofed/)
 
     await waitFor(() => expect(within(tree()).getAllByRole('link', { name: new RegExp(TS01) })).toHaveLength(2))
     // The attack paths of the threat scenario come along.
-    expect(within(tree()).getAllByRole('link', { name: /AP-01/ })).toHaveLength(2)
+    expect(within(tree()).getAllByRole('link', { name: /AP-1/ })).toHaveLength(2)
   })
 
   it('removes a threat scenario link after confirmation and keeps the threat scenario available', async () => {
@@ -99,7 +99,7 @@ describe('damage scenario relations', () => {
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
     await waitFor(() => expect(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' })).toHaveFocus())
     expect(await screen.findByRole('link', { name: 'Relations 1' })).toBeInTheDocument()
-    expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-01' }))
+    expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-1' }))
   })
 
   it('adds an asset with all its properties and offers only assets with properties', async () => {
@@ -110,9 +110,9 @@ describe('damage scenario relations', () => {
     await user.click((await findSection('Assets')).getByRole('button', { name: 'Add Asset' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Add Asset' }))
     expect(dialog.queryByRole('button', { name: /Unrated asset/ })).not.toBeInTheDocument()
-    await user.click(dialog.getByRole('button', { name: /A-04 Diagnostic session key/ }))
+    await user.click(dialog.getByRole('button', { name: /AS-4 Diagnostic session key/ }))
 
-    const properties = await section('Assets').findByRole('group', { name: 'A-04 properties' })
+    const properties = await section('Assets').findByRole('group', { name: 'AS-4 properties' })
     expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['C', 'I'])
     await waitFor(async () => expect((await api.content.assets('headlamp', 'i-01')).find((a) => a.id === 'a-04')).toMatchObject({ damageScenarios: 1, threatScenarios: 1 }))
   })
@@ -122,9 +122,9 @@ describe('damage scenario relations', () => {
 
     await user.click((await findSection('Assets')).getByRole('button', { name: 'Add Asset' }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Add Asset' }))
-    await user.click(dialog.getByRole('button', { name: 'A-04 Diagnostic session key Properties C, I' }))
+    await user.click(dialog.getByRole('button', { name: 'AS-4 Diagnostic session key Properties C, I' }))
 
-    await section('Assets').findByRole('group', { name: 'A-04 properties' })
+    await section('Assets').findByRole('group', { name: 'AS-4 properties' })
     expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets.find((a) => a.id === 'a-04')).toMatchObject({ linkedProperties: ['C', 'I'] })
   })
 
@@ -138,14 +138,14 @@ describe('damage scenario relations', () => {
     const search = dialog.getByRole('textbox', { name: 'Search by name, ID, or type a new name' })
 
     await user.type(search, 'denial')
-    expect(dialog.queryByRole('button', { name: /TS-02/ })).not.toBeInTheDocument()
-    expect(dialog.getByRole('button', { name: /TS-03/ })).toBeInTheDocument()
+    expect(dialog.queryByRole('button', { name: /TS-2/ })).not.toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: /TS-3/ })).toBeInTheDocument()
     await user.clear(search)
-    await user.type(search, 'ts-02')
-    expect(dialog.getByRole('button', { name: /TS-02/ })).toBeInTheDocument()
-    expect(dialog.queryByRole('button', { name: /TS-03/ })).not.toBeInTheDocument()
+    await user.type(search, 'ts-2')
+    expect(dialog.getByRole('button', { name: /TS-2/ })).toBeInTheDocument()
+    expect(dialog.queryByRole('button', { name: /TS-3/ })).not.toBeInTheDocument()
     await user.type(search, 'x')
-    expect(dialog.getByText('No threat scenarios match "ts-02x".')).toBeInTheDocument()
+    expect(dialog.getByText('No threat scenarios match "ts-2x".')).toBeInTheDocument()
 
     await user.click(dialog.getByRole('button', { name: 'Close' }))
     expect((await openDialog()).getByRole('textbox', { name: 'Search by name, ID, or type a new name' })).toHaveValue('')
@@ -155,11 +155,11 @@ describe('damage scenario relations', () => {
     const { user, api } = renderApp(page)
     const assets = await findSection('Assets')
 
-    await user.click(assets.getByRole('button', { name: 'A-01 Availability' }))
+    await user.click(assets.getByRole('button', { name: 'AS-1 Availability' }))
 
-    await waitFor(() => expect(assets.getByRole('button', { name: 'A-01 Availability' })).toHaveAttribute('aria-pressed', 'false'))
+    await waitFor(() => expect(assets.getByRole('button', { name: 'AS-1 Availability' })).toHaveAttribute('aria-pressed', 'false'))
     expect((await api.damageScenarios.relations('headlamp', 'ds-01')).assets[0].linkedProperties).toEqual(['I'])
-    const integrity = assets.getByRole('button', { name: 'A-01 Integrity' })
+    const integrity = assets.getByRole('button', { name: 'AS-1 Integrity' })
     await waitFor(() => expect(integrity).toHaveAttribute('aria-disabled', 'true'))
     await user.click(integrity)
     expect(integrity).toHaveAttribute('aria-pressed', 'true')
@@ -172,9 +172,9 @@ describe('damage scenario relations', () => {
     await remove(user, 'Assets', A01)
 
     expect(await section('Assets').findByText('No assets linked yet.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
-    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-01/ })).not.toBeInTheDocument())
-    expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-01' })
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })).toBeInTheDocument()
+    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-1/ })).not.toBeInTheDocument())
+    expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-1' })
   })
 
   it('shows an error and keeps the links when saving fails', async () => {
@@ -182,7 +182,7 @@ describe('damage scenario relations', () => {
     api.damageScenarios.linkThreatScenario = () => Promise.reject(new ApiError(500, 'Server error'))
     const { user } = renderApp(page, api)
 
-    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-03/)
+    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-3/)
 
     expect(await section('Threat Scenarios').findByRole('alert')).toHaveTextContent('The link could not be changed')
     expect(section('Threat Scenarios').getAllByRole('listitem')).toHaveLength(1)
@@ -221,14 +221,14 @@ describe('damage scenario relations', () => {
     await findSection('Threat Scenarios')
     api.damageScenarios.relations = () => Promise.reject(new ApiError(500, 'Server error'))
 
-    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-03/)
+    await add(user, 'Threat Scenarios', 'Add Threat Scenario', /TS-3/)
 
     expect(await screen.findByText('The relations could not be refreshed.')).toBeInTheDocument()
     expect(section('Threat Scenarios').getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toBeInTheDocument()
     // The saved link is shown although the refetch failed, and it is not offered again.
     expect(section('Threat Scenarios').getByRole('link', { name: 'Denial of service on the body control ECU' })).toBeInTheDocument()
     await user.click(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' }))
-    expect(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).queryByRole('button', { name: /TS-03/ })).not.toBeInTheDocument()
+    expect(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).queryByRole('button', { name: /TS-3/ })).not.toBeInTheDocument()
   })
 
   it('shows an error in the add dialog when the elements to link cannot be loaded', async () => {
@@ -273,13 +273,13 @@ describe('damage scenario relations', () => {
     }
     const { user } = renderApp(page, api)
     const assets = await findSection('Assets')
-    const availability = assets.getByRole('button', { name: 'A-01 Availability' })
+    const availability = assets.getByRole('button', { name: 'AS-1 Availability' })
 
     await user.click(availability)
     await waitFor(() => expect(availability).toHaveAttribute('aria-disabled', 'true'))
 
     expect(availability).toHaveFocus()
-    await user.click(assets.getByRole('button', { name: 'A-01 Integrity' }))
+    await user.click(assets.getByRole('button', { name: 'AS-1 Integrity' }))
     await user.click(assets.getByRole('button', { name: 'Add Asset' }))
     expect(saved).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -293,7 +293,7 @@ describe('damage scenario relations', () => {
     const { user } = renderApp(page, api)
     const assets = await findSection('Assets')
     api.damageScenarios.relations = () => new Promise(() => undefined)
-    const availability = assets.getByRole('button', { name: 'A-01 Availability' })
+    const availability = assets.getByRole('button', { name: 'AS-1 Availability' })
 
     await user.click(availability)
 
@@ -311,7 +311,7 @@ describe('damage scenario relations', () => {
       })
     const { user } = renderApp(page, api)
     const assets = await findSection('Assets')
-    const availability = assets.getByRole('button', { name: 'A-01 Availability' })
+    const availability = assets.getByRole('button', { name: 'AS-1 Availability' })
 
     await user.click(availability)
     await waitFor(() => expect(availability).toHaveAttribute('aria-disabled', 'true'))

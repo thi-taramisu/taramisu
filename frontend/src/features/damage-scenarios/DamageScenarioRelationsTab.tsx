@@ -14,6 +14,7 @@ import { CiaProperties } from '../items/RiskBadge'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
+import { formatEntityId } from '../workspace/entities'
 
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
@@ -66,7 +67,7 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         onRemove={(assetId) => assetLink.mutate({ assetId, properties: [] })}
         rows={assets.map((asset) => ({
           id: asset.id,
-          code: asset.code,
+          code: formatEntityId(asset.code),
           name: asset.name,
           details: (
             <AssetPropertyToggles

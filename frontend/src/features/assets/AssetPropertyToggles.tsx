@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import type { CiaProperty } from '../../api/models/asset'
 import type { EntityRef } from '../../api/models/tree'
 import { CIA_PROPERTIES } from './ciaProperties'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetPropertyTogglesProps {
   asset: Pick<EntityRef, 'code'> & { properties: CiaProperty[] }
@@ -21,7 +22,7 @@ interface AssetPropertyTogglesProps {
 export function AssetPropertyToggles({ asset, selected, onChange, pending = false, requireOne = false, showUnavailable = false, disabled = false }: AssetPropertyTogglesProps) {
   return (
     <fieldset disabled={disabled} className="flex gap-1">
-      <legend className="sr-only">{asset.code} properties</legend>
+      <legend className="sr-only">{formatEntityId(asset.code)} properties</legend>
       {CIA_PROPERTIES.filter((p) => showUnavailable || asset.properties.includes(p.value)).map((p) => {
         if (!asset.properties.includes(p.value)) {
           const note = `${p.label}: not a property of this asset`
@@ -42,7 +43,7 @@ export function AssetPropertyToggles({ asset, selected, onChange, pending = fals
             size="icon-xs"
             className={`font-mono ${pressed ? '' : 'text-muted-foreground'} ${pending ? 'opacity-50' : ''}`}
             aria-pressed={pressed}
-            aria-label={`${asset.code} ${p.label}`}
+            aria-label={`${formatEntityId(asset.code)} ${p.label}`}
             title={locked ? `${p.label}: at least one property must stay linked` : p.label}
             // aria-disabled keeps the full contrast and the explaining tooltip of a locked property.
             aria-disabled={pending || locked}
