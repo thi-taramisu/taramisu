@@ -251,10 +251,10 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	const del, res = db.EventProjectDeleted, db.EventProjectRestored
 
 	must(store.DeleteTaraProject(ctx, actor, restored))
-	must(store.RestoreTaraProject(ctx, actor, restored))
+	must(store.RestoreTaraProject(ctx, actor, restored, "operator"))
 	// Deleted, restored, and deleted again: the retention period runs from the second deletion.
 	must(store.DeleteTaraProject(ctx, actor, deleted))
-	must(store.RestoreTaraProject(ctx, actor, deleted))
+	must(store.RestoreTaraProject(ctx, actor, deleted, "operator"))
 	must(store.DeleteTaraProject(ctx, actor, deleted))
 	var secondDeletion time.Time
 	must(tx.QueryRow(ctx, `SELECT max(occurred_at) FROM audit_event WHERE tara_project_id = $1 AND event = $2`, deleted, del).Scan(&secondDeletion))

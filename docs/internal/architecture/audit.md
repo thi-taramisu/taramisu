@@ -56,6 +56,8 @@ project.
    are resolved through Authentik when the history is shown, like in the member list. Project events keep only the project
    name, so that operators can tell which project an event belongs to, not the free-text description. Content events keep
    the record as the API returns it, including free text, because that is the work product whose history is traced.
+   The one exception is `project.restored`: operators run the restore outside the application and have no application ID,
+   so the event keeps the name they give.
 7. **One event per API operation.** Membership and project events describe what happened (`member.role_changed`). Content
    events store the record as the API returns it, before and after. `project.deleted` also lists the role assignments of
    the project, so it stays visible who had access. Content records deleted by cascade get no event of their own; the deletion
@@ -73,7 +75,7 @@ project.
 | Project | `project.created` | After: name, first Owner | Stored |
 | Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
 | Project | `project.deleted` | Before: name and role assignments (role, user or group). Recorded when an Owner requests the deletion | Stored |
-| Project | `project.restored` | After: name. Recorded when an operator restores a deleted project; the actor is the user the operator names | Stored |
+| Project | `project.restored` | After: name and operator. Recorded when an operator restores a deleted project; the actor is the user the operator names, the operator is who ran the restore | Stored |
 | Project | `project.archived`, `project.unarchived` | Archived state before and after | Stored |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
 | Members | `member.added` | After: role, user or group | Stored |
@@ -156,8 +158,9 @@ To record the changes of another record type:
 - Events are kept as long as their project exists, because they document how the project's work products came about.
 - Deleting a project only marks it ([deleting a project](iam/project-roles.md#deleting-a-project)). `project.deleted` is
   recorded at that moment. After the grace period (`PROJECT_DELETE_GRACE_PERIOD`, default `720h`) the API deletes the
-  project for good; that writes no event, only a log line with the project ID. If an operator restores the project in time,
-  `project.restored` is recorded and the history continues.
+  project for good, each project in its own transaction; that writes no event, only a log line with the project ID. A
+  project that cannot be deleted is logged with its ID and retried an hour later, without holding back the others. If an
+  operator restores the project in time, `project.restored` is recorded and the history continues.
 - Content events hold copies of the analysis content, which can be confidential. Deleting a project removes its
   content from the history only when the retention period ends, so that an unwanted deletion can still be investigated and
   the deleted content traced.
@@ -200,6 +203,7 @@ Events of deleted projects stay readable for operators only.
 - The stored history and the logs can show who changed what and when, even without a user interface. Where Taramisu is used
   by employees in Germany, such data can require works council co-determination (§ 87 (1) no. 6 BetrVG). Its use must stay
   within the purpose stated above.
+- `project.restored` keeps the name or user name of the operator who ran the restore.
 - Free text in content events (for example an item definition's functions) can contain personal data that users typed in.
 - How an erasure request is handled for audit events is not decided yet, see [Open questions](#open-questions).
 

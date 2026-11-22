@@ -104,9 +104,12 @@ type DeletedProjectState struct {
 	Members []AssignmentState `json:"members"`
 }
 
-// RestoredProjectState is what project.restored keeps of a project: its name, like project.deleted.
+// RestoredProjectState is what project.restored keeps of a project: its name, like project.deleted,
+// and the operator who ran the restore. The actor is the user the operator names, so without the
+// operator the history would not show who actually restored the project.
 type RestoredProjectState struct {
-	Name string `json:"name"`
+	Name     string `json:"name"`
+	Operator string `json:"operator"`
 }
 
 func insertEvent(ctx context.Context, q *Queries, actor Actor, c Change) error {

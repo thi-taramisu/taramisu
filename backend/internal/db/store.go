@@ -260,10 +260,11 @@ func (s *Store) DeleteTaraProject(ctx context.Context, actor Actor, id pgtype.UU
 
 // RestoreTaraProject makes a project that is marked as deleted available again, with its content and
 // role assignments as they were, and records project.restored. Operators run it within the grace
-// period (cmd/restore-project); the actor is the user they name, because no request carries one. It
+// period (cmd/restore-project); the actor is the user they name, because no request carries one, and
+// operator is who ran it. It
 // returns ErrActorNotFound for an unknown actor and ErrProjectNotFound if the project does not exist
 // or is not marked as deleted.
-func (s *Store) RestoreTaraProject(ctx context.Context, actor Actor, id pgtype.UUID) error {
+func (s *Store) RestoreTaraProject(ctx context.Context, actor Actor, id pgtype.UUID, operator string) error {
 	return s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
 		known, err := s.IAMUserExists(ctx, actor.UserID)
 		if err != nil {
@@ -276,30 +277,59 @@ func (s *Store) RestoreTaraProject(ctx context.Context, actor Actor, id pgtype.U
 		if err != nil {
 			return Change{}, projectNotFound(err)
 		}
-		return Change{Event: EventProjectRestored, ProjectID: id, TargetType: TargetProject, TargetID: id, After: RestoredProjectState{Name: row.Name}}, nil
+		return Change{Event: EventProjectRestored, ProjectID: id, TargetType: TargetProject, TargetID: id, After: RestoredProjectState{Name: row.Name, Operator: operator}}, nil
 	})
 }
 
 // PurgeDeletedProjects deletes the projects marked as deleted before cutoff for good, with all their
-// content, and returns their IDs. It records no audit event: the deletion was recorded when it was
-// requested. All of them are deleted in one transaction, which is enough for the few projects a day
-// can bring. If another replica is already running it, it returns nothing without waiting.
+// content, and returns the IDs of those it deleted. It records no audit event: the deletion was
+// recorded when it was requested. Each project is deleted in its own transaction, so one that cannot
+// be deleted does not hold back the others; the returned error names each project that failed. If
+// another replica is already deleting, it stops without waiting.
 func (s *Store) PurgeDeletedProjects(ctx context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
-	tx, err := s.conn.Begin(ctx)
+	ids, err := s.ListPurgeableTaraProjects(ctx, cutoff)
 	if err != nil {
 		return nil, err
+	}
+	var purged []pgtype.UUID
+	var failed []error
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			failed = append(failed, ctx.Err())
+			break
+		}
+		deleted, locked, err := s.purgeDeletedProject(ctx, id, cutoff)
+		switch {
+		case err != nil:
+			failed = append(failed, fmt.Errorf("purge project %s: %w", id, err))
+		case !locked:
+			return purged, errors.Join(failed...)
+		case deleted:
+			purged = append(purged, id)
+		}
+	}
+	return purged, errors.Join(failed...)
+}
+
+// purgeDeletedProject deletes one project in its own transaction. deleted is false if the project
+// was restored in the meantime, locked is false if another replica is deleting projects.
+func (s *Store) purgeDeletedProject(ctx context.Context, id pgtype.UUID, cutoff pgtype.Timestamptz) (deleted, locked bool, err error) {
+	tx, err := s.conn.Begin(ctx)
+	if err != nil {
+		return false, false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.WithTx(tx)
-	locked, err := q.TryProjectPurgeLock(ctx)
-	if err != nil || !locked {
-		return nil, err
+	if locked, err = q.TryProjectPurgeLock(ctx); err != nil || !locked {
+		return false, locked, err
 	}
-	ids, err := q.PurgeDeletedTaraProjects(ctx, cutoff)
-	if err != nil {
-		return nil, err
+	if _, err := q.PurgeDeletedTaraProject(ctx, PurgeDeletedTaraProjectParams{ID: id, Cutoff: cutoff}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, true, nil
+		}
+		return false, true, err
 	}
-	return ids, tx.Commit(ctx)
+	return true, true, tx.Commit(ctx)
 }
 
 // PurgeExpiredAuditEvents deletes the audit history of projects whose deletion was requested before

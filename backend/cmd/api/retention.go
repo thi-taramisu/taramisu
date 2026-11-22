@@ -60,8 +60,9 @@ type deletedProjectPurger interface {
 // IDs: the deletion was recorded when it was requested.
 func purgeDeletedProjects(store deletedProjectPurger, grace time.Duration) func(context.Context) error {
 	return func(ctx context.Context) error {
+		// Some projects can be deleted although others fail; the error names those.
 		ids, err := store.PurgeDeletedProjects(ctx, cutoff(grace))
-		if err == nil && len(ids) > 0 {
+		if len(ids) > 0 {
 			projects := make([]string, len(ids))
 			for i, id := range ids {
 				projects[i] = id.String()

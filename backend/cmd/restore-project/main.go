@@ -2,10 +2,10 @@
 // within the grace period, before the API deletes the project for good
 // (docs/internal/architecture/audit.md):
 //
-//	restore-project -project <project id> -actor <iam_user id>
+//	restore-project -project <project id> -actor <iam_user id> -operator <your name>
 //
 // It reads DATABASE_URL and records project.restored in the audit history with the given actor,
-// for example the Owner who asked for the restore.
+// for example the Owner who asked for the restore, and the operator who ran it.
 package main
 
 import (
@@ -13,15 +13,19 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log/slog"
 	"io"
+	"log/slog"
 	"os"
+	"regexp"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
+
+// validOperator limits the operator to a name or user name that fits safely into the audit history.
+var validOperator = regexp.MustCompile(`^[A-Za-z0-9._@-]{1,64}$`)
 
 // errUsage is returned for wrong arguments, after the reason and the usage were written to stderr.
 var errUsage = errors.New("wrong arguments")
@@ -41,7 +45,7 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, databaseURL string, stdout, stderr io.Writer) error {
-	projectID, actorID, err := parseArgs(args, stderr)
+	projectID, actorID, operator, err := parseArgs(args, stderr)
 	if err != nil {
 		return err
 	}
@@ -53,19 +57,20 @@ func run(ctx context.Context, args []string, databaseURL string, stdout, stderr 
 		return err
 	}
 	defer pool.Close()
-	return restore(ctx, db.NewStore(pool), projectID, actorID, stdout)
+	return restore(ctx, db.NewStore(pool), projectID, actorID, operator, stdout)
 }
 
-func parseArgs(args []string, stderr io.Writer) (projectID, actorID pgtype.UUID, err error) {
+func parseArgs(args []string, stderr io.Writer) (projectID, actorID pgtype.UUID, operator string, err error) {
 	flags := flag.NewFlagSet("restore-project", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	project := flags.String("project", "", "ID of the deleted project")
 	actor := flags.String("actor", "", "iam_user.id recorded as the actor of project.restored")
+	flags.StringVar(&operator, "operator", "", "your name or user name, recorded in project.restored as who ran the restore")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return projectID, actorID, err
+			return projectID, actorID, operator, err
 		}
-		return projectID, actorID, errUsage // the flag package has already written the reason
+		return projectID, actorID, operator, errUsage // the flag package has already written the reason
 	}
 	var wrong string
 	switch {
@@ -75,20 +80,22 @@ func parseArgs(args []string, stderr io.Writer) (projectID, actorID pgtype.UUID,
 		wrong = fmt.Sprintf("-project must be a project ID (UUID): %q", *project)
 	case actorID.Scan(*actor) != nil || !actorID.Valid:
 		wrong = fmt.Sprintf("-actor must be a user ID (UUID): %q", *actor)
+	case !validOperator.MatchString(operator):
+		wrong = fmt.Sprintf("-operator must be your name or user name (letters, digits, . _ @ -, up to 64 characters): %q", operator)
 	default:
-		return projectID, actorID, nil
+		return projectID, actorID, operator, nil
 	}
 	_, _ = fmt.Fprintln(stderr, wrong)
 	flags.Usage()
-	return projectID, actorID, errUsage
+	return projectID, actorID, operator, errUsage
 }
 
 type projectRestorer interface {
-	RestoreTaraProject(context.Context, db.Actor, pgtype.UUID) error
+	RestoreTaraProject(ctx context.Context, actor db.Actor, id pgtype.UUID, operator string) error
 }
 
-func restore(ctx context.Context, store projectRestorer, projectID, actorID pgtype.UUID, stdout io.Writer) error {
-	err := store.RestoreTaraProject(ctx, db.Actor{UserID: actorID}, projectID)
+func restore(ctx context.Context, store projectRestorer, projectID, actorID pgtype.UUID, operator string, stdout io.Writer) error {
+	err := store.RestoreTaraProject(ctx, db.Actor{UserID: actorID}, projectID, operator)
 	switch {
 	case errors.Is(err, db.ErrProjectNotFound):
 		return fmt.Errorf("project %s does not exist or is not marked as deleted", projectID)

@@ -214,7 +214,7 @@ nothing.
 | `member.role_changed`, including ownership transfer | Actor, project, member ID; role before and after, user or group |
 | `member.removed`, including leaving the project | Actor, project, member ID; before: role, user or group. When someone left, the actor is that user |
 | `project.deleted` | Actor, project; before: name and role assignments (role, user or group). Recorded when the deletion is requested |
-| `project.restored` | Actor (the user named by the operator), project; after: name |
+| `project.restored` | Actor (the user named by the operator), project; after: name and the operator who ran the restore |
 
 Actor, user, and group are internal IDs, never names or email addresses. Events are kept for the project's lifetime and one
 year after its deletion; at first only operators read them. Each event is also written as an `audit` log line with IDs and

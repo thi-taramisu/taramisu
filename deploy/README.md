@@ -249,13 +249,15 @@ user may use Docker there:
 
 ```bash
 docker compose --env-file iam/.env -f deploy/compose.yaml run --rm --no-deps --entrypoint /restore-project api \
-  -project <project id> -actor <user id>
+  -project <project id> -actor <user id> -operator <your name>
 ```
 
 - Deleted projects that can still be restored: `SELECT id, name, deleted_at FROM tara_project WHERE deleted_at IS NOT NULL;`
 - The actor is the `iam_user.id` recorded for the `project.restored` event, for example the Owner who asked for the
   restore: `actor_user_id` of the project's latest `project.deleted` event in `audit_event`
   ([Audit and logging](../docs/internal/architecture/audit.md#who-may-read-the-history)).
+- The operator is your own name or user name (letters, digits, `.`, `_`, `@`, `-`). The event records it, because the
+  actor alone does not show who ran the restore.
 
 ## Database password mismatch
 

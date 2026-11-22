@@ -15,6 +15,7 @@ import (
 const (
 	projectID = "11111111-1111-4111-8111-111111111111"
 	actorID   = "22222222-2222-4222-8222-222222222222"
+	operator  = "jane.doe"
 )
 
 func TestRunRejectsBadInputBeforeConnecting(t *testing.T) {
@@ -25,13 +26,15 @@ func TestRunRejectsBadInputBeforeConnecting(t *testing.T) {
 		wantErr error  // nil: any other error, whose text must contain want
 		want    string // in the error text, or on stderr for wrong arguments
 	}{
-		{"no project", []string{"-actor", actorID}, "postgres://x", errUsage, "-project must be"},
-		{"bad project", []string{"-project", "nope", "-actor", actorID}, "postgres://x", errUsage, "-project must be"},
-		{"no actor", []string{"-project", projectID}, "postgres://x", errUsage, "-actor must be"},
-		{"extra argument", []string{"-project", projectID, "-actor", actorID, "now"}, "postgres://x", errUsage, "unexpected argument"},
+		{"no project", []string{"-actor", actorID, "-operator", operator}, "postgres://x", errUsage, "-project must be"},
+		{"bad project", []string{"-project", "nope", "-actor", actorID, "-operator", operator}, "postgres://x", errUsage, "-project must be"},
+		{"no actor", []string{"-project", projectID, "-operator", operator}, "postgres://x", errUsage, "-actor must be"},
+		{"no operator", []string{"-project", projectID, "-actor", actorID}, "postgres://x", errUsage, "-operator must be"},
+		{"bad operator", []string{"-project", projectID, "-actor", actorID, "-operator", "jane doe"}, "postgres://x", errUsage, "-operator must be"},
+		{"extra argument", []string{"-project", projectID, "-actor", actorID, "-operator", operator, "now"}, "postgres://x", errUsage, "unexpected argument"},
 		{"unknown flag", []string{"-force"}, "postgres://x", errUsage, "not defined"},
 		{"help", []string{"-h"}, "postgres://x", flag.ErrHelp, "Usage of restore-project"},
-		{"no database", []string{"-project", projectID, "-actor", actorID}, "", nil, "DATABASE_URL is required"},
+		{"no database", []string{"-project", projectID, "-actor", actorID, "-operator", operator}, "", nil, "DATABASE_URL is required"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr strings.Builder
@@ -48,18 +51,19 @@ func TestRunRejectsBadInputBeforeConnecting(t *testing.T) {
 }
 
 type fakeRestorer struct {
-	actor   db.Actor
-	project pgtype.UUID
-	err     error
+	actor    db.Actor
+	project  pgtype.UUID
+	operator string
+	err      error
 }
 
-func (f *fakeRestorer) RestoreTaraProject(_ context.Context, actor db.Actor, id pgtype.UUID) error {
-	f.actor, f.project = actor, id
+func (f *fakeRestorer) RestoreTaraProject(_ context.Context, actor db.Actor, id pgtype.UUID, operator string) error {
+	f.actor, f.project, f.operator = actor, id, operator
 	return f.err
 }
 
 func TestRestoreReportsTheOutcome(t *testing.T) {
-	project, actor, err := parseArgs([]string{"-project", projectID, "-actor", actorID}, io.Discard)
+	project, actor, op, err := parseArgs([]string{"-project", projectID, "-actor", actorID, "-operator", operator}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,15 +81,15 @@ func TestRestoreReportsTheOutcome(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := &fakeRestorer{err: tc.err}
 			var out strings.Builder
-			err := restore(t.Context(), store, project, actor, &out)
+			err := restore(t.Context(), store, project, actor, op, &out)
 			if (err == nil) != (tc.wantErr == "") || (err != nil && !strings.Contains(err.Error(), tc.wantErr)) {
 				t.Fatalf("error = %v, want %q", err, tc.wantErr)
 			}
 			if out.String() != tc.wantOut {
 				t.Errorf("output = %q, want %q", out.String(), tc.wantOut)
 			}
-			if store.project.String() != projectID || store.actor.UserID.String() != actorID {
-				t.Errorf("restored project %s as %s, want %s as %s", store.project, store.actor.UserID, projectID, actorID)
+			if store.project.String() != projectID || store.actor.UserID.String() != actorID || store.operator != operator {
+				t.Errorf("restored project %s as %s by %q, want %s as %s by %q", store.project, store.actor.UserID, store.operator, projectID, actorID, operator)
 			}
 		})
 	}

@@ -43,6 +43,31 @@ func TestProjectDeletePostgres(t *testing.T) {
 			t.Error(err)
 		}
 	}()
+	// The purge deletes a project with ON DELETE CASCADE. A foreign key below tara_project without it
+	// would pass this test while its table is empty, but make the purge fail for every project with
+	// rows in it. Only the treatment decision's reference to a risk value may stay NO ACTION: both
+	// are deleted together through the threat scenario. The attachment's reference is SET NULL, so
+	// that the attachment cleanup still finds the files of a purged project.
+	rows, err := tx.Query(ctx, `
+		WITH RECURSIVE below(t) AS (
+			SELECT 'tara_project'::regclass
+			UNION
+			SELECT c.conrelid::regclass FROM pg_constraint c JOIN below ON c.confrelid = below.t WHERE c.contype = 'f'
+		)
+		SELECT c.conname::text FROM pg_constraint c JOIN below ON c.confrelid = below.t
+		WHERE c.contype = 'f' AND c.confdeltype <> 'c' AND c.conname NOT IN ('risk_treatment_decision_risk_threat_fk', 'attachment_project_id_fkey')
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notCascading, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notCascading) > 0 {
+		t.Fatalf("foreign keys below tara_project without ON DELETE CASCADE: %v", notCascading)
+	}
+
 	store := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, store)
 	handler := httpapi.New(store, fixture.Manager)
@@ -149,29 +174,39 @@ func TestProjectDeletePostgres(t *testing.T) {
 	complete(item)
 	events(added, deletedByOwner)
 
-	// An operator restores the project, naming a known user as the actor.
+	// An operator restores the project, naming a known user as the actor and themselves as the operator.
 	editorActor := db.Actor{UserID: mustUUID(editorID)}
 	unknown := db.Actor{UserID: pgtype.UUID{Bytes: [16]byte{0x23, 0x60, 0x01}, Valid: true}}
-	if err := store.RestoreTaraProject(ctx, unknown, project); !errors.Is(err, db.ErrActorNotFound) {
+	if err := store.RestoreTaraProject(ctx, unknown, project, "jane.doe"); !errors.Is(err, db.ErrActorNotFound) {
 		t.Fatalf("restore as an unknown user: %v, want ErrActorNotFound", err)
 	}
 	reachable(http.StatusNotFound)
-	if err := store.RestoreTaraProject(ctx, editorActor, project); err != nil {
+	if err := store.RestoreTaraProject(ctx, editorActor, project, "jane.doe"); err != nil {
 		t.Fatal(err)
 	}
 	reachable(http.StatusOK)
 	complete(item)
-	if err := store.RestoreTaraProject(ctx, editorActor, project); !errors.Is(err, db.ErrProjectNotFound) {
+	if err := store.RestoreTaraProject(ctx, editorActor, project, "jane.doe"); !errors.Is(err, db.ErrProjectNotFound) {
 		t.Fatalf("restore a project that is not deleted: %v, want ErrProjectNotFound", err)
 	}
 	stored := events(added, deletedByOwner, db.EventProjectRestored+" by "+editorID)
-	wantRestored := storedEvent{editorID, db.EventProjectRestored, db.TargetProject, projectID, nil, map[string]any{"name": "Deleted project"}, "<NULL>"}
+	wantRestored := storedEvent{editorID, db.EventProjectRestored, db.TargetProject, projectID, nil, map[string]any{"name": "Deleted project", "operator": "jane.doe"}, "<NULL>"}
 	if !reflect.DeepEqual(stored[2], wantRestored) {
 		t.Fatalf("restore event = %+v, want %+v", stored[2], wantRestored)
 	}
 
 	// Deleted again, the project is deleted for good once the grace period is over.
 	call(owner, http.MethodDelete, projectPath, http.StatusNoContent)
+	// A project that cannot be deleted, here because of a row that refers to it, must not hold
+	// back the others. The table exists only in this transaction, which the test rolls back.
+	blocked, blockedItem := newProject("Blocked project")
+	call(owner, http.MethodDelete, "/api/v1/projects/"+blocked.String(), http.StatusNoContent)
+	if _, err := tx.Exec(ctx, `CREATE TABLE test_purge_blocker (tara_project_id uuid REFERENCES tara_project (id))`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO test_purge_blocker VALUES ($1)`, blocked); err != nil {
+		t.Fatal(err)
+	}
 	// purge runs the cleanup and checks whether it deleted the project. It never deletes the other
 	// project; projects that other tests left marked in the database are ignored.
 	purge := func(cutoff time.Time, wantPurged bool) {
@@ -197,7 +232,20 @@ func TestProjectDeletePostgres(t *testing.T) {
 	purge(time.Now().Add(-time.Hour), false) // still within the grace period
 	complete(item)
 
-	purge(time.Now().Add(time.Hour), true)
+	got, err := store.PurgeDeletedProjects(ctx, pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true})
+	if !slices.Contains(got, project) || slices.Contains(got, blocked) || err == nil || !strings.Contains(err.Error(), blocked.String()) {
+		t.Fatalf("purged projects = %v, %v; want %s purged and an error that names %s", got, err, project, blocked)
+	}
+	complete(blockedItem)
+	if _, err := tx.Exec(ctx, `DELETE FROM test_purge_blocker`); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.PurgeDeletedProjects(ctx, pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}); err != nil || !slices.Contains(got, blocked) {
+		t.Fatalf("purged projects = %v, %v; want %s purged once nothing refers to it", got, err, blocked)
+	}
+	if got := blockedItem.remaining(t, ctx, tx); len(got) != 0 {
+		t.Fatalf("purged project still has rows in %v", got)
+	}
 	if got := item.remaining(t, ctx, tx); len(got) != 0 {
 		t.Fatalf("purged project still has rows in %v", got)
 	}

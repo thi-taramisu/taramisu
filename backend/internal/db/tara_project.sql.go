@@ -107,6 +107,31 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 	return i, err
 }
 
+const listPurgeableTaraProjects = `-- name: ListPurgeableTaraProjects :many
+SELECT id FROM tara_project WHERE deleted_at < $1::timestamptz ORDER BY deleted_at
+`
+
+// The projects that were marked as deleted before the cutoff, oldest first.
+func (q *Queries) ListPurgeableTaraProjects(ctx context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listPurgeableTaraProjects, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaraProjects = `-- name: ListTaraProjects :many
 SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
@@ -183,31 +208,23 @@ func (q *Queries) MarkTaraProjectDeleted(ctx context.Context, id pgtype.UUID) (M
 	return i, err
 }
 
-const purgeDeletedTaraProjects = `-- name: PurgeDeletedTaraProjects :many
-DELETE FROM tara_project WHERE deleted_at < $1::timestamptz
+const purgeDeletedTaraProject = `-- name: PurgeDeletedTaraProject :one
+DELETE FROM tara_project WHERE id = $1 AND deleted_at < $2::timestamptz
 RETURNING id
 `
 
-// Deletes the projects that were marked as deleted before the cutoff, with all their content
-// (ON DELETE CASCADE). A project restored in the meantime no longer matches.
-func (q *Queries) PurgeDeletedTaraProjects(ctx context.Context, cutoff pgtype.Timestamptz) ([]pgtype.UUID, error) {
-	rows, err := q.db.Query(ctx, purgeDeletedTaraProjects, cutoff)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []pgtype.UUID
-	for rows.Next() {
-		var id pgtype.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type PurgeDeletedTaraProjectParams struct {
+	ID     pgtype.UUID
+	Cutoff pgtype.Timestamptz
+}
+
+// Deletes one project that was marked as deleted before the cutoff, with all its content
+// (ON DELETE CASCADE). No row if it was restored in the meantime.
+func (q *Queries) PurgeDeletedTaraProject(ctx context.Context, arg PurgeDeletedTaraProjectParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, purgeDeletedTaraProject, arg.ID, arg.Cutoff)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const replaceTaraProject = `-- name: ReplaceTaraProject :one

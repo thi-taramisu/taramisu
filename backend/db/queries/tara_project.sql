@@ -59,12 +59,16 @@ UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING *;
 UPDATE tara_project SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL
 RETURNING id, name;
 
+-- The projects that were marked as deleted before the cutoff, oldest first.
+-- name: ListPurgeableTaraProjects :many
+SELECT id FROM tara_project WHERE deleted_at < sqlc.arg(cutoff)::timestamptz ORDER BY deleted_at;
+
 -- Lets one replica at a time delete projects for good; released when the transaction ends.
 -- name: TryProjectPurgeLock :one
 SELECT pg_try_advisory_xact_lock(236001);
 
--- Deletes the projects that were marked as deleted before the cutoff, with all their content
--- (ON DELETE CASCADE). A project restored in the meantime no longer matches.
--- name: PurgeDeletedTaraProjects :many
-DELETE FROM tara_project WHERE deleted_at < sqlc.arg(cutoff)::timestamptz
+-- Deletes one project that was marked as deleted before the cutoff, with all its content
+-- (ON DELETE CASCADE). No row if it was restored in the meantime.
+-- name: PurgeDeletedTaraProject :one
+DELETE FROM tara_project WHERE id = sqlc.arg(id) AND deleted_at < sqlc.arg(cutoff)::timestamptz
 RETURNING id;

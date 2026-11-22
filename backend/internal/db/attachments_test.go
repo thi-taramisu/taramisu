@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -177,8 +176,8 @@ func TestAttachmentPersistence(t *testing.T) {
 	if _, err = queries.MarkTaraProjectDeleted(ctx, project); err != nil {
 		t.Fatal(err)
 	}
-	if purged, err := queries.PurgeDeletedTaraProjects(ctx, pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}); err != nil || !slices.Contains(purged, project) {
-		t.Fatalf("purge project with attachment: %v %v", purged, err)
+	if _, err = queries.PurgeDeletedTaraProject(ctx, db.PurgeDeletedTaraProjectParams{ID: project, Cutoff: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}}); err != nil {
+		t.Fatalf("purge project with attachment: %v", err)
 	}
 	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
 	if err != nil || len(rows) != 1 || rows[0].ProjectID.Valid || rows[0].S3ObjectKey != attachment.S3ObjectKey {
