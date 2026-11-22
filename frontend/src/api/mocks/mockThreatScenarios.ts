@@ -1,17 +1,21 @@
 import { ApiError } from '../errors'
 import type { AttackFeasibility } from '../models/attackPath'
-import type { RiskValue, ThreatScenarioRelations, ThreatScenarioRisks } from '../models/threatScenario'
+import type { RiskValue, ThreatScenario, ThreatScenarioRelations, ThreatScenarioRisks } from '../models/threatScenario'
 import { FEASIBILITY_ORDER, RISK_MATRIX } from '../riskMatrix'
 import type { ThreatScenarioService } from '../services/threatScenarios'
 import {
   addThreatAttackPathLink,
   addThreatDamageLink,
+  findItem,
   isThreatCause,
+  nextCode,
   removeThreatAttackPathLink,
   removeThreatDamageLink,
   renameNodes,
   run,
+  syncLinks,
   titleRef,
+  validateLinkIds,
   validateTitle,
   type StoredItem,
 } from './mockStore'
@@ -89,6 +93,26 @@ export function createMockThreatScenarioService(db: Map<string, StoredItem>): Th
   }
 
   return {
+    create: (projectId, body) =>
+      run(() => {
+        const entry = findItem(db, projectId, body.item_definition_id)
+        const title = validateTitle(body.title)!
+        validateLinkIds(body.damage_scenario_ids, entry.damageScenarios, 'Damage scenario')
+        const scenario: ThreatScenario = {
+          id: crypto.randomUUID(),
+          item_definition_id: entry.item.id,
+          code: nextCode('TS', [...db.values()].flatMap((e) => e.threatScenarios.map((ts) => ts.code))),
+          title,
+          cause_of_compromise: null,
+          elicitation_method: null,
+          technical_notes: null,
+        }
+        entry.threatScenarios.push(scenario)
+        entry.threatDamageLinks.push(...body.damage_scenario_ids.map((id) => ({ threat_scenario_id: scenario.id, damage_scenario_id: id })))
+        // Shows the new threat scenario below each linked damage scenario in the tree.
+        syncLinks(entry)
+        return scenario
+      }),
     get: (projectId, threatScenarioId) => run(() => findThreatScenario(projectId, threatScenarioId).scenario),
     update: (projectId, threatScenarioId, body) =>
       run(() => {

@@ -4,7 +4,7 @@ import type { CiaProperty, NewAsset } from '../models/asset'
 import type { AttackFeasibilityRatingBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
-import type { PatchThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
+import type { PatchThreatScenarioBody, ThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
 import type { TreeNode } from '../models/tree'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
@@ -239,6 +239,12 @@ export function useThreatScenario(projectId: string, threatScenarioId: string) {
 }
 
 /** Saves the fields of the Definition tab; the targets are saved on their own, so a failure of one keeps the other. */
+export function useCreateThreatScenario(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: ThreatScenarioBody) => api.threatScenarios.create(projectId, body), onSuccess: invalidate })
+}
+
 export function useUpdateThreatScenario(projectId: string, threatScenarioId: string) {
   const api = useApi()
   const storeSaved = useStoreSaved(projectId, keys.threatScenario(projectId, threatScenarioId))

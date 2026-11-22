@@ -226,6 +226,27 @@ describe('createMockItemApi', () => {
   })
 
   describe('threat scenarios', () => {
+    it('creates a threat scenario with the next code below each linked damage scenario', async () => {
+      const api = createMockItemApi()
+
+      const created = await api.threatScenarios.create(project, { item_definition_id: 'i-01', title: ' Forged dimming command ', damage_scenario_ids: ['ds-01'] })
+
+      expect(created).toMatchObject({ code: 'TS-4', title: 'Forged dimming command', item_definition_id: 'i-01', elicitation_method: null })
+      expect((await treeBelow(api, 'a-01'))![0].children!.map((node) => node.code)).toContain('TS-4')
+      expect((await api.threatScenarios.relations(project, created.id)).damageScenarios.map((ds) => ds.code)).toEqual(['DS-1'])
+      expect((await api.content.assets(project, 'i-01')).find((asset) => asset.id === 'a-01')?.threatScenarios).toBe(2)
+    })
+
+    it('rejects a new threat scenario with a blank title, a damage scenario of another item or a duplicate link with 422', async () => {
+      const { threatScenarios } = createMockItemApi()
+      const body = { item_definition_id: 'i-01', title: 'X', damage_scenario_ids: ['ds-01'] }
+
+      await expect(threatScenarios.create(project, { ...body, title: ' ' })).rejects.toMatchObject({ status: 422 })
+      await expect(threatScenarios.create(project, { ...body, damage_scenario_ids: ['nope'] })).rejects.toMatchObject({ status: 422 })
+      await expect(threatScenarios.create(project, { ...body, damage_scenario_ids: ['ds-01', 'ds-01'] })).rejects.toMatchObject({ status: 422 })
+      await expect(threatScenarios.create('other', body)).rejects.toMatchObject({ status: 404 })
+    })
+
     it('patches the given fields, trims the title and renames every tree occurrence', async () => {
       const api = createMockItemApi()
 
