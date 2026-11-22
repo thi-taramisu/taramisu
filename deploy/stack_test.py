@@ -59,11 +59,11 @@ COMPOSE_TIMEOUT = 180
 # Matches proxy/nginx.conf 'log_format upstream_logging':
 #   $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent
 #   "$http_referer" "$http_user_agent" "$http_x_forwarded_for"
-#   upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time
+#   upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time request_id: $request_id
 LOG_PATTERN = re.compile(
     r'"(?P<method>[A-Z]+)\s+(?P<uri>\S+)[^"]*"\s+(?P<http_status>\d+)\s+\d+\s+'
     r'"[^"]*"\s+"(?P<user_agent>[^"]*)"\s+"[^"]*"\s+'
-    r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>[^\r\n]+)'
+    r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>.+?)\s+request_id:\s+\S+'
 )
 
 
@@ -578,6 +578,7 @@ def self_check() -> int:
         "upstream_addr": "10.0.0.2:8080, 10.0.0.3:8080",
         "upstream_status": "502, 200",
         "upstream_response_time": "0.001, 0.002",
+        "request_id": "0123456789abcdef0123456789abcdef",
     }
     try:
         line = re.sub(r"\$(\w+)", lambda m: values[m.group(1)], read_log_format())
