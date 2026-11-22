@@ -52,6 +52,16 @@ describe('relation graph', () => {
     expect(graph.elements.find((el) => el.id === 'ap2')?.risk).toBeNull()
     expect(graph.relations.some((edge) => edge.source === 'attack-paths:ap2' && edge.target === 'threat-scenarios:second-threat')).toBe(false)
   })
+  it('includes unassigned elements with the elements below them but without a relation to the item', () => {
+    const item: TreeNode = { type: 'items', id: 'item', name: 'Item', children: [], unassigned: [damage] }
+    const graph = buildRelationGraph([{ tree: item, risks: [] }])
+    expect(graph.elements.map((el) => el.id).toSorted()).toEqual(['ap1', 'ap2', 'ds', 'item', 'ts'])
+    expect(graph.relations.map((edge) => edge.id).toSorted()).toEqual([
+      'attack-paths:ap1->threat-scenarios:ts',
+      'attack-paths:ap2->threat-scenarios:ts',
+      'threat-scenarios:ts->damage-scenarios:ds',
+    ])
+  })
   it('shows neighbors and asset context, and supports moving to another focus', () => {
     const graph = buildRelationGraph([{ tree, risks }])
     const threat = graphNeighborhood(graph, elementKey('threat-scenarios', 'ts'))

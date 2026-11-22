@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
@@ -15,16 +16,42 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { ItemDefinition } from '../../api/models/item'
-import type { TreeNode } from '../../api/models/tree'
+import type { EntityType, TreeNode } from '../../api/models/tree'
 import { useDeleteItem, useItemChildren, useItemUnassigned } from '../../api/queries/items'
+import { ENTITY_TYPES } from '../workspace/entities'
 
-function countBelow(nodes: readonly TreeNode[] = []): number {
-  return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)
+/** Each element once by type and id, also when the tree shows it below several parents. */
+function collectElements(nodes: readonly TreeNode[], found = new Map<string, TreeNode>()) {
+  for (const node of nodes) {
+    found.set(`${node.type}/${node.id}`, node)
+    collectElements(node.children ?? [], found)
+  }
+  return found
+}
+
+/** Count of one type with its plural, e.g. "4 assets"; literal keys so the localization check sees them. */
+function countOf(t: TFunction, type: EntityType, count: number) {
+  switch (type) {
+    case 'items': return t('ui:itemCount', { count })
+    case 'assets': return t('ui:assetCount', { count })
+    case 'damage-scenarios': return t('ui:damageScenarioCount', { count })
+    case 'threat-scenarios': return t('ui:threatScenarioCount', { count })
+    case 'attack-paths': return t('ui:attackPathCount', { count })
+  }
+}
+
+/** What is deleted along with the item by type, e.g. "4 assets and 1 damage scenario"; types it does not have are left out. */
+function deletedWithItem(t: TFunction, language: string, elements: readonly TreeNode[]) {
+  const counts = (Object.keys(ENTITY_TYPES) as EntityType[]).flatMap((type) => {
+    const count = elements.filter((node) => node.type === type).length
+    return count > 0 ? [countOf(t, type, count)] : []
+  })
+  return counts.length > 0 ? t('ui:deleteItemChildren', { elements: new Intl.ListFormat(language).format(counts) }) : ''
 }
 
 /** Confirmation before deleting an item; not in the wireframes, built from the shadcn AlertDialog. */
 export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const projectId = item.tara_project_id
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
@@ -35,9 +62,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const unassigned = useItemUnassigned(projectId, item.id, { enabled: open })
   const deleteItem = useDeleteItem(projectId, item.id)
 
-  const below = children.data ?? []
-  const assets = below.filter((node) => node.type === 'assets').length
-  const others = countBelow(below) - assets + countBelow(unassigned.data)
+  const elements = [...collectElements([...(children.data ?? []), ...(unassigned.data ?? [])]).values()]
   const loaded = children.isSuccess && unassigned.isSuccess
 
   function handleDelete() {
@@ -63,9 +88,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
         <AlertDialogHeader>
           <AlertDialogTitle>{t('ui:deleteItemTitle', { name: item.name })}</AlertDialogTitle>
           <AlertDialogDescription>
-            {assets + others > 0
-              ? t('ui:deleteItemChildren', { assets: t('ui:assetCount', { count: assets }), elements: t('ui:otherElementCount', { count: others }) })
-              : ''}
+            {deletedWithItem(t, i18n.resolvedLanguage ?? 'en', elements)}
             {t('ui:cannotUndo')}
           </AlertDialogDescription>
         </AlertDialogHeader>

@@ -147,6 +147,18 @@ describe('create damage scenario', () => {
     expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage Scenario DS-2' })).toBeInTheDocument()
   })
 
+  it('asks for an item first in a project without items', async () => {
+    const api = createMockItemApi()
+    await api.items.delete('headlamp', 'i-01')
+    const { user } = renderApp(project, api)
+    const dialog = await openNewDamageScenarioDialog(user)
+
+    await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Create an item first.')
+    expect(await api.items.list('headlamp')).toEqual([])
+  })
+
   it('does not create before the assets of the item are loaded', async () => {
     const api = createMockItemApi()
     const assets = api.content.assets
@@ -161,6 +173,8 @@ describe('create damage scenario', () => {
     }
     const { user } = renderApp(`${project}/assets/a-02`, api)
     const dialog = await openNewDamageScenarioDialog(user)
+    // The asset of the page is linked once it is loaded, so the hint does not announce "Unassigned" meanwhile.
+    expect(within(dialog).getByText('Will appear in the tree below each linked asset.')).toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))

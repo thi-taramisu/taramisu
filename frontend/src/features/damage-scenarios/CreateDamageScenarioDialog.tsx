@@ -44,7 +44,8 @@ interface CreateDamageScenarioDialogProps {
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const { t } = useTranslation()
-  const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
+  const tree = useProjectTree(projectId)
+  const items = (tree.data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
@@ -83,7 +84,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     if (unfinished) return finish(unfinished)
     // Without links nothing waits for the assets anymore, but the owning item still has to be known.
     if (!itemId) {
-      setLinkError({ key: 'ui:itemsLoading' })
+      setLinkError({ key: tree.isPending ? 'ui:itemsLoading' : tree.isError ? 'ui:loadItemsError' : 'ui:itemRequired' })
       return undefined
     }
     // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
@@ -113,8 +114,8 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder={t('ui:damageNamePlaceholder')}
-      // From the shown links, so the hint matches the asset chips; while the assets load, creating with links is blocked anyway.
-      hint={linked.length > 0 ? t('ui:damageTreeHint') : t('ui:damageUnassignedHint')}
+      // Matches the asset chips once the assets are there; until then the chosen links say where it will appear.
+      hint={(assets ? linked : links).length > 0 ? t('ui:damageTreeHint') : t('ui:damageUnassignedHint')}
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))

@@ -188,7 +188,6 @@ describe('Filetree', () => {
   })
 
   describe('Unassigned', () => {
-
     it('lists the unassigned elements of each item by type and counts them', () => {
       renderTree(project, withUnassigned)
 

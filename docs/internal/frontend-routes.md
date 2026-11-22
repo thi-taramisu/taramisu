@@ -105,9 +105,9 @@ These were the open questions in the first draft of this page. The wireframes an
 5. **Where do graphs live?** The "Graph" switch in the header turns the selected element's page into a graph of its relations (Graph
    Concept). This is a view mode, so it is a query parameter (`?view=graph`) and not a separate route. It stays on when you select another
    element in the tree. The item definition diagram (React Flow) is the Definition tab of an item.
-6. **Unassigned elements?** "Flexible Definition" in the wireframes adds an "Unassigned" section to each item in the tree for elements
-   without a link upwards (#258). They keep the same flat URLs, so no extra route is needed. The breadcrumbs show
-   "Unassigned" as a step without a link between the item and the element.
+6. **Unassigned elements?** "Flexible Definition" in the wireframes adds an "Unassigned" section to the items in the tree for elements
+   without a link upwards (#258); it is only shown while the item has such elements. They keep the same flat URLs, so no extra route
+   is needed. The breadcrumbs show "Unassigned" as a step without a link between the item and the element.
 
 ## Open questions
 
@@ -123,7 +123,8 @@ Edit opens the normal detail page (some entity editors are still placeholders). 
 the display mode. The normal and minimal variants share the same entities and relations.
 
 The graph reads current mock services via `useRelationGraph`, deduplicates shared tree occurrences, and
-merges relations from the risk rows. Attack paths point to threats, which point to damage scenarios.
+merges relations from the risk rows. Unassigned elements (#258) are included without a relation to their item.
+Attack paths point to threats, which point to damage scenarios.
 A threat view also includes the linked asset as context. New damage scenarios and saved names are
 reflected after the existing project-query invalidation. Failed requests show an error and Retry,
 rather than presenting incomplete data as a valid empty graph.
