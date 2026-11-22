@@ -39,7 +39,7 @@ test('invalid saved values fall back to light without consulting the OS preferen
   await expect(page.getByRole('button', { name: 'Dark mode' })).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('html')).not.toHaveClass(/dark/)
   await page.getByRole('link', { name: 'Colour schemes', exact: true }).click()
-  await expect(page.getByRole('combobox', { name: 'Color scheme' })).toHaveValue('neutral')
+  await expect(page.getByRole('combobox', { name: 'Colour scheme' })).toHaveValue('neutral')
 })
 
 test('item diagram, settings and risk views remain usable in dark mode', async ({ page }) => {
@@ -61,7 +61,7 @@ test('item diagram, settings and risk views remain usable in dark mode', async (
 
 test('selects all palettes globally, independently of dark mode, and restores the selection', async ({ page }) => {
   await page.goto('/projects')
-  const select = page.getByRole('combobox', { name: 'Color scheme' })
+  const select = page.getByRole('combobox', { name: 'Colour scheme' })
   const toggle = page.getByRole('button', { name: 'Dark mode' })
   await expect(select).toHaveCount(0)
   await page.getByRole('link', { name: 'Colour schemes', exact: true }).click()

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { ColorScheme } from '../design-system/colorSchemes'
+import { colorSchemes, type ColorScheme } from '../design-system/colorSchemes'
 
 export type Theme = 'light' | 'dark'
 export type ColorSchemeId = ColorScheme['id']
@@ -16,7 +16,7 @@ function currentTheme(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 }
 function validScheme(value: string | null): ColorSchemeId {
-  return value === 'ocean' || value === 'iris' ? value : 'neutral'
+  return colorSchemes.find((scheme) => scheme.id === value)?.id ?? 'neutral'
 }
 function applyColorScheme(scheme: ColorSchemeId) {
   document.documentElement.dataset.colorScheme = scheme

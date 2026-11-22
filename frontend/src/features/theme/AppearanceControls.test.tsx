@@ -18,7 +18,7 @@ describe('AppearanceControls', () => {
   it('applies and saves each palette while keeping dark mode independent', async () => {
     const user = userEvent.setup()
     render(<><ThemeToggle /><AppearanceControls /></>)
-    const select = screen.getByRole('combobox', { name: 'Color scheme' })
+    const select = screen.getByRole('combobox', { name: 'Colour scheme' })
     expect(select).toHaveValue('neutral')
     await user.click(screen.getByRole('button', { name: 'Dark mode' }))
     for (const value of ['ocean', 'iris', 'neutral']) {
@@ -32,7 +32,7 @@ describe('AppearanceControls', () => {
   it('synchronizes controls and palettes changed from another tab', async () => {
     const user = userEvent.setup()
     render(<><AppearanceControls /><AppearanceControls /></>)
-    const selects = screen.getAllByRole('combobox', { name: 'Color scheme' })
+    const selects = screen.getAllByRole('combobox', { name: 'Colour scheme' })
     await user.selectOptions(selects[0], 'ocean')
     expect(selects[1]).toHaveValue('ocean')
     act(() => window.dispatchEvent(new StorageEvent('storage', { key: COLOR_SCHEME_STORAGE_KEY, newValue: 'iris' })))
@@ -46,7 +46,7 @@ describe('AppearanceControls', () => {
     const user = userEvent.setup()
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied') })
     render(<AppearanceControls />)
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Color scheme' }), 'iris')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Colour scheme' }), 'iris')
     expect(document.documentElement).toHaveAttribute('data-color-scheme', 'iris')
   })
 })
