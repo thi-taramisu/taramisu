@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
+import { changeError } from '@/features/projects/changeError'
 import {
   resetFailed,
   useArchiveProject,
@@ -50,7 +51,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   const { name, archived } = project.data
   const pending = archiveProject.isPending || restoreProject.isPending || deleteProject.isPending
   const mutations = [archiveProject, restoreProject, deleteProject]
-  const failed = mutations.some((mutation) => mutation.isError)
+  const failed = mutations.find((mutation) => mutation.isError)
 
   return (
     <section aria-labelledby="danger-zone" className="grid gap-3">
@@ -102,7 +103,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
       </div>
       {failed && (
         <p role="alert" className="text-sm text-destructive">
-          The change could not be saved. Please try again.
+          {changeError(failed.error)}
         </p>
       )}
 

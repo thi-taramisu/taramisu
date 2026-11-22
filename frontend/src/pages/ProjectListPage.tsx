@@ -16,6 +16,7 @@ import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
+import { changeError } from '@/features/projects/changeError'
 import { exampleProject } from '@/api/mocks/data/headlamp'
 import { isUnauthorized } from '@/api/errors'
 import { SignInPrompt } from '@/auth/SignInPrompt'
@@ -79,7 +80,8 @@ export function ProjectListPage() {
   const projects = projectsQuery.data ?? []
   const activeProjects = projects.filter((project) => !project.archived)
   const archivedProjects = projects.filter((project) => project.archived)
-  const actionFailed = mutations.some((mutation) => mutation.isError)
+  const failedMutation = mutations.find((mutation) => mutation.isError)
+  const actionFailed = failedMutation !== undefined
 
   return (
     <>
@@ -120,7 +122,7 @@ export function ProjectListPage() {
             )}
             {actionFailed && (
               <p role="alert" className="text-sm text-destructive">
-                The change could not be saved. Please try again.
+                {changeError(failedMutation?.error)}
               </p>
             )}
             {activeView === 'projects' ? (

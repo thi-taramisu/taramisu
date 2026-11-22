@@ -146,6 +146,20 @@ describe('ProjectLifecycleSettings', () => {
     expect(within(lifecycle).getByRole('button', { name: 'Archive Project' })).toBeEnabled()
   })
 
+  it('explains why a project that still has item definitions cannot be deleted', async () => {
+    const projects = createMockProjectApi()
+    projects.delete = () => Promise.reject(new ApiError(409, 'project still contains item definitions'))
+    const { user } = renderSettings(projects)
+    const lifecycle = await section()
+
+    await user.click(await confirmDelete(user, lifecycle))
+
+    expect(await within(lifecycle).findByRole('alert')).toHaveTextContent(
+      'The project still contains item definitions, so it cannot be deleted yet.',
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(settings)
+  })
+
   it('deletes only once when the confirm button is clicked twice', async () => {
     const projects = createMockProjectApi()
     const remove = projects.delete
