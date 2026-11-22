@@ -18,8 +18,8 @@ describe('element header', () => {
     expect(screen.queryByText('Asset AS-1')).not.toBeInTheDocument()
 
     await user.click(within(tree).getByRole('link', { name: 'TS-1 Spoofed headlamp command on the CAN bus' }))
-    await screen.findByRole('heading', { name: 'Spoofed headlamp command on the CAN bus, Threat scenario TS-1' })
-    expect(screen.getByText('Threat scenario TS-1')).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Spoofed headlamp command on the CAN bus, Threat Scenario TS-1' })
+    expect(screen.getByText('Threat Scenario TS-1')).toBeInTheDocument()
     expect(screen.queryByText('Asset AS-2')).not.toBeInTheDocument()
   })
 

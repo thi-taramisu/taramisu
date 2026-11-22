@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -12,8 +13,8 @@ import { useProjectAccess } from '../../api/queries/projects'
 import { AttackStepsField, type StepDraft } from './AttackStepsField'
 
 const APPROACHES: { value: AnalysisApproach; label: string }[] = [
-  { value: 'TOP_DOWN', label: 'Top-Down' },
-  { value: 'BOTTOM_UP', label: 'Bottom-Up' },
+  { value: 'TOP_DOWN', label: 'ui:topDown' },
+  { value: 'BOTTOM_UP', label: 'ui:bottomUp' },
 ]
 
 interface FormValues {
@@ -46,6 +47,7 @@ export function AttackPathDefinitionTab() {
 }
 
 function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPath }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(path))
   const [steps, setSteps] = useState(() => toDrafts(path.attack_steps_and_weaknesses))
@@ -71,7 +73,7 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
     event.preventDefault()
     const title = values.title.trim()
     if (!title) {
-      setTitleError('Name is required.')
+      setTitleError('ui:nameRequired')
       return
     }
     update.mutate(
@@ -96,9 +98,9 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
       {/* Read-only projects show the fields and steps disabled and no Save. */}
       <fieldset disabled={!canEdit} className="contents">
-        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
           <Input
             id={`${id}-title`}
             value={values.title}
@@ -109,22 +111,22 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
           />
           {titleError && (
             <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-              {titleError}
+              {t(titleError)}
             </p>
           )}
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-approach`}>Analysis Approach</Label>
+          <Label htmlFor={`${id}-approach`}>{t('ui:analysisApproach')}</Label>
           <NativeSelect
             id={`${id}-approach`}
             value={values.analysis_approach}
             onChange={(event) => change({ analysis_approach: event.target.value as FormValues['analysis_approach'] })}
             className={cn('w-full', !values.analysis_approach && 'text-muted-foreground')}
           >
-            <NativeSelectOption value="">Select…</NativeSelectOption>
+            <NativeSelectOption value="">{t('ui:select')}</NativeSelectOption>
             {APPROACHES.map((approach) => (
               <NativeSelectOption key={approach.value} value={approach.value}>
-                {approach.label}
+                {t(approach.label)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -133,9 +135,7 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
         <AttackStepsField
           actions={
             <Label className="font-normal">
-              <Checkbox checked={values.is_partial_early_stage} onCheckedChange={(checked) => change({ is_partial_early_stage: checked === true })} />
-              Partial Attack Path
-            </Label>
+              <Checkbox checked={values.is_partial_early_stage} onCheckedChange={(checked) => change({ is_partial_early_stage: checked === true })} />{t('ui:partialAttackPath')}</Label>
           }
           steps={steps}
           onChange={(next) => {
@@ -146,16 +146,12 @@ function DefinitionForm({ projectId, path }: { projectId: string; path: AttackPa
       </fieldset>
       {canEdit && (
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!dirty || update.isPending}>
-            Save
-          </Button>
+          <Button type="submit" disabled={!dirty || update.isPending}>{t('ui:save')}</Button>
           <output aria-live="polite" className="text-sm text-muted-foreground">
-            {update.isSuccess && !dirty && 'Saved.'}
+            {update.isSuccess && !dirty && t('ui:saved')}
           </output>
           {update.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              The attack path could not be saved. Please try again.
-            </p>
+            <p role="alert" className="text-sm text-destructive">{t('ui:theAttackPathCouldNotBeSavedPleaseTryAgain')}</p>
           )}
         </div>
       )}

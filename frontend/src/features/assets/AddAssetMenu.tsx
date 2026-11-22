@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -6,12 +7,13 @@ import { formatEntityId } from '../workspace/entities'
 
 /** "Add Asset" button of the create dialog with the assets that can still be linked. */
 export function AddAssetMenu({ assets, onAdd }: { assets: ItemAsset[]; onAdd: (asset: ItemAsset) => void }) {
+  const { t } = useTranslation()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="justify-self-start border-dashed" disabled={assets.length === 0}>
           <Plus aria-hidden="true" />
-          Add Asset
+          {t('ui:addAsset')}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">

@@ -30,7 +30,7 @@ describe('create damage scenario', () => {
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario DS-2' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
@@ -58,7 +58,7 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario DS-2' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })).toBeInTheDocument()
   })
 
   it('links further assets with the properties they have', async () => {
@@ -133,7 +133,7 @@ describe('create damage scenario', () => {
     act(() => loadAssets())
     await within(dialog).findByRole('button', { name: 'AS-2 Integrity' })
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario DS-2' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage Scenario DS-2' })).toBeInTheDocument()
   })
 
   it('keeps the dialog open with "Create & add another"', async () => {
@@ -177,8 +177,8 @@ describe('damage scenario page', () => {
   it('shows the type label with the prefixed ID above the title', async () => {
     renderApp(page)
 
-    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })
-    expect(screen.getByText('Damage scenario DS-1')).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
     expect(heading.parentElement).toHaveTextContent('DS-1')
   })
 
@@ -191,14 +191,14 @@ describe('damage scenario page', () => {
     })
     const { user } = renderApp(page, api)
 
-    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })
-    expect(screen.getByText('Damage scenario DS-1')).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
     await user.click(await within(tree()).findByRole('link', { name: 'DS-2 Diagnostic key leaked' }))
 
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${second.id}`)
-    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario DS-2' })
-    expect(screen.getByText('Damage scenario DS-2')).toBeInTheDocument()
-    expect(screen.queryByText('Damage scenario DS-1')).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })
+    expect(screen.getByText('Damage Scenario DS-2')).toBeInTheDocument()
+    expect(screen.queryByText('Damage Scenario DS-1')).not.toBeInTheDocument()
   })
 
   it('falls back to the tree code when the API returns an empty code', async () => {
@@ -207,8 +207,8 @@ describe('damage scenario page', () => {
     api.damageScenarios.get = async (...args) => ({ ...(await get(...args)), code: '' })
     renderApp(page, api)
 
-    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })
-    expect(screen.getByText('Damage scenario DS-1')).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown damage scenarios', async () => {
@@ -216,7 +216,7 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByRole('heading', { name: 'Damage scenario not found' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute('href', project)
-    expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Damage Scenario tabs' })).not.toBeInTheDocument()
   })
 
   it('keeps the damage scenario page when a refetch of the loaded damage scenario fails', async () => {
@@ -231,7 +231,7 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be refreshed')
-    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })).toBeInTheDocument()
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
@@ -258,7 +258,7 @@ describe('damage scenario definition', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage scenario DS-1' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage Scenario DS-1' })).toBeInTheDocument()
     expect(within(tree()).getByRole('link', { name: 'DS-1 Low beam fails at night' })).toBeInTheDocument()
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({
       title: 'Low beam fails at night',

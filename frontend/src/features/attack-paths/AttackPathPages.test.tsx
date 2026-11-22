@@ -21,8 +21,8 @@ describe('attack path page', () => {
   it('shows the tabs of the wireframe with Definition as default and the number of relations', async () => {
     renderApp(page)
 
-    expect(await screen.findByRole('heading', { name: 'Compromised navigation ECU via cellular, Attack path AP-1' })).toBeInTheDocument()
-    const tabs = within(screen.getByRole('navigation', { name: 'Attack path tabs' }))
+    expect(await screen.findByRole('heading', { name: 'Compromised navigation ECU via cellular, Attack Path AP-1' })).toBeInTheDocument()
+    const tabs = within(screen.getByRole('navigation', { name: 'Attack Path tabs' }))
     expect(tabs.getByRole('link', { name: 'Definition' })).toHaveAttribute('aria-current', 'page')
     expect(tabs.getByRole('link', { name: 'Rating' })).toHaveAttribute('href', `${page}/rating`)
     expect(await tabs.findByRole('link', { name: 'Relations 1' })).toHaveAttribute('href', `${page}/relations`)

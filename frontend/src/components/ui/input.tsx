@@ -1,7 +1,24 @@
+import { useTranslation } from "react-i18next"
 import * as React from "react"
 import { cn } from "cn"
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+function validationKey(input: HTMLInputElement) {
+  if (input.validity.valueMissing) return "ui:fieldRequired"
+  if (input.type === "email" && input.validity.typeMismatch) return "ui:invalidEmail"
+  return "ui:invalidValue"
+}
+
+function Input({ className, type, onInvalid, onInput, ...props }: React.ComponentProps<"input">) {
+  const { t } = useTranslation()
+  const invalidInput = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    const input = invalidInput.current
+    if (!input) return
+    input.setCustomValidity("")
+    if (!input.validity.valid) input.setCustomValidity(t(validationKey(input)))
+  }, [t])
+
   return (
     <input
       type={type}
@@ -11,6 +28,18 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         className
       )}
       {...props}
+      onInvalid={(event) => {
+        const input = event.currentTarget
+        input.setCustomValidity("")
+        invalidInput.current = input
+        if (!input.validity.valid) input.setCustomValidity(t(validationKey(input)))
+        onInvalid?.(event)
+      }}
+      onInput={(event) => {
+        invalidInput.current = null
+        event.currentTarget.setCustomValidity("")
+        onInput?.(event)
+      }}
     />
   )
 }
