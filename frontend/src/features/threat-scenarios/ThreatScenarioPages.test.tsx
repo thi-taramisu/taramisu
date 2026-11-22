@@ -1,10 +1,10 @@
-import { formatEntityId } from '../workspace/entities'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import { holdRequest } from '../../test/holdRequest'
 import { renderApp } from '../../test/renderApp'
+import { formatEntityId } from '../workspace/entities'
 
 const project = '/projects/headlamp'
 const page = `${project}/threat-scenarios/ts-01`
@@ -381,7 +381,7 @@ describe('threat scenario relations', () => {
 
     await waitFor(() => expect(section('Attack Paths').getAllByRole('listitem')).toHaveLength(1))
     await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument())
-    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-01' }))
+    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-1' }))
   })
 
   it('creates a damage scenario from the add dialog with the typed name and links it', async () => {
@@ -401,7 +401,7 @@ describe('threat scenario relations', () => {
     await user.click(dialog.getByRole('button', { name: 'Create & open' }))
 
     expect(await screen.findByRole('heading', { name: 'Headlamp flickers, Damage scenario DS-2' })).toBeInTheDocument()
-    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-1', 'DS-2'])
   })
 
   it('only links on retry when linking a new damage scenario fails, so it is not created twice', async () => {
@@ -427,8 +427,8 @@ describe('threat scenario relations', () => {
     await user.click(dialog.getByRole('button', { name: 'Create & open' }))
 
     expect(await screen.findByRole('heading', { name: 'Headlamp flickers, Damage scenario DS-2' })).toBeInTheDocument()
-    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
-    expect((await api.content.damageScenarios('headlamp', 'i-01')).map((ds) => ds.code)).toEqual(['DS-01', 'DS-02'])
+    expect((await api.threatScenarios.relations('headlamp', 'ts-01')).damageScenarios.map((ds) => ds.code)).toEqual(['DS-1', 'DS-2'])
+    expect((await api.content.damageScenarios('headlamp', 'i-01')).map((ds) => ds.code)).toEqual(['DS-1', 'DS-2'])
   })
 
   it('adds a damage scenario and offers its causes as targets on the Definition tab', async () => {

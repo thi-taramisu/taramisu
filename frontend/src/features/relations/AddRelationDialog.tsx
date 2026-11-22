@@ -1,10 +1,10 @@
-import { formatEntityId } from '../workspace/entities'
 import { useId, useState, type ReactNode, type Ref } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { EntityRef } from '../../api/models/tree'
+import { formatEntityId } from '../workspace/entities'
 
 // Names creating as in the wireframe; element types without a create dialog follow with their tickets.
 const SEARCH_LABEL = 'Search by name, ID, or type a new name'

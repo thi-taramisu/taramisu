@@ -1,9 +1,9 @@
-import { formatEntityId } from '../workspace/entities'
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/errors'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import { renderApp } from '../../test/renderApp'
+import { formatEntityId } from '../workspace/entities'
 
 const project = '/projects/headlamp'
 const risks = `${project}/threat-scenarios/ts-01/risks`

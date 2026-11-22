@@ -1,8 +1,8 @@
-import { formatEntityId } from '../workspace/entities'
 import { Button } from '@/components/ui/button'
 import type { CiaProperty } from '../../api/models/asset'
 import type { EntityRef } from '../../api/models/tree'
 import { CIA_PROPERTIES } from './ciaProperties'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetPropertyTogglesProps {
   asset: Pick<EntityRef, 'code'> & { properties: CiaProperty[] }

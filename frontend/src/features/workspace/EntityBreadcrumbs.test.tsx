@@ -1,4 +1,3 @@
-import { formatEntityId } from './entities'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -9,6 +8,7 @@ import { createApiClient } from '../../api/client'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { EntityPage } from './EntityPage'
+import { formatEntityId } from './entities'
 
 function renderPage(path: string, api = createMockItemApi()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })

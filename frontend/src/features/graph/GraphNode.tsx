@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { AlertTriangle, Box, GitBranch, Layers, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -6,6 +5,7 @@ import { ENTITY_TYPES } from '../workspace/entities'
 import type { GraphElement } from './graphModel'
 
 import { riskClasses, riskText } from './riskStyles'
+import { formatEntityId } from '../workspace/entities'
 
 export type RelationNode = Node<{
   element: GraphElement

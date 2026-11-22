@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { useId } from 'react'
 import { ChevronDown, Pencil, TriangleAlert } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
@@ -17,6 +16,7 @@ import { entityPath } from '../workspace/entities'
 import { EntityLink } from '../workspace/EntityLink'
 import { RiskMatrix } from './RiskMatrix'
 import { isRated, riskView, type RatedFeasibility, type RatedRiskRow, type RiskBlocker, type RiskResult } from './riskView'
+import { formatEntityId } from '../workspace/entities'
 
 /** Risks tab of a threat scenario ("TS Risks" wireframe): the risk values from impact and attack feasibility. */
 export function ThreatScenarioRisksTab() {

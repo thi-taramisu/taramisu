@@ -27,15 +27,14 @@ export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
   return code ? `${formatEntityId(code)} ${name}` : name
 }
 
-/** Display IDs retain their type prefix and have no padding. Legacy asset prefix A becomes AS. */
+/** Display IDs retain their agreed type prefix and have no padding. */
 export function formatEntityId(code: string): string
 export function formatEntityId(code: string | undefined): string | undefined
 export function formatEntityId(code: string | undefined) {
   if (code === undefined) return undefined
-  const match = /^(AS|A|DS|TS|AP|I)-?(\d+)$/.exec(code)
+  const match = /^(AS|DS|TS|AP|IT)-?(\d+)$/.exec(code)
   if (!match) return code
-  const prefix = match[1] === 'A' ? 'AS' : match[1]
-  return `${prefix}-${match[2].replace(/^0+(?=\d)/, '')}`
+  return `${match[1]}-${match[2].replace(/^0+(?=\d)/, '')}`
 }
 
 export function entityPath(projectId: string, type: EntityType, id: string) {

@@ -303,7 +303,7 @@ describe('attack path relations', () => {
 
     expect(await section('Threat Scenarios').findByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Relations 2' })).toBeInTheDocument()
-    expect((await api.threatScenarios.relations('headlamp', 'ts-02')).attackPaths.map((path) => path.code)).toEqual(['AP-01'])
+    expect((await api.threatScenarios.relations('headlamp', 'ts-02')).attackPaths.map((path) => path.code)).toEqual(['AP-1'])
   })
 
   it('removes a link after confirmation and keeps the attack path', async () => {
@@ -314,7 +314,7 @@ describe('attack path relations', () => {
 
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
     await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument())
-    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-01' }))
+    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-1' }))
   })
 
   it('shows an error and keeps the links when saving fails', async () => {

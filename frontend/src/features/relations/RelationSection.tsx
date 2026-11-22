@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -18,6 +17,7 @@ import type { EntityType } from '../../api/models/tree'
 import { useProjectAccess } from '../../api/queries/projects'
 import { ENTITY_TYPES, entityPath, entityTitle } from '../workspace/entities'
 import { AddRelationDialog, type RelationEntry } from './AddRelationDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** What the section passes to its dialog for creating an element. */
 export interface RelationCreateDialogProps {

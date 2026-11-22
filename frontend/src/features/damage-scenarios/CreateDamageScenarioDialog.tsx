@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { matchPath, useLocation } from 'react-router-dom'
@@ -13,6 +12,7 @@ import { AddAssetMenu } from '../assets/AddAssetMenu'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetLink {
   assetId: string

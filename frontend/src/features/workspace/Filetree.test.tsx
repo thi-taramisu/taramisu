@@ -8,7 +8,7 @@ import type { TreeNode } from '../../api/models/tree'
 const project = '/projects/test-project'
 const nodes: TreeNode[] = [
   {
-    type: 'items', id: 'i-01', code: 'I-1', name: 'Headlamp', children: [
+    type: 'items', id: 'i-01', code: 'IT-1', name: 'Headlamp', children: [
       {
         type: 'assets', id: 'a-01', code: 'AS-1', name: 'Long asset name', children: [
           { type: 'damage-scenarios', id: 'ds-01', code: 'DS-1', name: 'Loss of light' },
@@ -37,7 +37,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('Filetree', () => {
   it('hides element IDs visually but keeps them in accessible names', () => {
     const allTypes: TreeNode[] = [{
-      type: 'items', id: 'i-10', code: 'I-10', name: 'Gateway', children: [{
+      type: 'items', id: 'i-10', code: 'IT-10', name: 'Gateway', children: [{
         type: 'assets', id: 'a-12', code: 'AS-12', name: 'CAN bus', children: [{
           type: 'damage-scenarios', id: 'ds-11', code: 'DS-11', name: 'Bus flooding', children: [{
             type: 'threat-scenarios', id: 'ts-14', code: 'TS-14', name: 'Spoofed frames', children: [
@@ -53,7 +53,7 @@ describe('Filetree', () => {
     const anyCode = /\b[A-Z]{1,2}-\d+\b/
     // Codes appear only in screen-reader text; the visible labels and tooltips show names only.
     const codes = within(tree).getAllByText(anyCode)
-    expect(codes.map((code) => code.textContent?.trim())).toEqual(['I-10', 'AS-12', 'DS-11', 'TS-14', 'AP-15'])
+    expect(codes.map((code) => code.textContent?.trim())).toEqual(['IT-10', 'AS-12', 'DS-11', 'TS-14', 'AP-15'])
     for (const code of codes) expect(code).toHaveClass('sr-only')
     const links = within(tree).getAllByRole('link')
     for (const link of links) expect(link.title).not.toMatch(anyCode)
@@ -81,7 +81,7 @@ describe('Filetree', () => {
 
     const asset = screen.getByRole('link', { name: 'AS-1 Long asset name' })
     expect(asset).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('link', { name: 'I-1 Headlamp' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'IT-1 Headlamp' })).not.toHaveAttribute('aria-current')
     const damage = screen.getByRole('link', { name: 'DS-1 Loss of light' })
     expect(damage).toHaveAttribute('href', `${project}/damage-scenarios/ds-01?view=graph&filter=open`)
 
@@ -95,20 +95,20 @@ describe('Filetree', () => {
     renderTree()
 
     await user.tab()
-    const initialToggle = screen.getByRole('button', { name: 'Collapse I-1 Headlamp' })
+    const initialToggle = screen.getByRole('button', { name: 'Collapse IT-1 Headlamp' })
     const content = document.getElementById(initialToggle.getAttribute('aria-controls')!)
     expect(initialToggle).toHaveFocus()
     await user.keyboard(' ')
-    const rootToggle = screen.getByRole('button', { name: 'Expand I-1 Headlamp' })
+    const rootToggle = screen.getByRole('button', { name: 'Expand IT-1 Headlamp' })
     expect(rootToggle).toHaveAttribute('aria-expanded', 'false')
     expect(content).not.toBeVisible()
     expect(screen.queryByRole('link', { name: 'AS-1 Long asset name' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'I-1 Headlamp' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'IT-1 Headlamp' })).not.toHaveAttribute('aria-current')
 
     await user.keyboard('{Enter}')
     await user.click(screen.getByRole('button', { name: 'Collapse AS-1 Long asset name' }))
-    await user.click(screen.getByRole('button', { name: 'Collapse I-1 Headlamp' }))
-    await user.click(screen.getByRole('button', { name: 'Expand I-1 Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse IT-1 Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Expand IT-1 Headlamp' }))
     expect(screen.getByRole('button', { name: 'Expand AS-1 Long asset name' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('link', { name: 'DS-1 Loss of light' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'AS-2 Firmware' })).toBeVisible()
@@ -117,7 +117,7 @@ describe('Filetree', () => {
   it('moves between visible entries with arrows, Home and End', async () => {
     const user = userEvent.setup()
     renderTree()
-    const root = screen.getByRole('link', { name: 'I-1 Headlamp' })
+    const root = screen.getByRole('link', { name: 'IT-1 Headlamp' })
     root.focus()
 
     await user.keyboard('{ArrowRight}')
@@ -139,21 +139,21 @@ describe('Filetree', () => {
   it('reveals ancestors when another link opens a hidden descendant', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01`)
-    await user.click(screen.getByRole('button', { name: 'Collapse I-1 Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse IT-1 Headlamp' }))
     await user.click(screen.getByRole('link', { name: 'Open impact externally' }))
 
     expect(screen.getByRole('link', { name: 'DS-1 Loss of light' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Collapse I-1 Headlamp' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Collapse IT-1 Headlamp' })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('preserves a manual collapse when switching tabs or graph view on the same entity', async () => {
     const user = userEvent.setup()
     renderTree(`${project}/assets/a-01`)
-    await user.click(screen.getByRole('button', { name: 'Collapse I-1 Headlamp' }))
+    await user.click(screen.getByRole('button', { name: 'Collapse IT-1 Headlamp' }))
 
     for (const name of ['Open asset risks', 'Open asset relations', 'Open asset definition', 'Open asset graph']) {
       await user.click(screen.getByRole('link', { name }))
-      expect(screen.getByRole('button', { name: 'Expand I-1 Headlamp' })).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByRole('button', { name: 'Expand IT-1 Headlamp' })).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByRole('link', { name: 'AS-1 Long asset name' })).not.toBeInTheDocument()
     }
 
@@ -163,7 +163,7 @@ describe('Filetree', () => {
 
   it('keeps shared entities independently expandable under different parents', async () => {
     const user = userEvent.setup()
-    const tree: TreeNode[] = [nodes[0], { ...nodes[0], id: 'i-02', code: 'I-2', name: 'Second item' }]
+    const tree: TreeNode[] = [nodes[0], { ...nodes[0], id: 'i-02', code: 'IT-2', name: 'Second item' }]
     renderTree(project, tree)
     const occurrences = screen.getAllByRole('button', { name: 'Collapse AS-1 Long asset name' })
     await user.click(occurrences[0])

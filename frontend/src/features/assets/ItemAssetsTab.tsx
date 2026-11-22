@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { Link, useParams } from 'react-router-dom'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
@@ -6,6 +5,7 @@ import { useAddAsset, useItemAssets } from '../../api/queries/items'
 import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
 import { AddAssetDialog } from './AddAssetDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** Assets tab of an item (interactive wireframe): table of the item's assets and "Add Asset". */
 export function ItemAssetsTab() {

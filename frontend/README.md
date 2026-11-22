@@ -128,8 +128,8 @@ fallback can still return HTTP 200. `npm run preview` is for local verification 
 
 ## Element display IDs
 
-Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3 and AP-100.
-The shared formatter also displays legacy asset codes such as A-01 as AS-1.
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3, AP-100 and IT-1.
+Mock data and newly created mock elements use this format directly.
 Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
 Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
-by the tree; no code is invented from an item's internal UUID.
+by the tree, using the IT prefix; no code is invented from an item's internal UUID.

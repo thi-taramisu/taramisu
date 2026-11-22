@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { useParams } from 'react-router-dom'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import {
@@ -15,6 +14,7 @@ import { CiaProperties } from '../items/RiskBadge'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
+import { formatEntityId } from '../workspace/entities'
 
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */

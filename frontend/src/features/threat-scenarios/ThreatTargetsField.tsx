@@ -1,10 +1,10 @@
-import { formatEntityId } from '../workspace/entities'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { CiaProperty } from '../../api/models/asset'
 import type { ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { CIA_PROPERTIES } from '../assets/ciaProperties'
 import { isSameTarget, toggleTarget } from './targetSelection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatTargetsFieldProps {
   damageScenarios: ThreatScenarioRelations['damageScenarios']

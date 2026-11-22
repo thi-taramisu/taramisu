@@ -1,4 +1,3 @@
-import { formatEntityId } from '../workspace/entities'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { MarkerType, type Edge, type XYPosition } from '@xyflow/react'
@@ -12,6 +11,7 @@ import type { RelationNode } from './GraphNode'
 import { GraphCanvas } from './GraphCanvas'
 import { riskClasses, riskStroke, riskText } from './riskStyles'
 import { useRelationGraph } from './useRelationGraph'
+import { formatEntityId } from '../workspace/entities'
 import '@xyflow/react/dist/style.css'
 
 /** Local graph prototype: the query string carries focus and display mode through tree navigation. */

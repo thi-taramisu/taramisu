@@ -55,7 +55,7 @@ describe('damage scenario relations', () => {
     expect(await section('Threat Scenarios').findByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
     expect(await within(tree()).findByRole('link', { name: /TS-2 Replayed headlamp command/ })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Relations 3' })).toBeInTheDocument()
-    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-01', 'TS-02'])
+    expect((await api.damageScenarios.relations('headlamp', 'ds-01')).threatScenarios.map((t) => t.code)).toEqual(['TS-1', 'TS-2'])
   })
 
   it('offers only threat scenarios that are not linked yet', async () => {
@@ -99,7 +99,7 @@ describe('damage scenario relations', () => {
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
     await waitFor(() => expect(section('Threat Scenarios').getByRole('button', { name: 'Add Threat Scenario' })).toHaveFocus())
     expect(await screen.findByRole('link', { name: 'Relations 1' })).toBeInTheDocument()
-    expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-01' }))
+    expect(await api.content.threatScenarios('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'TS-1' }))
   })
 
   it('adds an asset with all its properties and offers only assets with properties', async () => {
@@ -174,7 +174,7 @@ describe('damage scenario relations', () => {
     expect(await section('Assets').findByText('No assets linked yet.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })).toBeInTheDocument()
     await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-1/ })).not.toBeInTheDocument())
-    expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-01' })
+    expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-1' })
   })
 
   it('shows an error and keeps the links when saving fails', async () => {

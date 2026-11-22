@@ -1,8 +1,8 @@
-import { formatEntityId } from '../workspace/entities'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { ItemAsset } from '../../api/models/asset'
+import { formatEntityId } from '../workspace/entities'
 
 /** "Add Asset" button of the create dialog with the assets that can still be linked. */
 export function AddAssetMenu({ assets, onAdd }: { assets: ItemAsset[]; onAdd: (asset: ItemAsset) => void }) {

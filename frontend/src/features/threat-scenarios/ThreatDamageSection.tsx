@@ -1,10 +1,10 @@
-import { formatEntityId } from '../workspace/entities'
 import { exampleProject } from '../../api/mocks/data/headlamp'
 import type { ThreatScenario, ThreatScenarioRelations } from '../../api/models/threatScenario'
 import { useItemDamageScenarios, useSetThreatDamageLink } from '../../api/queries/items'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { LINK_REMOVE_WITH_TARGETS, LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatDamageSectionProps {
   projectId: string
