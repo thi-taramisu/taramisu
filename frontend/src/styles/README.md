@@ -87,7 +87,8 @@ entity. Generic `chart-1`–`chart-5` tokens are categorical UI colours and must
 ## Light and dark mode (#188)
 
 The project-list and workspace/settings headers expose an accessible, icon-only light/dark toggle. Its icon, title and pressed state
-indicate the current mode, saved as `taramisu.theme` in local storage. The palette selector is on the Colour schemes page. The selected Neutral, Ocean or Iris palette
+indicate the current mode, saved as `taramisu.theme` in local storage. The palette selector is on the Colour schemes page.
+The selected Neutral, Ocean or Iris palette
 is applied to the document root and saved independently as `taramisu.colorScheme`. Missing or invalid preferences
 default to light and Neutral, regardless of the OS preference. The blocking `public/theme-init.js` script applies
 the saved mode before the app and styles load; `features/theme/` keeps mounted controls and tabs in sync.
