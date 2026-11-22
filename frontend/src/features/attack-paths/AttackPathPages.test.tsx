@@ -7,7 +7,7 @@ import { renderApp } from '../../test/renderApp'
 
 const project = '/projects/headlamp'
 const page = `${project}/attack-paths/ap-01`
-const TS01 = 'TS-01 Spoofed headlamp command on the CAN bus'
+const TS01 = 'TS-1 Spoofed headlamp command on the CAN bus'
 
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
 const section = (name: string) => within(screen.getByRole('region', { name }))
@@ -21,8 +21,8 @@ describe('attack path page', () => {
   it('shows the tabs of the wireframe with Definition as default and the number of relations', async () => {
     renderApp(page)
 
-    expect(await screen.findByRole('heading', { name: 'Compromised navigation ECU via cellular, Attack path #01' })).toBeInTheDocument()
-    const tabs = within(screen.getByRole('navigation', { name: 'Attack path tabs' }))
+    expect(await screen.findByRole('heading', { name: 'Compromised navigation ECU via cellular, Attack Path AP-1' })).toBeInTheDocument()
+    const tabs = within(screen.getByRole('navigation', { name: 'Attack Path tabs' }))
     expect(tabs.getByRole('link', { name: 'Definition' })).toHaveAttribute('aria-current', 'page')
     expect(tabs.getByRole('link', { name: 'Rating' })).toHaveAttribute('href', `${page}/rating`)
     expect(await tabs.findByRole('link', { name: 'Relations 1' })).toHaveAttribute('href', `${page}/relations`)
@@ -69,7 +69,7 @@ describe('attack path definition', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(await within(tree()).findByRole('link', { name: /AP-01 Remote head unit exploit/ })).toBeInTheDocument()
+    expect(await within(tree()).findByRole('link', { name: /AP-1 Remote head unit exploit/ })).toBeInTheDocument()
     expect(await api.attackPaths.get('headlamp', 'ap-01')).toMatchObject({ title: 'Remote head unit exploit', analysis_approach: 'BOTTOM_UP', is_partial_early_stage: true })
   })
 
@@ -299,11 +299,11 @@ describe('attack path relations', () => {
     const { user, api } = renderApp(relations)
 
     await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: 'Add Threat Scenario' }))
-    await user.click(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).getByRole('button', { name: /TS-02/ }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).getByRole('button', { name: /TS-2/ }))
 
     expect(await section('Threat Scenarios').findByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Relations 2' })).toBeInTheDocument()
-    expect((await api.threatScenarios.relations('headlamp', 'ts-02')).attackPaths.map((path) => path.code)).toEqual(['AP-01'])
+    expect((await api.threatScenarios.relations('headlamp', 'ts-02')).attackPaths.map((path) => path.code)).toEqual(['AP-1'])
   })
 
   it('removes a link after confirmation and keeps the attack path', async () => {
@@ -313,8 +313,8 @@ describe('attack path relations', () => {
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove link' }))
 
     expect(await section('Threat Scenarios').findByText('No threat scenarios linked yet.')).toBeInTheDocument()
-    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-01/ })).not.toBeInTheDocument())
-    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-01' }))
+    await waitFor(() => expect(within(tree()).queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument())
+    expect(await api.content.attackPaths('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ code: 'AP-1' }))
   })
 
   it('shows an error and keeps the links when saving fails', async () => {
@@ -323,7 +323,7 @@ describe('attack path relations', () => {
     const { user } = renderApp(relations, api)
 
     await user.click((await findSection('Threat Scenarios')).getByRole('button', { name: 'Add Threat Scenario' }))
-    await user.click(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).getByRole('button', { name: /TS-03/ }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Add Threat Scenario' })).getByRole('button', { name: /TS-3/ }))
 
     expect(await section('Threat Scenarios').findByRole('alert')).toHaveTextContent('The link could not be changed')
     expect(section('Threat Scenarios').getAllByRole('listitem')).toHaveLength(1)

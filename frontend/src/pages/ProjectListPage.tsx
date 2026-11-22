@@ -21,6 +21,7 @@ import { exampleProject } from '@/api/mocks/data/headlamp'
 import { isUnauthorized } from '@/api/errors'
 import { SignInPrompt } from '@/auth/SignInPrompt'
 import type { Project } from '@/api/models/project'
+import { useTranslation } from 'react-i18next'
 import {
   useArchiveProject,
   useCreateProject,
@@ -35,6 +36,7 @@ type MainView = 'projects' | 'archive'
 
 /** Start page: project overview, favorites, and archived projects. */
 export function ProjectListPage() {
+  const { t } = useTranslation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeView, setActiveView] = useState<MainView>('projects')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -59,7 +61,7 @@ export function ProjectListPage() {
   function handleCreateProject(name: string, image?: File) {
     resetFailed(...mutations)
     createProject.mutate(
-      { name, description: 'New TARA project', image },
+      { name, description: t('ui:newProjectDescription'), image },
       { onSuccess: () => setActiveView('projects') },
     )
   }
@@ -105,39 +107,33 @@ export function ProjectListPage() {
         <main className="min-w-0 flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-8">
             {projectsQuery.isPending && (
-              <p className="text-sm text-muted-foreground">Loading projects…</p>
+              <p className="text-sm text-muted-foreground">{t('ui:loadingProjects')}</p>
             )}
             {isUnauthorized(projectsQuery.error) && (
-              <SignInPrompt>Sign in to see your projects.</SignInPrompt>
+              <SignInPrompt>{t('ui:signInToSeeYourProjects')}</SignInPrompt>
             )}
             {projectsQuery.isError && !isUnauthorized(projectsQuery.error) && (
               <div className="flex items-center justify-between gap-2">
-                <p role="alert" className="text-sm text-destructive">
-                  The projects could not be loaded.
-                </p>
-                <Button variant="outline" size="sm" onClick={() => void projectsQuery.refetch()}>
-                  Retry
-                </Button>
+                <p role="alert" className="text-sm text-destructive">{t('ui:theProjectsCouldNotBeLoaded')}</p>
+                <Button variant="outline" size="sm" onClick={() => void projectsQuery.refetch()}>{t('ui:retry')}</Button>
               </div>
             )}
             {actionFailed && (
-              <p role="alert" className="text-sm text-destructive">
-                {changeError(failedMutation?.error)}
-              </p>
+              <p role="alert" className="text-sm text-destructive">{t(changeError(failedMutation?.error))}</p>
             )}
             {activeView === 'projects' ? (
               <>
-                <h1 className="text-2xl font-semibold">Projects</h1>
+                <h1 className="text-2xl font-semibold">{t('navigation.projects')}</h1>
                 <section className="space-y-4">
                   <div className="flex justify-end">
                     <Link
                       to="/design-system/colors"
                       className="text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
                     >
-                      Colour schemes
+                      {t('navigation.colourSchemes')}
                     </Link>
                   </div>
-                  <h2 className="text-xl font-semibold">Favorites</h2>
+                  <h2 className="text-xl font-semibold">{t('navigation.favorites')}</h2>
 
                   <div className="flex flex-wrap gap-4">
                     {activeProjects
@@ -159,7 +155,7 @@ export function ProjectListPage() {
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-xl font-semibold">All Projects</h2>
+                  <h2 className="text-xl font-semibold">{t('navigation.allProjects')}</h2>
 
                   <div className="space-y-3">
                     {activeProjects.map((project) => {
@@ -180,7 +176,7 @@ export function ProjectListPage() {
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
-                                aria-label={`${project.name} (example)`}
+                                aria-label={t('ui:exampleProjectName', { name: project.name })}
                                 className="min-w-0 flex-1 hover:opacity-80"
                               >
                                 {projectDetails}
@@ -203,8 +199,8 @@ export function ProjectListPage() {
                               onClick={() => handleToggleFavorite(project)}
                               aria-label={
                                 project.favorite
-                                  ? `Remove ${project.name} from favorites`
-                                  : `Add ${project.name} to favorites`
+                                  ? t('ui:removeFavorite', { name: project.name })
+                                  : t('ui:addFavorite', { name: project.name })
                               }
                               aria-pressed={project.favorite}
                             >
@@ -228,7 +224,7 @@ export function ProjectListPage() {
                                       actionsButtons.current.delete(project.id)
                                     }
                                   }}
-                                  aria-label={`Actions for ${project.name}`}
+                                  aria-label={t('ui:projectActions', { name: project.name })}
                                 >
                                   <Ellipsis className="size-5" />
                                 </Button>
@@ -242,7 +238,7 @@ export function ProjectListPage() {
                                   }}
                                 >
                                   <Archive className="size-4" />
-                                  Archive Project
+                                  {t('ui:archiveProject')}
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
@@ -253,7 +249,7 @@ export function ProjectListPage() {
                                   }}
                                 >
                                   <Trash2 className="size-4" />
-                                  Delete Project
+                                  {t('ui:deleteProject')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -266,11 +262,11 @@ export function ProjectListPage() {
               </>
             ) : (
               <section className="space-y-4">
-                <h1 className="text-xl font-semibold">Archive</h1>
+                <h1 className="text-xl font-semibold">{t('navigation.archive')}</h1>
 
                 {archivedProjects.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No archived projects.
+                    {t('ui:noArchivedProjects')}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -292,10 +288,10 @@ export function ProjectListPage() {
                               resetFailed(...mutations)
                               restoreProject.mutate(project.id)
                             }}
-                            aria-label={`Restore ${project.name}`}
+                            aria-label={t('ui:restoreNamedProject', { name: project.name })}
                           >
                             <ArchiveRestore className="size-4" />
-                            Restore Project
+                            {t('ui:restoreProject')}
                           </Button>
                         </CardHeader>
                       </Card>

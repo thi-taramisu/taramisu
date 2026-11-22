@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -12,13 +13,15 @@ import { resetFailed, useProject, useProjectAccess, useUpdateProject } from '../
 import { ProjectImageInput } from './ProjectImageInput'
 import { ProjectLifecycleSettings } from './ProjectLifecycleSettings'
 
+/** Translation key of the message for a failed save. */
 function saveError(error: unknown) {
-  if (error instanceof ApiError && error.status === 403) return 'Only owners can change the project.'
-  return 'The project could not be saved. Please try again.'
+  if (error instanceof ApiError && error.status === 403) return 'ui:onlyOwnersCanChangeTheProject'
+  return 'ui:theProjectCouldNotBeSavedPleaseTryAgain'
 }
 
 /** Name, description and image; Save sends name and description, the image is not uploaded yet (#231). */
 function DetailsForm({ project }: { project: Project }) {
+  const { t } = useTranslation()
   // The backend lets only owners change the project settings (`update-tara-project`).
   const canEdit = useProjectAccess(project.id).canEdit && project.role === 'OWNER'
   const updateProject = useUpdateProject()
@@ -44,32 +47,32 @@ function DetailsForm({ project }: { project: Project }) {
       }}
       className="grid gap-4"
     >
-      <h1 className="text-lg font-semibold">General</h1>
+      <h1 className="text-lg font-semibold">{t('navigation.general')}</h1>
       {/* Archived projects and members other than owners see the details disabled and no Save. */}
       <fieldset disabled={!canEdit} className="contents">
         <div className="grid gap-2">
-          <Label htmlFor="project-name">Name</Label>
+          <Label htmlFor="project-name">{t('ui:name')}</Label>
           {/* The pattern also rejects names that only contain spaces. */}
           <Input id="project-name" name="name" defaultValue={project.name} required pattern=".*\S.*" />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="project-description">Description</Label>
+          <Label htmlFor="project-description">{t('ui:description')}</Label>
           <Textarea id="project-description" name="description" defaultValue={project.description} className="min-h-32" />
         </div>
         <ProjectImageInput defaultValue={project.image ?? null} generatedImage={generatedProjectImage(project.id)} />
       </fieldset>
       {updateProject.isError && (
         <p role="alert" className="text-sm text-destructive">
-          {saveError(updateProject.error)}
+          {t(saveError(updateProject.error))}
         </p>
       )}
       {canEdit && (
         <div className="flex items-center justify-end gap-3">
           <output className="text-sm text-muted-foreground">
-            {updateProject.isSuccess ? 'Saved.' : ''}
+            {updateProject.isSuccess ? t('ui:saved') : ''}
           </output>
           <Button type="submit" disabled={updateProject.isPending}>
-            {updateProject.isPending ? 'Saving…' : 'Save'}
+            {updateProject.isPending ? t('ui:saving') : t('ui:save')}
           </Button>
         </div>
       )}
@@ -78,21 +81,22 @@ function DetailsForm({ project }: { project: Project }) {
 }
 
 export function GeneralSettings() {
+  const { t } = useTranslation()
   const { projectId = '' } = useParams()
   const project = useProject(projectId)
 
   return (
     <div className="grid gap-8">
-      {project.isPending && <p className="text-sm text-muted-foreground">Loading project…</p>}
-      {isUnauthorized(project.error) && <SignInPrompt>Sign in to see this project.</SignInPrompt>}
+      {project.isPending && <p className="text-sm text-muted-foreground">{t('ui:loadingProject')}</p>}
+      {isUnauthorized(project.error) && <SignInPrompt>{t('ui:signInToSeeThisProject')}</SignInPrompt>}
       {/* A 404 is handled by the settings page. */}
       {project.isError && !isNotFound(project.error) && !isUnauthorized(project.error) && (
         <div className="flex items-center justify-between gap-2">
           <p role="alert" className="text-sm text-destructive">
-            The project could not be loaded.
+            {t('ui:theProjectCouldNotBeLoaded')}
           </p>
           <Button variant="outline" size="sm" onClick={() => void project.refetch()}>
-            Retry
+            {t('ui:retry')}
           </Button>
         </div>
       )}

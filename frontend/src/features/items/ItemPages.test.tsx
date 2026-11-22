@@ -22,7 +22,7 @@ describe('sidebar tree', () => {
 
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
-    expect(within(tree()).getByRole('link', { name: 'AP-02 Malicious device on the OBD-II connector' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'AP-2 Malicious device on the OBD-II connector' })).toBeInTheDocument()
   })
 })
 
@@ -197,7 +197,7 @@ describe('item page', () => {
     expect(await within(tabs).findByRole('link', { name: 'Assets (4)' })).toHaveAttribute('aria-current', 'page')
     const table = await screen.findByRole('table')
     const row = (await within(table).findByRole('link', { name: 'Headlamp on/off command' })).closest('tr')!
-    expect(within(row).getByText('A-01')).toBeInTheDocument()
+    expect(within(row).getByText('AS-1')).toBeInTheDocument()
     expect(within(row).getByText('4')).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Definition' }))
@@ -208,8 +208,8 @@ describe('item page', () => {
     renderApp(`${project}/items/i-01/risks`)
 
     const table = await screen.findByRole('table')
-    expect(within(table).getByRole('rowheader', { name: /A-01 Headlamp on\/off command/ })).toBeInTheDocument()
-    expect(within(table).getAllByRole('link', { name: /TS-01 Spoofed headlamp command/ })[0]).toHaveAttribute(
+    expect(within(table).getByRole('rowheader', { name: /AS-1 Headlamp on\/off command/ })).toBeInTheDocument()
+    expect(within(table).getAllByRole('link', { name: /TS-1 Spoofed headlamp command/ })[0]).toHaveAttribute(
       'href',
       `${project}/threat-scenarios/ts-01`,
     )

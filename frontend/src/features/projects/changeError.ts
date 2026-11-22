@@ -1,7 +1,10 @@
 import { ApiError } from '@/api/errors'
 
-/** Message for a failed archive, restore, delete or favorite. The backend refuses to delete a project that still has items (409). */
+/**
+ * Translation key of the message for a failed archive, restore, delete or favorite. The backend refuses to
+ * delete a project that still has item definitions (409).
+ */
 export function changeError(error: unknown) {
-  if (error instanceof ApiError && error.status === 409) return 'The project still contains item definitions, so it cannot be deleted yet.'
-  return 'The change could not be saved. Please try again.'
+  if (error instanceof ApiError && error.status === 409) return 'ui:theProjectStillContainsItemDefinitionsSoItCannotBeDeletedYet'
+  return 'ui:theChangeCouldNotBeSavedPleaseTryAgain'
 }

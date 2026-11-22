@@ -21,7 +21,7 @@ export function PalettePreview({ scheme, dark }: { scheme: ColorScheme; dark: bo
         <div className="space-y-3">
           <div className="rounded-lg border border-sidebar-border bg-sidebar p-3 text-sm text-sidebar-foreground">
             <p className="mb-2 text-xs font-medium text-muted-foreground">Navigation example</p>
-            <div className="rounded-md bg-sidebar-accent px-2 py-1.5 font-medium text-sidebar-accent-foreground">I-01 Headlamp system</div>
+            <div className="rounded-md bg-sidebar-accent px-2 py-1.5 font-medium text-sidebar-accent-foreground">IT-1 Headlamp system</div>
             <div className="px-2 py-1.5">A-01 Headlamp command</div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">

@@ -1,8 +1,9 @@
 name: Discord notifications
 
 on:
-  issues:
-    types: [labeled]
+  schedule:
+    - cron: '0 9,19 * * *'
+      timezone: Europe/Berlin
   pull_request_target:
     branches: [main]
     types: [opened, labeled, closed]
@@ -10,11 +11,20 @@ on:
 permissions:
   contents: read
 
+# Both jobs update the same checkpoint file. Keep every queued event.
+concurrency:
+  group: discord-notification-state
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   notify:
-    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    if: github.event_name == 'pull_request_target' && (github.event.action != 'closed' || github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write # Record delivered PR destinations on the state branch.
+      pull-requests: read
     steps:
       - name: Check out trusted base code
         uses: actions/checkout@v7
@@ -24,7 +34,29 @@ jobs:
           sparse-checkout: .github/scripts
       - name: Deliver notifications
         env:
+          GH_TOKEN: ${{ github.token }}
           DISCORD_BACKEND_WEBHOOK: ${{ secrets.DISCORD_BACKEND_WEBHOOK }}
           DISCORD_FRONTEND_WEBHOOK: ${{ secrets.DISCORD_FRONTEND_WEBHOOK }}
           DISCORD_DEVOPS_WEBHOOK: ${{ secrets.DISCORD_DEVOPS_WEBHOOK }}
-        run: python3 .github/scripts/discord_notifications.py --deliver
+        run: python3 .github/scripts/discord_pr_notifications.py
+
+  issue-digest:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # Dedicated digest state branch; never writes main.
+      issues: read
+    steps:
+      - name: Check out trusted default branch code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Deliver issue digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISCORD_BACKEND_WEBHOOK: ${{ secrets.DISCORD_BACKEND_WEBHOOK }}
+          DISCORD_FRONTEND_WEBHOOK: ${{ secrets.DISCORD_FRONTEND_WEBHOOK }}
+          DISCORD_DEVOPS_WEBHOOK: ${{ secrets.DISCORD_DEVOPS_WEBHOOK }}
+        run: python3 .github/scripts/discord_issue_digest.py

@@ -4,11 +4,11 @@ import type { ThreatAttackPathLink, ThreatDamageLink, ThreatScenario, ThreatScen
 // Example threat scenarios and attack paths of the headlamp system, seed data of the mock item API
 // until the backend has their endpoints.
 
-// TS-02 and TS-03 have no links yet, so they can be added on the Relations tab.
+// TS-2 and TS-3 have no links yet, so they can be added on the Relations tab.
 export const headlampThreatScenarios: ThreatScenario[] = [
-  { id: 'ts-01', item_definition_id: 'i-01', code: 'TS-01', title: 'Spoofed headlamp command on the CAN bus', cause_of_compromise: 'Spoofing of CAN messages', elicitation_method: 'STRIDE', technical_notes: 'Needs access to the vehicle CAN bus behind the gateway.' },
-  { id: 'ts-02', item_definition_id: 'i-01', code: 'TS-02', title: 'Replayed headlamp command on the CAN bus', cause_of_compromise: null, elicitation_method: null, technical_notes: null },
-  { id: 'ts-03', item_definition_id: 'i-01', code: 'TS-03', title: 'Denial of service on the body control ECU', cause_of_compromise: null, elicitation_method: null, technical_notes: null },
+  { id: 'ts-01', item_definition_id: 'i-01', code: 'TS-1', title: 'Spoofed headlamp command on the CAN bus', cause_of_compromise: 'Spoofing of CAN messages', elicitation_method: 'STRIDE', technical_notes: 'Needs access to the vehicle CAN bus behind the gateway.' },
+  { id: 'ts-02', item_definition_id: 'i-01', code: 'TS-2', title: 'Replayed headlamp command on the CAN bus', cause_of_compromise: null, elicitation_method: null, technical_notes: null },
+  { id: 'ts-03', item_definition_id: 'i-01', code: 'TS-3', title: 'Denial of service on the body control ECU', cause_of_compromise: null, elicitation_method: null, technical_notes: null },
 ]
 
 export const headlampThreatDamageLinks: ThreatDamageLink[] = [{ threat_scenario_id: 'ts-01', damage_scenario_id: 'ds-01' }]
@@ -19,7 +19,7 @@ export const headlampAttackPaths: AttackPath[] = [
   {
     id: 'ap-01',
     item_definition_id: 'i-01',
-    code: 'AP-01',
+    code: 'AP-1',
     title: 'Compromised navigation ECU via cellular',
     analysis_approach: 'TOP_DOWN',
     is_partial_early_stage: false,
@@ -32,7 +32,7 @@ export const headlampAttackPaths: AttackPath[] = [
   {
     id: 'ap-02',
     item_definition_id: 'i-01',
-    code: 'AP-02',
+    code: 'AP-2',
     title: 'Malicious device on the OBD-II connector',
     analysis_approach: 'TOP_DOWN',
     is_partial_early_stage: false,
@@ -41,10 +41,10 @@ export const headlampAttackPaths: AttackPath[] = [
       { description: 'Send spoofed headlamp commands on the CAN bus.' },
     ],
   },
-  { id: 'ap-03', item_definition_id: 'i-01', code: 'AP-03', title: 'Manipulated firmware update in the workshop', analysis_approach: null, is_partial_early_stage: true, attack_steps_and_weaknesses: [] },
+  { id: 'ap-03', item_definition_id: 'i-01', code: 'AP-3', title: 'Manipulated firmware update in the workshop', analysis_approach: null, is_partial_early_stage: true, attack_steps_and_weaknesses: [] },
 ]
 
-// AP-03 is not rated yet; AP-02 stays the decisive path of the example risk table.
+// AP-3 is not rated yet; AP-2 stays the decisive path of the example risk table.
 export const headlampAttackFeasibilityRatings: AttackFeasibilityRating[] = [
   {
     id: 'afr-01',
