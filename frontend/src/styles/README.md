@@ -93,3 +93,6 @@ is applied to the document root and saved independently as `taramisu.colorScheme
 default to light and Neutral, regardless of the OS preference. The blocking `public/theme-init.js` script applies
 the saved mode before the app and styles load; `features/theme/` keeps mounted controls and tabs in sync.
 If storage is unavailable, switching still works for the current page.
+
+Authentik login and enrollment use these palettes and the Geist stylesheet exported at `/theme-font.css`.
+After editing a palette, regenerate the branding blueprint as described in the [IAM theme guide](../../../iam/README.md#login-theme).
