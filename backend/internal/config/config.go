@@ -13,8 +13,9 @@ import (
 
 const (
 	defaultHTTPAddr = ":8080"
-	// defaultLLMModel answered the tool-calling test for #229 quickly and correctly.
-	defaultLLMModel = "qwen3-30b-a3b-instruct-2507"
+	// defaultLLMModel called a tool for every question in the tests for #299. The faster qwen3-30b-a3b-instruct-2507
+	// answered some of them without a tool and invented project data.
+	defaultLLMModel = "qwen3.6-35b-a3b"
 )
 
 // Config contains the runtime configuration for the API.
