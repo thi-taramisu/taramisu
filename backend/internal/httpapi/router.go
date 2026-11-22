@@ -62,6 +62,16 @@ func OpenAPI() *huma.OpenAPI {
 	return api.OpenAPI()
 }
 
+// selfRouted serves requests that a handler sends to the API itself, such as the assistant's tool reads. Their
+// context comes from the request being handled, which chi has already routed. A routing context of their own
+// makes chi route them by their method and path instead of continuing with the outer request.
+func selfRouted(mux *chi.Mux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, huma.API) {
 	var o options
 	for _, opt := range opts {
@@ -108,7 +118,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewDamageScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
-	handlers.NewAssistant(queries, queries, o.llm, o.llmModel).Register(api)
+	handlers.NewAssistant(queries, selfRouted(mux), o.llm, o.llmModel).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
