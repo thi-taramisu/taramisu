@@ -4,6 +4,7 @@ import type { ThreatScenario, ThreatScenarioRelations } from '../../api/models/t
 import { useItemDamageScenarios, useSetThreatDamageLink } from '../../api/queries/items'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { RelationSection } from '../relations/RelationSection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatDamageSectionProps {
   projectId: string
@@ -33,16 +34,16 @@ export function ThreatDamageSection({ projectId, scenario, linked }: ThreatDamag
       candidatesError={itemScenarios.isLoadingError ? t('ui:loadItemDamageError') : undefined}
       pending={link.isPending}
       error={link.isError ? t('ui:saveRelationError') : undefined}
-      onAdd={(damageScenarioId) => link.mutate({ damageScenarioId, linked: true })}
-      onRemove={(damageScenarioId) => link.mutate({ damageScenarioId, linked: false })}
+      onAdd={(id) => link.mutate({ id, linked: true })}
+      onRemove={(id) => link.mutate({ id, linked: false })}
       renderCreateDialog={(dialog) => (
         <CreateDamageScenarioDialog
           {...dialog}
           projectId={projectId}
           projectName={exampleProject.name}
           lockedItemId={scenario.item_definition_id}
-          onCreated={(created) => link.mutateAsync({ damageScenarioId: created.id, linked: true })}
-          onCreatedError={(created) => t('ui:createdLinkError', { code: created.code })}
+          onCreated={(created) => link.mutateAsync({ id: created.id, linked: true })}
+          onCreatedError={(created) => t('ui:createdLinkError', { code: formatEntityId(created.code) })}
         />
       )}
     />

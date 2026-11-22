@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { ThemeToggle } from '../theme/ThemeToggle'
 import { exampleProject } from '../../api/mocks/data/headlamp'
 import { LanguageSelector } from '@/components/layout/LanguageSelector'
 import { useTranslation } from 'react-i18next'
@@ -21,8 +22,9 @@ export function ProjectHeader({ projectId, children }: { projectId: string; chil
       </NavLink>
       <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">{t('navigation.colourSchemes')}</Link>
       <div className="ml-auto flex items-center gap-2">
-        {children}
         <LanguageSelector />
+        <ThemeToggle />
+        {children}
       </div>
     </header>
   )

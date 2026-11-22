@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { CIA_PROPERTIES } from '../assets/ciaProperties'
-import { TARGET_SELECTION, isSameTarget, toggleTarget, type TargetSelection } from './targetSelection'
+import { isSameTarget, toggleTarget } from './targetSelection'
+import { formatEntityId } from '../workspace/entities'
 
 interface ThreatTargetsFieldProps {
   damageScenarios: ThreatScenarioRelations['damageScenarios']
@@ -11,11 +12,10 @@ interface ThreatTargetsFieldProps {
   onChange: (targets: ThreatTarget[]) => void
   /** Where to link the damage scenarios that offer the targets. */
   relationsPath: string
-  selection?: TargetSelection
 }
 
 /** Part of the Definition form: per linked damage scenario, its causes among which the threat names the targets [RQ-15-03]. */
-export function ThreatTargetsField({ damageScenarios, value, onChange, relationsPath, selection = TARGET_SELECTION }: ThreatTargetsFieldProps) {
+export function ThreatTargetsField({ damageScenarios, value, onChange, relationsPath }: ThreatTargetsFieldProps) {
   const { t } = useTranslation()
   return (
     <fieldset className="grid gap-3">
@@ -29,7 +29,7 @@ export function ThreatTargetsField({ damageScenarios, value, onChange, relations
           .
         </p>
       ) : (
-        damageScenarios.map((scenario) => <DamageScenarioTargets key={scenario.id} scenario={scenario} value={value} onChange={onChange} selection={selection} />)
+        damageScenarios.map((scenario) => <DamageScenarioTargets key={scenario.id} scenario={scenario} value={value} onChange={onChange} />)
       )}
     </fieldset>
   )
@@ -39,49 +39,32 @@ interface DamageScenarioTargetsProps {
   scenario: ThreatScenarioRelations['damageScenarios'][number]
   value: ThreatTarget[]
   onChange: (targets: ThreatTarget[]) => void
-  selection: TargetSelection
 }
 
-function DamageScenarioTargets({ scenario, value, onChange, selection }: DamageScenarioTargetsProps) {
+function DamageScenarioTargets({ scenario, value, onChange }: DamageScenarioTargetsProps) {
   const { t } = useTranslation()
-  const propertyLabel = (property: string) => t(CIA_PROPERTIES.find((p) => p.value === property)?.label ?? property)
-  const groupId = useId()
-  const single = selection === 'one-per-asset'
   const { causes } = scenario
 
   return (
     <fieldset className="overflow-hidden rounded-lg border">
       <legend className="sr-only">
-        {scenario.code} {scenario.name}
+        {formatEntityId(scenario.code)} {scenario.name}
       </legend>
       <div aria-hidden="true" className="flex items-center gap-3 border-b bg-muted/50 px-4 py-2 text-sm">
-        <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{scenario.code}</span>
+        <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(scenario.code)}</span>
         <span className="min-w-0 flex-1 truncate font-medium" title={scenario.name}>
           {scenario.name}
         </span>
       </div>
       {causes.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">{t('ui:noDamageAssets')}</p>}
       <div className="divide-y">
-        {causes.map(({ asset, property }, index) => {
+        {causes.map(({ asset, property }) => {
           const target = { assetId: asset.id, property }
           const checked = value.some((entry) => isSameTarget(entry, target))
-          const toggle = () => onChange(toggleTarget(value, target, selection))
-          // A target from another damage scenario has no entry in this group, but choosing one here would replace it.
-          const elsewhere = single && causes.findIndex((c) => c.asset.id === asset.id) === index
-            ? value.find((entry) => entry.assetId === asset.id && !causes.some((c) => c.asset.id === asset.id && c.property === entry.property))
-            : undefined
+          const toggle = () => onChange(toggleTarget(value, target))
           return (
             <label key={`${asset.id}:${property}`} className="flex min-h-10 cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:bg-muted/30 has-checked:bg-muted/50">
-              <input
-                type={single ? 'radio' : 'checkbox'}
-                name={`${groupId}-${asset.id}`}
-                checked={checked}
-                onChange={toggle}
-                // A checked radio button fires no change event, and a threat can also have no target yet.
-                onClick={() => {
-                  if (single && checked) toggle()
-                }}
-              />
+              <Checkbox checked={checked} onCheckedChange={toggle} />
               <span
                 aria-hidden="true"
                 className={`inline-flex size-6 shrink-0 items-center justify-center rounded-lg border font-mono ${
@@ -91,10 +74,9 @@ function DamageScenarioTargets({ scenario, value, onChange, selection }: DamageS
                 {property}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}{' '}
-                <span className="text-muted-foreground">· {propertyLabel(property)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}{' '}
+                <span className="text-muted-foreground">· {t(CIA_PROPERTIES.find((p) => p.value === property)?.label ?? property)}</span>
               </span>
-              {elsewhere && <span className="shrink-0 text-xs text-muted-foreground">{t('ui:currentProperty', { property: propertyLabel(elsewhere.property) })}</span>}
             </label>
           )
         })}

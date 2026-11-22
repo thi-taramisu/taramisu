@@ -161,6 +161,7 @@ it('switches an existing validation error without changing the form data', async
 
 it('updates existing native validation messages when switching languages', async () => {
   const { user } = renderApp('/projects/headlamp/settings')
+  await screen.findByRole('button', { name: 'Save' })
   const name = screen.getByLabelText('Name') as HTMLInputElement
   await user.clear(name)
   await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -213,4 +214,13 @@ it.each([
   await screen.findByRole('heading', { name: 'Headlamp system' })
   await user.click(screen.getByRole('button', { name: button }))
   expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(labels)
+})
+
+it('translates the attack potential factors and keeps the selected score', async () => {
+  const { user } = renderApp('/projects/headlamp/attack-paths/ap-01/rating')
+  expect(await screen.findByRole('radio', { name: '≤6 months 17 points' })).toBeChecked()
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+  expect(screen.getByRole('radiogroup', { name: 'Verstrichene Zeit' })).toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: '≤6 Monate 17 Punkte' })).toBeChecked()
+  expect(screen.getByText('21 Punkte')).toBeInTheDocument()
 })

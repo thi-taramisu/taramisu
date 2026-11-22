@@ -3,6 +3,7 @@ import { useAuth } from '@/auth/useAuth'
 import { Button } from '@/components/ui/button'
 import { LanguageSelector } from './LanguageSelector'
 import { useTranslation } from 'react-i18next'
+import { ThemeToggle } from '@/features/theme/ThemeToggle'
 
 type AppHeaderProps = {
   collapsed: boolean
@@ -28,6 +29,7 @@ export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
       <span className="text-xl font-semibold">TARAmisu</span>
       <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-3">
         <LanguageSelector />
+        <ThemeToggle />
         {status === 'authenticated' && user ? (
           <>
             <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground" title={user.email}>

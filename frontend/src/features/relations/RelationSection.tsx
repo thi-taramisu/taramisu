@@ -15,8 +15,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import type { EntityType } from '../../api/models/tree'
+import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath, entityTitle } from '../workspace/entities'
 import { AddRelationDialog, type RelationEntry } from './AddRelationDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** What the section passes to its dialog for creating an element. */
 export interface RelationCreateDialogProps {
@@ -56,10 +58,12 @@ interface RelationSectionProps {
 /**
  * One block of a Relations tab (DS / TS Relation wireframes): the linked elements of one type with
  * "+ Add …" and remove. Knows nothing about the element it belongs to, so every Relations tab can use it.
+ * In a read-only project it only lists the links.
  */
 export function RelationSection({ projectId, type, direction, title, pluralLabel, elementLabel, rows, candidates, candidatesLoading, candidatesError, onAdd, onRemove, removeEffect, renderCreateDialog, pending = false, error }: RelationSectionProps) {
   const { t } = useTranslation()
   const headingId = useId()
+  const { canEdit } = useProjectAccess(projectId)
   const Arrow = direction === 'up' ? ArrowUp : ArrowDown
   const directionHint = t(direction === 'up' ? 'ui:aboveHierarchy' : 'ui:belowHierarchy')
   // Gets the focus after a removal, because the row with the remove button is gone then.
@@ -87,7 +91,7 @@ export function RelationSection({ projectId, type, direction, title, pluralLabel
         <h2 id={headingId} className="flex-1 text-sm font-medium">
           {title}
         </h2>
-        <AddRelationDialog elementLabel={elementLabel} pluralLabel={pluralLabel} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} triggerRef={setAddButton} onAdd={onAdd} onCreate={renderCreateDialog && ((name) => setCreating(({ key }) => ({ open: true, name, key: key + 1 })))} />
+        {canEdit && <AddRelationDialog elementLabel={elementLabel} pluralLabel={pluralLabel} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} triggerRef={setAddButton} onAdd={onAdd} onCreate={renderCreateDialog && ((name) => setCreating(({ key }) => ({ open: true, name, key: key + 1 })))} />}
       </div>
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">{t('ui:noLinkedElements', { elements: pluralLabel })}</p>
@@ -96,22 +100,24 @@ export function RelationSection({ projectId, type, direction, title, pluralLabel
           {rows.map((row) => (
             <li key={row.id} className="px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{row.code}</span>
+                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(row.code)}</span>
                 <div className="min-w-0 flex-1 truncate text-sm">
                   <Link to={entityPath(projectId, type, row.id)} title={row.name} className="hover:underline">
                     {row.name}
                   </Link>
                 </div>
                 {row.details}
-                <RemoveRelationButton
-                  row={row}
-                  effect={removeEffect ?? t('ui:onlyLinkRemoved')}
-                  pending={pending}
-                  onRemove={() => {
-                    removingId.current = row.id
-                    onRemove(row.id)
-                  }}
-                />
+                {canEdit && (
+                  <RemoveRelationButton
+                    row={row}
+                    effect={removeEffect ?? t('ui:onlyLinkRemoved')}
+                    pending={pending}
+                    onRemove={() => {
+                      removingId.current = row.id
+                      onRemove(row.id)
+                    }}
+                  />
+                )}
               </div>
             </li>
           ))}

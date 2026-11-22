@@ -13,6 +13,7 @@ import { AddAssetMenu } from '../assets/AddAssetMenu'
 import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
 import { entityPath, findNode } from '../workspace/entities'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetLink {
   assetId: string
@@ -100,7 +101,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     }
     const empty = linked.find((link) => link.properties.length === 0)
     if (empty) {
-      setLinkError({ key: 'ui:propertyRequired', code: empty.asset.code })
+      setLinkError({ key: 'ui:propertyRequired', code: formatEntityId(empty.asset.code) })
       return undefined
     }
     const scenario = await createDamageScenario.mutateAsync({
@@ -121,7 +122,11 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       initialName={initialName}
       namePlaceholder={t('ui:damageNamePlaceholder')}
       hint={t('ui:damageTreeHint')}
-      errorMessage={unfinished ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: unfinished.code })) : t('ui:createDamageError')}
+      errorMessage={
+        unfinished
+          ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
+          : t('ui:createDamageError')
+      }
       locked={Boolean(unfinished)}
       onCreate={create}
       onReset={() => {
@@ -192,10 +197,10 @@ function AssetLinkChip({ asset, properties, onChange, onRemove }: AssetLinkChipP
   return (
     <li className="flex items-center gap-3 rounded-full border bg-muted/50 py-1 pr-1 pl-3 text-sm">
       <span>
-        <span className="font-mono text-xs text-muted-foreground">{asset.code}</span> {asset.name}
+        <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}
       </span>
       <AssetPropertyToggles asset={asset} selected={properties} onChange={onChange} />
-      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={t('ui:removeNamed', { name: `${asset.code} ${asset.name}` })} onClick={onRemove}>
+      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`${t('ui:remove')} ${formatEntityId(asset.code)} ${asset.name}`} onClick={onRemove}>
         <X aria-hidden="true" />
       </Button>
     </li>

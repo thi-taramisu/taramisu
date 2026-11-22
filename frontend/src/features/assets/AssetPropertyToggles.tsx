@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import type { CiaProperty } from '../../api/models/asset'
 import type { EntityRef } from '../../api/models/tree'
 import { CIA_PROPERTIES } from './ciaProperties'
+import { formatEntityId } from '../workspace/entities'
 
 interface AssetPropertyTogglesProps {
   asset: Pick<EntityRef, 'code'> & { properties: CiaProperty[] }
@@ -14,14 +15,16 @@ interface AssetPropertyTogglesProps {
   requireOne?: boolean
   /** Also shows the properties the asset does not have, so C / I / A line up in a table. */
   showUnavailable?: boolean
+  /** Shows the selection without changing it, e.g. in a read-only project. */
+  disabled?: boolean
 }
 
 /** C / I / A toggles of an asset link (DS Relation wireframe); only the properties the asset has can be linked. */
-export function AssetPropertyToggles({ asset, selected, onChange, pending = false, requireOne = false, showUnavailable = false }: AssetPropertyTogglesProps) {
+export function AssetPropertyToggles({ asset, selected, onChange, pending = false, requireOne = false, showUnavailable = false, disabled = false }: AssetPropertyTogglesProps) {
   const { t } = useTranslation()
   return (
-    <fieldset className="flex gap-1">
-      <legend className="sr-only">{t('ui:assetProperties', { code: asset.code })}</legend>
+    <fieldset disabled={disabled} className="flex gap-1">
+      <legend className="sr-only">{t('ui:assetProperties', { code: formatEntityId(asset.code) })}</legend>
       {CIA_PROPERTIES.filter((p) => showUnavailable || asset.properties.includes(p.value)).map((p) => {
         if (!asset.properties.includes(p.value)) {
           const note = t('ui:unavailableAssetProperty', { property: t(p.label) })
@@ -42,7 +45,7 @@ export function AssetPropertyToggles({ asset, selected, onChange, pending = fals
             size="icon-xs"
             className={`font-mono ${pressed ? '' : 'text-muted-foreground'} ${pending ? 'opacity-50' : ''}`}
             aria-pressed={pressed}
-            aria-label={`${asset.code} ${t(p.label)}`}
+            aria-label={`${formatEntityId(asset.code)} ${t(p.label)}`}
             title={locked ? t('ui:keepLinkedProperty', { property: t(p.label) }) : t(p.label)}
             // aria-disabled keeps the full contrast and the explaining tooltip of a locked property.
             aria-disabled={pending || locked}

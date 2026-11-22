@@ -1,17 +1,18 @@
-import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
 import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
 import { EntityBreadcrumbs } from './EntityBreadcrumbs'
-import { Placeholder } from './Placeholder'
-import { useTranslation } from 'react-i18next'
+
+const RelationGraphView = lazy(() => import('../graph/RelationGraphView').then((module) => ({ default: module.RelationGraphView })))
 
 interface EntityPageProps {
   type: EntityType
   /** Heading; defaults to the name of the element in the project tree. */
   name?: string
-  /** Display ID such as DS-01, shown as #01 next to the type; defaults to the code in the project tree. */
+  /** Display ID such as DS-1, shown next to the type; defaults to the code in the project tree. */
   code?: string
   /** Buttons on the right of the header, e.g. delete. */
   actions?: ReactNode
@@ -55,7 +56,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
         {actions}
       </div>
       {searchParams.get('view') === 'graph' ? (
-        <Placeholder title={t('ui:graphView')} />
+        <Suspense fallback={<output>{t('ui:loadingGraph')}</output>}><RelationGraphView type={type} /></Suspense>
       ) : (
         <>
           <nav aria-label={t('navigation.entityTabs', { type: label })} className="flex flex-wrap gap-4 border-b">

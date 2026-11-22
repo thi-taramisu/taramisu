@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import type { ThreatScenario } from '../../api/models/threatScenario'
 import { useItemAttackPaths, useSetThreatAttackPathLink, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
 import { RelationSection } from '../relations/RelationSection'
+import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 import { ThreatDamageSection } from './ThreatDamageSection'
 
 /** Relations tab of a threat scenario ("TS Relations" wireframe): its damage scenarios and attack paths. */
@@ -21,20 +22,12 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
   const itemPaths = useItemAttackPaths(projectId, scenario.item_definition_id)
   const pathLink = useSetThreatAttackPathLink(projectId, scenario.id)
 
-  if (!relations.data) {
-    return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">{t('ui:loadRelationsError')}</p>
-    ) : (
-      <output className="text-sm text-muted-foreground">{t('ui:loadingRelations')}</output>
-    )
-  }
+  if (!relations.data) return <RelationsQueryStatus query={relations} />
 
   const { damageScenarios, attackPaths } = relations.data
   return (
     <div className="space-y-4">
-      {relations.isError && (
-        <p role="alert" className="text-sm text-destructive">{t('ui:refreshRelationsError')}</p>
-      )}
+      <RelationsQueryStatus query={relations} />
       <ThreatDamageSection projectId={projectId} scenario={scenario} linked={damageScenarios} />
       <RelationSection
         projectId={projectId}
@@ -48,8 +41,8 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
         candidatesError={itemPaths.isLoadingError ? t('ui:loadItemPathsError') : undefined}
         pending={pathLink.isPending}
         error={pathLink.isError ? t('ui:saveRelationError') : undefined}
-        onAdd={(attackPathId) => pathLink.mutate({ attackPathId, linked: true })}
-        onRemove={(attackPathId) => pathLink.mutate({ attackPathId, linked: false })}
+        onAdd={(id) => pathLink.mutate({ id, linked: true })}
+        onRemove={(id) => pathLink.mutate({ id, linked: false })}
         rows={attackPaths}
       />
       <p className="text-xs text-muted-foreground">

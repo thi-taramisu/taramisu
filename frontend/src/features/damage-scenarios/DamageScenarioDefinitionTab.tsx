@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import { useDamageScenario, useUpdateDamageScenario } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 
 const TEXT_FIELDS = [
   {
@@ -44,6 +45,7 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
   const [saved, setSaved] = useState(values)
   const [titleError, setTitleError] = useState<string>()
   const update = useUpdateDamageScenario(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   const dirty = (Object.keys(values) as (keyof FormValues)[]).some((key) =>
     // The title is saved trimmed, so surrounding spaces alone are no change.
     key === 'title' ? values.title.trim() !== saved.title : values[key] !== saved[key],
@@ -51,7 +53,8 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
 
   function change(key: keyof FormValues, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
     if (key === 'title') setTitleError(undefined)
   }
 
@@ -69,8 +72,9 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
         road_user_harm_description: values.road_user_harm_description || null,
       },
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
+          setValues((current) => (current === values ? toValues(updated) : current))
           setSaved(toValues(updated))
         },
       },
@@ -79,47 +83,48 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
-        <Input
-          id={`${id}-title`}
-          value={values.title}
-          required
-          onChange={(event) => change('title', event.target.value)}
-          aria-invalid={Boolean(titleError)}
-          aria-describedby={titleError ? `${id}-title-error` : undefined}
-        />
-        {titleError && (
-          <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-            {t(titleError)}
-          </p>
-        )}
-      </div>
-      {TEXT_FIELDS.map((field) => (
-        <div key={field.key} className="grid gap-2">
-          <Label htmlFor={`${id}-${field.key}`}>{t(field.label)}</Label>
-          <Textarea
-            id={`${id}-${field.key}`}
-            value={values[field.key]}
-            placeholder={t(field.placeholder)}
-            onChange={(event) => change(field.key, event.target.value)}
+      {/* Read-only projects show the fields disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
+          <Input
+            id={`${id}-title`}
+            value={values.title}
+            required
+            onChange={(event) => change('title', event.target.value)}
+            aria-invalid={Boolean(titleError)}
+            aria-describedby={titleError ? `${id}-title-error` : undefined}
           />
+          {titleError && (
+            <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
+              {t(titleError)}
+            </p>
+          )}
         </div>
-      ))}
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          {t('ui:save')}
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && t('ui:saved')}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            {t('ui:saveDamageError')}
-          </p>
-        )}
-      </div>
+        {TEXT_FIELDS.map((field) => (
+          <div key={field.key} className="grid gap-2">
+            <Label htmlFor={`${id}-${field.key}`}>{t(field.label)}</Label>
+            <Textarea
+              id={`${id}-${field.key}`}
+              value={values[field.key]}
+              placeholder={t(field.placeholder)}
+              onChange={(event) => change(field.key, event.target.value)}
+            />
+          </div>
+        ))}
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>{t('ui:save')}</Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && t('ui:saved')}
+          </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveDamageError')}</p>
+          )}
+        </div>
+      )}
     </form>
   )
 }

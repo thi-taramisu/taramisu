@@ -4,6 +4,7 @@ import { DeleteItemDialog } from './DeleteItemDialog'
 import { isNotFound } from '../../api/errors'
 import { useItem, useItemAssets } from '../../api/queries/items'
 import { useTranslation } from 'react-i18next'
+import { useProjectAccess } from '../../api/queries/projects'
 
 /** Item page: header from the item API, delete action and the asset count on the Assets tab. */
 export function ItemPage() {
@@ -11,6 +12,7 @@ export function ItemPage() {
   const { projectId = '', entityId = '' } = useParams()
   const item = useItem(projectId, entityId)
   const assets = useItemAssets(projectId, entityId)
+  const { canEdit } = useProjectAccess(projectId)
 
   if (isNotFound(item.error)) {
     return (
@@ -43,7 +45,7 @@ export function ItemPage() {
               {t('ui:refreshItemError')}
             </p>
           )}
-          <DeleteItemDialog item={item.data} />
+          {canEdit && <DeleteItemDialog item={item.data} />}
         </>
       }
       tabLabels={assets.data ? { assets: t('navigation.assetsWithCount', { count: assets.data.length }) } : undefined}

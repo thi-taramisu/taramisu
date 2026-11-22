@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { MAX_IMAGE_SIZE, IMAGE_TYPES, type ImageError, validateImage } from '@/lib/imageUpload'
 
 /** File input for the project image with a local preview; the file is not uploaded yet. */
-export function ProjectImageInput({ defaultValue }: { defaultValue: string | null }) {
+export function ProjectImageInput({ defaultValue, generatedImage }: { defaultValue: string | null; generatedImage?: string }) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState(defaultValue)
@@ -54,6 +54,8 @@ export function ProjectImageInput({ defaultValue }: { defaultValue: string | nul
         <AspectRatio ratio={3 / 1} className="flex items-center justify-center overflow-hidden rounded-lg border bg-muted">
           {imageSource ? (
             <img src={imageSource} alt={t('ui:preview')} className="size-full object-cover" />
+          ) : generatedImage ? (
+            <img src={generatedImage} alt="" className="size-full object-cover" />
           ) : (
             <ImageIcon aria-hidden="true" className="size-8 text-muted-foreground" />
           )}

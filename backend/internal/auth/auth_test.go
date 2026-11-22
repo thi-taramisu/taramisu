@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -221,31 +222,45 @@ func TestRejectMissingInvalidOrMalformedTokens(t *testing.T) {
 	mac.Write([]byte(header + "." + payload))
 	hs256Token := header + "." + payload + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 
+	// Missing and expired tokens are routine and logged at info; other failures at warn.
+	logged := func(level, reason string) string {
+		return `"level":"` + level + `","msg":"authentication failed","reason":"` + reason + `"`
+	}
+	logMissing, logExpired := logged("INFO", "missing_token"), logged("INFO", "expired_token")
+	logInvalid, logClaims, logDecode := logged("WARN", "invalid_token"), logged("WARN", "missing_claims"), logged("WARN", "invalid_claims")
 	tests := []struct {
 		name   string
 		header string
+		log    string // expected log entry
 	}{
-		{"missing header", ""},
-		{"basic auth scheme", "Basic dXNlcjpwYXNz"},
-		{"empty bearer token", "Bearer    "},
-		{"malformed jwt", "Bearer not-a-jwt"},
-		{"tampered signature", "Bearer " + tampered},
-		{"disallowed algorithm HS256", "Bearer " + hs256Token},
-		{"wrong issuer", "Bearer " + f.signToken(t, map[string]any{"iss": "https://other.example"})},
-		{"wrong audience", "Bearer " + f.signToken(t, map[string]any{"aud": "other-client"})},
-		{"expired token", "Bearer " + f.signToken(t, map[string]any{"exp": time.Now().Add(-time.Minute).Unix()})},
-		{"missing sub", "Bearer " + f.signToken(t, map[string]any{"sub": ""})},
-		{"blank sub", "Bearer " + f.signToken(t, map[string]any{"sub": "   "})},
-		{"missing name", "Bearer " + f.signToken(t, map[string]any{"name": nil})},
-		{"blank name", "Bearer " + f.signToken(t, map[string]any{"name": "   "})},
-		{"missing email", "Bearer " + f.signToken(t, map[string]any{"email": nil})},
-		{"blank email", "Bearer " + f.signToken(t, map[string]any{"email": "   "})},
-		{"non-string claim type", "Bearer " + f.signToken(t, map[string]any{"name": 12345})},
+		{"missing header", "", logMissing},
+		{"basic auth scheme", "Basic dXNlcjpwYXNz", logMissing},
+		{"empty bearer token", "Bearer    ", logMissing},
+		{"malformed jwt", "Bearer not-a-jwt", logInvalid},
+		{"tampered signature", "Bearer " + tampered, logInvalid},
+		{"disallowed algorithm HS256", "Bearer " + hs256Token, logInvalid},
+		{"wrong issuer", "Bearer " + f.signToken(t, map[string]any{"iss": "https://other.example"}), logInvalid},
+		{"wrong audience", "Bearer " + f.signToken(t, map[string]any{"aud": "other-client"}), logInvalid},
+		{"expired token", "Bearer " + f.signToken(t, map[string]any{"exp": time.Now().Add(-time.Minute).Unix()}), logExpired},
+		{"missing sub", "Bearer " + f.signToken(t, map[string]any{"sub": ""}), logClaims},
+		{"blank sub", "Bearer " + f.signToken(t, map[string]any{"sub": "   "}), logClaims},
+		{"missing name", "Bearer " + f.signToken(t, map[string]any{"name": nil}), logClaims},
+		{"blank name", "Bearer " + f.signToken(t, map[string]any{"name": "   "}), logClaims},
+		{"missing email", "Bearer " + f.signToken(t, map[string]any{"email": nil}), logClaims},
+		{"blank email", "Bearer " + f.signToken(t, map[string]any{"email": "   "}), logClaims},
+		{"non-string claim type", "Bearer " + f.signToken(t, map[string]any{"name": 12345}), logDecode},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var logs strings.Builder
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
 			w := f.requestWithAuth(tt.header)
+			slog.SetDefault(previous)
+			if !strings.Contains(logs.String(), tt.log) {
+				t.Errorf("log = %s, want %s", logs.String(), tt.log)
+			}
 			if w.Code != http.StatusUnauthorized {
 				t.Fatalf("got status %d, want 401 (%s)", w.Code, w.Body.String())
 			}

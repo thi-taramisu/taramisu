@@ -8,36 +8,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ImpactCategory, ImpactRating, ImpactRatingValue } from '../../api/models/damageScenario'
 import { useImpactRatings, useUpdateImpactRatings } from '../../api/queries/items'
-
-const CATEGORIES: { value: ImpactCategory; label: string }[] = [
-  { value: 'SAFETY', label: 'ui:safety' },
-  { value: 'FINANCIAL', label: 'ui:financial' },
-  { value: 'OPERATIONAL', label: 'ui:operational' },
-  { value: 'PRIVACY', label: 'ui:privacy' },
-]
+import { useProjectAccess } from '../../api/queries/projects'
+import { IMPACT_CATEGORIES, IMPACT_CLASSES, IMPACT_SCALE } from './impactScale'
 
 interface RatingOption {
   value: ImpactRatingValue
   label: string
 }
 
-const SCALE: RatingOption[] = [
-  { value: 'SEVERE', label: 'ui:severe' },
-  { value: 'MAJOR', label: 'ui:major' },
-  { value: 'MODERATE', label: 'ui:moderate' },
-  { value: 'NEGLIGIBLE', label: 'ui:negligible' },
-]
-
 // Not a level of the scale, so it is shown apart from it.
 const OMITTED: RatingOption = { value: 'OMITTED', label: 'ui:omitted' }
-
-const RATING_CLASSES: Record<ImpactRatingValue, string> = {
-  SEVERE: 'border-impact-severe-border bg-impact-severe text-impact-severe-foreground',
-  MAJOR: 'border-impact-major-border bg-impact-major text-impact-major-foreground',
-  MODERATE: 'border-impact-moderate-border bg-impact-moderate text-impact-moderate-foreground',
-  NEGLIGIBLE: 'border-impact-negligible-border bg-impact-negligible text-impact-negligible-foreground',
-  OMITTED: 'border-impact-omitted-border bg-impact-omitted text-impact-omitted-foreground',
-}
 
 interface CategoryValues {
   rating: ImpactRatingValue | null
@@ -50,7 +30,7 @@ type FormValues = Record<ImpactCategory, CategoryValues>
 
 function toValues(ratings: ImpactRating[]): FormValues {
   return Object.fromEntries(
-    CATEGORIES.map(({ value }) => {
+    IMPACT_CATEGORIES.map(({ value }) => {
       const rating = ratings.find((r) => r.impact_category === value)
       return [
         value,
@@ -68,9 +48,9 @@ type FormErrors = Partial<Record<ImpactCategory, string>>
 
 /** A category can only be omitted with a rationale and in favour of a rated category [PM-15-07]. */
 function omissionErrors(values: FormValues): FormErrors {
-  const rated = CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
+  const rated = IMPACT_CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
   const errors: FormErrors = {}
-  for (const { value } of CATEGORIES) {
+  for (const { value } of IMPACT_CATEGORIES) {
     if (values[value].rating !== 'OMITTED') continue
     if (!rated) errors[value] = 'ui:omitRequiresRating'
     else if (!values[value].rationale.trim()) errors[value] = 'ui:omitRequiresRationale'
@@ -104,13 +84,15 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   const [saved, setSaved] = useState(values)
   const [errors, setErrors] = useState<FormErrors>({})
   const update = useUpdateImpactRatings(projectId, damageScenarioId)
-  const dirty = CATEGORIES.some(({ value }) =>
+  const { canEdit } = useProjectAccess(projectId)
+  const dirty = IMPACT_CATEGORIES.some(({ value }) =>
     (Object.keys(values[value]) as (keyof CategoryValues)[]).some((key) => values[value][key] !== saved[value][key]),
   )
 
   function change(category: ImpactCategory, patch: Partial<CategoryValues>) {
     setValues((prev) => ({ ...prev, [category]: { ...prev[category], ...patch } }))
-    update.reset()
+    // Keeps Save disabled while a request runs; resetting would also drop its success callback.
+    if (!update.isPending) update.reset()
     // A change in one category can resolve the error of another, e.g. rating it in favour of an omission.
     setErrors({})
   }
@@ -121,7 +103,7 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
     update.mutate(
-      CATEGORIES.map(({ value }) => ({
+      IMPACT_CATEGORIES.map(({ value }) => ({
         impact_category: value,
         rating_value: values[value].rating,
         is_omitted_by_pm_15_07: values[value].rating === 'OMITTED',
@@ -129,8 +111,9 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
         reused_from_functional_safety: value === 'SAFETY' && values[value].reusedFromFunctionalSafety,
       })),
       {
+        // Takes over the saved values only where nothing was edited while saving.
         onSuccess: (updated) => {
-          setValues(toValues(updated))
+          setValues((current) => (current === values ? toValues(updated) : current))
           setSaved(toValues(updated))
         },
       },
@@ -141,29 +124,28 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
   return (
     <form onSubmit={handleSubmit} noValidate className="@container grid max-w-3xl gap-4">
       <div className="divide-y justify-self-start rounded-lg border px-4">
-        {CATEGORIES.map((category) => (
+        {IMPACT_CATEGORIES.map((category) => (
           <ImpactCategoryRow
             key={category.value}
             category={category}
             values={values[category.value]}
             error={errors[category.value]}
+            readOnly={!canEdit}
             onChange={(patch) => change(category.value, patch)}
           />
         ))}
       </div>
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || update.isPending}>
-          {t('ui:save')}
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && t('ui:saved')}
-        </output>
-        {update.isError && (
-          <p role="alert" className="text-sm text-destructive">
-            {t('ui:saveImpactError')}
-          </p>
-        )}
-      </div>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>{t('ui:save')}</Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {update.isSuccess && !dirty && t('ui:saved')}
+          </output>
+          {update.isError && (
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveImpactError')}</p>
+          )}
+        </div>
+      )}
     </form>
   )
 }
@@ -172,37 +154,43 @@ interface RatingSegmentProps {
   name: string
   option: RatingOption
   checked: boolean
+  disabled: boolean
   onSelect: () => void
   className?: string
 }
 
 /** Radio styled as a segment; its width depends on the space only, so selecting or clearing a rating moves nothing. */
-function RatingSegment({ name, option, checked, onSelect, className }: RatingSegmentProps) {
+function RatingSegment({ name, option, checked, disabled, onSelect, className }: RatingSegmentProps) {
   const { t } = useTranslation()
   return (
     <label
       className={cn(
-        'relative flex min-h-10 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors',
+        'relative flex h-8 min-w-0 cursor-pointer items-center justify-center border text-sm transition-colors has-[:disabled]:cursor-default',
         'has-[:focus-visible]:z-20 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
-        checked ? `z-10 font-medium ${RATING_CLASSES[option.value]}` : 'border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+        checked
+          ? `z-10 font-medium ${IMPACT_CLASSES[option.value]}`
+          : 'border-input bg-background text-muted-foreground not-has-[:disabled]:hover:bg-muted not-has-[:disabled]:hover:text-foreground',
         className,
       )}
     >
-      <input type="radio" name={name} value={option.value} checked={checked} onChange={onSelect} className="sr-only" />
-      <span className="px-1 text-center text-xs leading-tight">{t(option.label)}</span>
+      {/* Disabled ratings keep their colours, so a read-only project still shows them clearly. */}
+      <input type="radio" name={name} value={option.value} checked={checked} disabled={disabled} onChange={onSelect} className="sr-only" />
+      <span className="truncate px-1">{t(option.label)}</span>
     </label>
   )
 }
 
 interface ImpactCategoryRowProps {
-  category: (typeof CATEGORIES)[number]
+  category: (typeof IMPACT_CATEGORIES)[number]
   values: CategoryValues
   error?: string
+  /** Shows the rating and rationale without changing them; the rationale can still be opened. */
+  readOnly: boolean
   onChange: (patch: Partial<CategoryValues>) => void
 }
 
 /** One impact category: the rating, and below it the rationale, collapsed to a preview until opened. */
-function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategoryRowProps) {
+function ImpactCategoryRow({ category, values, error, readOnly, onChange }: ImpactCategoryRowProps) {
   const { t } = useTranslation()
   const id = useId()
   const [open, setOpen] = useState(false)
@@ -230,20 +218,22 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
       <div className="flex items-center gap-3">
         {/* Five equal tracks of at most 6rem, so the segments only depend on the available space. */}
         <div role="radiogroup" aria-labelledby={`${id}-label`} className="grid min-w-0 flex-1 grid-cols-[repeat(5,minmax(0,6rem))]">
-          {SCALE.map((option, index) => (
+          {IMPACT_SCALE.map((option, index) => (
             <RatingSegment
               key={option.value}
               name={name}
               option={option}
               checked={rating === option.value}
+              disabled={readOnly}
               onSelect={() => selectRating(option.value)}
-              className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === SCALE.length - 1 && 'rounded-r-md')}
+              className={cn(index === 0 ? 'rounded-l-md' : '-ml-px', index === IMPACT_SCALE.length - 1 && 'rounded-r-md')}
             />
           ))}
           <RatingSegment
             name={name}
             option={OMITTED}
             checked={rating === OMITTED.value}
+            disabled={readOnly}
             onSelect={() => selectRating(OMITTED.value)}
             className="ml-3 rounded-md"
           />
@@ -254,7 +244,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           variant="ghost"
           size="icon-sm"
           className="shrink-0 text-muted-foreground"
-          disabled={!rating && !rationale}
+          disabled={readOnly || (!rating && !rationale)}
           aria-label={t('ui:clearCategory', { category: t(category.label) })}
           title={t('ui:clearRating')}
           onClick={clear}
@@ -279,6 +269,7 @@ function ImpactCategoryRow({ category, values, error, onChange }: ImpactCategory
           <Textarea
             aria-label={t('ui:categoryRationale', { category: t(category.label) })}
             value={rationale}
+            disabled={readOnly}
             onChange={(event) => onChange({ rationale: event.target.value })}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? `${id}-error` : undefined}
