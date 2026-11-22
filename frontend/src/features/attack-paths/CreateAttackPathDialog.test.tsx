@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import { renderApp } from '../../test/renderApp'
@@ -8,6 +8,13 @@ const TS01 = 'TS-1 Spoofed headlamp command on the CAN bus'
 
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
 const location = () => screen.getByTestId('location')
+
+/** "Add Threat Scenario" once the threat scenarios are loaded; before, it is disabled and a click does nothing. */
+async function addButton(dialog: HTMLElement) {
+  const button = within(dialog).getByRole('button', { name: 'Add Threat Scenario' })
+  await waitFor(() => expect(button).toBeEnabled())
+  return button
+}
 
 async function openDialog(user: ReturnType<typeof renderApp>['user']) {
   await user.click(await within(tree()).findByRole('button', { name: 'New' }))
@@ -35,7 +42,7 @@ describe('create attack path', () => {
     const { user } = renderApp(`${project}/items/i-01`)
     const dialog = await openDialog(user)
 
-    await user.click(within(dialog).getByRole('button', { name: 'Add Threat Scenario' }))
+    await user.click(await addButton(dialog))
     await user.click(await screen.findByRole('menuitem', { name: TS01 }))
     await user.type(within(dialog).getByLabelText(/Name/), 'Replay via the OBD port')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
@@ -47,7 +54,7 @@ describe('create attack path', () => {
     const { user } = renderApp(`${project}/items/i-01`)
     const dialog = await openDialog(user)
 
-    await user.click(await within(dialog).findByRole('button', { name: 'Add Threat Scenario' }))
+    await user.click(await addButton(dialog))
 
     expect(await screen.findByRole('menuitem', { name: TS01 })).toBeInTheDocument()
     // TS-2 and TS-3 lead to no damage scenario, so they are not in the tree.
@@ -68,7 +75,8 @@ describe('create attack path', () => {
     const dialog = await openDialog(user)
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Replay via the OBD port')
-    await within(dialog).findByRole('button', { name: 'Add Threat Scenario' })
+    // Before the threat scenarios are loaded, Create would say they are still loading.
+    await addButton(dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Link at least one threat scenario.')

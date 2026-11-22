@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { ApiError } from '../../api/errors'
 import { describe, expect, it } from 'vitest'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
@@ -9,6 +9,13 @@ const DS01 = 'DS-1 Headlamp turns off while driving at night'
 
 const tree = () => screen.getByRole('navigation', { name: 'Project elements' })
 const location = () => screen.getByTestId('location')
+
+/** "Add Damage Scenario" once the damage scenarios are loaded; before, it is disabled and a click does nothing. */
+async function addButton(dialog: HTMLElement) {
+  const button = within(dialog).getByRole('button', { name: 'Add Damage Scenario' })
+  await waitFor(() => expect(button).toBeEnabled())
+  return button
+}
 
 async function openDialog(user: ReturnType<typeof renderApp>['user']) {
   await user.click(await within(tree()).findByRole('button', { name: 'New' }))
@@ -31,7 +38,7 @@ describe('create threat scenario', () => {
 
     const dialog = await openDialog(user)
 
-    await within(dialog).findByRole('button', { name: 'Add Damage Scenario' })
+    await addButton(dialog)
     expect(calls).toBe(1)
   })
 
@@ -56,7 +63,7 @@ describe('create threat scenario', () => {
     const dialog = await openDialog(user)
     expect(within(dialog).queryByRole('button', { name: `Remove ${DS01}` })).not.toBeInTheDocument()
 
-    await user.click(within(dialog).getByRole('button', { name: 'Add Damage Scenario' }))
+    await user.click(await addButton(dialog))
     await user.click(await screen.findByRole('menuitem', { name: DS01 }))
     await user.type(within(dialog).getByLabelText(/Name/), 'Forged dimming command')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
@@ -172,7 +179,7 @@ describe('create threat scenario from a Relations tab', () => {
     api.attackPaths.linkThreatScenario = () => Promise.reject(new ApiError(500, 'Server error'))
     const { user } = renderApp(`${project}/attack-paths/ap-01/relations`, api)
     const dialog = await createFromRelations(user, 'Forged dimming command')
-    await user.click(dialog.getByRole('button', { name: 'Add Damage Scenario' }))
+    await user.click(await addButton(screen.getByRole('dialog', { name: 'New Threat Scenario' })))
     await user.click(await screen.findByRole('menuitem', { name: DS01 }))
 
     await user.click(dialog.getByRole('button', { name: 'Create & open' }))
