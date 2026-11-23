@@ -45,6 +45,23 @@ class DeliveryTests(unittest.TestCase):
         send.assert_not_called()
         github.approved_pulls.assert_called_once()
 
+    @patch("discord_issue_digest.send_webhook")
+    def test_failed_digest_warns_and_preserves_only_failed_route(self, send):
+        github = Mock()
+        since = "2026-11-17T09:00:00Z"
+        github.load.return_value = {"initial_since": since, "channels": {}}
+        item = event_payload(labels=["backend", "frontend"])["issue"]
+        github.issues.return_value = [dict(item, created_at=since)]
+        github.approved_pulls.return_value = ([], 0, "")
+        env = {"DISCORD_BACKEND_WEBHOOK": "one", "DISCORD_FRONTEND_WEBHOOK": "two"}
+        send.side_effect = [DeliveryError("unavailable"), None]
+        with patch("builtins.print") as log:
+            deliver_digest(github, env, datetime(2026, 11, 17, 19, tzinfo=timezone.utc))
+        log.assert_any_call("::warning title=Discord notification undelivered::backend: unavailable")
+        channels = github.load.return_value["channels"]
+        self.assertEqual(channels["DISCORD_BACKEND_WEBHOOK"], {"since": since, "sent": []})
+        self.assertEqual(channels["DISCORD_FRONTEND_WEBHOOK"]["since"], "2026-11-17T19:00:00Z")
+
     @patch("discord_pr_notifications.send_webhook")
     def test_pr_overlap_and_merge_are_each_announced_once(self, send):
         for actions in (("opened", "labeled"), ("labeled", "opened")):
@@ -72,8 +89,9 @@ class DeliveryTests(unittest.TestCase):
         event = event_payload("pull_request_target", labels=["backend"])
         github.request.return_value = dict(event["pull_request"], state="open")
         send.side_effect = DeliveryError("unavailable")
-        with self.assertRaises(DeliveryError):
+        with patch("builtins.print") as log:
             deliver_pr(github, event, ENV)
+        log.assert_any_call("::warning title=Discord notification undelivered::backend: unavailable")
         github.save.assert_not_called()
         send.reset_mock(side_effect=True)
         deliver_pr(github, event, ENV)

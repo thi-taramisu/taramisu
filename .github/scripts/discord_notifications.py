@@ -54,6 +54,11 @@ class DeliveryError(Exception):
     pass
 
 
+def warn_delivery(labels, error):
+    # Route labels come from LABEL_WEBHOOKS and transport errors omit secrets.
+    print(f"::warning title=Discord notification undelivered::{', '.join(labels)}: {error}")
+
+
 def send_webhook(webhook, payload):
     try:
         parsed = urlsplit(webhook)

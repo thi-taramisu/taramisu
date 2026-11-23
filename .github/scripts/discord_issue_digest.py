@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from discord_notifications import (
     DeliveryError, GitHub, ISSUE_COLOR, LABEL_WEBHOOKS, NO_MENTIONS,
-    destinations, display_text, send_webhook, timestamp,
+    destinations, display_text, send_webhook, timestamp, warn_delivery,
 )
 
 
@@ -65,7 +65,6 @@ def deliver_digest(github, environ, now):
     since = min(checkpoint["since"] for _, _, checkpoints in channels for checkpoint in checkpoints.values())
     # Deduplicate API results and exclude PRs defensively, including on retries.
     issues = {item["number"]: item for item in github.issues(since, until) if "pull_request" not in item}
-    failed = False
     for webhook, labels, checkpoints in channels:
         pending = sorted((item for item in issues.values()
                           if any(label["name"] in labels
@@ -73,35 +72,34 @@ def deliver_digest(github, environ, now):
                                  and item["number"] not in checkpoints[LABEL_WEBHOOKS[label["name"]]]["sent"]
                                  for label in item["labels"])),
                          key=lambda item: (item["created_at"], item["number"]))
-        try:
-            pr_section = ""
-            if pending:
-                try:
-                    pulls, total, url = github.approved_pulls(labels)
-                except (OSError, ValueError, KeyError):
-                    print("Approved PR lookup failed; sending issue digest.", file=sys.stderr)
-                else:
-                    if pulls:
-                        lines = ["", "", "**🕒 Approved PRs awaiting merge**", ""]
-                        lines.extend(digest_line(pull) for pull in pulls)
-                        if total > len(pulls):
-                            lines.append(f"[View all {total} approved PRs]({url})")
-                        pr_section = "\n".join(lines)
-            for batch, payload in digest_batches(pending, now, pr_section):
+        pr_section = ""
+        if pending:
+            try:
+                pulls, total, url = github.approved_pulls(labels)
+            except (OSError, ValueError, KeyError):
+                print("Approved PR lookup failed; sending issue digest.", file=sys.stderr)
+            else:
+                if pulls:
+                    lines = ["", "", "**🕒 Approved PRs awaiting merge**", ""]
+                    lines.extend(digest_line(pull) for pull in pulls)
+                    if total > len(pulls):
+                        lines.append(f"[View all {total} approved PRs]({url})")
+                    pr_section = "\n".join(lines)
+        for batch, payload in digest_batches(pending, now, pr_section):
+            try:
                 send_webhook(webhook, payload)
-                for checkpoint in checkpoints.values():
-                    checkpoint["sent"].extend(item["number"] for item in batch)
-                # A state-write failure must stop the run immediately.
-                github.save(state)
+            except DeliveryError as error:
+                warn_delivery(labels, error)
+                break
+            for checkpoint in checkpoints.values():
+                checkpoint["sent"].extend(item["number"] for item in batch)
+            # A state-write failure must stop the run immediately.
+            github.save(state)
+        else:
             for checkpoint in checkpoints.values():
                 checkpoint.update(since=until, sent=[])
             github.save(state)
             print(f"Delivered {len(pending)} new issues for {', '.join(labels)}.")
-        except DeliveryError:
-            print(f"Discord delivery failed for {', '.join(labels)}; checkpoint retained.", file=sys.stderr)
-            failed = True
-    if failed:
-        raise DeliveryError("Some digest destinations failed")
 
 
 def main():
