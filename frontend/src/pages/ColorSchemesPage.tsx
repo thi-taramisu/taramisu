@@ -1,6 +1,7 @@
 import { Link, NavLink, useParams } from 'react-router-dom'
 import { colorSchemes } from '../features/design-system/colorSchemes'
 import { PalettePreview } from '../features/design-system/PalettePreview'
+import { AppearanceControls } from '../features/theme/AppearanceControls'
 import { NotFoundPage } from './NotFoundPage'
 
 export function ColorSchemesPage() {
@@ -13,9 +14,10 @@ export function ColorSchemesPage() {
       <header className="max-w-3xl space-y-3">
         <Link to="/projects" className="text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">Back to projects</Link>
         <h1 className="text-3xl font-semibold tracking-tight">{schemeId ? `${schemes[0].name} colour scheme` : 'Colour schemes'}</h1>
-        <p className="text-muted-foreground">Three UI palette proposals for team review, with light and dark examples. Risk scores and rating labels keep the same colours in every scheme.</p>
+        <p className="text-muted-foreground">Choose an app colour scheme and compare the light and dark previews. Risk scores and rating labels keep the same colours in every scheme.</p>
         <p className="text-sm text-muted-foreground">The mappings describe presentation, not risk calculation or acceptance. Entity colours identify types and do not indicate severity.</p>
       </header>
+      <AppearanceControls />
       <nav aria-label="Colour schemes" className="flex flex-wrap gap-2">
         {[{ id: '', name: 'Compare all' }, ...colorSchemes].map((scheme) => (
           <NavLink

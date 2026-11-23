@@ -60,12 +60,12 @@ func TestDamageScenarioPostgresLifecycle(t *testing.T) {
 	if _, err := tx.Exec(ctx, `INSERT INTO project_role_assignment (tara_project_id, user_id, project_role) VALUES ($1, $2, 'EDITOR')`, projectID, userID); err != nil {
 		t.Fatal(err)
 	}
-	do := func(q db.DBTX, method, path, body string) *httptest.ResponseRecorder {
+	do := func(q db.TxStarter, method, path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", bearer)
 		rr := httptest.NewRecorder()
-		httpapi.New(db.New(q), manager).ServeHTTP(rr, req)
+		httpapi.New(db.NewStore(q), manager).ServeHTTP(rr, req)
 		return rr
 	}
 	call := func(method, path, body string, want int, out any) {

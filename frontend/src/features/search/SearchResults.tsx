@@ -1,7 +1,8 @@
 import { ArrowUpRight, Box, FileText, Folder, GitBranch, Shield, TriangleAlert } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { SearchResult, SearchType } from '../../api/models/search'
-import { searchResultKey, searchTypeLabel } from './search'
+import { searchResultKey } from './search'
 
 const ICONS = { projects: Folder, items: Box, assets: Shield, 'damage-scenarios': TriangleAlert, 'threat-scenarios': FileText, 'attack-paths': GitBranch } satisfies Record<SearchType, typeof Folder>
 
@@ -13,9 +14,10 @@ export function SearchResults({ results, activeKey, listId, disabled, onActiveCh
   onActiveChange: (key: string) => void
   onChoose: (result: SearchResult) => void
 }) {
+  const { t } = useTranslation()
   return (
     // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- Rich ARIA combobox popup; native select cannot contain these result details.
-    <div id={listId} role="listbox" aria-label="Search results" className="space-y-1 p-2">
+    <div id={listId} role="listbox" aria-label={t('search.results')} className="space-y-1 p-2">
       {results.map((result, index) => {
         const key = searchResultKey(result)
         const Icon = ICONS[result.type]
@@ -38,7 +40,7 @@ export function SearchResults({ results, activeKey, listId, disabled, onActiveCh
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium" title={result.name}>{result.name}</span>
               <span className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                <span>{searchTypeLabel(result.type)}</span><span className="font-mono break-all">{result.code || result.id}</span>
+                <span>{t(`search.types.${result.type}`)}</span><span className="font-mono break-all">{result.code || result.id}</span>
               </span>
               <span className="block truncate text-xs text-muted-foreground" title={result.project.name}>
                 {result.project.name}{result.item && result.type !== 'items' && ` · ${result.item.name}`}

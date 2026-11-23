@@ -1,13 +1,15 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import type { TreeNode } from '../../api/models/tree'
 import { entityPath, entityTitle } from './entities'
 
 /** Data-driven relation path; wrapping keeps even long names fully accessible. */
 export function EntityBreadcrumbs({ projectId, path }: { projectId: string; path: readonly TreeNode[] }) {
+  const { t } = useTranslation()
   const { search } = useLocation()
 
   return (
-    <nav aria-label="Breadcrumbs" className="text-sm">
+    <nav aria-label={t('ui:breadcrumbs')} className="text-sm">
       <ol className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {path.map((node, index) => {
           const current = index === path.length - 1

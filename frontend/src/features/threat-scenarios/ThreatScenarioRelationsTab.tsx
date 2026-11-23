@@ -1,7 +1,7 @@
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import type { ThreatScenario } from '../../api/models/threatScenario'
 import { useItemAttackPaths, useSetThreatAttackPathLink, useThreatScenario, useThreatScenarioRelations } from '../../api/queries/items'
-import { LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 import { ThreatDamageSection } from './ThreatDamageSection'
@@ -16,6 +16,7 @@ export function ThreatScenarioRelationsTab() {
 }
 
 function Relations({ projectId, scenario }: { projectId: string; scenario: ThreatScenario }) {
+  const { t } = useTranslation()
   const relations = useThreatScenarioRelations(projectId, scenario.id)
   // Links stay within the item that owns the threat scenario.
   const itemPaths = useItemAttackPaths(projectId, scenario.item_definition_id)
@@ -32,19 +33,20 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Threa
         projectId={projectId}
         type="attack-paths"
         direction="down"
-        title="Attack Paths"
-        elementLabel="Attack Path"
+        title={t('ui:relationPathsTitle')}
+        pluralLabel={t('ui:relationPathsPlural')}
+        elementLabel={t('entities.attack-paths')}
         candidates={itemPaths.data?.filter((path) => !attackPaths.some((linked) => linked.id === path.id)) ?? []}
         candidatesLoading={itemPaths.isPending}
-        candidatesError={itemPaths.isLoadingError ? 'The attack paths of this item could not be loaded.' : undefined}
+        candidatesError={itemPaths.isLoadingError ? t('ui:loadItemPathsError') : undefined}
         pending={pathLink.isPending}
-        error={pathLink.isError ? LINK_SAVE_ERROR : undefined}
+        error={pathLink.isError ? t('ui:saveRelationError') : undefined}
         onAdd={(id) => pathLink.mutate({ id, linked: true })}
         onRemove={(id) => pathLink.mutate({ id, linked: false })}
         rows={attackPaths}
       />
       <p className="text-xs text-muted-foreground">
-        Removing a link does not delete the element. The targets are chosen on the Definition tab and end when no linked damage scenario leads to them anymore.
+        {t('ui:threatRelationsHint')}
       </p>
     </div>
   )

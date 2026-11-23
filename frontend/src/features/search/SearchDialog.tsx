@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { LoaderCircle, Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,7 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
   onOpenChange: (open: boolean) => void
   returnFocus: () => void
 }) {
+  const { t } = useTranslation()
   const api = useApi()
   const navigate = useNavigate()
   const { status, user } = useAuth()
@@ -68,7 +70,8 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
   }
 
   function keyboard(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.nativeEvent.isComposing || searching || results.length === 0) return
+    if (event.nativeEvent.isComposing) return
+    if (searching || results.length === 0) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const next = (activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length
@@ -87,22 +90,22 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
         onOpenAutoFocus={(event) => { event.preventDefault(); inputRef.current?.focus() }}
         onCloseAutoFocus={(event) => { event.preventDefault(); returnFocus() }}
       >
-        <DialogTitle className="sr-only">Search projects and elements</DialogTitle>
-        <DialogDescription className="sr-only">Search by name or ID. Combine project and element type filters to narrow the results.</DialogDescription>
+        <DialogTitle className="sr-only">{t('search.title')}</DialogTitle>
+        <DialogDescription className="sr-only">{t('search.description')}</DialogDescription>
         <div className="flex shrink-0 items-center gap-3 px-4 pt-4 pb-3">
           <Search aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
           <Input
             ref={inputRef}
             // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- Editable ARIA combobox with rich results, not a native select.
             role="combobox"
-            aria-label="Search by name or ID"
+            aria-label={t('search.inputLabel')}
             aria-autocomplete="list"
             aria-expanded={!failed}
             aria-controls={listId}
             aria-activedescendant={!searching && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
             aria-describedby={hintId}
             value={query}
-            placeholder="Search by name or ID…"
+            placeholder={t('search.placeholder')}
             autoComplete="off"
             spellCheck={false}
             className="h-10 min-w-0 border-0 bg-transparent px-3 shadow-none focus-visible:ring-2 dark:bg-transparent"
@@ -110,7 +113,7 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
             onKeyDown={keyboard}
           />
           <DialogClose asChild>
-            <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" aria-label="Close">
+            <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('ui:close')}>
               <X aria-hidden="true" />
             </Button>
           </DialogClose>
@@ -125,26 +128,26 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
         <div ref={resultsRef} aria-busy={searching} className="h-[min(52dvh,28rem)] min-h-0 shrink overflow-y-auto overscroll-contain">
           {failed ? (
             <div className="space-y-2 px-5 py-8 text-center">
-              <p role="alert">Search could not be loaded. Please try again.</p>
+              <p role="alert">{t('search.loadError')}</p>
               <Button type="button" variant="outline" size="sm" onClick={() => {
                 if (projects.isError) void projects.refetch()
                 void search.refetch()
-              }}>Retry</Button>
+              }}>{t('ui:retry')}</Button>
             </div>
           ) : (
             <>
               <output aria-live="polite" className="flex items-center gap-2 px-5 pt-3 text-xs text-muted-foreground">
-                {searching ? <><LoaderCircle aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />Searching…</> : `${total} ${total === 1 ? 'result' : 'results'}`}
+                {searching ? <><LoaderCircle aria-hidden="true" className="size-3 animate-spin motion-reduce:animate-none" />{t('search.searching')}</> : t('search.resultCount', { count: total })}
               </output>
               {!searching && results.length === 0 && (
-                <p className="px-5 py-8 text-center text-muted-foreground">No results. Try another name or ID, or remove a filter.</p>
+                <p className="px-5 py-8 text-center text-muted-foreground">{t('search.noResults')}</p>
               )}
               <SearchResults results={results} activeKey={searching ? undefined : activeKey} listId={listId} disabled={searching} onActiveChange={setSelectedKey} onChoose={choose} />
-              {search.isFetchNextPageError && <p role="alert" className="px-5 py-2 text-sm text-destructive">More results could not be loaded. Try again below.</p>}
+              {search.isFetchNextPageError && <p role="alert" className="px-5 py-2 text-sm text-destructive">{t('search.moreError')}</p>}
               {search.hasNextPage && (
                 <div className="px-4 pb-3">
                   <Button type="button" variant="outline" size="sm" className="w-full" disabled={searching || search.isFetchingNextPage} onClick={() => void search.fetchNextPage()}>
-                    {search.isFetchingNextPage ? 'Loading more…' : 'Load more results'}
+                    {search.isFetchingNextPage ? t('search.loadingMore') : t('search.loadMore')}
                   </Button>
                 </div>
               )}
@@ -152,7 +155,7 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
           )}
         </div>
         <p id={hintId} className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 border-t bg-muted/30 px-5 py-2.5 text-[11px] text-muted-foreground">
-          <span>↑ ↓ Navigate</span><span>↵ Open</span><span>Esc Close</span>
+          <span>{t('search.navigateHint')}</span><span>{t('search.openHint')}</span><span>{t('search.closeHint')}</span>
         </p>
       </DialogContent>
     </Dialog>

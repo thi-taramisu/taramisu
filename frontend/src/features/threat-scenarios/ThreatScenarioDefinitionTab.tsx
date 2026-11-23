@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -13,14 +14,8 @@ import { entityPath } from '../workspace/entities'
 import { hasSameTargets } from './targetSelection'
 import { ThreatTargetsField } from './ThreatTargetsField'
 
-const ELICITATION_METHODS: { value: ElicitationMethod; label: string }[] = [
-  { value: 'GROUP_DISCUSSION', label: 'Group Discussion' },
-  { value: 'MALICIOUS_USE_CASE', label: 'Malicious Use Case' },
-  { value: 'EVITA', label: 'EVITA' },
-  { value: 'TVRA', label: 'TVRA' },
-  { value: 'PASTA', label: 'PASTA' },
-  { value: 'STRIDE', label: 'STRIDE' },
-  { value: 'OTHER', label: 'Other' },
+const ELICITATION_METHODS: ElicitationMethod[] = [
+  'GROUP_DISCUSSION', 'MALICIOUS_USE_CASE', 'EVITA', 'TVRA', 'PASTA', 'STRIDE', 'OTHER',
 ]
 
 interface FormValues {
@@ -45,15 +40,16 @@ function toValues(scenario: ThreatScenario): FormValues {
 
 /** Definition tab of a threat scenario ("TS Definition" wireframe): the fields of the data model and the targets, saved together. */
 export function ThreatScenarioDefinitionTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: scenario } = useThreatScenario(projectId, entityId)
   const relations = useThreatScenarioRelations(projectId, entityId)
   if (!scenario) return null
   if (!relations.data) {
     return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The targets could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:loadTargetsError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading targets…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingTargets')}</output>
     )
   }
   // Remount on threat scenario change so the form starts from the saved values.
@@ -61,6 +57,7 @@ export function ThreatScenarioDefinitionTab() {
 }
 
 function DefinitionForm({ projectId, scenario, relations }: { projectId: string; scenario: ThreatScenario; relations: ThreatScenarioRelations }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(scenario))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
@@ -109,7 +106,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     event.preventDefault()
     const title = values.title.trim()
     if (!title) {
-      setTitleError('Name is required.')
+      setTitleError('ui:nameRequired')
       return
     }
     setStatus('pending')
@@ -148,9 +145,9 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
       {/* Read-only projects show the fields and targets disabled and no Save. */}
       <fieldset disabled={!canEdit} className="contents">
-        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
           <Input
             id={`${id}-title`}
             value={values.title}
@@ -161,41 +158,41 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           />
           {titleError && (
             <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-              {titleError}
+              {t(titleError)}
             </p>
           )}
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-cause`}>Cause of Compromise</Label>
+          <Label htmlFor={`${id}-cause`}>{t('ui:compromiseCause')}</Label>
           <Input
             id={`${id}-cause`}
             value={values.cause_of_compromise}
-            placeholder="How the property is compromised, e.g. spoofing, tampering or denial of service"
+            placeholder={t('ui:compromisePlaceholder')}
             onChange={(event) => change({ cause_of_compromise: event.target.value })}
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-elicitation`}>Elicitation</Label>
+          <Label htmlFor={`${id}-elicitation`}>{t('ui:elicitation')}</Label>
           <NativeSelect
             id={`${id}-elicitation`}
             value={values.elicitation_method}
             onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
             className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
           >
-            <NativeSelectOption value="">Select…</NativeSelectOption>
+            <NativeSelectOption value="">{t('ui:select')}</NativeSelectOption>
             {ELICITATION_METHODS.map((method) => (
-              <NativeSelectOption key={method.value} value={method.value}>
-                {method.label}
+              <NativeSelectOption key={method} value={method}>
+                {t(`ui:elicitationMethods.${method}`)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-notes`}>Technical Notes</Label>
+          <Label htmlFor={`${id}-notes`}>{t('ui:technicalNotes')}</Label>
           <Textarea
             id={`${id}-notes`}
             value={values.technical_notes}
-            placeholder="Interdependencies, attackers, tools and attack surfaces"
+            placeholder={t('ui:technicalNotesPlaceholder')}
             onChange={(event) => change({ technical_notes: event.target.value })}
           />
         </div>
@@ -211,21 +208,16 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
       </fieldset>
       {canEdit && (
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!dirty || status === 'pending'}>
-            Save
-          </Button>
+          <Button type="submit" disabled={!dirty || status === 'pending'}>{t('ui:save')}</Button>
           <output aria-live="polite" className="text-sm text-muted-foreground">
-            {status === 'saved' && !dirty && 'Saved.'}
+            {status === 'saved' && !dirty && t('ui:saved')}
           </output>
           {status === 'fields-failed' && (
-            <p role="alert" className="text-sm text-destructive">
-              The threat scenario could not be saved. Please try again.
-            </p>
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveThreatError')}</p>
           )}
           {status === 'targets-failed' && (
             <p role="alert" className="text-sm text-destructive">
-              {fieldsSaved ? 'The fields were saved, but the targets could not be saved.' : 'The targets could not be saved.'} Please try again.
-            </p>
+              {t(fieldsSaved ? 'ui:fieldsSavedTargetsError' : 'ui:saveTargetsError')} </p>
           )}
         </div>
       )}

@@ -29,7 +29,7 @@ The sidebar can be expanded or collapsed.
 Select **Search** in the sidebar or the search icon in the project header.
 You can also press **Ctrl + K** (Windows/Linux) or **Cmd + K** (macOS) from any page.
 
-Type a name or ID, such as `TS-01`. Results show the element's name, type, ID and project.
+Type a name or ID, such as `TS-1`. Results show the element's name, type, ID and project.
 Use the arrow keys and Enter, or click a result, to open it. Select **Load more results** if more matches are available.
 Press Escape, select Close or click outside the dialog to dismiss it.
 
@@ -43,6 +43,12 @@ the project overview starts without a project filter.
 
 Search currently uses the same temporary mock data as the other frontend previews, including elements without a tree link.
 Project changes survive navigation but reset on reload. Production search and membership authorization require the backend integration.
+
+## Display mode
+
+Use the sun or moon button in the header to switch between light and dark mode. Open **Colour schemes**
+to apply **Neutral**, **Ocean** or **Iris** throughout the app. The browser saves both choices independently.
+The default is light mode with Neutral. The mode button also works with Tab followed by Space or Enter.
 
 ## Creating a project
 

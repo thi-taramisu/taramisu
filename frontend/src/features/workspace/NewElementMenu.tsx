@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
+import { useTranslation } from 'react-i18next'
 
 // Only items and damage scenarios can be created so far; the other types follow with their own tickets.
-const OTHER_TYPES = ['Asset', 'Threat Scenario', 'Attack Path']
+const OTHER_TYPES = ['assets', 'threat-scenarios', 'attack-paths']
 
 interface NewElementMenuProps {
   projectId: string
@@ -17,6 +18,7 @@ interface NewElementMenuProps {
 
 /** "+ New" button above the element tree (Add Items wireframes). */
 export function NewElementMenu({ projectId, projectName, disabled = false }: NewElementMenuProps) {
+  const { t } = useTranslation()
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
   // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
@@ -28,18 +30,18 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         <DropdownMenuTrigger asChild>
           <Button ref={setNewButton} size="sm" disabled={disabled}>
             <Plus aria-hidden="true" />
-            New
+            {t('navigation.new')}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
-          <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>Item</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
           {/* A new key per opening, so the dialog starts from the item and asset of the current page. */}
           <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            Damage Scenario
+            {t('entities.damage-scenarios')}
           </DropdownMenuItem>
           {OTHER_TYPES.map((label) => (
             <DropdownMenuItem key={label} disabled>
-              {label}
+              {t(`entities.${label}`)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

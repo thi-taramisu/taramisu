@@ -189,8 +189,8 @@ export function createMockItemApi(projects: ProjectService = createMockProjectAp
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
           const entry = find(projectId, itemId)
-          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(2))))
-          const code = `A-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`
+          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(3))))
+          const code = `AS-${Math.max(0, ...codes) + 1}`
           const asset: ItemAsset = { ...newAsset, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
           entry.assets.push(asset)
           entry.children.push({ type: 'assets', id: asset.id, code, name: asset.name })
@@ -217,7 +217,7 @@ export function createMockItemApi(projects: ProjectService = createMockProjectAp
           const scenario: DamageScenario = {
             id: crypto.randomUUID(),
             item_definition_id: entry.item.id,
-            code: `DS-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`,
+            code: `DS-${Math.max(0, ...codes) + 1}`,
             title: validateTitle(body.title)!,
             functionality_adverse_relation: null,
             road_user_harm_description: null,

@@ -56,10 +56,10 @@ describe('Spotlight search', () => {
 
   it('searches by display ID and opens the selected element with Enter', async () => {
     const { user, input, dialog } = await openSearch()
-    await user.type(input, 'ts-01')
+    await user.type(input, 'TS-1')
     await waitForSearch(dialog)
     const option = await resultList(dialog).findByRole('option', { name: /Spoofed headlamp/ })
-    expect(option).toHaveTextContent('TS-01')
+    expect(option).toHaveTextContent('TS-1')
     expect(option).toHaveTextContent('Threat scenario')
     expect(option).toHaveTextContent('Headlamp System')
     expect(input).toHaveAttribute('aria-activedescendant', option.id)
@@ -83,6 +83,28 @@ describe('Spotlight search', () => {
     await user.keyboard('{ArrowUp}{ArrowUp}')
     expect(options.at(-1)).toHaveAttribute('aria-selected', 'true')
     expect(input).toHaveAttribute('aria-activedescendant', options.at(-1)!.id)
+  })
+
+  it('uses German search controls and keeps entity names and routes unchanged', async () => {
+    const { user } = renderApp('/projects/headlamp/items/i-01')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'de')
+    await user.click(screen.getByRole('button', { name: 'Projekte und Elemente suchen' }))
+    const dialog = screen.getByRole('dialog', { name: 'Projekte und Elemente suchen' })
+    const input = within(dialog).getByRole('combobox', { name: 'Nach Name oder ID suchen' })
+    expect(input).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: 'Filter Headlamp System entfernen' })).toBeInTheDocument()
+
+    await user.type(input, 'TS-1')
+    await waitFor(() => expect(within(dialog).queryByText('Suche läuft…')).not.toBeInTheDocument())
+    const results = within(within(dialog).getByRole('listbox', { name: 'Suchergebnisse' }))
+    const option = await results.findByRole('option', { name: /Spoofed headlamp/ })
+    expect(option).toBeEnabled()
+    expect(option).toHaveTextContent('Bedrohungsszenario')
+    expect(option).toHaveTextContent('TS-1')
+    expect(option).toHaveTextContent('Headlamp System')
+    await user.keyboard('{Enter}')
+    expect(screen.getByTestId('location')).toHaveTextContent('/projects/headlamp/threat-scenarios/ts-01')
+    expect(await screen.findByLabelText('Ermittlungsmethode')).toBeInTheDocument()
   })
 
   it('debounces typing and prevents opening previous results while a new query is pending', async () => {

@@ -156,7 +156,26 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 		op.Errors = appendMissing(op.Errors, http.StatusForbidden, http.StatusNotFound)
 		op.Middlewares = append(op.Middlewares, access.middleware(api))
 	}
-	huma.Register(api, op, handler)
+	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
+		out, err := handler(ctx, in)
+		return out, hideUnexpected(ctx, op.OperationID, err)
+	})
+}
+
+// hideUnexpected logs an error that the handler did not map to an HTTP status and replaces it with a
+// plain 500. Huma would otherwise send the error text, such as a database message, to the client.
+func hideUnexpected(ctx context.Context, operationID string, err error) error {
+	var statusErr huma.StatusError
+	if err == nil || errors.As(err, &statusErr) {
+		return err
+	}
+	if ctx.Err() != nil {
+		// The client went away or the server is shutting down; nobody reads the response.
+		slog.InfoContext(ctx, "request cancelled", "operation", operationID, "error", err)
+		return huma.Error500InternalServerError("internal server error")
+	}
+	slog.ErrorContext(ctx, "unexpected error", "operation", operationID, "error", err)
+	return huma.Error500InternalServerError("internal server error")
 }
 
 func appendMissing(codes []int, add ...int) []int {
@@ -184,6 +203,7 @@ func (a Access) middleware(api huma.API) func(huma.Context, func(huma.Context)) 
 	return func(ctx huma.Context, next func(huma.Context)) {
 		access, err := a.check(ctx.Context(), ctx.Param(a.scope.param))
 		if err != nil {
+			logDenied(ctx.Context(), ctx.Operation().OperationID, err)
 			writeAccessError(api, ctx, err)
 			return
 		}
@@ -215,8 +235,31 @@ func writeAccessError(api huma.API, ctx huma.Context, err error) {
 		_ = huma.WriteErr(api, ctx, statusErr.GetStatus(), statusErr.Error())
 		return
 	}
-	slog.Error("check project access", "error", err)
+	if ctx.Context().Err() != nil {
+		slog.InfoContext(ctx.Context(), "request cancelled", "operation", ctx.Operation().OperationID, "error", err)
+	} else {
+		slog.ErrorContext(ctx.Context(), "check project access", "error", err)
+	}
 	_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "internal server error")
+}
+
+// logDenied writes a security log entry when the access check refuses a request: 403 at warn level,
+// 404 at info level, because a 404 also covers records that no longer exist (for example a reload after
+// a deletion), which the API does not tell apart from a missing role.
+func logDenied(ctx context.Context, operationID string, err error) {
+	var statusErr huma.StatusError
+	if !errors.As(err, &statusErr) {
+		return
+	}
+	level := slog.LevelWarn
+	switch statusErr.GetStatus() {
+	case http.StatusForbidden:
+	case http.StatusNotFound:
+		level = slog.LevelInfo
+	default:
+		return
+	}
+	slog.Log(ctx, level, "access denied", "operation", operationID, "status", statusErr.GetStatus(), "actor", auth.UserFromContext(ctx).ID)
 }
 
 // RoleFromContext returns the caller's role in the operation's project, set by the access check.

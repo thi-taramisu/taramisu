@@ -105,7 +105,7 @@ can later be added there in one place. The backend rejects writes to archived pr
 ## Global search
 
 Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
-focuses its input, searches names, internal IDs and display IDs (for example `TS-01`), and opens the selected result with Enter.
+focuses its input, searches names, internal IDs and display IDs (for example `TS-1`), and opens the selected result with Enter.
 Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
 The dialog stays anchored near the top with a fixed-height, scrollable results area. Input is debounced by 250 ms; filters apply
 immediately. While typing, previous results stay visible but cannot be opened until the current search finishes.
@@ -115,6 +115,8 @@ Several types or projects are ORed within that filter; project and type filters
 are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
 projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
 Results include the project, type and ID. Further matches are available through **Load more results**.
+
+Search labels and counts follow the header's English/German language choice; entity names and route IDs stay unchanged.
 
 The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50
 matches initially and offers **Show more projects** for browsing. Arrow keys and Enter work across these batches. Escape closes the
@@ -155,3 +157,11 @@ React Flow out of the initial bundle.
 Build with Node 24 and `npm run build`, then serve the static `dist/` directory. Configure the web server to serve `index.html` for
 application routes so direct links and browser refreshes work. Unknown application routes show the React not-found page; the static SPA
 fallback can still return HTTP 200. `npm run preview` is for local verification of this build.
+
+## Element display IDs
+
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3, AP-100 and IT-1.
+Mock data and newly created mock elements use this format directly.
+Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
+Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
+by the tree, using the IT prefix; no code is invented from an item's internal UUID.

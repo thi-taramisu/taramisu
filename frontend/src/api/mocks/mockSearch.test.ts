@@ -14,7 +14,7 @@ describe('mock global search', () => {
     expect(new Set(page.results.map((result) => result.type))).toEqual(new Set([
       'projects', 'items', 'assets', 'damage-scenarios', 'threat-scenarios', 'attack-paths',
     ]))
-    const threat = page.results.find((result) => result.code === 'TS-01')!
+    const threat = page.results.find((result) => result.code === 'TS-1')!
     expect(threat).toMatchObject({
       id: 'ts-01', name: 'Spoofed headlamp command on the CAN bus', type: 'threat-scenarios',
       project: { id: 'headlamp', name: 'Headlamp System' }, item: { id: 'i-01', name: 'Headlamp system' },
@@ -22,9 +22,15 @@ describe('mock global search', () => {
     expect(page.results.filter((result) => result.id === 'ts-01')).toHaveLength(1)
   })
 
-  it.each(['ts-01', 'TS-01', 'ts-01 spoofed', '  SPOOFED   HEADLAMP  '])('matches display IDs and names case-insensitively: %s', async (query) => {
+  it.each(['TS-1', 'ts-1 spoofed', 'ts-01', 'TS-01', 'ts-01 spoofed', '  SPOOFED   HEADLAMP  '])('matches display IDs and names case-insensitively: %s', async (query) => {
     const { search } = createMockItemApi()
     expect((await search.search({ ...request, query }, options())).results.map((result) => result.id)).toEqual(['ts-01'])
+  })
+
+  it('finds assets by their current AS display prefix', async () => {
+    const api = createMockItemApi()
+    const page = await api.search.search({ ...request, query: 'AS-1' }, options())
+    expect(page.results).toEqual([expect.objectContaining({ id: 'a-01', code: 'AS-1', type: 'assets' })])
   })
 
   it('combines project and type filters; multiple types are ORed', async () => {

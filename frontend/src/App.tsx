@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
@@ -56,6 +57,7 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
 
 // Route concept: docs/internal/frontend-routes.md
 export default function App() {
+  const { t } = useTranslation()
   return (
     <SearchProvider>
       <Routes>
@@ -70,11 +72,11 @@ export default function App() {
           <Route path="members" element={<MembersSettings />} />
         </Route>
         <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
-          <Route index element={<Placeholder title="Select an element in the tree" />} />
+          <Route index element={<Placeholder title={t('ui:selectTreeElement')} />} />
           {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
             <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
-              {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
-                const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
+              {ENTITY_TYPES[type].tabs.map(({ path }) => {
+                const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={t(`navigation.tabs.${path || 'definition'}`)} />
                 return path ? (
                   <Route key={path} path={path} element={element} />
                 ) : (

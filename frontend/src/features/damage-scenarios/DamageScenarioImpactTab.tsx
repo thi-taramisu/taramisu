@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { ChevronDown, Eraser, MessageSquareText } from 'lucide-react'
 import { useParams } from 'react-router-dom'
@@ -16,7 +17,7 @@ interface RatingOption {
 }
 
 // Not a level of the scale, so it is shown apart from it.
-const OMITTED: RatingOption = { value: 'OMITTED', label: 'Omitted' }
+const OMITTED: RatingOption = { value: 'OMITTED', label: 'ui:omitted' }
 
 interface CategoryValues {
   rating: ImpactRatingValue | null
@@ -49,26 +50,27 @@ type FormErrors = Partial<Record<ImpactCategory, string>>
 function omissionErrors(values: FormValues): FormErrors {
   const rated = IMPACT_CATEGORIES.some(({ value }) => values[value].rating && values[value].rating !== 'OMITTED')
   const errors: FormErrors = {}
-  for (const { value, label } of IMPACT_CATEGORIES) {
+  for (const { value } of IMPACT_CATEGORIES) {
     if (values[value].rating !== 'OMITTED') continue
-    if (!rated) errors[value] = `${label} can only be omitted if another category is rated.`
-    else if (!values[value].rationale.trim()) errors[value] = `A rationale is required to omit ${label}.`
+    if (!rated) errors[value] = 'ui:omitRequiresRating'
+    else if (!values[value].rationale.trim()) errors[value] = 'ui:omitRequiresRationale'
   }
   return errors
 }
 
 /** Impact tab of a damage scenario: one rating per impact category S / F / O / P. */
 export function DamageScenarioImpactTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: ratings, isError } = useImpactRatings(projectId, entityId)
 
   if (!ratings) {
     return isError ? (
       <p role="alert" className="text-sm text-destructive">
-        The impact ratings could not be loaded.
+        {t('ui:loadImpactError')}
       </p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading impact ratings…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingImpact')}</output>
     )
   }
   // Remount on damage scenario change so the form starts from the saved values.
@@ -76,6 +78,7 @@ export function DamageScenarioImpactTab() {
 }
 
 function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: string; damageScenarioId: string; ratings: ImpactRating[] }) {
+  const { t } = useTranslation()
   const [values, setValues] = useState(() => toValues(ratings))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
   const [saved, setSaved] = useState(values)
@@ -134,16 +137,12 @@ function ImpactForm({ projectId, damageScenarioId, ratings }: { projectId: strin
       </div>
       {canEdit && (
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!dirty || update.isPending}>
-            Save
-          </Button>
+          <Button type="submit" disabled={!dirty || update.isPending}>{t('ui:save')}</Button>
           <output aria-live="polite" className="text-sm text-muted-foreground">
-            {update.isSuccess && !dirty && 'Saved.'}
+            {update.isSuccess && !dirty && t('ui:saved')}
           </output>
           {update.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              The impact ratings could not be saved. Please try again.
-            </p>
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveImpactError')}</p>
           )}
         </div>
       )}
@@ -162,6 +161,7 @@ interface RatingSegmentProps {
 
 /** Radio styled as a segment; its width depends on the space only, so selecting or clearing a rating moves nothing. */
 function RatingSegment({ name, option, checked, disabled, onSelect, className }: RatingSegmentProps) {
+  const { t } = useTranslation()
   return (
     <label
       className={cn(
@@ -175,7 +175,7 @@ function RatingSegment({ name, option, checked, disabled, onSelect, className }:
     >
       {/* Disabled ratings keep their colours, so a read-only project still shows them clearly. */}
       <input type="radio" name={name} value={option.value} checked={checked} disabled={disabled} onChange={onSelect} className="sr-only" />
-      <span className="truncate px-1">{option.label}</span>
+      <span className="truncate px-1">{t(option.label)}</span>
     </label>
   )
 }
@@ -191,6 +191,7 @@ interface ImpactCategoryRowProps {
 
 /** One impact category: the rating, and below it the rationale, collapsed to a preview until opened. */
 function ImpactCategoryRow({ category, values, error, readOnly, onChange }: ImpactCategoryRowProps) {
+  const { t } = useTranslation()
   const id = useId()
   const [open, setOpen] = useState(false)
   const { rating, rationale } = values
@@ -212,7 +213,7 @@ function ImpactCategoryRow({ category, values, error, readOnly, onChange }: Impa
   return (
     <div className="grid items-center gap-x-4 gap-y-1 py-3 @xl:grid-cols-[7rem_1fr]">
       <span id={`${id}-label`} className="text-sm font-medium">
-        {category.label}
+        {t(category.label)}
       </span>
       <div className="flex items-center gap-3">
         {/* Five equal tracks of at most 6rem, so the segments only depend on the available space. */}
@@ -244,8 +245,8 @@ function ImpactCategoryRow({ category, values, error, readOnly, onChange }: Impa
           size="icon-sm"
           className="shrink-0 text-muted-foreground"
           disabled={readOnly || (!rating && !rationale)}
-          aria-label={`Clear ${category.label}`}
-          title="Clear rating and rationale"
+          aria-label={t('ui:clearCategory', { category: t(category.label) })}
+          title={t('ui:clearRating')}
           onClick={clear}
         >
           <Eraser aria-hidden="true" />
@@ -258,7 +259,7 @@ function ImpactCategoryRow({ category, values, error, readOnly, onChange }: Impa
             {/* The negative margin lines the icon up with the rating segments above. */}
             <Button type="button" variant="ghost" size="sm" className="relative -ml-1.5">
               <MessageSquareText aria-hidden="true" data-icon="inline-start" />
-              <span className="sr-only">{category.label}</span> Rationale
+              <span className="sr-only">{t(category.label)}</span> {t('ui:rationale')}
               <ChevronDown aria-hidden="true" data-icon="inline-end" className={cn('transition-transform', expanded && 'rotate-180')} />
             </Button>
           </CollapsibleTrigger>
@@ -266,7 +267,7 @@ function ImpactCategoryRow({ category, values, error, readOnly, onChange }: Impa
         </div>
         <CollapsibleContent className="grid gap-2">
           <Textarea
-            aria-label={`${category.label} rationale`}
+            aria-label={t('ui:categoryRationale', { category: t(category.label) })}
             value={rationale}
             disabled={readOnly}
             onChange={(event) => onChange({ rationale: event.target.value })}
@@ -275,7 +276,7 @@ function ImpactCategoryRow({ category, values, error, readOnly, onChange }: Impa
           />
           {error && (
             <p id={`${id}-error`} role="alert" className="text-sm text-destructive">
-              {error}
+              {t(error, { category: t(category.label) })}
             </p>
           )}
         </CollapsibleContent>

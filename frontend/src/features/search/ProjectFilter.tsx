@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -14,6 +15,7 @@ export function ProjectFilter({ projects, selectedIds, onChange }: {
   selectedIds: string[]
   onChange: (ids: string[]) => void
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -63,8 +65,8 @@ export function ProjectFilter({ projects, selectedIds, onChange }: {
       if (next) changeQuery('')
     }}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" aria-label="Filter by project" aria-haspopup="listbox" aria-controls={open ? listId : undefined} disabled={projects.length === 0}>
-          {selectedIds.length > 0 ? `Projects (${selectedIds.length})` : 'Filter by project…'}
+        <Button type="button" variant="outline" size="sm" aria-label={t('search.filterByProject')} aria-haspopup="listbox" aria-controls={open ? listId : undefined} disabled={projects.length === 0}>
+          {selectedIds.length > 0 ? t('search.selectedProjects', { count: selectedIds.length }) : t('search.filterPlaceholder')}
           <ChevronDown aria-hidden="true" className="ml-1 size-3.5 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
@@ -81,13 +83,13 @@ export function ProjectFilter({ projects, selectedIds, onChange }: {
             ref={input}
             // eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- Editable combobox with multiselect options, not a native select.
             role="combobox"
-            aria-label="Search projects"
+            aria-label={t('search.projectInput')}
             aria-expanded={open}
             aria-autocomplete="list"
             aria-controls={listId}
             aria-describedby={hintId}
             aria-activedescendant={activeProject ? `${listId}-${activeIndex}` : undefined}
-            placeholder="Find a project by name or ID…"
+            placeholder={t('search.projectPlaceholder')}
             autoComplete="off"
             spellCheck={false}
             value={query}
@@ -96,14 +98,14 @@ export function ProjectFilter({ projects, selectedIds, onChange }: {
             onKeyDown={keyboard}
           />
           {query && (
-            <Button type="button" variant="ghost" size="icon-xs" aria-label="Clear project search" onClick={() => { changeQuery(''); input.current?.focus() }}>
+            <Button type="button" variant="ghost" size="icon-xs" aria-label={t('search.clearProjectSearch')} onClick={() => { changeQuery(''); input.current?.focus() }}>
               <X aria-hidden="true" />
             </Button>
           )}
         </div>
         {/* The input owns keyboard focus; options expose selection separately from the active cursor. */}
         {/* eslint-disable-next-line jsx-a11y/prefer-tag-over-role -- Rich multiselect listbox controlled by the combobox input. */}
-        <div ref={list} id={listId} role="listbox" aria-label="Project filters" aria-multiselectable="true" className="max-h-60 min-h-0 overflow-y-auto overscroll-contain p-1">
+        <div ref={list} id={listId} role="listbox" aria-label={t('search.projectFilters')} aria-multiselectable="true" className="max-h-60 min-h-0 overflow-y-auto overscroll-contain p-1">
           {visible.map((project, index) => (
             <button
               key={project.id}
@@ -130,15 +132,15 @@ export function ProjectFilter({ projects, selectedIds, onChange }: {
         </div>
         <div className="shrink-0 space-y-2 border-t p-2 text-xs text-muted-foreground">
           <output className="block px-1" aria-live="polite">
-            {matches.length === 0 ? 'No projects found.' : `${visible.length} of ${matches.length} ${matches.length === 1 ? 'project' : 'projects'}`}
+            {matches.length === 0 ? t('search.noProjects') : t('search.projectCount', { shown: visible.length, count: matches.length })}
           </output>
           {visible.length < matches.length && (
             <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => {
               setVisibleCount((count) => count + PAGE_SIZE)
               input.current?.focus()
-            }}>Show more projects</Button>
+            }}>{t('search.showMoreProjects')}</Button>
           )}
-          <p id={hintId} className="px-1">↑ ↓ Navigate · Enter Toggle · Esc Close</p>
+          <p id={hintId} className="px-1">{t('search.projectHint')}</p>
         </div>
       </PopoverContent>
     </Popover>

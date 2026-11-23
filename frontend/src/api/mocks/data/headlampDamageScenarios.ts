@@ -7,7 +7,7 @@ export const headlampDamageScenarios: DamageScenario[] = [
   {
     id: 'ds-01',
     item_definition_id: 'i-01',
-    code: 'DS-01',
+    code: 'DS-1',
     title: 'Headlamp turns off while driving at night',
     functionality_adverse_relation: 'Loss of the low beam function while the vehicle is driven in the dark.',
     road_user_harm_description: 'The driver no longer sees the road; collision with other road users or obstacles.',

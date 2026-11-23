@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { i18n } from '../../i18n'
 import type { SearchProject } from '../../api/models/search'
 import { ProjectFilter } from './ProjectFilter'
 
@@ -31,7 +32,7 @@ describe('searchable project filter', () => {
     expect(input).toHaveFocus()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(list.getAllByRole('option')).toHaveLength(50)
-    expect(screen.getByText('50 of 1000 projects')).toBeInTheDocument()
+    expect(screen.getByText('50 of 1,000 projects')).toBeInTheDocument()
 
     await user.type(input, 'FLEET 0999')
     expect(list.getAllByRole('option')).toHaveLength(1)
@@ -95,5 +96,25 @@ describe('searchable project filter', () => {
   it('does not offer projects while no accessible directory is available', () => {
     render(<ProjectFilter projects={[]} selectedIds={[]} onChange={() => {}} />)
     expect(screen.getByRole('button', { name: 'Filter by project' })).toBeDisabled()
+  })
+
+  it('translates the picker and formats counts for German without changing project names', async () => {
+    await i18n.changeLanguage('de')
+    const user = userEvent.setup()
+    const onChange = vi.fn<(ids: string[]) => void>()
+    render(<ControlledPicker entries={projects} onChange={onChange} />)
+    await user.click(screen.getByRole('button', { name: 'Nach Projekt filtern' }))
+    const input = screen.getByRole('combobox', { name: 'Projekte suchen' })
+    expect(input).toHaveFocus()
+    expect(screen.getByText('50 von 1.000 Projekten')).toBeInTheDocument()
+
+    await user.type(input, '0999')
+    const option = screen.getByRole('option', { name: 'Fleet project 0999 (project-0999)' })
+    await user.keyboard('{Enter}')
+    expect(option).toHaveAttribute('aria-selected', 'true')
+    expect(onChange).toHaveBeenLastCalledWith(['project-0999'])
+    expect(screen.getByText('1 von 1 Projekt')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Nach Projekt filtern' })).toHaveFocus()
   })
 })

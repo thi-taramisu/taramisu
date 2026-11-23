@@ -8,6 +8,11 @@ The additional design reference routes are `/design-system/colors` (all schemes)
 `iris`). The project list and workspace link to them. Pages and Filetree navigation render in the browser through React Router.
 Deployment serves the static Vite build with an SPA fallback; see the [frontend README](../../frontend/README.md#client-rendering-and-deployment).
 
+The interface supports English and German through the header's language selector (#256; [ADR 0004](adr/0004-frontend-internationalization.md)).
+Working navigation, dialogs, forms, validation, and accessibility labels use translations, including controls backed by mock services.
+Stored data, internal design previews, demo diagrams, and unfinished-feature placeholders remain unchanged.
+Switching language keeps the same URLs and entered values. Authentik manages its own language separately.
+
 ## Basis
 
 The elements follow the ISO/SAE 21434 steps in the project scope (see course slides):
@@ -97,10 +102,9 @@ These were the open questions in the first draft of this page. The wireframes an
 ## Open questions
 
 1. **Auth and session:** token handling, the login flow and route guards depend on the IAM decision (#46).
-2. **Language:** English only, or German as well?
-3. **Read-only sharing:** is a public read-only link per project wanted?
-4. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
-5. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
+2. **Read-only sharing:** is a public read-only link per project wanted?
+3. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
+4. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
    They still get the same flat URLs, so no extra route is needed.
 
 ## Global Spotlight search (#193)
