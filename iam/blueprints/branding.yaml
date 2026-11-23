@@ -15,6 +15,14 @@ entries:
       branding_favicon: /static/dist/assets/icons/blank.svg
       branding_default_flow_background: /static/dist/assets/icons/blank.svg
       branding_custom_css: |
+        /* The page and spinner paint before the flow component initializes. */
+        html:has(ak-flow-executor),
+        body:has(ak-flow-executor) {
+          background-color: var(--background, Canvas);
+        }
+        ak-flow-executor .pf-c-spinner {
+          --pf-c-spinner--Color: var(--primary, CanvasText);
+        }
         ak-flow-executor {
           --pf-global--FontFamily--text: "Geist Variable", sans-serif;
           --pf-global--FontFamily--heading: var(--pf-global--FontFamily--text);
