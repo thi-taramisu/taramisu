@@ -57,11 +57,9 @@ A missing `Register` call in step 3 compiles, but the routes return `404`. A rou
 
 ## Conflicting edits
 
-Two users can open the same record, change it, and save. Without a check, the second save silently overwrites the first, also
-in fields the second user did not touch, because forms send all their fields. Transactions do not prevent this: each save is
-consistent on its own, but it is based on a state the user read minutes earlier. Taramisu therefore uses optimistic
-concurrency control with HTTP preconditions ([#241](https://github.com/thi-taramisu/taramisu/issues/241)), instead of locks
-that users hold while they edit.
+A change based on an outdated state is rejected instead of silently overwriting someone else's change. Why Taramisu uses
+optimistic concurrency control with HTTP preconditions instead of edit locks is recorded in
+[ADR 0006](../../adr/0006-conflicting-edits.md); this section describes the contract and how handlers implement it.
 
 - **Version.** Every editable table has a `version` column. Every update raises it (`version = <table or alias>.version + 1`); deletes
   and cascades do not need to. `TestEveryUpdateRaisesTheVersion` checks the queries, because Atlas manages triggers only in
