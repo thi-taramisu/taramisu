@@ -113,6 +113,11 @@ func run(logLevel *slog.LevelVar) error {
 	} else {
 		slog.Warn("AUTHENTIK_API_URL or AUTHENTIK_API_TOKEN not set: member names are hidden and adding members is disabled")
 	}
+	if cfg.RequireIfMatch {
+		opts = append(opts, httpapi.WithRequiredIfMatch())
+	} else {
+		slog.Info("REQUIRE_IF_MATCH is off: changes without If-Match are not checked for conflicting edits")
+	}
 	handler := httpapi.New(queries, iam, opts...)
 	if os.Getenv("SENTRY_DSN") != "" {
 		handler = logging.WithSentryHub(handler)

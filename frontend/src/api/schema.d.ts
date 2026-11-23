@@ -5504,7 +5504,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -5575,6 +5575,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5590,7 +5599,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -5645,6 +5654,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5660,7 +5678,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -5724,6 +5742,15 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5927,7 +5954,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -5983,6 +6010,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -5998,7 +6034,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -6054,6 +6090,15 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6725,7 +6770,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -6806,6 +6851,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -6830,7 +6884,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -6904,6 +6958,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Internal Server Error */
             500: {
                 headers: {
@@ -6928,7 +6991,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
                 "If-Match"?: string;
             };
             path: {
@@ -7002,6 +7065,15 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };

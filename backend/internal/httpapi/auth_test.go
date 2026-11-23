@@ -162,3 +162,21 @@ func TestProjectMemberRoutesRequireBearer(t *testing.T) {
 		}
 	}
 }
+
+// TestRequiredIfMatchKeepsOtherRoutes checks that REQUIRE_IF_MATCH leaves reads alone; the 428 for
+// changes is tested in handlers (TestRequiredIfMatch).
+func TestRequiredIfMatchKeepsOtherRoutes(t *testing.T) {
+	manager, bearerToken := authtest.NewManagerAndToken(t)
+	handler := New(nil, manager, WithRequiredIfMatch())
+	for path, token := range map[string]string{"/health/live": "", "/api/v1/me": bearerToken} {
+		r := httptest.NewRequest(http.MethodGet, path, http.NoBody)
+		if token != "" {
+			r.Header.Set("Authorization", token)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Errorf("GET %s with REQUIRE_IF_MATCH: %d, want 200", path, w.Code)
+		}
+	}
+}

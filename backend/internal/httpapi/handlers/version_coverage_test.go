@@ -69,12 +69,13 @@ func TestEveryChangeIsDeclaredForVersions(t *testing.T) {
 			delete(declared, op.OperationID)
 			hasIfMatch := slices.ContainsFunc(op.Parameters, func(p *huma.Param) bool { return p.In == "header" && p.Name == "If-Match" })
 			response412, has412 := op.Responses["412"]
-			has412 = has412 && response412.Headers["ETag"] != nil
+			_, has428 := op.Responses["428"]
+			documented := hasIfMatch && has412 && response412.Headers["ETag"] != nil && has428
 			switch {
 			case !ok:
 				problems = append(problems, method+" "+path+" ("+op.OperationID+") is in none of the lists")
-			case list == "versionedOperations" && (!hasIfMatch || !has412):
-				problems = append(problems, op.OperationID+" is versioned but does not document If-Match and 412 with ETag")
+			case list == "versionedOperations" && !documented:
+				problems = append(problems, op.OperationID+" is versioned but does not document If-Match, 412 with ETag, and 428")
 			case list != "versionedOperations" && hasIfMatch:
 				problems = append(problems, op.OperationID+" accepts If-Match; move it to versionedOperations")
 			}

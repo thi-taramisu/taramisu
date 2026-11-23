@@ -95,6 +95,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       AUDIT_RETENTION_AFTER_DELETE: ${AUDIT_RETENTION_AFTER_DELETE:-8760h}
       PROJECT_DELETE_GRACE_PERIOD: ${PROJECT_DELETE_GRACE_PERIOD:-720h}
+      REQUIRE_IF_MATCH: ${REQUIRE_IF_MATCH:-false}
     depends_on:
       storage-init:
         condition: service_completed_successfully

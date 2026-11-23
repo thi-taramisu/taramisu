@@ -150,7 +150,8 @@ const accessMetadataKey = "taramisu.access"
 func Register[I, O any](api huma.API, op huma.Operation, access Access, handler func(context.Context, *I) (*O, error)) {
 	op = declareAccess(api, op, access)
 	if hasIfMatch(reflect.TypeFor[I]()) {
-		op.Errors = appendMissing(op.Errors, http.StatusPreconditionFailed)
+		op.Errors = appendMissing(op.Errors, http.StatusPreconditionFailed, http.StatusPreconditionRequired)
+		op.Middlewares = append(op.Middlewares, requirePrecondition(api))
 	}
 	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
 		out, err := handler(ctx, in)

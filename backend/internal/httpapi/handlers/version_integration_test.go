@@ -39,6 +39,7 @@ func TestConflictingEditsPostgres(t *testing.T) {
 	store := db.NewStore(pool)
 	fixture := authtest.NewFixture(t, store)
 	handler := httpapi.New(store, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
+	required := httpapi.New(store, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}), httpapi.WithRequiredIfMatch())
 	subject := "conflicting-edits-" + rand.Text()
 	token := "Bearer " + fixture.Token(t, map[string]any{"sub": subject})
 	var projectID string
@@ -62,7 +63,7 @@ func TestConflictingEditsPostgres(t *testing.T) {
 		etag   string
 		body   map[string]any
 	}
-	send := func(method, path, ifMatch, body string) response {
+	sendTo := func(handler http.Handler, method, path, ifMatch, body string) response {
 		req := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", token)
@@ -77,6 +78,7 @@ func TestConflictingEditsPostgres(t *testing.T) {
 		}
 		return out
 	}
+	send := func(method, path, ifMatch, body string) response { return sendTo(handler, method, path, ifMatch, body) }
 	call := func(method, path, ifMatch, body string, want int) response {
 		t.Helper()
 		got := send(method, path, ifMatch, body)
@@ -138,7 +140,15 @@ func TestConflictingEditsPostgres(t *testing.T) {
 	if v := version(call(http.MethodPut, projectPath, "*", `{"name":"Replaced"}`, http.StatusOK)); v != 3 {
 		t.Fatalf("version after a change with If-Match * = %d, want 3", v)
 	}
-	// Until the frontend sends If-Match, a change without it is not checked.
+	// With REQUIRE_IF_MATCH, a change without If-Match is rejected and changes nothing.
+	eventsBefore := events()
+	if got := sendTo(required, http.MethodPatch, projectPath, "", `{"name":"Lost"}`); got.status != http.StatusPreconditionRequired {
+		t.Fatalf("change without If-Match where it is required: status %d, want 428", got.status)
+	}
+	if got := getProject(); version(got) != 3 || got.body["name"] != "Replaced" || events() != eventsBefore {
+		t.Fatalf("rejected change without If-Match still changed the project: %v", got.body)
+	}
+	// Without it, a change without If-Match is not checked, so that the current frontend can save.
 	if v := version(call(http.MethodPatch, projectPath, "", `{"name":"Versions"}`, http.StatusOK)); v != 4 {
 		t.Fatalf("version after a change without If-Match = %d, want 4", v)
 	}

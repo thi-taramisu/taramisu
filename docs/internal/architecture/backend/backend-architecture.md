@@ -77,8 +77,10 @@ that users hold while they edit.
   the update returned carries a version that was never committed.
 - **Scope.** The version covers the record's own fields, not the lists of records below it. Creating a record needs no
   version.
-- **Transition.** Until the frontend sends `If-Match`, a request without it is not checked. Afterwards the header becomes
-  required (`428 Precondition Required`).
+- **Required header.** With `REQUIRE_IF_MATCH=true`, a change of a versioned record without `If-Match` is rejected with
+  `428 Precondition Required`, after the access check and before the input is validated. The default is `false`, so that the
+  current frontend, which does not send the header yet, can still save; turn it on once every client sends it. Creating a
+  record, changing links, and deleting attachments never need the header.
 - **Current state.** All editable tables have the column and every update raises it, but only project settings, project
   deletion, members, and item definitions return the version and check `If-Match` so far. `notVersionedYet` in
   `TestEveryChangeIsDeclaredForVersions` lists the operations that follow.
