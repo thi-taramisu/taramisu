@@ -116,6 +116,10 @@ are ANDed. Opening in a project workspace or its settings starts with that proje
 projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
 Results include the project, type and ID. Further matches are available through **Load more results**.
 
+Start with `item:` or type `item` and press Tab to activate the Item filter and keep typing a name or ID.
+The same works with `project`, `asset`, `damage`, `threat` and `attack`, or the full English/German type names.
+Commands add to the selected type filters without changing project filters; toggle the type button to remove one.
+Tab keeps its normal focus behavior for other text, and Shift+Tab always moves backwards.
 Search labels and counts follow the header's English/German language choice; entity names and route IDs stay unchanged.
 
 The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50

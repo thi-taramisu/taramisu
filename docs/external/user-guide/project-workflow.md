@@ -36,6 +36,9 @@ Press Escape, select Close or click outside the dialog to dismiss it.
 Use the type buttons and project selector to narrow the results. Multiple selected types are included;
 project filters narrow the matches further. Toggle a selected type button to remove it; remove a project using its filter chip.
 Select **Clear filters** to remove all selections.
+You can also type `item:` or type `item` and press Tab to select the Item filter, then continue with the search text.
+For example, `item: headlamp` searches items named headlamp. Use `project`, `asset`, `damage`, `threat` or `attack`
+for the other types. This adds the same filters as the buttons; toggle a selected button to remove its filter.
 The project selector lets you search its list by name or ID without leaving the search dialog. Choose several projects using the
 checkbox marks; use **Show more projects** to browse additional matches. Escape closes the project selector first.
 Opening search from a project starts with that project selected. Remove its filter to search across projects;
