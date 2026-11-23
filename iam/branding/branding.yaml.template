@@ -43,7 +43,7 @@ entries:
           border-radius: var(--taramisu-radius);
         }
         /* Brand CSS is adopted into Authentik's shadow roots. Scope controls to flows. */
-        :host-context(ak-flow-executor) .pf-c-button.pf-m-primary {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button.pf-m-primary {
           font-family: inherit;
           font-size: 0.875rem;
           font-weight: 500;
@@ -51,18 +51,18 @@ entries:
           color: var(--taramisu-primary-foreground);
           border-radius: calc(var(--taramisu-radius) * 0.8);
         }
-        :host-context(ak-flow-executor) .pf-c-button.pf-m-primary:hover:not(:disabled) {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button.pf-m-primary:hover:not(:disabled) {
           background: color-mix(in srgb, var(--taramisu-primary) 90%, transparent);
         }
-        :host-context(ak-flow-executor) .pf-c-button:focus-visible,
-        :host-context(ak-flow-executor) a:focus-visible {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button:focus-visible,
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) a:focus-visible {
           outline: 2px solid var(--taramisu-ring);
           outline-offset: 2px;
         }
-        :host-context(ak-flow-executor) .pf-c-button:disabled {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button:disabled {
           opacity: 0.5;
         }
-        :host-context(ak-flow-executor) .pf-c-form-control {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-form-control {
           font-family: inherit;
           --pf-c-form-control--BackgroundColor: var(--taramisu-card);
           --pf-c-form-control--Color: var(--taramisu-card-foreground);
@@ -76,11 +76,11 @@ entries:
           --pf-c-form-control--invalid--BorderBottomColor: var(--taramisu-destructive);
           --pf-c-form-control--placeholder--Color: var(--taramisu-muted-foreground);
         }
-        :host-context(ak-flow-executor) .pf-c-login__main-footer-band {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-login__main-footer-band {
           background: var(--taramisu-muted);
           color: var(--taramisu-foreground);
         }
-        :host-context(ak-flow-executor) a {
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) a {
           color: var(--taramisu-primary);
         }
   - model: authentik_flows.flow
