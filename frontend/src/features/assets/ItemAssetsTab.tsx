@@ -30,7 +30,7 @@ export function ItemAssetsTab() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>ID</TableHead>
+            <TableHead>{t('ui:id')}</TableHead>
             <TableHead>{t('entities.assets')}</TableHead>
             <TableHead>{t('ui:componentInterface')}</TableHead>
             <TableHead>{t('ui:properties')}</TableHead>
