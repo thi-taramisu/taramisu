@@ -123,10 +123,9 @@ Forbidden paths use the target's IP address, because Docker's DNS does not resol
 ## Server (VM) setup and updates
 
 `taramisu-ctl.sh` installs and updates a taramisu release on a Linux host with Docker (ARM64 or x86_64).
-Unlike `dev.sh` it uses only `compose.yaml` (no dev ports) and pulls the API, frontend and docs images from GHCR
-instead of building them. Storage provisioning jobs are built locally from the selected release.
+Unlike `dev.sh` it uses only `compose.yaml` (no dev ports) and pulls the API, frontend, docs, and storage bootstrap images from GHCR.
 One release tag `vX.Y.Z` selects both the Git checkout (compose files, nginx config,
-Authentik blueprints, migrations) and the three images, so they always fit together.
+Authentik blueprints, migrations) and the images, so they always fit together.
 
 ### Prerequisites
 
@@ -175,7 +174,7 @@ sudo -u taramisu /opt/taramisu/deploy/taramisu-ctl.sh --prune           # also r
   Releases older than the script cannot be installed with it. Database migrations are not rolled back.
 - On the first run it generates `iam/.env` with the same code as `dev.sh` and adds `PROXY_BIND=0.0.0.0`,
   so the proxy accepts connections from outside. Locally the proxy stays on `127.0.0.1`.
-- Every run pulls the images, builds the storage provisioning jobs, runs pending migrations, recreates changed containers,
+- Every run pulls the images, runs pending migrations, recreates changed containers,
   waits for the health checks
   (up to 10 minutes for Authentik, whose first start migrates its database), checks `/health/ready` through the proxy
   and ends with a table of services, image tags and digests.

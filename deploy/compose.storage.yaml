@@ -1,5 +1,5 @@
 x-storage-bootstrap: &storage-bootstrap
-  build: ../storage
+  image: ghcr.io/thi-taramisu/taramisu-storage-bootstrap:${TARAMISU_VERSION:-latest}
   networks: [storage]
   # Validate at startup so down works with older .env files.
   environment:
@@ -12,6 +12,7 @@ x-storage-bootstrap: &storage-bootstrap
 services:
   storage-config:
     <<: *storage-bootstrap
+    build: ../storage
     command: [config]
     volumes:
       - storage_config:/config
@@ -52,6 +53,7 @@ services:
 
   storage-init:
     <<: *storage-bootstrap
+    pull_policy: never
     command: [bucket]
     depends_on:
       storage:
