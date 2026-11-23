@@ -45,10 +45,10 @@ src/
   test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
-All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
-`/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
-The project list comes from the backend (`/api/v1/projects`) plus the example project; projects from the backend open their settings,
-since their workspace needs the item routes (#250).
+All routes from the concept exist, most of them as placeholders. Start at `/projects` and open a project, or the hard-coded example project,
+e.g. `/projects/headlamp/items/i-01` for the item pages. The project list and the items of a project come from the backend
+(`/api/v1/projects`, `/api/v1/projects/{project_id}/item-definitions`); assets, risks and scenarios exist only in the example project,
+which the mock APIs serve, so its changes last until reload.
 The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
@@ -87,6 +87,8 @@ src/api/
   client.ts, schema.d.ts   # REAL: openapi-fetch client, types generated from backend/openapi.json
   queries/backend.ts       # REAL: hooks on the client (health, current user)
   projects.ts              # REAL: ProjectService on /api/v1/projects, with mocked extras (see below)
+  items.ts                 # REAL: ItemService on /api/v1/projects/{project_id}/item-definitions (see below)
+  unwrap.ts                # turns openapi-fetch results into data or an ApiError
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
   services/                # service interfaces the views use (e.g. ItemService, ProjectService)
@@ -95,16 +97,18 @@ src/api/
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
 
-`ApiProvider` is the only place that decides between real and mock: by default it provides the real client and project service and the
-mock item services; tests pass mocks through its `api` prop. Once a route is in the spec, implement its service on the client (rejecting
+`ApiProvider` decides between real and mock services: by default it provides the real client, project and item services and the mock
+scenario services; tests pass mocks through its `api` prop. Once a route is in the spec, implement its service on the client (rejecting
 with `ApiError` and the HTTP status), derive the model from `components['schemas']` in `schema.d.ts`, and use it as the default in
 `ApiProvider`.
 
 Project fields the backend does not have yet (`favorite`, `archived`, `owner`, `image`) come from `mocks/mockProjectExtras.ts`, kept in
 memory by project ID and reset on reload; each is marked with the issue that moves it to the backend. The example project (`headlamp`) is
-served by the mock project API until it exists in the backend. The E2E tests run without a backend and stub `/api/v1/projects` with
-`e2e/support/projectsApi.ts`. Components never import from `mocks/` except for data
-that has no service yet (project settings, example project).
+served by the mock project and item APIs until it exists in the backend; the real services hand its calls to them
+(`isExampleProject` in `mocks/data/headlamp.ts`). Real items have nothing below them yet: their content is empty, the Assets and Risks tabs
+are placeholders (`features/workspace/ExampleProjectOnly.tsx`) and "+ New" offers only items. The E2E tests run without a backend and stub
+`/api/v1/projects` and the item routes with `e2e/support/projectsApi.ts` and `e2e/support/itemsApi.ts`. Components never import from
+`mocks/` except for data that has no service yet (project settings, example project).
 
 Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
 instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
