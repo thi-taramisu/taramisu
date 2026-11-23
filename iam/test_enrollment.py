@@ -11,9 +11,13 @@ from threading import Barrier
 from uuid import uuid4
 
 from django.conf import settings
+from django.forms.models import model_to_dict
 from requests import Session
 
 from authentik.core.models import User
+from authentik.flows.models import Flow, FlowStageBinding
+from authentik.policies.models import PolicyBinding
+from authentik.stages.identification.models import IdentificationStage
 from authentik.providers.oauth2.models import AccessToken
 
 BASE = f"http://authentik-server:9000{os.environ.get('AUTHENTIK_WEB__PATH', '').rstrip('/')}"
@@ -97,6 +101,40 @@ class EnrollmentTest(unittest.TestCase):
         # Drop the deliberately stale hostless cookie; use the server's scoped cookie.
         client.cookies.clear(domain="", path="/", name=settings.LANGUAGE_COOKIE_NAME)
         return client
+
+    def test_localized_authentication_security_bindings(self):
+        def policies(target, *, german_flow=False):
+            bindings = PolicyBinding.objects.filter(target=target)
+            if german_flow:
+                bindings = bindings.exclude(policy__name="taramisu-german-language", order=0)
+            result = []
+            for binding in bindings.order_by("order", "policy_id", "group_id", "user_id"):
+                settings = model_to_dict(binding, exclude=("target", "expires"))
+                if binding.expiring:
+                    settings["expires"] = binding.expires
+                result.append(settings)
+            return result
+
+        def flow_settings(slug, redirect, identification, *, german=False):
+            flow = Flow.objects.get(slug=slug)
+            identify = IdentificationStage.objects.get(name=identification)
+            stages = []
+            bindings = FlowStageBinding.objects.filter(target=flow).exclude(stage__name=redirect)
+            for binding in bindings.order_by("order", "stage__name"):
+                stage = binding.stage.name
+                if binding.stage_id == identify.pk:
+                    stage = model_to_dict(identify, exclude=("stage_ptr", "name", "enrollment_flow"))
+                stages.append((binding.order, stage, binding.policy_engine_mode,
+                               binding.evaluate_on_plan, binding.re_evaluate_policies,
+                               binding.invalid_response_action, policies(binding)))
+            return flow.policy_engine_mode, policies(flow, german_flow=german), stages
+
+        self.assertEqual(
+            flow_settings("default-authentication-flow", "taramisu-redirect-authentication-de",
+                          "default-authentication-identification"),
+            flow_settings("default-authentication-de", "taramisu-redirect-authentication-en",
+                          "taramisu-authentication-identification-de", german=True),
+        )
 
     def test_localized_login_registration_and_validation(self):
         for language in ("en", "de"):
