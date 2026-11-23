@@ -77,6 +77,8 @@ approval, sequential and concurrent collisions, ambiguous login rejection, and
 profile validation, and remove their temporary Authentik users. The language regression
 starts with OIDC authorization in English and German and checks the language cookie,
 flow titles, labels, confirmation, and custom validation messages.
+Run this suite after Authentik upgrades or login blueprint changes to check that the English and German login flows
+have matching security stage and policy bindings.
 
 For a UI check, select each language in Taramisu, sign in, and follow the registration
 link. Check short and mismatched passwords, invalid and duplicate usernames, duplicate

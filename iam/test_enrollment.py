@@ -103,6 +103,8 @@ class EnrollmentTest(unittest.TestCase):
         return client
 
     def test_localized_authentication_security_bindings(self):
+        self.maxDiff = None
+
         def policies(target, *, german_flow=False):
             bindings = PolicyBinding.objects.filter(target=target)
             if german_flow:
