@@ -76,7 +76,7 @@ entries:
           --pf-c-form-control--placeholder--Color: var(--muted-foreground, GrayText);
         }
         :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-login__main-footer-band {
-          background: var(--muted, Canvas);
+          background: var(--card, Canvas);
           color: var(--foreground, CanvasText);
         }
         :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) a {
