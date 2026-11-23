@@ -55,10 +55,11 @@ func (h *TaraProject) Register(api huma.API) {
 }
 
 type TaraProjectBody struct {
-	ID          string    `json:"id" format:"uuid"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	TitleImageURL *string   `json:"title_image_url,omitempty" doc:"Authenticated download endpoint for the project title image"`
+	ID            string    `json:"id" format:"uuid"`
+	Name          string    `json:"name"`
+	Description   *string   `json:"description,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 }
@@ -128,7 +129,7 @@ func (h *TaraProject) List(ctx context.Context, _ *struct{}) (*TaraProjectListOu
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, TitleImageID: p.TitleImageID,
 		}, p.Role))
 	}
 	return out, nil
@@ -200,12 +201,18 @@ func mapTaraProjectError(err error) error {
 }
 
 func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
+	var imageURL *string
+	if p.TitleImageID.Valid {
+		url := "/api/v1/projects/" + p.ID.String() + "/title-image"
+		imageURL = &url
+	}
 	return TaraProjectBody{
-		ID:          p.ID.String(),
-		Name:        p.Name,
-		Description: p.Description,
-		CreatedAt:   p.CreatedAt.Time,
-		Role:        role,
+		TitleImageURL: imageURL,
+		ID:            p.ID.String(),
+		Name:          p.Name,
+		Description:   p.Description,
+		CreatedAt:     p.CreatedAt.Time,
+		Role:          role,
 	}
 }
 
