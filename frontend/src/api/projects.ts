@@ -1,6 +1,6 @@
 import type { ApiClient } from './client'
 import { ApiError } from './errors'
-import { exampleProject } from './mocks/data/headlamp'
+import { isExampleProject } from './mocks/data/headlamp'
 import { createExampleProjectApi } from './mocks/mockProjectApi'
 import { createMockProjectExtras, type MockProjectExtras } from './mocks/mockProjectExtras'
 import type { Project } from './models/project'
@@ -13,8 +13,6 @@ import { unwrap } from './unwrap'
 // until it lives in the backend (#250).
 
 type ProjectBody = components['schemas']['TaraProjectBody']
-
-const isExample = (projectId: string) => projectId === exampleProject.id
 
 export interface ProjectApiOptions {
   extras?: MockProjectExtras
@@ -57,7 +55,7 @@ export function createProjectApi(
       return [...(bodies ?? []).map(toProject), ...examples]
     },
     get: async (projectId) => {
-      if (isExample(projectId)) return example.get(projectId)
+      if (isExampleProject(projectId)) return example.get(projectId)
       return toProject(await fetchProject(projectId))
     },
     create: async ({ name, description, image }) => {
@@ -67,7 +65,7 @@ export function createProjectApi(
       return toProject(body)
     },
     update: async (projectId, { name, description }) => {
-      if (isExample(projectId)) return example.update(projectId, { name, description })
+      if (isExampleProject(projectId)) return example.update(projectId, { name, description })
       const body = await unwrap(
         client.PATCH('/api/v1/projects/{id}', {
           params: { path: { id: projectId } },
@@ -77,14 +75,14 @@ export function createProjectApi(
       return toProject(body)
     },
     setFavorite: async (projectId, favorite) => {
-      if (isExample(projectId)) return example.setFavorite(projectId, favorite)
+      if (isExampleProject(projectId)) return example.setFavorite(projectId, favorite)
       // Favorites have no backend route yet, so nothing is sent.
       extras.set(projectId, { favorite })
     },
-    archive: (projectId) => (isExample(projectId) ? example.archive(projectId) : setOwnedExtras(projectId, true)),
-    restore: (projectId) => (isExample(projectId) ? example.restore(projectId) : setOwnedExtras(projectId, false)),
+    archive: (projectId) => (isExampleProject(projectId) ? example.archive(projectId) : setOwnedExtras(projectId, true)),
+    restore: (projectId) => (isExampleProject(projectId) ? example.restore(projectId) : setOwnedExtras(projectId, false)),
     delete: async (projectId) => {
-      if (isExample(projectId)) return example.delete(projectId)
+      if (isExampleProject(projectId)) return example.delete(projectId)
       await unwrap(client.DELETE('/api/v1/projects/{id}', { params: { path: { id: projectId } } }))
       extras.remove(projectId)
     },
