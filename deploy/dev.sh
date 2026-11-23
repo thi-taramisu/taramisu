@@ -60,6 +60,12 @@ compose up -d --wait --wait-timeout 240 authentik-server authentik-worker
 # Blueprint output may contain secrets.
 : > ../iam/.blueprint.log
 chmod 600 ../iam/.blueprint.log
+# Authentik applies its own blueprints after it starts. Ours must come after them: applied later,
+# Authentik's would reset what ours change, such as the login title (#344).
+if ! compose exec -T authentik-worker ak shell < authentik-blueprints-wait.py > ../iam/.blueprint.log 2>&1; then
+    echo 'Authentik did not finish applying its own blueprints. Details: iam/.blueprint.log (private; may contain secrets).' >&2
+    exit 1
+fi
 if ! compose exec -T authentik-worker ak apply_blueprint $(grep -v '^#' authentik-blueprints.txt) > ../iam/.blueprint.log 2>&1; then
     echo 'Authentik provisioning failed. Details: iam/.blueprint.log (private; may contain secrets).' >&2
     exit 1

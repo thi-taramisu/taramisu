@@ -11,7 +11,7 @@ cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
 cp ../backend/Makefile "$scratch/backend/"
 cp ../proxy/nginx.conf "$scratch/proxy/"
-cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
+cp dev.sh compose*.yaml Makefile authentik-blueprints.txt authentik-blueprints-wait.py "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
 #!/bin/sh
@@ -28,6 +28,11 @@ test "$1 $2 $3 $4 $5 $6 $7" = 'compose --env-file ../iam/.env -f compose.yaml -f
 echo "$*" >> "$COMMAND_LOG"
 case " $* " in
     *" config --quiet "*) exec "$REAL_DOCKER" "$@" ;;
+    *" ak shell "*)
+        # The only script dev.sh feeds to the Authentik shell is the wait for Authentik's own blueprints.
+        grep -q 'blueprints_find' || exit 1
+        echo 'blueprint wait diagnosis: sentinel-secret'
+        exit "${BLUEPRINT_WAIT_FAIL:-0}" ;;
     *" ak apply_blueprint "*)
         echo 'blueprint diagnosis: sentinel-secret'
         exit "${BLUEPRINT_FAIL:-0}" ;;
@@ -55,7 +60,7 @@ export PATH="$scratch/bin:$PATH"
 unset APP_URL OIDC_ISSUER OIDC_JWKS_URL OIDC_CLIENT_ID PG_PASS
 unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD AUTHENTIK_API_TOKEN
 unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES
-unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
+unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_WAIT_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
 unset PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL
 unset EXISTING_IAM_VOLUME DOCKER_UNAVAILABLE
 
@@ -90,13 +95,14 @@ run
 awk '
     /up .* authentik-db$/ { db = NR }
     /up .*authentik-server authentik-worker/ { iam = NR }
+    /ak shell$/ { settled = NR }
     /ak apply_blueprint/ { provision = NR }
     /up .* api$/ { api = NR }
     /up .*frontend proxy/ { web = NR }
     /proxy nginx -t$/ { validate = NR }
     /proxy nginx -s reload$/ { reload = NR }
     /^readiness$/ { ready = NR }
-    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < web && web < validate && validate < reload && reload < ready) }
+    END { exit !(db > 0 && db < iam && iam < settled && settled < provision && provision < api && api < web && web < validate && validate < reload && reload < ready) }
 ' "$COMMAND_LOG"
 grep -q '/blueprints/custom/enrollment.yaml' "$COMMAND_LOG"
 grep -q '/blueprints/default/flow-default-user-settings-flow.yaml' "$COMMAND_LOG"
@@ -165,8 +171,21 @@ export IAM_FAIL=1
 : > "$COMMAND_LOG"
 expect_failure
 unset IAM_FAIL
+! grep -q 'ak shell$' "$COMMAND_LOG"
 ! grep -q 'ak apply_blueprint' "$COMMAND_LOG"
 ! grep -q ' up .* api$' "$COMMAND_LOG"
+
+# Our blueprints are not applied while Authentik's own are still pending: applied later, those would reset ours.
+export BLUEPRINT_WAIT_FAIL=1
+: > "$COMMAND_LOG"
+expect_failure
+unset BLUEPRINT_WAIT_FAIL
+! grep -q 'ak apply_blueprint' "$COMMAND_LOG"
+! grep -q ' up .* api$' "$COMMAND_LOG"
+grep -q 'did not finish applying its own blueprints' "$scratch/output"
+grep -q 'sentinel-secret' "$scratch/iam/.blueprint.log"
+test -n "$(find "$scratch/iam/.blueprint.log" -perm 600)"
+! grep -q 'sentinel-secret' "$scratch/output"
 
 export BLUEPRINT_FAIL=1
 : > "$COMMAND_LOG"

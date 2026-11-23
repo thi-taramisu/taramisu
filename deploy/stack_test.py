@@ -10,6 +10,8 @@ Validates:
    with the proxy_next_upstream retry recorded in the NGINX access log.
 7. Removal of the dead replica from the upstream pool by the NGINX runtime resolver.
 8. A replacement replica (rolling-deploy order) being picked up with a cold cache while NGINX drops the old one.
+9. The login page showing the title from the branding blueprint, which Authentik's own blueprints reset
+   when they are applied after ours.
 
 Timing assumptions (resolver valid=, fail_timeout=) are read from proxy/nginx.conf.
 Usage: stack_test.py [--self-check | TEST ...]
@@ -46,6 +48,7 @@ ENV_FILE = REPO_ROOT / "iam" / ".env"
 # Same files as dev.sh and the Makefile, so compose sees the stack exactly as dev.sh started it.
 COMPOSE_FILES = (SCRIPT_DIR / "compose.yaml", SCRIPT_DIR / "compose.dev.yaml")
 PROXY_CONF = REPO_ROOT / "proxy" / "nginx.conf"
+BRANDING_BLUEPRINT = REPO_ROOT / "iam" / "blueprints" / "branding.yaml"
 
 # Unique identifier for this test run so proxy access logs can be correlated
 # strictly to test requests, preventing cross-contamination from other clients.
@@ -104,6 +107,15 @@ def read_log_format(path: Path = PROXY_CONF) -> str:
     if not match:
         raise RuntimeError(f"{path} must define 'log_format upstream_logging'")
     return "".join(re.findall(r"'([^']*)'", match.group(1)))
+
+
+def read_login_title(path: Path = BRANDING_BLUEPRINT) -> str:
+    """Returns the title that the branding blueprint sets on the login flow."""
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r"^\s*slug: default-authentication-flow\n\s*attrs:\n\s*title: (.+)$", text, re.MULTILINE)
+    if not match:
+        raise RuntimeError(f"{path} must set 'title' on the flow default-authentication-flow")
+    return match.group(1).strip()
 
 
 def _run(
@@ -311,6 +323,17 @@ def oidc_pkce_login(
     if "access_token" not in token_res:
         raise RuntimeError(f"No access_token found in token response: {token_res}")
     return token_res["access_token"]
+
+
+def shown_login_title(base_url: str) -> str:
+    """Returns the title of the login flow as Authentik serves it to the login page via NGINX."""
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+    base = base_url.rstrip("/")
+    with opener.open(urllib.request.Request(f"{base}/auth/if/flow/default-authentication-flow/"), timeout=20) as resp:
+        resp.read()
+    executor_url = f"{base}/auth/api/v3/flows/executor/default-authentication-flow/"
+    with opener.open(urllib.request.Request(executor_url), timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))["flow_info"]["title"]
 
 
 def compose_ids(service: str) -> list[str]:
@@ -689,6 +712,12 @@ class TokenClaimsTest(unittest.TestCase):
         self.assertEqual(validity, 600, f"Expected token validity to be 600s (10 min), got {validity}s")
 
 
+class ProvisioningTest(unittest.TestCase):
+    def test_login_shows_branding_title(self) -> None:
+        """Authentik's own blueprints reset the title when they are applied after ours, as on a first start (#344)."""
+        self.assertEqual(shown_login_title(STACK.base_url), read_login_title())
+
+
 class MultiReplicaFailoverTest(unittest.TestCase):
     replicas: list[dict[str, str]] = []
 
@@ -844,6 +873,7 @@ def build_suite(names: list[str]) -> unittest.TestSuite | None:
     if not names:
         return unittest.TestSuite([
             loader.loadTestsFromTestCase(TokenClaimsTest),
+            loader.loadTestsFromTestCase(ProvisioningTest),
             loader.loadTestsFromTestCase(MultiReplicaFailoverTest),
         ])
     suite = loader.loadTestsFromNames(names, sys.modules[__name__])
