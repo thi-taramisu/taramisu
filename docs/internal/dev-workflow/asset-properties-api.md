@@ -94,8 +94,9 @@ For PATCH, send any subset of the same fields. For example, `{"description":null
 a property description; `{"compromise_mechanism_note":null}` clears a damage link's note.
 
 Responses contain the fields above plus the server-generated UUID `id`. Asset responses include
-`item_definition_id`; property responses include `asset_id`. Nullable response fields appear as
-`null` when unset.
+`item_definition_id` and the read-only `display_id` (for example `AS-7`, see
+[display IDs](../architecture/data-model.md#27-display-ids)); property responses include `asset_id`.
+Nullable response fields appear as `null` when unset.
 
 ## Errors and contract generation
 
@@ -105,7 +106,7 @@ Errors use `application/problem+json`:
 | --- | --- |
 | `401` | Missing, invalid, or expired Bearer token |
 | `403` | Project member whose role does not permit this operation |
-| `404` | No project role, unknown item, or record/reference outside the URL's item definition |
+| `404` | No project role, unknown item (also one deleted while an asset is created), or record/reference outside the URL's item definition |
 | `409` | Duplicate asset/property type or scenario/property pair |
 | `422` | Invalid UUID, enum, body, pagination, or a reference deleted during the request |
 | `503` | Authentication configuration or database unavailable |
