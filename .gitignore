@@ -3,3 +3,4 @@ tmp/
 backend/coverage.out
 __pycache__/
 backups/
+*.pem
