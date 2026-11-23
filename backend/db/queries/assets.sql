@@ -24,13 +24,13 @@ LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ReplaceAsset :one
 UPDATE asset
-SET name = sqlc.arg(name), description = sqlc.narg(description), identification_source = sqlc.narg(identification_source)
+SET version = asset.version + 1, name = sqlc.arg(name), description = sqlc.narg(description), identification_source = sqlc.narg(identification_source)
 WHERE id = sqlc.arg(id) AND item_definition_id = sqlc.arg(item_definition_id)
 RETURNING *;
 
 -- name: UpdateAsset :one
 UPDATE asset
-SET name = COALESCE(sqlc.narg(name)::text, name),
+SET version = asset.version + 1, name = COALESCE(sqlc.narg(name)::text, name),
     description = CASE WHEN sqlc.arg(set_description)::boolean THEN sqlc.narg(description)::text ELSE description END,
     identification_source = CASE WHEN sqlc.arg(set_identification_source)::boolean THEN sqlc.narg(identification_source)::identification_source ELSE identification_source END
 WHERE id = sqlc.arg(id) AND item_definition_id = sqlc.arg(item_definition_id)

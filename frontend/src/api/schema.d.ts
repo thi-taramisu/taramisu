@@ -1039,6 +1039,11 @@ export interface components {
             scope_type: "ITEM" | "COMPONENT";
             /** Format: uuid */
             tara_project_id: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the item definition.
+             */
+            version: number;
         };
         ItemDefinitionBody: {
             architectural_design?: string | null;
@@ -1094,6 +1099,11 @@ export interface components {
             type: "user" | "group";
             /** Format: uuid */
             user_id?: string;
+            /**
+             * Format: int32
+             * @description Raised by every role change; send it as If-Match to change or remove the member.
+             */
+            version: number;
         };
         ReadyOutputBody: {
             message: string;
@@ -1194,6 +1204,11 @@ export interface components {
             name: string;
             /** @enum {string} */
             role: "VIEWER" | "EDITOR" | "OWNER";
+            /**
+             * Format: int32
+             * @description Raised by every change of the settings; send it as If-Match to change or delete the project.
+             */
+            version: number;
         };
         ThreatAttackPathLinkBody: {
             /** Format: uuid */
@@ -5408,6 +5423,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5439,6 +5455,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5486,7 +5503,10 @@ export interface operations {
     "replace-tara-project": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 id: string;
             };
@@ -5501,6 +5521,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5534,6 +5555,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -5557,7 +5589,10 @@ export interface operations {
     "delete-tara-project": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 id: string;
             };
@@ -5590,6 +5625,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -5613,7 +5659,10 @@ export interface operations {
     "update-tara-project": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 id: string;
             };
@@ -5628,6 +5677,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5655,6 +5705,17 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5695,6 +5756,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5815,6 +5877,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -5863,7 +5926,10 @@ export interface operations {
     "remove-project-member": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 id: string;
                 member_id: string;
@@ -5897,6 +5963,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -5920,7 +5997,10 @@ export interface operations {
     "update-project-member": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 id: string;
                 member_id: string;
@@ -5936,6 +6016,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5954,6 +6035,17 @@ export interface operations {
             /** @description Not Found */
             404: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5994,6 +6086,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6468,6 +6561,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -6555,6 +6649,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6629,7 +6724,10 @@ export interface operations {
     "replace-item-definition": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 project_id: string;
                 item_id: string;
@@ -6645,6 +6743,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6687,6 +6786,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -6719,7 +6829,10 @@ export interface operations {
     "delete-item-definition": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 project_id: string;
                 item_id: string;
@@ -6771,6 +6884,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -6803,7 +6927,10 @@ export interface operations {
     "update-item-definition": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required. */
+                "If-Match"?: string;
+            };
             path: {
                 project_id: string;
                 item_id: string;
@@ -6819,6 +6946,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6855,6 +6983,17 @@ export interface operations {
             /** @description Conflict */
             409: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {

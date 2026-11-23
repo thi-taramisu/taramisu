@@ -12,7 +12,7 @@ import (
 )
 
 const archiveTaraProject = `-- name: ArchiveTaraProject :one
-UPDATE tara_project SET archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at
+UPDATE tara_project SET version = tara_project.version + 1, archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at, version
 `
 
 func (q *Queries) ArchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -25,6 +25,7 @@ func (q *Queries) ArchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraP
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }
@@ -33,12 +34,12 @@ const createTaraProject = `-- name: CreateTaraProject :one
 WITH project AS (
     INSERT INTO tara_project (name, description)
     VALUES ($1, $2)
-    RETURNING id, name, description, archived_at, created_at, deleted_at
+    RETURNING id, name, description, archived_at, created_at, deleted_at, version
 ), owner AS (
     INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
     SELECT id, $3, 'OWNER' FROM project
 )
-SELECT id, name, description, archived_at, created_at FROM project
+SELECT id, name, description, archived_at, created_at, version FROM project
 `
 
 type CreateTaraProjectParams struct {
@@ -53,6 +54,7 @@ type CreateTaraProjectRow struct {
 	Description *string
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
+	Version     int32
 }
 
 // Create the project and make its creator the first Owner in one statement,
@@ -66,12 +68,13 @@ func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectPa
 		&i.Description,
 		&i.ArchivedAt,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getTaraProject = `-- name: GetTaraProject :one
-SELECT id, name, description, archived_at, created_at, deleted_at FROM tara_project WHERE id = $1 AND deleted_at IS NULL
+SELECT id, name, description, archived_at, created_at, deleted_at, version FROM tara_project WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -84,12 +87,13 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getTaraProjectForUpdate = `-- name: GetTaraProjectForUpdate :one
-SELECT id, name, description, archived_at, created_at, deleted_at FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE
+SELECT id, name, description, archived_at, created_at, deleted_at, version FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE
 `
 
 // The project before a settings change, locked until the transaction ends (see LockTaraProject).
@@ -103,6 +107,7 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }
@@ -133,7 +138,7 @@ func (q *Queries) ListPurgeableTaraProjects(ctx context.Context, cutoff pgtype.T
 }
 
 const listTaraProjects = `-- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.archived_at, p.created_at, p.version, max(a.project_role)::project_role AS role
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
@@ -156,6 +161,7 @@ type ListTaraProjectsRow struct {
 	Description *string
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
+	Version     int32
 	Role        ProjectRole
 }
 
@@ -176,6 +182,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 			&i.Description,
 			&i.ArchivedAt,
 			&i.CreatedAt,
+			&i.Version,
 			&i.Role,
 		); err != nil {
 			return nil, err
@@ -189,7 +196,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 }
 
 const markTaraProjectDeleted = `-- name: MarkTaraProjectDeleted :one
-UPDATE tara_project SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
+UPDATE tara_project SET version = tara_project.version + 1, deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
 RETURNING id, name
 `
 
@@ -228,7 +235,7 @@ func (q *Queries) PurgeDeletedTaraProject(ctx context.Context, arg PurgeDeletedT
 }
 
 const replaceTaraProject = `-- name: ReplaceTaraProject :one
-UPDATE tara_project SET name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at
+UPDATE tara_project SET version = tara_project.version + 1, name = $2, description = $3 WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at, version
 `
 
 type ReplaceTaraProjectParams struct {
@@ -247,12 +254,13 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const restoreTaraProject = `-- name: RestoreTaraProject :one
-UPDATE tara_project SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL
+UPDATE tara_project SET version = tara_project.version + 1, deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL
 RETURNING id, name
 `
 
@@ -282,7 +290,7 @@ func (q *Queries) TryProjectPurgeLock(ctx context.Context) (bool, error) {
 }
 
 const unarchiveTaraProject = `-- name: UnarchiveTaraProject :one
-UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at
+UPDATE tara_project SET version = tara_project.version + 1, archived_at = NULL WHERE id = $1 RETURNING id, name, description, archived_at, created_at, deleted_at, version
 `
 
 func (q *Queries) UnarchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -295,16 +303,17 @@ func (q *Queries) UnarchiveTaraProject(ctx context.Context, id pgtype.UUID) (Tar
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateTaraProject = `-- name: UpdateTaraProject :one
 UPDATE tara_project
-SET name = COALESCE($1, name),
+SET version = tara_project.version + 1, name = COALESCE($1, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END
 WHERE id = $4
-RETURNING id, name, description, archived_at, created_at, deleted_at
+RETURNING id, name, description, archived_at, created_at, deleted_at, version
 `
 
 type UpdateTaraProjectParams struct {
@@ -329,6 +338,7 @@ func (q *Queries) UpdateTaraProject(ctx context.Context, arg UpdateTaraProjectPa
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.DeletedAt,
+		&i.Version,
 	)
 	return i, err
 }

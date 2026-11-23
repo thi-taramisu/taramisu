@@ -108,6 +108,10 @@ func (r errRow) Scan(...any) error { return r.err }
 // runs with the context it receives take part in the transaction; queries with any other context do
 // not, and can block on the transaction's own row locks. Audit cannot be nested. After the commit,
 // the event is also written as an "audit" log line.
+//
+// A change that records no event (a zero Change) changed nothing but the version that every update
+// raises, so Audit rolls it back: an unchanged record keeps its version, and a client that read it
+// before can still change it.
 func (s *Store) Audit(ctx context.Context, actor Actor, fn func(ctx context.Context) (Change, error)) error {
 	if _, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
 		return ErrNestedAudit
@@ -122,17 +126,16 @@ func (s *Store) Audit(ctx context.Context, actor Actor, fn func(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	if change.Event != "" {
-		if err := insertEvent(txCtx, s.Queries, actor, change); err != nil {
-			return err
-		}
+	if change.Event == "" {
+		return nil // rolled back by the deferred call
+	}
+	if err := insertEvent(txCtx, s.Queries, actor, change); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
-	if change.Event != "" {
-		logEvent(ctx, actor, change)
-	}
+	logEvent(ctx, actor, change)
 	return nil
 }
 
@@ -149,6 +152,34 @@ func projectNotFound(err error) error {
 		return ErrProjectNotFound
 	}
 	return err
+}
+
+// VersionCheck compares the version of a record that a change has locked with the version the change
+// is based on, and returns an error to reject the change. A nil VersionCheck accepts every version.
+// The handlers build it from the request's If-Match header.
+type VersionCheck func(current int32) error
+
+func (c VersionCheck) run(current int32) error {
+	if c == nil {
+		return nil
+	}
+	return c(current)
+}
+
+// checkMemberVersion locks the role assignment and runs check on its version. A missing assignment is
+// left to the change itself, which then finds no row.
+func (s *Store) checkMemberVersion(ctx context.Context, projectID, id pgtype.UUID, check VersionCheck) error {
+	if check == nil {
+		return nil
+	}
+	version, err := s.GetProjectMemberVersionForUpdate(ctx, GetProjectMemberVersionForUpdateParams{ProjectID: projectID, ID: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return check(version)
 }
 
 // AddProjectMemberParams describes a new role assignment. Set exactly one of UserSubject (the
@@ -196,9 +227,12 @@ func (s *Store) AddProjectMember(ctx context.Context, actor Actor, arg AddProjec
 // UpdateProjectMemberRole runs the guarded update after locking the project row. The last-Owner guard
 // in the query reads the other assignments; without the lock, two concurrent downgrades could each
 // still see the other Owner and both succeed. Setting the current role again records nothing.
-func (s *Store) UpdateProjectMemberRole(ctx context.Context, actor Actor, arg UpdateProjectMemberRoleParams) (row UpdateProjectMemberRoleRow, err error) {
+func (s *Store) UpdateProjectMemberRole(ctx context.Context, actor Actor, arg UpdateProjectMemberRoleParams, check VersionCheck) (row UpdateProjectMemberRoleRow, err error) {
 	err = s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
 		if err := s.lockProject(ctx, arg.ProjectID); err != nil {
+			return Change{}, err
+		}
+		if err := s.checkMemberVersion(ctx, arg.ProjectID, arg.ID, check); err != nil {
 			return Change{}, err
 		}
 		var err error
@@ -218,9 +252,12 @@ func (s *Store) UpdateProjectMemberRole(ctx context.Context, actor Actor, arg Up
 
 // DeleteProjectMember runs the guarded delete after locking the project row (see
 // UpdateProjectMemberRole).
-func (s *Store) DeleteProjectMember(ctx context.Context, actor Actor, arg DeleteProjectMemberParams) (row DeleteProjectMemberRow, err error) {
+func (s *Store) DeleteProjectMember(ctx context.Context, actor Actor, arg DeleteProjectMemberParams, check VersionCheck) (row DeleteProjectMemberRow, err error) {
 	err = s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
 		if err := s.lockProject(ctx, arg.ProjectID); err != nil {
+			return Change{}, err
+		}
+		if err := s.checkMemberVersion(ctx, arg.ProjectID, arg.ID, check); err != nil {
 			return Change{}, err
 		}
 		var err error
@@ -237,9 +274,13 @@ func (s *Store) DeleteProjectMember(ctx context.Context, actor Actor, arg Delete
 // then on the project is hidden from everyone; PurgeDeletedProjects deletes it for good after the
 // grace period, unless RestoreTaraProject takes the mark back. It returns ErrProjectNotFound if the
 // project does not exist or is already marked.
-func (s *Store) DeleteTaraProject(ctx context.Context, actor Actor, id pgtype.UUID) error {
+func (s *Store) DeleteTaraProject(ctx context.Context, actor Actor, id pgtype.UUID, check VersionCheck) error {
 	return s.Audit(ctx, actor, func(ctx context.Context) (Change, error) {
-		if err := s.lockProject(ctx, id); err != nil {
+		project, err := s.GetTaraProjectForUpdate(ctx, id) // locks like lockProject
+		if err != nil {
+			return Change{}, projectNotFound(err)
+		}
+		if err := check.run(project.Version); err != nil {
 			return Change{}, err
 		}
 		assignments, err := s.ListProjectRoleAssignments(ctx, id)

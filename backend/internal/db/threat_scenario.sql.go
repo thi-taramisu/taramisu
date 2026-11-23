@@ -21,7 +21,7 @@ WITH display AS (
 INSERT INTO threat_scenario (item_definition_id, tara_project_id, display_number, title)
 SELECT $1, display.tara_project_id, display.last_number, $2
 FROM display
-RETURNING id, item_definition_id, tara_project_id, display_number, title, cause_of_compromise, elicitation_method, technical_notes, aggregated_attack_feasibility, max_risk_score
+RETURNING id, item_definition_id, tara_project_id, display_number, title, cause_of_compromise, elicitation_method, technical_notes, aggregated_attack_feasibility, max_risk_score, version
 `
 
 type CreateThreatScenarioParams struct {
@@ -46,6 +46,7 @@ func (q *Queries) CreateThreatScenario(ctx context.Context, arg CreateThreatScen
 		&i.TechnicalNotes,
 		&i.AggregatedAttackFeasibility,
 		&i.MaxRiskScore,
+		&i.Version,
 	)
 	return i, err
 }

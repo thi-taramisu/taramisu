@@ -25,7 +25,7 @@ INSERT INTO attack_path (
 SELECT $1, display.tara_project_id, display.last_number,
     $2, $3, $4, $5
 FROM display
-RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version
 `
 
 type CreateAttackPathParams struct {
@@ -56,6 +56,7 @@ func (q *Queries) CreateAttackPath(ctx context.Context, arg CreateAttackPathPara
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }
@@ -78,7 +79,7 @@ func (q *Queries) DeleteAttackPath(ctx context.Context, arg DeleteAttackPathPara
 }
 
 const getAttackPath = `-- name: GetAttackPath :one
-SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version FROM attack_path WHERE id = $1 AND item_definition_id = $2
 `
 
 type GetAttackPathParams struct {
@@ -98,12 +99,13 @@ func (q *Queries) GetAttackPath(ctx context.Context, arg GetAttackPathParams) (A
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAttackPathForDelete = `-- name: GetAttackPathForDelete :one
-SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version FROM attack_path WHERE id = $1 AND item_definition_id = $2
 FOR UPDATE
 `
 
@@ -124,12 +126,13 @@ func (q *Queries) GetAttackPathForDelete(ctx context.Context, arg GetAttackPathF
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAttackPathForUpdate = `-- name: GetAttackPathForUpdate :one
-SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version FROM attack_path WHERE id = $1 AND item_definition_id = $2
 FOR NO KEY UPDATE
 `
 
@@ -150,12 +153,13 @@ func (q *Queries) GetAttackPathForUpdate(ctx context.Context, arg GetAttackPathF
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listAttackPaths = `-- name: ListAttackPaths :many
-SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path
+SELECT id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version FROM attack_path
 WHERE item_definition_id = $1
 ORDER BY title, id
 LIMIT $3 OFFSET $2
@@ -185,6 +189,7 @@ func (q *Queries) ListAttackPaths(ctx context.Context, arg ListAttackPathsParams
 			&i.AnalysisApproach,
 			&i.IsPartialEarlyStage,
 			&i.AttackStepsAndWeaknesses,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -198,9 +203,9 @@ func (q *Queries) ListAttackPaths(ctx context.Context, arg ListAttackPathsParams
 
 const replaceAttackPath = `-- name: ReplaceAttackPath :one
 UPDATE attack_path
-SET title = $3, analysis_approach = $4, is_partial_early_stage = $5, attack_steps_and_weaknesses = $6
+SET version = attack_path.version + 1, title = $3, analysis_approach = $4, is_partial_early_stage = $5, attack_steps_and_weaknesses = $6
 WHERE id = $1 AND item_definition_id = $2
-RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version
 `
 
 type ReplaceAttackPathParams struct {
@@ -231,18 +236,19 @@ func (q *Queries) ReplaceAttackPath(ctx context.Context, arg ReplaceAttackPathPa
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateAttackPath = `-- name: UpdateAttackPath :one
 UPDATE attack_path
-SET title = COALESCE($1, title),
+SET version = attack_path.version + 1, title = COALESCE($1, title),
     analysis_approach = CASE WHEN $2::boolean THEN $3::analysis_approach ELSE analysis_approach END,
     is_partial_early_stage = COALESCE($4, is_partial_early_stage),
     attack_steps_and_weaknesses = CASE WHEN $5::boolean THEN $6::jsonb ELSE attack_steps_and_weaknesses END
 WHERE id = $7 AND item_definition_id = $8
-RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+RETURNING id, item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, version
 `
 
 type UpdateAttackPathParams struct {
@@ -277,6 +283,7 @@ func (q *Queries) UpdateAttackPath(ctx context.Context, arg UpdateAttackPathPara
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.Version,
 	)
 	return i, err
 }

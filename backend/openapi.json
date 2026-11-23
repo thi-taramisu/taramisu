@@ -876,6 +876,11 @@
           "tara_project_id": {
             "format": "uuid",
             "type": "string"
+          },
+          "version": {
+            "description": "Raised by every change; send it as If-Match to change or delete the item definition.",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [
@@ -883,6 +888,7 @@
           "display_id",
           "tara_project_id",
           "created_at",
+          "version",
           "name",
           "scope_type"
         ],
@@ -1104,13 +1110,19 @@
           "user_id": {
             "format": "uuid",
             "type": "string"
+          },
+          "version": {
+            "description": "Raised by every role change; send it as If-Match to change or remove the member.",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [
           "id",
           "type",
           "role",
-          "assigned_at"
+          "assigned_at",
+          "version"
         ],
         "type": "object"
       },
@@ -1431,6 +1443,11 @@
               "OWNER"
             ],
             "type": "string"
+          },
+          "version": {
+            "description": "Raised by every change of the settings; send it as If-Match to change or delete the project.",
+            "format": "int32",
+            "type": "integer"
           }
         },
         "required": [
@@ -1438,7 +1455,8 @@
           "id",
           "name",
           "created_at",
-          "role"
+          "role",
+          "version"
         ],
         "type": "object"
       },
@@ -7876,7 +7894,14 @@
                 }
               }
             },
-            "description": "Created"
+            "description": "Created",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "default": {
             "content": {
@@ -7913,6 +7938,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -7938,6 +7972,24 @@
               }
             },
             "description": "Not Found"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -7994,7 +8046,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -8060,6 +8119,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -8081,7 +8149,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -8112,6 +8187,24 @@
               }
             },
             "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -8157,6 +8250,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -8178,7 +8280,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -8209,6 +8318,24 @@
               }
             },
             "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -8267,7 +8394,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -8443,6 +8577,11 @@
             },
             "description": "Created",
             "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Location": {
                 "schema": {
                   "type": "string"
@@ -8526,6 +8665,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -8551,6 +8699,24 @@
               }
             },
             "description": "Not Found"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -8606,6 +8772,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -8627,7 +8802,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -8648,6 +8830,24 @@
               }
             },
             "description": "Not Found"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -8706,7 +8906,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "403": {
             "content": {
@@ -9228,6 +9435,11 @@
             },
             "description": "Created",
             "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Location": {
                 "schema": {
                   "type": "string"
@@ -9340,6 +9552,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -9385,6 +9606,24 @@
               }
             },
             "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -9460,7 +9699,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -9565,6 +9811,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -9586,7 +9841,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -9627,6 +9889,24 @@
               }
             },
             "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {
@@ -9691,6 +9971,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "description": "Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example \"3\" for version 3. If it is outdated, the change is rejected with 412. Optional for now; it will become required.",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -9712,7 +10001,14 @@
                 }
               }
             },
-            "description": "OK"
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -9753,6 +10049,24 @@
               }
             },
             "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Precondition Failed",
+            "headers": {
+              "ETag": {
+                "description": "Current version of the record, to reload it and send with the next change.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "422": {
             "content": {

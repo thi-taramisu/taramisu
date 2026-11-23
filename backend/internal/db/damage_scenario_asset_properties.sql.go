@@ -19,7 +19,7 @@ JOIN asset a ON a.id = p.asset_id
 WHERE d.id = $2 AND p.id = $3
     AND d.item_definition_id = $4
     AND a.item_definition_id = $4
-RETURNING id, damage_scenario_id, asset_cybersecurity_property_id, compromise_mechanism_note
+RETURNING id, damage_scenario_id, asset_cybersecurity_property_id, compromise_mechanism_note, version
 `
 
 type CreateDamageScenarioAssetPropertyParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) CreateDamageScenarioAssetProperty(ctx context.Context, arg Cre
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }
@@ -70,7 +71,7 @@ func (q *Queries) DeleteDamageScenarioAssetProperty(ctx context.Context, arg Del
 }
 
 const getDamageScenarioAssetProperty = `-- name: GetDamageScenarioAssetProperty :one
-SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version FROM damage_scenario_asset_property l
 JOIN damage_scenario d ON d.id = l.damage_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -92,12 +93,13 @@ func (q *Queries) GetDamageScenarioAssetProperty(ctx context.Context, arg GetDam
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getDamageScenarioAssetPropertyForDelete = `-- name: GetDamageScenarioAssetPropertyForDelete :one
-SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version FROM damage_scenario_asset_property l
 JOIN damage_scenario d ON d.id = l.damage_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -119,12 +121,13 @@ func (q *Queries) GetDamageScenarioAssetPropertyForDelete(ctx context.Context, a
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getDamageScenarioAssetPropertyForUpdate = `-- name: GetDamageScenarioAssetPropertyForUpdate :one
-SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version FROM damage_scenario_asset_property l
 JOIN damage_scenario d ON d.id = l.damage_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -146,12 +149,13 @@ func (q *Queries) GetDamageScenarioAssetPropertyForUpdate(ctx context.Context, a
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listDamageScenarioAssetProperties = `-- name: ListDamageScenarioAssetProperties :many
-SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version FROM damage_scenario_asset_property l
 JOIN damage_scenario d ON d.id = l.damage_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -181,6 +185,7 @@ func (q *Queries) ListDamageScenarioAssetProperties(ctx context.Context, arg Lis
 			&i.DamageScenarioID,
 			&i.AssetCybersecurityPropertyID,
 			&i.CompromiseMechanismNote,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -194,7 +199,7 @@ func (q *Queries) ListDamageScenarioAssetProperties(ctx context.Context, arg Lis
 
 const replaceDamageScenarioAssetProperty = `-- name: ReplaceDamageScenarioAssetProperty :one
 UPDATE damage_scenario_asset_property l
-SET damage_scenario_id = $1,
+SET version = l.version + 1, damage_scenario_id = $1,
     asset_cybersecurity_property_id = $2,
     compromise_mechanism_note = $3
 FROM damage_scenario old_d, asset_cybersecurity_property old_p
@@ -205,7 +210,7 @@ WHERE l.id = $4 AND old_d.id = l.damage_scenario_id AND old_p.id = l.asset_cyber
     AND old_d.item_definition_id = $5 AND old_a.item_definition_id = $5
     AND d.id = $1 AND p.id = $2
     AND d.item_definition_id = $5 AND a.item_definition_id = $5
-RETURNING l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note
+RETURNING l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version
 `
 
 type ReplaceDamageScenarioAssetPropertyParams struct {
@@ -233,13 +238,14 @@ func (q *Queries) ReplaceDamageScenarioAssetProperty(ctx context.Context, arg Re
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateDamageScenarioAssetProperty = `-- name: UpdateDamageScenarioAssetProperty :one
 UPDATE damage_scenario_asset_property l
-SET damage_scenario_id = COALESCE($1::uuid, l.damage_scenario_id),
+SET version = l.version + 1, damage_scenario_id = COALESCE($1::uuid, l.damage_scenario_id),
     asset_cybersecurity_property_id = COALESCE($2::uuid, l.asset_cybersecurity_property_id),
     compromise_mechanism_note = CASE WHEN $3::boolean
         THEN $4::text ELSE l.compromise_mechanism_note END
@@ -252,7 +258,7 @@ WHERE l.id = $5 AND old_d.id = l.damage_scenario_id AND old_p.id = l.asset_cyber
     AND d.id = COALESCE($1::uuid, l.damage_scenario_id)
     AND p.id = COALESCE($2::uuid, l.asset_cybersecurity_property_id)
     AND d.item_definition_id = $6 AND a.item_definition_id = $6
-RETURNING l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note
+RETURNING l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note, l.version
 `
 
 type UpdateDamageScenarioAssetPropertyParams struct {
@@ -282,6 +288,7 @@ func (q *Queries) UpdateDamageScenarioAssetProperty(ctx context.Context, arg Upd
 		&i.DamageScenarioID,
 		&i.AssetCybersecurityPropertyID,
 		&i.CompromiseMechanismNote,
+		&i.Version,
 	)
 	return i, err
 }

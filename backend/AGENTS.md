@@ -16,6 +16,8 @@ Shared instructions are in [../AGENTS.md](../AGENTS.md).
 - For API changes, follow the README's OpenAPI workflow and the [frontend API workflow](../frontend/README.md#api-client)
   to update the OpenAPI spec and generated TypeScript types.
 - Use the authentication and project authorization behavior implemented on the target branch.
+- New `PUT`, `PATCH`, and `DELETE` operations check `If-Match` and new editable tables get a `version` column, as described in
+  [conflicting edits](../docs/internal/architecture/backend/backend-architecture.md#conflicting-edits).
 
 ## Verification
 

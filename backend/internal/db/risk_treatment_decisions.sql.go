@@ -17,7 +17,7 @@ SELECT $1, $2, $3, $4, $5
 WHERE ($2::uuid IS NULL OR EXISTS (
     SELECT 1 FROM risk_value rv WHERE rv.id = $2
       AND rv.threat_scenario_id = $1))
-RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim
+RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version
 `
 
 type CreateRiskTreatmentDecisionParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) CreateRiskTreatmentDecision(ctx context.Context, arg CreateRis
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ func (q *Queries) DeleteRiskTreatmentDecision(ctx context.Context, arg DeleteRis
 }
 
 const getRiskTreatmentDecision = `-- name: GetRiskTreatmentDecision :one
-SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version FROM risk_treatment_decision
 WHERE risk_treatment_decision.threat_scenario_id = $1
   AND risk_treatment_decision.id = $2
 `
@@ -87,12 +88,13 @@ func (q *Queries) GetRiskTreatmentDecision(ctx context.Context, arg GetRiskTreat
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getRiskTreatmentDecisionForDelete = `-- name: GetRiskTreatmentDecisionForDelete :one
-SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version FROM risk_treatment_decision
 WHERE risk_treatment_decision.threat_scenario_id = $1
   AND risk_treatment_decision.id = $2
 FOR UPDATE
@@ -113,12 +115,13 @@ func (q *Queries) GetRiskTreatmentDecisionForDelete(ctx context.Context, arg Get
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getRiskTreatmentDecisionForUpdate = `-- name: GetRiskTreatmentDecisionForUpdate :one
-SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version FROM risk_treatment_decision
 WHERE risk_treatment_decision.threat_scenario_id = $1
   AND risk_treatment_decision.id = $2
 FOR NO KEY UPDATE
@@ -139,12 +142,13 @@ func (q *Queries) GetRiskTreatmentDecisionForUpdate(ctx context.Context, arg Get
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listRiskTreatmentDecisions = `-- name: ListRiskTreatmentDecisions :many
-SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version FROM risk_treatment_decision
 WHERE risk_treatment_decision.threat_scenario_id = $1
 ORDER BY id LIMIT $3 OFFSET $2
 `
@@ -171,6 +175,7 @@ func (q *Queries) ListRiskTreatmentDecisions(ctx context.Context, arg ListRiskTr
 			&i.TreatmentOption,
 			&i.DecisionRationale,
 			&i.IsCybersecurityClaim,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -184,7 +189,7 @@ func (q *Queries) ListRiskTreatmentDecisions(ctx context.Context, arg ListRiskTr
 
 const patchRiskTreatmentDecision = `-- name: PatchRiskTreatmentDecision :one
 UPDATE risk_treatment_decision
-SET risk_value_id = CASE WHEN $1::boolean THEN $2::uuid ELSE risk_treatment_decision.risk_value_id END,
+SET version = risk_treatment_decision.version + 1, risk_value_id = CASE WHEN $1::boolean THEN $2::uuid ELSE risk_treatment_decision.risk_value_id END,
     treatment_option = COALESCE($3::risk_treatment_option, treatment_option),
     decision_rationale = CASE WHEN $4::boolean THEN $5::text ELSE decision_rationale END,
     is_cybersecurity_claim = COALESCE($6::boolean, is_cybersecurity_claim)
@@ -192,7 +197,7 @@ WHERE risk_treatment_decision.threat_scenario_id = $7
   AND risk_treatment_decision.id = $8 AND (CASE WHEN $1::boolean THEN $2::uuid ELSE risk_treatment_decision.risk_value_id END::uuid IS NULL OR EXISTS (
     SELECT 1 FROM risk_value rv WHERE rv.id = CASE WHEN $1::boolean THEN $2::uuid ELSE risk_treatment_decision.risk_value_id END
       AND rv.threat_scenario_id = $7))
-RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim
+RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version
 `
 
 type PatchRiskTreatmentDecisionParams struct {
@@ -225,13 +230,14 @@ func (q *Queries) PatchRiskTreatmentDecision(ctx context.Context, arg PatchRiskT
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }
 
 const replaceRiskTreatmentDecision = `-- name: ReplaceRiskTreatmentDecision :one
 UPDATE risk_treatment_decision
-SET risk_value_id = $1,
+SET version = risk_treatment_decision.version + 1, risk_value_id = $1,
     treatment_option = $2,
     decision_rationale = $3,
     is_cybersecurity_claim = $4
@@ -239,7 +245,7 @@ WHERE risk_treatment_decision.threat_scenario_id = $5
   AND risk_treatment_decision.id = $6 AND ($1::uuid IS NULL OR EXISTS (
     SELECT 1 FROM risk_value rv WHERE rv.id = $1
       AND rv.threat_scenario_id = $5))
-RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim
+RETURNING id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim, version
 `
 
 type ReplaceRiskTreatmentDecisionParams struct {
@@ -268,6 +274,7 @@ func (q *Queries) ReplaceRiskTreatmentDecision(ctx context.Context, arg ReplaceR
 		&i.TreatmentOption,
 		&i.DecisionRationale,
 		&i.IsCybersecurityClaim,
+		&i.Version,
 	)
 	return i, err
 }

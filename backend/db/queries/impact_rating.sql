@@ -18,7 +18,7 @@ LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ReplaceImpactRating :one
 UPDATE impact_rating
-SET impact_category = $4, rating_value = $5, is_omitted_by_pm_15_07 = $6,
+SET version = impact_rating.version + 1, impact_category = $4, rating_value = $5, is_omitted_by_pm_15_07 = $6,
     omission_or_rating_rationale = $7, reused_from_functional_safety = $8
 WHERE impact_rating.id = $1 AND impact_rating.damage_scenario_id = $2
   AND EXISTS(SELECT 1 FROM damage_scenario WHERE damage_scenario.id = $2 AND damage_scenario.item_definition_id = $3)
@@ -26,7 +26,7 @@ RETURNING *;
 
 -- name: UpdateImpactRating :one
 UPDATE impact_rating
-SET impact_category = COALESCE(sqlc.narg('impact_category'), impact_category),
+SET version = impact_rating.version + 1, impact_category = COALESCE(sqlc.narg('impact_category'), impact_category),
     rating_value = COALESCE(sqlc.narg('rating_value'), rating_value),
     is_omitted_by_pm_15_07 = COALESCE(sqlc.narg('is_omitted_by_pm_15_07'), is_omitted_by_pm_15_07),
     omission_or_rating_rationale = CASE WHEN sqlc.arg('set_omission_or_rating_rationale')::boolean THEN sqlc.narg('omission_or_rating_rationale')::text ELSE omission_or_rating_rationale END,

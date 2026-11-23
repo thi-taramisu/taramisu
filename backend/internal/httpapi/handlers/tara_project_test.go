@@ -121,7 +121,7 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 	return p, nil
 }
 
-func (f *fakeProjects) DeleteTaraProject(_ context.Context, actor db.Actor, _ pgtype.UUID) error {
+func (f *fakeProjects) DeleteTaraProject(_ context.Context, actor db.Actor, _ pgtype.UUID, _ db.VersionCheck) error {
 	f.deletedBy = actor
 	if !f.found {
 		return db.ErrProjectNotFound

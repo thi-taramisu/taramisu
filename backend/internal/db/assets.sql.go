@@ -22,7 +22,7 @@ INSERT INTO asset (item_definition_id, tara_project_id, display_number, name, de
 SELECT $1, display.tara_project_id, display.last_number,
     $2, $3, $4
 FROM display
-RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version
 `
 
 type CreateAssetParams struct {
@@ -50,6 +50,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }
@@ -72,7 +73,7 @@ func (q *Queries) DeleteAsset(ctx context.Context, arg DeleteAssetParams) (pgtyp
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version FROM asset WHERE id = $1 AND item_definition_id = $2
 `
 
 type GetAssetParams struct {
@@ -91,12 +92,13 @@ func (q *Queries) GetAsset(ctx context.Context, arg GetAssetParams) (Asset, erro
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAssetForDelete = `-- name: GetAssetForDelete :one
-SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version FROM asset WHERE id = $1 AND item_definition_id = $2
 FOR UPDATE
 `
 
@@ -116,12 +118,13 @@ func (q *Queries) GetAssetForDelete(ctx context.Context, arg GetAssetForDeletePa
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAssetForUpdate = `-- name: GetAssetForUpdate :one
-SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version FROM asset WHERE id = $1 AND item_definition_id = $2
 FOR NO KEY UPDATE
 `
 
@@ -141,12 +144,13 @@ func (q *Queries) GetAssetForUpdate(ctx context.Context, arg GetAssetForUpdatePa
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listAssets = `-- name: ListAssets :many
-SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version FROM asset
 WHERE item_definition_id = $1
 ORDER BY id
 LIMIT $3 OFFSET $2
@@ -175,6 +179,7 @@ func (q *Queries) ListAssets(ctx context.Context, arg ListAssetsParams) ([]Asset
 			&i.Name,
 			&i.Description,
 			&i.IdentificationSource,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -188,9 +193,9 @@ func (q *Queries) ListAssets(ctx context.Context, arg ListAssetsParams) ([]Asset
 
 const replaceAsset = `-- name: ReplaceAsset :one
 UPDATE asset
-SET name = $1, description = $2, identification_source = $3
+SET version = asset.version + 1, name = $1, description = $2, identification_source = $3
 WHERE id = $4 AND item_definition_id = $5
-RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version
 `
 
 type ReplaceAssetParams struct {
@@ -218,17 +223,18 @@ func (q *Queries) ReplaceAsset(ctx context.Context, arg ReplaceAssetParams) (Ass
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateAsset = `-- name: UpdateAsset :one
 UPDATE asset
-SET name = COALESCE($1::text, name),
+SET version = asset.version + 1, name = COALESCE($1::text, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END,
     identification_source = CASE WHEN $4::boolean THEN $5::identification_source ELSE identification_source END
 WHERE id = $6 AND item_definition_id = $7
-RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source, version
 `
 
 type UpdateAssetParams struct {
@@ -260,6 +266,7 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
+		&i.Version,
 	)
 	return i, err
 }

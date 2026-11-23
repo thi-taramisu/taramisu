@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -148,10 +149,16 @@ const accessMetadataKey = "taramisu.access"
 // before the handler runs; the handler can read it with RoleFromContext.
 func Register[I, O any](api huma.API, op huma.Operation, access Access, handler func(context.Context, *I) (*O, error)) {
 	op = declareAccess(api, op, access)
+	if hasIfMatch(reflect.TypeFor[I]()) {
+		op.Errors = appendMissing(op.Errors, http.StatusPreconditionFailed)
+	}
 	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
 		out, err := handler(ctx, in)
 		return out, hideUnexpected(ctx, op.OperationID, err)
 	})
+	if hasIfMatch(reflect.TypeFor[I]()) {
+		documentCurrentETag(api, op)
+	}
 }
 
 // RegisterRaw registers a streaming handler with the same project access checks as typed handlers.

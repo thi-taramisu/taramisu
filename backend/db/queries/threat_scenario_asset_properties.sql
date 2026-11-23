@@ -33,7 +33,7 @@ ORDER BY l.id LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 -- link, and t/p/a check the replacement references; both sets must belong to the requested item.
 -- name: ReplaceThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
-SET threat_scenario_id = sqlc.arg(threat_scenario_id), asset_cybersecurity_property_id = sqlc.arg(asset_cybersecurity_property_id)
+SET version = l.version + 1, threat_scenario_id = sqlc.arg(threat_scenario_id), asset_cybersecurity_property_id = sqlc.arg(asset_cybersecurity_property_id)
 FROM threat_scenario old_t, asset_cybersecurity_property old_p
 JOIN asset old_a ON old_a.id = old_p.asset_id,
     threat_scenario t, asset_cybersecurity_property p
@@ -48,7 +48,7 @@ RETURNING l.*;
 -- Check both the old and resulting references against the requested item before changing the link.
 -- name: UpdateThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
-SET threat_scenario_id = COALESCE(sqlc.narg(threat_scenario_id)::uuid, l.threat_scenario_id),
+SET version = l.version + 1, threat_scenario_id = COALESCE(sqlc.narg(threat_scenario_id)::uuid, l.threat_scenario_id),
     asset_cybersecurity_property_id = COALESCE(sqlc.narg(asset_cybersecurity_property_id)::uuid, l.asset_cybersecurity_property_id)
 FROM threat_scenario old_t, asset_cybersecurity_property old_p
 JOIN asset old_a ON old_a.id = old_p.asset_id,
