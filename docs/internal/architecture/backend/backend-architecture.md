@@ -78,19 +78,22 @@ optimistic concurrency control with HTTP preconditions instead of edit locks is 
   the update returned carries a version that was never committed.
 - **Scope.** The version covers the record's own fields, not the lists of records below it. Creating a record needs no
   version.
-- **Required header.** With `REQUIRE_IF_MATCH=true`, a change of a versioned record without `If-Match` is rejected with
-  `428 Precondition Required`, after the access check and before the input is validated. The default is `false`, so that the
-  current frontend, which does not send the header yet, can still save; turn it on once every client sends it. Creating a
-  record, changing links, and deleting attachments never need the header.
-- **Current state.** All editable tables have the column and every update raises it, but only project settings, project
-  deletion, members, and item definitions return the version and check `If-Match` so far. `notVersionedYet` in
-  `TestEveryChangeIsDeclaredForVersions` lists the operations that follow.
+- **Create or replace.** The `PUT` of an attack feasibility rating creates it if the attack path has none. `If-Match`
+  replaces an existing rating and fails with `412` if there is none; `If-None-Match: *` creates a missing rating and fails
+  with `412` if one exists.
+- **Required header.** With `REQUIRE_IF_MATCH=true`, a change of a versioned record without `If-Match` (or
+  `If-None-Match: *` for the create-or-replace `PUT`) is rejected with `428 Precondition Required`, after the access check
+  and before the input is validated. The default is `false`, so that the current frontend, which does not send the header
+  yet, can still save; turn it on once every client sends it. Creating a record, deleting threat-damage and
+  threat-attack-path links, and deleting attachments never need the header.
 
 In a handler, embed `IfMatch` in the input of the operation and call `check` with the version of the record that the change
 has locked (`FOR UPDATE` or `FOR NO KEY UPDATE`) inside `Audit`. The row stays locked until the commit, so no other change can
-come in between the check and the write. Store methods that lock the record themselves take a `db.VersionCheck` instead.
-`TestEveryChangeIsDeclaredForVersions` lists every `PUT`, `PATCH`, and `DELETE` as versioned, not versioned yet, or
-unversioned; a new operation must be added to one of the lists.
+come in between the check and the write. Return the result of `updated` instead of building the audit change with
+`db.Updated` directly; it returns the record as before when nothing changed. A `DELETE` gets its own input type, so that the
+`GET` of the same record does not accept `If-Match`. Store methods that lock the record themselves take a `db.VersionCheck`
+instead. `TestEveryChangeIsDeclaredForVersions` lists every `PUT`, `PATCH`, and `DELETE` as versioned or unversioned (links); a
+new operation must be added to one of the lists.
 
 ## Testing Routes
 

@@ -74,6 +74,7 @@ type AssetCybersecurityProperty struct {
 	AssetID      string                       `json:"asset_id" format:"uuid"`
 	PropertyType db.CybersecurityPropertyType `json:"property_type" enum:"CONFIDENTIALITY,INTEGRITY,AVAILABILITY"`
 	Description  *string                      `json:"description" nullable:"true"`
+	Version      int32                        `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the cybersecurity property."`
 }
 
 // AssetCybersecurityPropertyParentPath reads item_definition_id and asset_id from the URL.
@@ -97,6 +98,7 @@ type CreateAssetCybersecurityPropertyInput struct {
 
 // ReplaceAssetCybersecurityPropertyInput identifies an existing record and supplies its replacement values.
 type ReplaceAssetCybersecurityPropertyInput struct {
+	IfMatch
 	AssetCybersecurityPropertyIDInput
 	Body AssetCybersecurityPropertyBody
 }
@@ -104,6 +106,7 @@ type ReplaceAssetCybersecurityPropertyInput struct {
 // UpdateAssetCybersecurityPropertyInput identifies an existing record and tracks which JSON fields were supplied.
 // Optional distinguishes an omitted field from an explicit null, which can clear the description.
 type UpdateAssetCybersecurityPropertyInput struct {
+	IfMatch
 	AssetCybersecurityPropertyIDInput
 	Body struct {
 		PropertyType Optional[db.CybersecurityPropertyType] `json:"property_type,omitempty" enum:"CONFIDENTIALITY,INTEGRITY,AVAILABILITY" nullable:"false"`
@@ -119,13 +122,17 @@ type ListAssetCybersecurityPropertiesInput struct {
 }
 
 // AssetCybersecurityPropertyOutput returns one property as the JSON body, without a Body wrapper.
-type AssetCybersecurityPropertyOutput struct{ Body AssetCybersecurityProperty }
+type AssetCybersecurityPropertyOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body AssetCybersecurityProperty
+}
 
 // ListAssetCybersecurityPropertiesOutput returns a JSON array of properties.
 type ListAssetCybersecurityPropertiesOutput struct{ Body []AssetCybersecurityProperty }
 
 // CreateAssetCybersecurityPropertyOutput returns the created record and its URL in the Location header.
 type CreateAssetCybersecurityPropertyOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     AssetCybersecurityProperty
 }
@@ -133,7 +140,7 @@ type CreateAssetCybersecurityPropertyOutput struct {
 // assetCybersecurityPropertyBody converts a database record into the API response representation.
 // Database UUIDs become strings; this function does not execute a database query.
 func assetCybersecurityPropertyBody(p db.AssetCybersecurityProperty) AssetCybersecurityProperty {
-	return AssetCybersecurityProperty{ID: p.ID.String(), AssetID: p.AssetID.String(), PropertyType: p.PropertyType, Description: p.Description}
+	return AssetCybersecurityProperty{Version: p.Version, ID: p.ID.String(), AssetID: p.AssetID.String(), PropertyType: p.PropertyType, Description: p.Description}
 }
 
 // Create handles POST: inserts a property using parent IDs from the URL and values from the JSON body.
@@ -155,7 +162,7 @@ func (h *AssetCybersecurityProperties) Create(ctx context.Context, in *CreateAss
 		return nil, propertyError(err)
 	}
 	location := itemCollection(in.ItemDefinitionID, "assets/"+p.AssetID.String()+"/cybersecurity-properties/"+p.ID.String())
-	return &CreateAssetCybersecurityPropertyOutput{Location: location, Body: assetCybersecurityPropertyBody(p)}, nil
+	return &CreateAssetCybersecurityPropertyOutput{ETag: etag(p.Version), Location: location, Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
 // Get handles GET for one property, using the property, asset, and item definition IDs from the URL.
@@ -166,7 +173,7 @@ func (h *AssetCybersecurityProperties) Get(ctx context.Context, in *AssetCyberse
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{ETag: etag(p.Version), Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
 // List handles GET for the collection, applying the limit and offset query parameters.
@@ -193,18 +200,23 @@ func (h *AssetCybersecurityProperties) Replace(ctx context.Context, in *ReplaceA
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		p, err = h.queries.ReplaceAssetCybersecurityProperty(ctx, db.ReplaceAssetCybersecurityPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID),
 			PropertyType: in.Body.PropertyType, Description: in.Body.Description})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAssetCybersecurityProperty, projectIDFromContext(ctx), p.ID, assetCybersecurityPropertyBody(before), assetCybersecurityPropertyBody(p)), nil
+		var change db.Change
+		change, p = updated(db.TargetAssetCybersecurityProperty, projectIDFromContext(ctx), p.ID, before, p, assetCybersecurityPropertyBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{ETag: etag(p.Version), Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
 // Update handles PATCH: changes only fields included in the request body.
@@ -220,27 +232,35 @@ func (h *AssetCybersecurityProperties) Update(ctx context.Context, in *UpdateAss
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		p, err = h.queries.UpdateAssetCybersecurityProperty(ctx, db.UpdateAssetCybersecurityPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID),
 			PropertyType: in.Body.PropertyType.Value, SetDescription: in.Body.Description.Set, Description: in.Body.Description.Value})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAssetCybersecurityProperty, projectIDFromContext(ctx), p.ID, assetCybersecurityPropertyBody(before), assetCybersecurityPropertyBody(p)), nil
+		var change db.Change
+		change, p = updated(db.TargetAssetCybersecurityProperty, projectIDFromContext(ctx), p.ID, before, p, assetCybersecurityPropertyBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &AssetCybersecurityPropertyOutput{Body: assetCybersecurityPropertyBody(p)}, nil
+	return &AssetCybersecurityPropertyOutput{ETag: etag(p.Version), Body: assetCybersecurityPropertyBody(p)}, nil
 }
 
 // Delete handles DELETE for a property belonging to the URL's asset and item definition.
 // Database foreign keys also delete its damage and threat scenario links, preserving the
 // asset and scenarios. On success, Huma returns 204 No Content; a missing property returns 404.
-func (h *AssetCybersecurityProperties) Delete(ctx context.Context, in *AssetCybersecurityPropertyIDInput) (*struct{}, error) {
+func (h *AssetCybersecurityProperties) Delete(ctx context.Context, in *DeleteAssetCybersecurityPropertyInput) (*struct{}, error) {
 	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
 		before, err := h.queries.GetAssetCybersecurityPropertyForDelete(ctx, db.GetAssetCybersecurityPropertyForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), AssetID: pgtype.UUID(in.AssetID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.queries.DeleteAssetCybersecurityProperty(ctx, db.DeleteAssetCybersecurityPropertyParams{
@@ -253,4 +273,10 @@ func (h *AssetCybersecurityProperties) Delete(ctx context.Context, in *AssetCybe
 		return nil, propertyError(err)
 	}
 	return nil, nil
+}
+
+// DeleteAssetCybersecurityPropertyInput identifies the record to delete and the version the deletion is based on.
+type DeleteAssetCybersecurityPropertyInput struct {
+	AssetCybersecurityPropertyIDInput
+	IfMatch
 }

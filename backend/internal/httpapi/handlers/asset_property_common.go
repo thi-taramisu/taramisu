@@ -46,6 +46,10 @@ func propertyOperation(id, method, path, tag, summary string) huma.Operation {
 // Missing rows become 404, uniqueness violations become 409, and deleted references become 422.
 // Unexpected failures are logged, while clients receive 503 without internal database details.
 func propertyError(err error) error {
+	var statusErr huma.StatusError
+	if errors.As(err, &statusErr) {
+		return err // already mapped, such as 412 for an outdated If-Match
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("record or referenced parent not found in this item definition")
 	}
@@ -75,4 +79,10 @@ func optionalUUID(value Optional[assetUUID]) pgtype.UUID {
 // itemCollection builds an item-scoped resource URL, used for the Location header after creation.
 func itemCollection(item assetUUID, resource string) string {
 	return "/api/v1/item-definitions/" + pgtype.UUID(item).String() + "/" + resource
+}
+
+// DeletePropertyLinkInput identifies the property link to delete and the version the deletion is based on.
+type DeletePropertyLinkInput struct {
+	PropertyLinkIDInput
+	IfMatch
 }

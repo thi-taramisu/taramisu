@@ -64,13 +64,16 @@ type ImpactRatingBody struct {
 	IsOmittedByPm1507          bool                  `json:"is_omitted_by_pm_15_07"`
 	OmissionOrRatingRationale  *string               `json:"omission_or_rating_rationale,omitempty"`
 	ReusedFromFunctionalSafety bool                  `json:"reused_from_functional_safety"`
+	Version                    int32                 `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the impact rating."`
 }
 
 type ImpactRatingOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Body ImpactRatingBody
 }
 
 type CreateImpactRatingOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     ImpactRatingBody
 }
@@ -109,11 +112,13 @@ type CreateImpactRatingInput struct {
 }
 
 type ReplaceImpactRatingInput struct {
+	IfMatch
 	ImpactRatingIDInput
 	Body ImpactRatingFields
 }
 
 type UpdateImpactRatingInput struct {
+	IfMatch
 	ImpactRatingIDInput
 	Body struct {
 		ImpactCategory             *db.ImpactCategory    `json:"impact_category,omitempty" enum:"SAFETY,FINANCIAL,OPERATIONAL,PRIVACY"`
@@ -167,6 +172,7 @@ func (h *ImpactRating) Create(ctx context.Context, in *CreateImpactRatingInput) 
 		return nil, mapImpactRatingError(err)
 	}
 	return &CreateImpactRatingOutput{
+		ETag:     etag(r.Version),
 		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/damage-scenarios/" + in.DamageScenarioID + "/impact-ratings/" + r.ID.String(),
 		Body:     toImpactRatingBody(r),
 	}, nil
@@ -215,6 +221,9 @@ func (h *ImpactRating) Replace(ctx context.Context, in *ReplaceImpactRatingInput
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		r, err = h.store.ReplaceImpactRating(ctx, db.ReplaceImpactRatingParams{
 			ID:                         ids.id,
 			DamageScenarioID:           ids.damageScenarioID,
@@ -228,7 +237,9 @@ func (h *ImpactRating) Replace(ctx context.Context, in *ReplaceImpactRatingInput
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, toImpactRatingBody(before), toImpactRatingBody(r)), nil
+		var change db.Change
+		change, r = updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, before, r, toImpactRatingBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
@@ -247,6 +258,9 @@ func (h *ImpactRating) Update(ctx context.Context, in *UpdateImpactRatingInput) 
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		r, err = h.store.UpdateImpactRating(ctx, db.UpdateImpactRatingParams{
 			ID:                           ids.id,
 			DamageScenarioID:             ids.damageScenarioID,
@@ -261,7 +275,9 @@ func (h *ImpactRating) Update(ctx context.Context, in *UpdateImpactRatingInput) 
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, toImpactRatingBody(before), toImpactRatingBody(r)), nil
+		var change db.Change
+		change, r = updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, before, r, toImpactRatingBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
@@ -269,14 +285,17 @@ func (h *ImpactRating) Update(ctx context.Context, in *UpdateImpactRatingInput) 
 	return toImpactRatingOutput(r), nil
 }
 
-func (h *ImpactRating) Delete(ctx context.Context, in *ImpactRatingIDInput) (*struct{}, error) {
-	ids, err := parseImpactRatingIDs(in)
+func (h *ImpactRating) Delete(ctx context.Context, in *DeleteImpactRatingInput) (*struct{}, error) {
+	ids, err := parseImpactRatingIDs(&in.ImpactRatingIDInput)
 	if err != nil {
 		return nil, err
 	}
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetImpactRatingForDelete(ctx, db.GetImpactRatingForDeleteParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		n, err := h.store.DeleteImpactRating(ctx, db.DeleteImpactRatingParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
@@ -312,6 +331,7 @@ func mapImpactRatingError(err error) error {
 
 func toImpactRatingBody(r db.ImpactRating) ImpactRatingBody {
 	return ImpactRatingBody{
+		Version:                    r.Version,
 		ID:                         r.ID.String(),
 		DamageScenarioID:           r.DamageScenarioID.String(),
 		ImpactCategory:             r.ImpactCategory,
@@ -323,5 +343,11 @@ func toImpactRatingBody(r db.ImpactRating) ImpactRatingBody {
 }
 
 func toImpactRatingOutput(r db.ImpactRating) *ImpactRatingOutput {
-	return &ImpactRatingOutput{Body: toImpactRatingBody(r)}
+	return &ImpactRatingOutput{ETag: etag(r.Version), Body: toImpactRatingBody(r)}
+}
+
+// DeleteImpactRatingInput identifies the record to delete and the version the deletion is based on.
+type DeleteImpactRatingInput struct {
+	ImpactRatingIDInput
+	IfMatch
 }

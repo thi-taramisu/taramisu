@@ -228,11 +228,9 @@ func (h *ItemDefinitions) update(ctx context.Context, projectID, id pgtype.UUID,
 		if row, err = change(ctx); err != nil {
 			return db.Change{}, err
 		}
-		updated := db.Updated(db.TargetItemDefinition, projectID, id, itemDefinition(before), itemDefinition(row))
-		if updated.Event == "" {
-			row = before // Audit rolls the no-op back, so the version stays
-		}
-		return updated, nil
+		var change db.Change
+		change, row = updated(db.TargetItemDefinition, projectID, id, before, row, itemDefinition)
+		return change, nil
 	})
 	if err != nil {
 		return nil, itemDefinitionError(err)

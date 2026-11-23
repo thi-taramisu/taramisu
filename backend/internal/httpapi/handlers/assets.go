@@ -69,10 +69,15 @@ type Asset struct {
 	Name                 string                   `json:"name"`
 	Description          *string                  `json:"description" nullable:"true"`
 	IdentificationSource *db.IdentificationSource `json:"identification_source" nullable:"true" enum:"ITEM_DEF,IMPACT_RATING,THREAT_DERIVED,CATALOGUE"`
+	Version              int32                    `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the asset."`
 }
 
-type AssetOutput struct{ Body Asset }
+type AssetOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body Asset
+}
 type CreateAssetOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     Asset
 }
@@ -89,11 +94,13 @@ type CreateAssetInput struct {
 	Body AssetBody
 }
 type ReplaceAssetInput struct {
+	IfMatch
 	AssetIDInput
 	Body AssetBody
 }
 
 type UpdateAssetInput struct {
+	IfMatch
 	AssetIDInput
 	Body UpdateAssetInputBody
 }
@@ -138,7 +145,7 @@ func (assetUUID) Schema(huma.Registry) *huma.Schema {
 		Pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"}
 }
 func assetBody(a db.Asset) Asset {
-	return Asset{ID: a.ID.String(), DisplayID: displayID(displayPrefixAsset, a.DisplayNumber),
+	return Asset{Version: a.Version, ID: a.ID.String(), DisplayID: displayID(displayPrefixAsset, a.DisplayNumber),
 		ItemDefinitionID: a.ItemDefinitionID.String(), Name: a.Name,
 		Description: a.Description, IdentificationSource: a.IdentificationSource}
 }
@@ -165,14 +172,14 @@ func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAsset
 	if err != nil {
 		return nil, assetError(err)
 	}
-	return &CreateAssetOutput{Location: "/api/v1/item-definitions/" + a.ItemDefinitionID.String() + "/assets/" + a.ID.String(), Body: assetBody(a)}, nil
+	return &CreateAssetOutput{ETag: etag(a.Version), Location: "/api/v1/item-definitions/" + a.ItemDefinitionID.String() + "/assets/" + a.ID.String(), Body: assetBody(a)}, nil
 }
 func (h *Assets) Get(ctx context.Context, in *AssetIDInput) (*AssetOutput, error) {
 	a, err := h.queries.GetAsset(ctx, db.GetAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
 	if err != nil {
 		return nil, assetError(err)
 	}
-	return &AssetOutput{Body: assetBody(a)}, nil
+	return &AssetOutput{ETag: etag(a.Version), Body: assetBody(a)}, nil
 }
 func (h *Assets) List(ctx context.Context, in *ListAssetsInput) (*ListAssetsOutput, error) {
 	assets, err := h.queries.ListAssets(ctx, db.ListAssetsParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID), PageLimit: in.Limit, PageOffset: in.Offset})
@@ -192,17 +199,22 @@ func (h *Assets) Replace(ctx context.Context, in *ReplaceAssetInput) (*AssetOutp
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		a, err = h.queries.ReplaceAsset(ctx, db.ReplaceAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 			Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+		var change db.Change
+		change, a = updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, before, a, assetBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, assetError(err)
 	}
-	return &AssetOutput{Body: assetBody(a)}, nil
+	return &AssetOutput{ETag: etag(a.Version), Body: assetBody(a)}, nil
 }
 func (h *Assets) Update(ctx context.Context, in *UpdateAssetInput) (*AssetOutput, error) {
 	b := in.Body
@@ -218,21 +230,29 @@ func (h *Assets) Update(ctx context.Context, in *UpdateAssetInput) (*AssetOutput
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		a, err = h.queries.UpdateAsset(ctx, p)
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+		var change db.Change
+		change, a = updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, before, a, assetBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, assetError(err)
 	}
-	return &AssetOutput{Body: assetBody(a)}, nil
+	return &AssetOutput{ETag: etag(a.Version), Body: assetBody(a)}, nil
 }
-func (h *Assets) Delete(ctx context.Context, in *AssetIDInput) (*struct{}, error) {
+func (h *Assets) Delete(ctx context.Context, in *DeleteAssetInput) (*struct{}, error) {
 	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
 		before, err := h.queries.GetAssetForDelete(ctx, db.GetAssetForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.queries.DeleteAsset(ctx, db.DeleteAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)}); err != nil {
@@ -244,4 +264,10 @@ func (h *Assets) Delete(ctx context.Context, in *AssetIDInput) (*struct{}, error
 		return nil, assetError(err)
 	}
 	return nil, nil
+}
+
+// DeleteAssetInput identifies the record to delete and the version the deletion is based on.
+type DeleteAssetInput struct {
+	AssetIDInput
+	IfMatch
 }

@@ -66,13 +66,16 @@ type AttackPathBody struct {
 	AnalysisApproach         *db.AnalysisApproach `json:"analysis_approach,omitempty" enum:"TOP_DOWN,BOTTOM_UP"`
 	IsPartialEarlyStage      bool                 `json:"is_partial_early_stage"`
 	AttackStepsAndWeaknesses json.RawMessage      `json:"attack_steps_and_weaknesses,omitempty"`
+	Version                  int32                `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the attack path."`
 }
 
 type AttackPathOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Body AttackPathBody
 }
 
 type CreateAttackPathOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     AttackPathBody
 }
@@ -109,6 +112,7 @@ type CreateAttackPathInput struct {
 }
 
 type ReplaceAttackPathInput struct {
+	IfMatch
 	AttackPathIDInput
 	Body AttackPathInputBody
 }
@@ -121,6 +125,7 @@ type OptionalJSON struct {
 func (OptionalJSON) Schema(huma.Registry) *huma.Schema { return &huma.Schema{} }
 
 type UpdateAttackPathInput struct {
+	IfMatch
 	AttackPathIDInput
 	Body struct {
 		Title                    *string                       `json:"title,omitempty" minLength:"1"`
@@ -151,6 +156,7 @@ func (h *AttackPath) Create(ctx context.Context, in *CreateAttackPathInput) (*Cr
 		return nil, mapAttackPathError(err)
 	}
 	return &CreateAttackPathOutput{
+		ETag:     etag(p.Version),
 		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/attack-paths/" + p.ID.String(),
 		Body:     toAttackPathBody(p),
 	}, nil
@@ -196,6 +202,9 @@ func (h *AttackPath) Replace(ctx context.Context, in *ReplaceAttackPathInput) (*
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		p, err = h.store.ReplaceAttackPath(ctx, db.ReplaceAttackPathParams{
 			ID:                       id,
 			ItemDefinitionID:         itemID,
@@ -207,7 +216,9 @@ func (h *AttackPath) Replace(ctx context.Context, in *ReplaceAttackPathInput) (*
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(before), toAttackPathBody(p)), nil
+		var change db.Change
+		change, p = updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, before, p, toAttackPathBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapAttackPathError(err)
@@ -234,11 +245,16 @@ func (h *AttackPath) Update(ctx context.Context, in *UpdateAttackPathInput) (*At
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		p, err = h.store.UpdateAttackPath(ctx, params)
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(before), toAttackPathBody(p)), nil
+		var change db.Change
+		change, p = updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, before, p, toAttackPathBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapAttackPathError(err)
@@ -246,7 +262,7 @@ func (h *AttackPath) Update(ctx context.Context, in *UpdateAttackPathInput) (*At
 	return toAttackPathOutput(p), nil
 }
 
-func (h *AttackPath) Delete(ctx context.Context, in *AttackPathIDInput) (*struct{}, error) {
+func (h *AttackPath) Delete(ctx context.Context, in *DeleteAttackPathInput) (*struct{}, error) {
 	id, itemID, err := attackPathIDs(in.ID, in.ItemDefinitionID)
 	if err != nil {
 		return nil, err
@@ -254,6 +270,9 @@ func (h *AttackPath) Delete(ctx context.Context, in *AttackPathIDInput) (*struct
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetAttackPathForDelete(ctx, db.GetAttackPathForDeleteParams{ID: id, ItemDefinitionID: itemID})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		n, err := h.store.DeleteAttackPath(ctx, db.DeleteAttackPathParams{ID: id, ItemDefinitionID: itemID})
@@ -302,6 +321,7 @@ func mapAttackPathError(err error) error {
 
 func toAttackPathBody(p db.AttackPath) AttackPathBody {
 	out := AttackPathBody{
+		Version:             p.Version,
 		ID:                  p.ID.String(),
 		DisplayID:           displayID(displayPrefixAttackPath, p.DisplayNumber),
 		ItemDefinitionID:    p.ItemDefinitionID.String(),
@@ -316,5 +336,11 @@ func toAttackPathBody(p db.AttackPath) AttackPathBody {
 }
 
 func toAttackPathOutput(p db.AttackPath) *AttackPathOutput {
-	return &AttackPathOutput{Body: toAttackPathBody(p)}
+	return &AttackPathOutput{ETag: etag(p.Version), Body: toAttackPathBody(p)}
+}
+
+// DeleteAttackPathInput identifies the record to delete and the version the deletion is based on.
+type DeleteAttackPathInput struct {
+	AttackPathIDInput
+	IfMatch
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
 // IfMatch is embedded in the input of every PUT, PATCH, and DELETE on a versioned record, so that a
@@ -47,21 +49,61 @@ func RequireIfMatch(next http.Handler) http.Handler {
 	})
 }
 
-// requirePrecondition rejects a request without If-Match with 428 if the context requires it. It runs
-// after the access check, so that a caller without access still gets 403 or 404.
-func requirePrecondition(api huma.API) func(huma.Context, func(huma.Context)) {
+// requirePrecondition rejects a request without If-Match (or If-None-Match: *, where the operation
+// can create the record) with 428 if the context requires it. Another If-None-Match does not count:
+// it would let an upsert replace an existing record without comparing its version. It runs after
+// the access check, so that a caller without access still gets 403 or 404.
+func requirePrecondition(api huma.API, upsert bool) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		if required, _ := ctx.Context().Value(requireIfMatchKey{}).(bool); required && ctx.Header("If-Match") == "" {
-			_ = huma.WriteErr(api, ctx, http.StatusPreconditionRequired,
-				"send the version the change is based on as If-Match; read the record to get its ETag")
+		sent := ctx.Header("If-Match") != "" || upsert && strings.TrimSpace(ctx.Header("If-None-Match")) == "*"
+		if required, _ := ctx.Context().Value(requireIfMatchKey{}).(bool); required && !sent {
+			message := "send the version the change is based on as If-Match; read the record to get its ETag"
+			if upsert {
+				message += ", or send If-None-Match: * to create the record"
+			}
+			_ = huma.WriteErr(api, ctx, http.StatusPreconditionRequired, message)
 			return
 		}
 		next(ctx)
 	}
 }
 
+// UpsertPrecondition is embedded in a PUT that creates the record if it does not exist yet: If-Match
+// replaces an existing record, If-None-Match: * creates a missing one.
+type UpsertPrecondition struct {
+	IfMatch
+	IfNoneMatch string `header:"If-None-Match" doc:"* to create the record only if it does not exist yet; if it does, the change is rejected with 412. Use If-Match to replace an existing record."`
+}
+
+// checkUpsert compares the preconditions with the locked record, or with its absence (exists false).
+// If-Match needs an existing record (RFC 9110), and If-None-Match: * a missing one.
+func (p UpsertPrecondition) checkUpsert(exists bool, current int32) error {
+	if !exists {
+		if p.IfMatch.IfMatch != "" {
+			return huma.Error412PreconditionFailed("the record does not exist; send If-None-Match: * to create it")
+		}
+		return nil
+	}
+	for _, tag := range strings.Split(p.IfNoneMatch, ",") {
+		// If-None-Match uses the weak comparison (RFC 9110), so W/"3" matches version 3 too.
+		if tag = strings.TrimPrefix(strings.TrimSpace(tag), "W/"); tag == "*" || tag == etag(current) {
+			return huma.ErrorWithHeaders(
+				huma.Error412PreconditionFailed("the record exists already; reload it and send its ETag as If-Match to replace it"),
+				http.Header{"ETag": {etag(current)}},
+			)
+		}
+	}
+	return p.check(current)
+}
+
 // etag is the entity tag of a record version. It is strong: equal tags mean equal stored fields.
 func etag(version int32) string { return `"` + strconv.FormatInt(int64(version), 10) + `"` }
+
+// isUpsert tells whether an operation's input embeds UpsertPrecondition.
+func isUpsert(input reflect.Type) bool {
+	field, ok := input.FieldByName("UpsertPrecondition")
+	return ok && field.Anonymous && field.Type == reflect.TypeFor[UpsertPrecondition]()
+}
 
 // hasIfMatch tells whether an operation's input embeds IfMatch, so that Register can document the 412.
 func hasIfMatch(input reflect.Type) bool {
@@ -90,4 +132,15 @@ func documentCurrentETag(api huma.API, op huma.Operation) {
 		}
 	}
 	panic(fmt.Sprintf("%s %s: registered operation %s with a 412 response not found", op.Method, op.Path, op.OperationID))
+}
+
+// updated returns the audit change of an update and the record to return. Audit rolls back a change
+// that records no event, so then the record as it was before is returned: the updated one carries a
+// version that was never committed, and a client would send it as an outdated If-Match.
+func updated[R, B any](targetType string, projectID, id pgtype.UUID, before, after R, body func(R) B) (db.Change, R) {
+	change := db.Updated(targetType, projectID, id, body(before), body(after))
+	if change.Event == "" {
+		return change, before
+	}
+	return change, after
 }

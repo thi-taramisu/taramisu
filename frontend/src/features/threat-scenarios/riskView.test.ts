@@ -16,6 +16,7 @@ const ap = (id: string, feasibility: ThreatScenarioRisks['attackPaths'][number][
 const riskValue = (impact_rating_id: string, risk_score: number) => ({
   id: `rv-${impact_rating_id}`,
   threat_scenario_id: 'ts-01',
+  version: 1,
   impact_rating_id,
   risk_score,
   determination_method: 'RISK_MATRIX' as const,

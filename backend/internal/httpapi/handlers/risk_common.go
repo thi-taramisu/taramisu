@@ -72,3 +72,9 @@ func riskOperation(id, method, path, summary string) huma.Operation {
 	return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary, Tags: []string{"Risk"}, DefaultStatus: status,
 		Security: []map[string][]string{{"bearer": {}}}, Errors: []int{401, 404, 409, 422, 500}}
 }
+
+// DeleteRiskResourceInput identifies the risk record to delete and the version the deletion is based on.
+type DeleteRiskResourceInput struct {
+	RiskResourcePath
+	IfMatch
+}
