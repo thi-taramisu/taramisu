@@ -12,7 +12,12 @@ from discord_notifications import (
 )
 
 
-def digest_batches(issues, now=None):
+def digest_line(item):
+    title = display_text(item["title"]).replace("\\[", "[").replace("\\]", "]")[:180].rstrip("\\")
+    return f"[#{item['number']}]({item['html_url']}) · {title}"
+
+
+def digest_batches(issues, now=None, pr_section=""):
     """One compact list per batch, within Discord's description limit."""
     now = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Europe/Berlin"))
     heading = "☀️ Morning issue digest" if now.hour < 12 else "🌙 Evening issue digest"
@@ -21,17 +26,17 @@ def digest_batches(issues, now=None):
         batch, lines = [], []
         while pending and len(batch) < 10:
             item = pending[0]
-            title = display_text(item["title"]).replace("\\[", "[").replace("\\]", "]")[:180].rstrip("\\")
-            line = f"[#{item['number']}]({item['html_url']}) · {title}"
-            if lines and len("\n".join([*lines, line])) > 4096:
+            line = digest_line(item)
+            if lines and len("\n".join([*lines, line]) + pr_section) > 4096:
                 break
             batch.append(pending.pop(0))
             lines.append(line)
         yield batch, {
             "allowed_mentions": NO_MENTIONS,
             "embeds": [{"author": {"name": f"{heading} ({len(batch)} new {'issue' if len(batch) == 1 else 'issues'})"},
-                        "description": "\n".join(lines), "color": ISSUE_COLOR}],
+                        "description": "\n".join(lines) + pr_section, "color": ISSUE_COLOR}],
         }
+        pr_section = ""
 
 
 def deliver_digest(github, environ, now):
@@ -65,7 +70,20 @@ def deliver_digest(github, environ, now):
                                  for label in item["labels"])),
                          key=lambda item: (item["created_at"], item["number"]))
         try:
-            for batch, payload in digest_batches(pending, now):
+            pr_section = ""
+            if pending:
+                try:
+                    pulls, total, url = github.approved_pulls(labels)
+                except (OSError, ValueError, KeyError):
+                    print("Approved PR lookup failed; sending issue digest.", file=sys.stderr)
+                else:
+                    if pulls:
+                        lines = ["", "", "**Approved PRs awaiting merge**"]
+                        lines.extend(digest_line(pull) for pull in pulls)
+                        if total > len(pulls):
+                            lines.append(f"[View all {total} approved PRs]({url})")
+                        pr_section = "\n".join(lines)
+            for batch, payload in digest_batches(pending, now, pr_section):
                 send_webhook(webhook, payload)
                 for checkpoint in checkpoints.values():
                     checkpoint["sent"].extend(item["number"] for item in batch)

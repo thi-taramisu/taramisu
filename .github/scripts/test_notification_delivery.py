@@ -27,16 +27,23 @@ class DeliveryTests(unittest.TestCase):
         github = Mock()
         github.load.return_value = {"initial_since": "2026-11-17T09:00:00Z", "channels": {}}
         github.issues.return_value = [item, item, dict(item, number=43, pull_request={})]
+        github.approved_pulls.return_value = ([dict(item, number=54)], 9, "https://github.com/example/repo/pulls")
         now = datetime(2026, 11, 17, 19, tzinfo=timezone.utc)
         deliver_digest(github, ENV, now)
         send.assert_called_once()
         payload = send.call_args.args[1]
-        self.assertEqual(len(payload["embeds"]), 1)
+        embed, = payload["embeds"]
+        self.assertEqual(embed["author"]["name"], "🌙 Evening issue digest (1 new issue)")
+        issues, pulls = embed["description"].split("\n\n**Approved PRs awaiting merge**\n")
+        self.assertIn("[#42]", issues)
+        self.assertIn("[#54]", pulls)
+        self.assertIn("View all 9", pulls)
         self.assertEqual(payload["allowed_mentions"], {
             "parse": [], "users": [], "roles": [], "replied_user": False})
         send.reset_mock()
         deliver_digest(github, ENV, now)
         send.assert_not_called()
+        github.approved_pulls.assert_called_once()
 
     @patch("discord_pr_notifications.send_webhook")
     def test_pr_overlap_and_merge_are_each_announced_once(self, send):
