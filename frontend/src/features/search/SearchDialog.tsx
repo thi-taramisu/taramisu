@@ -13,6 +13,7 @@ import { useAuth } from '../../auth/useAuth'
 import { SearchFilters } from './SearchFilters'
 import { SearchResults } from './SearchResults'
 import { searchResultKey, searchResultPath } from './search'
+import { parseSearchCommands, searchTypeCommand } from './searchCommands'
 
 export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnFocus }: {
   sessionId: number
@@ -69,8 +70,28 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
     navigate(searchResultPath(result))
   }
 
+  function changeQuery(value: string, completedType?: SearchType) {
+    const parsed = parseSearchCommands(value)
+    const addedTypes = completedType ? [completedType, ...parsed.types] : parsed.types
+    setQuery(parsed.query)
+    setSelectedKey(undefined)
+    if (addedTypes.length > 0) {
+      setTypes((previous) => [...new Set([...previous, ...addedTypes])])
+      // Match clicking a filter: apply it at once, including the remaining search text.
+      setDebouncedQuery(parsed.query.trim())
+    }
+  }
+
   function keyboard(event: KeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return
+    if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const type = searchTypeCommand(query)
+      if (type) {
+        event.preventDefault()
+        changeQuery('', type)
+        return
+      }
+    }
     if (searching || results.length === 0) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
@@ -109,7 +130,7 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
             autoComplete="off"
             spellCheck={false}
             className="h-10 min-w-0 border-0 bg-transparent px-3 shadow-none focus-visible:ring-2 dark:bg-transparent"
-            onChange={(event) => { setQuery(event.target.value); setSelectedKey(undefined) }}
+            onChange={(event) => changeQuery(event.target.value)}
             onKeyDown={keyboard}
           />
           <DialogClose asChild>
@@ -156,6 +177,7 @@ export function SearchDialog({ sessionId, open, projectId, onOpenChange, returnF
         </div>
         <p id={hintId} className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 border-t bg-muted/30 px-5 py-2.5 text-[11px] text-muted-foreground">
           <span>{t('search.navigateHint')}</span><span>{t('search.openHint')}</span><span>{t('search.closeHint')}</span>
+          <span>{t('search.typeHint')}</span>
         </p>
       </DialogContent>
     </Dialog>

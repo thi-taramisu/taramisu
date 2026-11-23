@@ -86,6 +86,7 @@
       "damage-scenarios": "Schadensszenario",
       "threat-scenarios": "Bedrohungsszenario",
       "attack-paths": "Angriffspfad"
-    }
+    },
+    "typeHint": "Mit item: oder item + Tab nach Typ filtern."
   }
 }

@@ -146,6 +146,60 @@ describe('Spotlight search', () => {
     expect(screen.getByRole('button', { name: dialogName })).toHaveFocus()
   })
 
+  it.each([
+    ['project', 'Project'], ['item', 'Item'], ['asset', 'Asset'],
+    ['damage', 'Damage scenario'], ['threat', 'Threat scenario'], ['attack', 'Attack path'],
+  ])('activates the %s filter with a colon', async (command, label) => {
+    const { user, input, dialog } = await openSearch()
+    await user.type(input, `${command}:`)
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: label, pressed: true })).toBeInTheDocument()
+    await waitForSearch(dialog)
+    for (const option of resultList(dialog).getAllByRole('option')) expect(option).toHaveTextContent(label)
+  })
+
+  it('activates a type with Tab while typing and keeps focus in the search input', async () => {
+    const { user, input, dialog } = await openSearch()
+    await user.type(input, 'item')
+    await user.tab()
+    expect(input).toHaveFocus()
+    expect(input).toHaveValue('')
+    expect(within(dialog).getByRole('button', { name: 'Item', pressed: true })).toBeInTheDocument()
+
+    await user.type(input, 'Headlamp system')
+    await waitForSearch(dialog)
+    expect(resultList(dialog).getAllByRole('option')).toHaveLength(1)
+    await user.keyboard('{Enter}')
+    expect(screen.getByTestId('location')).toHaveTextContent('/projects/headlamp/items/i-01')
+  })
+
+  it('keeps pasted search text and existing filters, without duplicating an active type', async () => {
+    const { user, input, dialog } = await openSearch('/projects/headlamp/items/i-01')
+    await user.click(within(dialog).getByRole('button', { name: 'Item', pressed: false }))
+    await user.click(input)
+    await user.paste('item: asset: headlamp')
+    expect(input).toHaveValue('headlamp')
+    expect(within(dialog).getByRole('button', { name: 'Item', pressed: true })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Asset', pressed: true })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Remove Headlamp System filter' })).toBeInTheDocument()
+    await waitForSearch(dialog)
+    expect(resultList(dialog).getAllByRole('option')).toHaveLength(2)
+  })
+
+  it('keeps regular Tab and Shift+Tab navigation for ordinary text and backwards navigation', async () => {
+    const { user, input, dialog } = await openSearch()
+    await user.type(input, 'Headlamp')
+    await user.tab()
+    expect(input).not.toHaveFocus()
+    await user.click(input)
+    await user.clear(input)
+    await user.type(input, 'item')
+    await user.tab({ shift: true })
+    expect(input).not.toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: 'Item', pressed: false })).toBeInTheDocument()
+  })
+
   it('starts scoped to the current project, combines/removes filters, and opens a different project', async () => {
     const { user, dialog, input } = await openSearch('/projects/headlamp/items/i-01')
     expect(within(dialog).getByRole('button', { name: 'Remove Headlamp System filter' })).toBeInTheDocument()
