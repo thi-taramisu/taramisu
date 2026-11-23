@@ -31,10 +31,9 @@ const keys = {
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
-export function useProjectTree(projectId: string, { enabled = true } = {}) {
+export function useProjectTree(projectId: string) {
   const api = useApi()
   return useQuery({
-    enabled,
     queryKey: keys.tree(projectId),
     queryFn: async (): Promise<TreeNode[]> => {
       const items = await api.items.list(projectId)
