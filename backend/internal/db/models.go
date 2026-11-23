@@ -140,6 +140,51 @@ func (ns NullCybersecurityPropertyType) Value() (driver.Value, error) {
 	return string(ns.CybersecurityPropertyType), nil
 }
 
+type DisplayIDType string
+
+const (
+	DisplayIDTypeITEM           DisplayIDType = "ITEM"
+	DisplayIDTypeASSET          DisplayIDType = "ASSET"
+	DisplayIDTypeDAMAGESCENARIO DisplayIDType = "DAMAGE_SCENARIO"
+	DisplayIDTypeTHREATSCENARIO DisplayIDType = "THREAT_SCENARIO"
+	DisplayIDTypeATTACKPATH     DisplayIDType = "ATTACK_PATH"
+)
+
+func (e *DisplayIDType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DisplayIDType(s)
+	case string:
+		*e = DisplayIDType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DisplayIDType: %T", src)
+	}
+	return nil
+}
+
+type NullDisplayIDType struct {
+	DisplayIDType DisplayIDType
+	Valid         bool // Valid is true if DisplayIDType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDisplayIDType) Scan(value interface{}) error {
+	if value == nil {
+		ns.DisplayIDType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DisplayIDType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDisplayIDType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DisplayIDType), nil
+}
+
 type ElicitationMethod string
 
 const (
@@ -494,6 +539,8 @@ func (ns NullScopeType) Value() (driver.Value, error) {
 type Asset struct {
 	ID                   pgtype.UUID
 	ItemDefinitionID     pgtype.UUID
+	TaraProjectID        pgtype.UUID
+	DisplayNumber        int32
 	Name                 string
 	Description          *string
 	IdentificationSource *IdentificationSource
@@ -535,6 +582,8 @@ type AttackFeasibilityRating struct {
 type AttackPath struct {
 	ID                       pgtype.UUID
 	ItemDefinitionID         pgtype.UUID
+	TaraProjectID            pgtype.UUID
+	DisplayNumber            int32
 	Title                    string
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
@@ -557,6 +606,8 @@ type AuditEvent struct {
 type DamageScenario struct {
 	ID                           pgtype.UUID
 	ItemDefinitionID             pgtype.UUID
+	TaraProjectID                pgtype.UUID
+	DisplayNumber                int32
 	Title                        string
 	FunctionalityAdverseRelation *string
 	RoadUserHarmDescription      *string
@@ -567,6 +618,12 @@ type DamageScenarioAssetProperty struct {
 	DamageScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
 	CompromiseMechanismNote      *string
+}
+
+type DisplayIDCounter struct {
+	TaraProjectID pgtype.UUID
+	ElementType   DisplayIDType
+	LastNumber    int32
 }
 
 type IamGroup struct {
@@ -592,6 +649,7 @@ type ImpactRating struct {
 type ItemDefinition struct {
 	ID                       pgtype.UUID
 	TaraProjectID            pgtype.UUID
+	DisplayNumber            int32
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
@@ -658,6 +716,8 @@ type ThreatDamageLink struct {
 type ThreatScenario struct {
 	ID                          pgtype.UUID
 	ItemDefinitionID            pgtype.UUID
+	TaraProjectID               pgtype.UUID
+	DisplayNumber               int32
 	Title                       string
 	CauseOfCompromise           *string
 	ElicitationMethod           *ElicitationMethod

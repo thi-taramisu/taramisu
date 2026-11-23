@@ -10,6 +10,14 @@
               "null"
             ]
           },
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "AS-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -37,6 +45,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "name",
           "description",
@@ -260,6 +269,14 @@
             "type": "string"
           },
           "attack_steps_and_weaknesses": {},
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "AP-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -277,6 +294,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "title",
           "is_partial_early_stage"
@@ -448,6 +466,14 @@
       "DamageScenarioBody": {
         "additionalProperties": false,
         "properties": {
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "DS-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "functionality_adverse_relation": {
             "type": "string"
           },
@@ -468,6 +494,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "title"
         ],
@@ -798,6 +825,14 @@
               "null"
             ]
           },
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "IT-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "functions": {
             "type": [
               "string",
@@ -845,6 +880,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "tara_project_id",
           "created_at",
           "name",

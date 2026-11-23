@@ -151,7 +151,7 @@ func (f resourceAuditFixture) exerciseAssetAudit(itemID string) {
 		create: "{\"name\":\"Controller\"}", replace: "{\"name\":\"Gateway\",\"description\":\"Vehicle network\"}",
 		patch: "{\"description\":null}",
 	})
-	assetID := f.seed("INSERT INTO asset (item_definition_id, name) VALUES ($1, 'Link asset') RETURNING id::text", itemID)
+	assetID := seedAsset(f.t, f.ctx, f.pool, itemID, "Link asset")
 	f.exercise(auditResource{
 		unavailableOnFailure: true, target: "asset_cybersecurity_property", operation: "asset-cybersecurity-property",
 		path: item + "/assets/" + assetID + "/cybersecurity-properties", parentColumn: "asset_id", parentID: assetID,
@@ -160,7 +160,7 @@ func (f resourceAuditFixture) exerciseAssetAudit(itemID string) {
 	})
 	propertyID := f.seed("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'INTEGRITY') RETURNING id::text", assetID)
 	otherProperty := f.seed("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'CONFIDENTIALITY') RETURNING id::text", assetID)
-	damageID := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	damageID := seedDamageScenario(f.t, f.ctx, f.pool, itemID, "Damage")
 	f.exercise(auditResource{
 		unavailableOnFailure: true, target: "damage_scenario_asset_property", operation: "damage-scenario-asset-property",
 		path: item + "/damage-scenario-asset-properties", parentColumn: "damage_scenario_id", parentID: damageID,
@@ -168,7 +168,7 @@ func (f resourceAuditFixture) exerciseAssetAudit(itemID string) {
 		replace: fmt.Sprintf("{\"damage_scenario_id\":%q,\"asset_cybersecurity_property_id\":%q,\"compromise_mechanism_note\":\"Tampering\"}", damageID, propertyID),
 		patch:   "{\"compromise_mechanism_note\":null}",
 	})
-	threatID := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
+	threatID := seedThreatScenario(f.t, f.ctx, f.pool, itemID, "Threat")
 	f.exercise(auditResource{
 		unavailableOnFailure: true, target: "threat_scenario_asset_property", operation: "threat-scenario-asset-property",
 		path: item + "/threat-scenario-asset-properties", parentColumn: "threat_scenario_id", parentID: threatID,
@@ -186,7 +186,7 @@ func (f resourceAuditFixture) exerciseDamageAudit(itemID string) {
 		create: "{\"title\":\"Control loss\"}", replace: "{\"title\":\"Steering loss\",\"road_user_harm_description\":\"Injury\"}",
 		patch: "{\"road_user_harm_description\":null}",
 	})
-	damageID := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Rated damage') RETURNING id::text", itemID)
+	damageID := seedDamageScenario(f.t, f.ctx, f.pool, itemID, "Rated damage")
 	f.exercise(auditResource{
 		target: "impact_rating", operation: "impact-rating", path: collection + "/" + damageID + "/impact-ratings",
 		parentColumn: "damage_scenario_id", parentID: damageID,
@@ -204,15 +204,15 @@ func (f resourceAuditFixture) exerciseAttackAudit(itemID string) {
 		create: "{\"title\":\"Access interface\"}", replace: "{\"title\":\"Access debug interface\",\"analysis_approach\":\"BOTTOM_UP\"}",
 		patch: "{\"is_partial_early_stage\":false}",
 	})
-	attackPath := f.seed("INSERT INTO attack_path (item_definition_id, title) VALUES ($1, 'Rated path') RETURNING id::text", itemID)
+	attackPath := seedAttackPath(f.t, f.ctx, f.pool, itemID, "Rated path")
 	f.exercise(auditResource{
 		target: "attack_feasibility_rating", operation: "attack-feasibility-rating", path: item + "/attack-paths/" + attackPath + "/feasibility-rating",
 		parentColumn: "attack_path_id", parentID: attackPath, upsert: true,
 		create: "{\"rationale\":\"Physical access\"}", replace: "{\"rationale\":\"Debug connector\"}",
 		patch: "{\"rationale\":null}",
 	})
-	threat := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
-	damage := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	threat := seedThreatScenario(f.t, f.ctx, f.pool, itemID, "Threat")
+	damage := seedDamageScenario(f.t, f.ctx, f.pool, itemID, "Damage")
 	f.exercise(auditResource{
 		target: "threat_damage_link", operation: "threat-damage-link", path: item + "/threat-damage-links",
 		parentColumn: "threat_scenario_id", parentID: threat,
@@ -226,8 +226,8 @@ func (f resourceAuditFixture) exerciseAttackAudit(itemID string) {
 }
 
 func (f resourceAuditFixture) exerciseRiskAudit(itemID string) {
-	threat := f.seed("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text", itemID)
-	damage := f.seed("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'Damage') RETURNING id::text", itemID)
+	threat := seedThreatScenario(f.t, f.ctx, f.pool, itemID, "Threat")
+	damage := seedDamageScenario(f.t, f.ctx, f.pool, itemID, "Damage")
 	impact := f.seed("INSERT INTO impact_rating (damage_scenario_id, impact_category) VALUES ($1, 'SAFETY') RETURNING id::text", damage)
 	scenario := "/api/v1/threat-scenarios/" + threat
 	f.exercise(auditResource{

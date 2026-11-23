@@ -239,6 +239,9 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 			if w.Code != tc.code || strings.Contains(w.Body.String(), "private database details") {
 				t.Errorf("%s error: %d %s", method, w.Code, w.Body.String())
 			}
+			if method == "POST" && errors.Is(tc.err, pgx.ErrNoRows) && !strings.Contains(w.Body.String(), "project not found") {
+				t.Errorf("create in a deleted project: %s, want project not found", w.Body.String())
+			}
 		}
 	}
 	store.err = nil

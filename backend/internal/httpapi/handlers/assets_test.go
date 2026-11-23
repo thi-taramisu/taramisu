@@ -101,17 +101,20 @@ func TestAssetErrors(t *testing.T) {
 		name, method, path string
 		err                error
 		want               int
+		detail             string
 	}{
-		{"missing", "GET", assetPath, pgx.ErrNoRows, 404},
-		{"unexpected error", "GET", assetPath, errors.New("private database details"), 500},
-		{"unknown parent", "POST", assetCollection, &pgconn.PgError{Code: "23503"}, 422},
-		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404},
+		{"missing", "GET", assetPath, pgx.ErrNoRows, 404, "asset not found"},
+		{"unexpected error", "GET", assetPath, errors.New("private database details"), 500, ""},
+		// The create query returns no row when the item was deleted after the access check.
+		{"deleted parent", "POST", assetCollection, pgx.ErrNoRows, 404, "item definition not found"},
+		{"parent deleted during create", "POST", assetCollection, &pgconn.PgError{Code: "23503"}, 404, "item definition not found"},
+		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404, "asset not found"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &assetStore{err: tc.err, resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(assetJSON))
-			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
+			if r.Code != tc.want || !strings.Contains(r.Body.String(), tc.detail) || strings.Contains(r.Body.String(), "private database details") {
 				t.Fatalf("got %d, want %d: %s", r.Code, tc.want, r.Body)
 			}
 		})

@@ -1,6 +1,16 @@
+-- Assigns the next display number of the project's assets (see CreateItemDefinition). Returns no row
+-- if the item definition does not exist.
 -- name: CreateAsset :one
-INSERT INTO asset (item_definition_id, name, description, identification_source)
-VALUES ($1, $2, $3, $4)
+WITH display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT tara_project_id, 'ASSET', 1 FROM item_definition WHERE id = sqlc.arg(item_definition_id)
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
+INSERT INTO asset (item_definition_id, tara_project_id, display_number, name, description, identification_source)
+SELECT sqlc.arg(item_definition_id), display.tara_project_id, display.last_number,
+    sqlc.arg(name), sqlc.narg(description), sqlc.narg(identification_source)
+FROM display
 RETURNING *;
 
 -- name: GetAsset :one

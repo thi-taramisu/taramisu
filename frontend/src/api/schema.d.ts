@@ -734,6 +734,11 @@ export interface components {
     schemas: {
         Asset: {
             description: string | null;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example AS-1
+             */
+            readonly display_id: string;
             /** Format: uuid */
             id: string;
             /** @enum {string|null} */
@@ -806,6 +811,11 @@ export interface components {
             /** @enum {string} */
             analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
             attack_steps_and_weaknesses?: unknown;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example AP-1
+             */
+            readonly display_id: string;
             /** Format: uuid */
             id: string;
             is_partial_early_stage: boolean;
@@ -867,6 +877,11 @@ export interface components {
             damage_scenario_id: string;
         };
         DamageScenarioBody: {
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example DS-1
+             */
+            readonly display_id: string;
             functionality_adverse_relation?: string;
             /** Format: uuid */
             id: string;
@@ -985,6 +1000,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             cybersecurity_specs_wp_10_01?: string | null;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example IT-1
+             */
+            readonly display_id: string;
             functions?: string | null;
             /** Format: uuid */
             id: string;

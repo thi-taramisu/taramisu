@@ -60,6 +60,7 @@ const itemPath = "/api/v1/item-definitions/{item_definition_id}"
 
 type AttackPathBody struct {
 	ID                       string               `json:"id" format:"uuid"`
+	DisplayID                string               `json:"display_id" readOnly:"true" example:"AP-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	ItemDefinitionID         string               `json:"item_definition_id" format:"uuid"`
 	Title                    string               `json:"title"`
 	AnalysisApproach         *db.AnalysisApproach `json:"analysis_approach,omitempty" enum:"TOP_DOWN,BOTTOM_UP"`
@@ -143,6 +144,9 @@ func (h *AttackPath) Create(ctx context.Context, in *CreateAttackPathInput) (*Cr
 		}
 		return db.Created(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(p)), nil
 	})
+	if notFound := itemDeletedOnCreate(err); notFound != nil {
+		return nil, notFound
+	}
 	if err != nil {
 		return nil, mapAttackPathError(err)
 	}
@@ -299,6 +303,7 @@ func mapAttackPathError(err error) error {
 func toAttackPathBody(p db.AttackPath) AttackPathBody {
 	out := AttackPathBody{
 		ID:                  p.ID.String(),
+		DisplayID:           displayID(displayPrefixAttackPath, p.DisplayNumber),
 		ItemDefinitionID:    p.ItemDefinitionID.String(),
 		Title:               p.Title,
 		IsPartialEarlyStage: p.IsPartialEarlyStage,

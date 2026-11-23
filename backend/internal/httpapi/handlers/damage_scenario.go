@@ -55,6 +55,7 @@ func (h *DamageScenario) Register(api huma.API) {
 
 type DamageScenarioBody struct {
 	ID                           string  `json:"id" format:"uuid"`
+	DisplayID                    string  `json:"display_id" readOnly:"true" example:"DS-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	ItemDefinitionID             string  `json:"item_definition_id" format:"uuid"`
 	Title                        string  `json:"title"`
 	FunctionalityAdverseRelation *string `json:"functionality_adverse_relation,omitempty"`
@@ -133,8 +134,8 @@ func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInp
 		}
 		return db.Created(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(d)), nil
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, huma.Error404NotFound("item definition not found")
+	if notFound := itemDeletedOnCreate(err); notFound != nil {
+		return nil, notFound
 	}
 	if err != nil {
 		return nil, err
@@ -276,6 +277,7 @@ func mapDamageScenarioError(err error) error {
 func toDamageScenarioBody(d db.DamageScenario) DamageScenarioBody {
 	return DamageScenarioBody{
 		ID:                           d.ID.String(),
+		DisplayID:                    displayID(displayPrefixDamageScenario, d.DisplayNumber),
 		ItemDefinitionID:             d.ItemDefinitionID.String(),
 		Title:                        d.Title,
 		FunctionalityAdverseRelation: d.FunctionalityAdverseRelation,

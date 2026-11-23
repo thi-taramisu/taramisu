@@ -174,6 +174,7 @@ func TestDamageRoutes(t *testing.T) {
 	}{
 		{"create scenario", true, nil, http.MethodPost, dmgScenarios, `{"title":"Brake loss"}`, http.StatusCreated},
 		{"create scenario unknown item", false, nil, http.MethodPost, dmgScenarios, `{"title":"x"}`, http.StatusNotFound},
+		{"create scenario item deleted during create", true, pgCode("23503"), http.MethodPost, dmgScenarios, `{"title":"x"}`, http.StatusNotFound},
 		{"create scenario blank title", true, nil, http.MethodPost, dmgScenarios, `{"title":"  "}`, http.StatusUnprocessableEntity},
 		{"create scenario missing title", true, nil, http.MethodPost, dmgScenarios, `{}`, http.StatusUnprocessableEntity},
 		{"create scenario bad item id", true, nil, http.MethodPost, "/api/v1/item-definitions/nope/damage-scenarios", `{"title":"x"}`, http.StatusUnprocessableEntity},

@@ -47,9 +47,8 @@ func TestDamageScenarioPostgresLifecycle(t *testing.T) {
 		}
 	}
 	seed(&projectID, `INSERT INTO tara_project (name) VALUES ('p') RETURNING id::text`)
-	seed(&itemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'a', 'ITEM') RETURNING id::text`, projectID)
-	seed(&otherItemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'b', 'ITEM') RETURNING id::text`, projectID)
-	seed(&threatID, `INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 't') RETURNING id::text`, itemID)
+	itemID, otherItemID = seedItem(t, ctx, tx, projectID, "a"), seedItem(t, ctx, tx, projectID, "b")
+	threatID = seedThreatScenario(t, ctx, tx, itemID, "t")
 
 	fixture := authtest.NewFixture(t, db.New(tx))
 	manager, bearer := fixture.Manager, "Bearer "+fixture.Token(t, nil)

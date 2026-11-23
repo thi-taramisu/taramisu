@@ -230,7 +230,7 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	kept, deleted := newProject("kept"), newProject("deleted")
 
 	// A project with item definitions cannot be deleted; the failed deletion stores no event.
-	if _, err := tx.Exec(ctx, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'Item', 'ITEM')`, kept); err != nil {
+	if _, err := db.New(tx).CreateItemDefinition(ctx, db.CreateItemDefinitionParams{ProjectID: kept, Name: "Item", ScopeType: db.ScopeTypeITEM}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.DeleteTaraProject(ctx, actor, kept); err == nil {
