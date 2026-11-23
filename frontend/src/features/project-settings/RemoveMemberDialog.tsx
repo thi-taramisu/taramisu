@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +20,7 @@ interface RemoveMemberDialogProps {
 }
 
 export function RemoveMemberDialog({ member, onCancel, onConfirm }: RemoveMemberDialogProps) {
+  const { t } = useTranslation()
   // Keep showing the last member while the dialog animates out, so the email does not disappear.
   const [shownMember, setShownMember] = useState(member)
   if (member && member !== shownMember) setShownMember(member)
@@ -27,17 +29,17 @@ export function RemoveMemberDialog({ member, onCancel, onConfirm }: RemoveMember
     <Dialog open={member !== null} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Remove member?</DialogTitle>
+          <DialogTitle>{t('ui:removeMemberTitle')}</DialogTitle>
           <DialogDescription>
-            <strong>{shownMember?.email}</strong> loses access to this project.
+            {t('ui:removeMemberDescription', { email: shownMember?.email })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">{t('ui:cancel')}</Button>
           </DialogClose>
           <Button variant="destructive" onClick={() => member && onConfirm(member)}>
-            Remove
+            {t('ui:remove')}
           </Button>
         </DialogFooter>
       </DialogContent>
