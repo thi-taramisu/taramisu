@@ -17,7 +17,7 @@ import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
 import { changeError } from '@/features/projects/changeError'
-import { exampleProject } from '@/api/mocks/data/headlamp'
+import { isExampleProject } from '@/api/mocks/data/headlamp'
 import { isUnauthorized } from '@/api/errors'
 import { SignInPrompt } from '@/auth/SignInPrompt'
 import type { Project } from '@/api/models/project'
@@ -172,24 +172,13 @@ export function ProjectListPage() {
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
                             <ProjectImage projectId={project.id} image={project.image} className="size-14 rounded-md" />
-                            {/* Only the example project has a workspace so far (#250); the others open their settings. */}
-                            {project.id === exampleProject.id ? (
-                              <Link
-                                to={`/projects/${project.id}`}
-                                aria-label={t('ui:exampleProjectName', { name: project.name })}
-                                className="min-w-0 flex-1 hover:opacity-80"
-                              >
-                                {projectDetails}
-                              </Link>
-                            ) : (
-                              <Link
-                                to={`/projects/${project.id}/settings`}
-                                aria-label={`${project.name} settings`}
-                                className="min-w-0 flex-1 hover:opacity-80"
-                              >
-                                {projectDetails}
-                              </Link>
-                            )}
+                            <Link
+                              to={`/projects/${project.id}`}
+                              aria-label={isExampleProject(project.id) ? t('ui:exampleProjectName', { name: project.name }) : project.name}
+                              className="min-w-0 flex-1 hover:opacity-80"
+                            >
+                              {projectDetails}
+                            </Link>
 
                             <Button
                               type="button"

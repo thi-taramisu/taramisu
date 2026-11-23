@@ -66,9 +66,9 @@ export function useItem(projectId: string, itemId: string) {
   return useQuery({ queryKey: keys.item(projectId, itemId), queryFn: () => api.items.get(projectId, itemId) })
 }
 
-export function useItemAssets(projectId: string, itemId: string) {
+export function useItemAssets(projectId: string, itemId: string, { enabled = true } = {}) {
   const api = useApi()
-  return useQuery({ queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
+  return useQuery({ enabled, queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
 }
 
 export function useItemRisks(projectId: string, itemId: string) {
