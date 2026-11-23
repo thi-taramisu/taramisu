@@ -77,7 +77,7 @@ with the project name (for example `taramisu_proxy`); no externally created netw
 | `proxy` | yes | proxy, frontend, API, docs, Authentik server | proxy forwards requests (incl. `/auth/` to Authentik); API fetches JWKS from `authentik-server:9000` |
 | `app-db` | yes | API, db, migrate, dev-db, pgAdmin | application database |
 | `iam-db` | yes | Authentik server, worker, and database | IAM database |
-| `taramisu-storage` | yes | API, storage, storage-config, storage-init | private object storage |
+| `storage` | yes | API, storage, storage-config, storage-init | private object storage |
 | `dev-app` | no | db, pgAdmin | only from `compose.dev.yaml`, so these services can publish ports locally |
 | `dev-iam` | no | Authentik server | only from `compose.dev.yaml`, separate from `dev-app` so Authentik cannot reach the application database |
 
@@ -279,9 +279,11 @@ See the [tooling guide](../docs/docusaurus/README.md) for other build options.
 
 ## SeaweedFS object storage
 
-`make up` starts SeaweedFS on the private `taramisu-storage` network and creates the application bucket automatically.
+`make up` starts SeaweedFS on the private `storage` network and creates the application bucket automatically.
 Only SeaweedFS, the API and provisioning jobs join this network; storage has no published ports or console.
 The API uses a separate bucket-scoped key and `http://storage:8333`.
+The server allows 32 volumes of 1 GiB each (about 32 GiB total before overhead).
+When no writable space remains, uploads fail until you free space or increase capacity.
 
 `make init` creates `storage/.env` for storage credentials; existing IAM credentials stay unchanged.
 Older IAM files also receive the service-account token required by the current backend.

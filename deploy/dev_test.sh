@@ -260,21 +260,25 @@ assert model['name'] == 'taramisu'
 assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
                          'authentik-server', 'authentik-worker', 'authentik-db', 'storage', 'storage-config', 'storage-init'}
 expected_networks = {
-    'api': {'proxy', 'app-db', 'taramisu-storage'},
+    'api': {'proxy', 'app-db', 'storage'},
     'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
     'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
     'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
     'docs': {'proxy'},
-    'storage': {'taramisu-storage'}, 'storage-config': {'taramisu-storage'}, 'storage-init': {'taramisu-storage'},
+    'storage': {'storage'}, 'storage-config': {'storage'}, 'storage-init': {'storage'},
 }
 for service, networks in expected_networks.items():
     assert set(services[service]['networks']) == networks, service
 assert not any(network.get('external') for network in model['networks'].values())
-assert model['networks']['taramisu-storage']['internal']
+assert model['networks']['storage']['internal']
 assert not services['storage'].get('ports')
 assert any(v['source'] == 'storage_data' and v['target'] == '/data' for v in services['storage']['volumes'])
 dev_model = json.loads((root / 'storage-dev.json').read_text())
-assert not dev_model['networks']['taramisu-storage'].get('internal', False)
+assert dev_model['networks']['storage']['internal']
+assert not dev_model['networks']['dev-storage'].get('internal', False)
+for service, config in dev_model['services'].items():
+    expected = expected_networks[service] | ({'dev-storage'} if service == 'storage' else set())
+    assert set(config['networks']) == expected, service
 ports = dev_model['services']['storage']['ports']
 assert len(ports) == 1 and ports[0]['host_ip'] == '127.0.0.1' and ports[0]['target'] == 8333
 assert str(ports[0]['published']) == '8333'
@@ -284,7 +288,7 @@ assert services['api']['environment']['S3_ENDPOINT'] == 'http://storage:8333'
 assert 'S3_ROOT_SECRET_KEY' not in services['api']['environment']
 assert services['api']['environment']['S3_ACCESS_KEY'] != services['storage-init']['environment']['S3_ROOT_ACCESS_KEY']
 assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
-    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'taramisu-storage': True}
+    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'storage': True}
 assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
 # Without the dev override only the proxy publishes a port.
 assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}

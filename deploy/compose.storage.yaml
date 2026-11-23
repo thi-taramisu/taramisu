@@ -1,6 +1,6 @@
 x-storage-bootstrap: &storage-bootstrap
   build: ../storage
-  networks: [taramisu-storage]
+  networks: [storage]
   # Validate at startup so down works with older .env files.
   environment:
     S3_ROOT_ACCESS_KEY: ${S3_ROOT_ACCESS_KEY:-}
@@ -18,7 +18,7 @@ services:
 
   storage:
     image: chrislusf/seaweedfs:4.51
-    networks: [taramisu-storage]
+    networks: [storage]
     restart: unless-stopped
     command:
       - server
@@ -56,10 +56,6 @@ services:
     depends_on:
       storage:
         condition: service_healthy
-
-networks:
-  taramisu-storage:
-    internal: true
 
 volumes:
   storage_data:
