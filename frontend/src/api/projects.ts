@@ -6,27 +6,13 @@ import { createMockProjectExtras, type MockProjectExtras } from './mocks/mockPro
 import type { Project } from './models/project'
 import type { components } from './schema'
 import type { ProjectService } from './services/projects'
+import { unwrap } from './unwrap'
 
 // REAL: the project service on `/api/v1/projects`. Fields the backend does not have yet come from the
 // mocked extras (`./mocks/mockProjectExtras.ts`); the example project comes from the mock project API
 // until it lives in the backend (#250).
 
 type ProjectBody = components['schemas']['TaraProjectBody']
-
-/** What openapi-fetch returns for every call: the data, or the problem details with the response. */
-interface FetchResult<T> {
-  data?: T
-  error?: { detail?: string; title?: string }
-  response: Response
-}
-
-async function unwrap<T>(call: Promise<FetchResult<T>>): Promise<T> {
-  const { data, error, response } = await call
-  if (!response.ok) {
-    throw new ApiError(response.status, error?.detail ?? error?.title ?? (response.statusText || 'Request failed.'))
-  }
-  return data as T
-}
 
 const isExample = (projectId: string) => projectId === exampleProject.id
 
