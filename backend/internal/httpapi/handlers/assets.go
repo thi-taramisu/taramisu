@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -14,6 +13,9 @@ import (
 )
 
 type AssetStore interface {
+	Auditor
+	GetAssetForUpdate(context.Context, db.GetAssetForUpdateParams) (db.Asset, error)
+	GetAssetForDelete(context.Context, db.GetAssetForDeleteParams) (db.Asset, error)
 	CreateAsset(context.Context, db.CreateAssetParams) (db.Asset, error)
 	GetAsset(context.Context, db.GetAssetParams) (db.Asset, error)
 	ListAssets(context.Context, db.ListAssetsParams) ([]db.Asset, error)
@@ -147,12 +149,19 @@ func assetError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
 		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
 	}
-	slog.Warn("asset database operation failed", "error", err)
-	return huma.Error500InternalServerError("internal server error")
+	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAssetOutput, error) {
-	a, err := h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
-		Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		var err error
+		a, err = h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
+			Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(a)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}
@@ -177,8 +186,19 @@ func (h *Assets) List(ctx context.Context, in *ListAssetsInput) (*ListAssetsOutp
 	return out, nil
 }
 func (h *Assets) Replace(ctx context.Context, in *ReplaceAssetInput) (*AssetOutput, error) {
-	a, err := h.queries.ReplaceAsset(ctx, db.ReplaceAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
-		Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForUpdate(ctx, db.GetAssetForUpdateParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		a, err = h.queries.ReplaceAsset(ctx, db.ReplaceAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
+			Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}
@@ -192,14 +212,34 @@ func (h *Assets) Update(ctx context.Context, in *UpdateAssetInput) (*AssetOutput
 	p := db.UpdateAssetParams{ID: pgtype.UUID(in.ID), Name: b.Name.Value, ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 		SetDescription: b.Description.Set, Description: b.Description.Value,
 		SetIdentificationSource: b.IdentificationSource.Set, IdentificationSource: b.IdentificationSource.Value}
-	a, err := h.queries.UpdateAsset(ctx, p)
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForUpdate(ctx, db.GetAssetForUpdateParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		a, err = h.queries.UpdateAsset(ctx, p)
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}
 	return &AssetOutput{Body: assetBody(a)}, nil
 }
 func (h *Assets) Delete(ctx context.Context, in *AssetIDInput) (*struct{}, error) {
-	_, err := h.queries.DeleteAsset(ctx, db.DeleteAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForDelete(ctx, db.GetAssetForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if _, err := h.queries.DeleteAsset(ctx, db.DeleteAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)}); err != nil {
+			return db.Change{}, err
+		}
+		return db.Deleted(db.TargetAsset, projectIDFromContext(ctx), before.ID, assetBody(before)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}

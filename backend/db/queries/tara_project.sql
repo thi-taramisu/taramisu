@@ -14,6 +14,10 @@ SELECT id, name, description, archived_at, created_at FROM project;
 -- name: GetTaraProject :one
 SELECT * FROM tara_project WHERE id = $1;
 
+-- The project before a settings change, locked until the transaction ends (see LockTaraProject).
+-- name: GetTaraProjectForUpdate :one
+SELECT * FROM tara_project WHERE id = $1 FOR NO KEY UPDATE;
+
 -- List only projects the caller has a role in, with the caller's highest role.
 -- name: ListTaraProjects :many
 SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
@@ -35,8 +39,10 @@ SET name = COALESCE(sqlc.narg('name'), name),
 WHERE id = @id
 RETURNING *;
 
--- name: DeleteTaraProject :execrows
-DELETE FROM tara_project WHERE id = $1;
+-- Returns the deleted project's settings for the audit history; no row if it does not exist.
+-- name: DeleteTaraProject :one
+DELETE FROM tara_project WHERE id = $1
+RETURNING id, name;
 
 -- name: ArchiveTaraProject :one
 UPDATE tara_project SET archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING *;

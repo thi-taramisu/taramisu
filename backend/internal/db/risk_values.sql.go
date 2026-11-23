@@ -90,6 +90,56 @@ func (q *Queries) GetRiskValue(ctx context.Context, arg GetRiskValueParams) (Ris
 	return i, err
 }
 
+const getRiskValueForDelete = `-- name: GetRiskValueForDelete :one
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+WHERE risk_value.threat_scenario_id = $1
+  AND risk_value.id = $2
+FOR UPDATE
+`
+
+type GetRiskValueForDeleteParams struct {
+	ThreatScenarioID pgtype.UUID
+	ID               pgtype.UUID
+}
+
+func (q *Queries) GetRiskValueForDelete(ctx context.Context, arg GetRiskValueForDeleteParams) (RiskValue, error) {
+	row := q.db.QueryRow(ctx, getRiskValueForDelete, arg.ThreatScenarioID, arg.ID)
+	var i RiskValue
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.ImpactRatingID,
+		&i.RiskScore,
+		&i.DeterminationMethod,
+	)
+	return i, err
+}
+
+const getRiskValueForUpdate = `-- name: GetRiskValueForUpdate :one
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+WHERE risk_value.threat_scenario_id = $1
+  AND risk_value.id = $2
+FOR NO KEY UPDATE
+`
+
+type GetRiskValueForUpdateParams struct {
+	ThreatScenarioID pgtype.UUID
+	ID               pgtype.UUID
+}
+
+func (q *Queries) GetRiskValueForUpdate(ctx context.Context, arg GetRiskValueForUpdateParams) (RiskValue, error) {
+	row := q.db.QueryRow(ctx, getRiskValueForUpdate, arg.ThreatScenarioID, arg.ID)
+	var i RiskValue
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.ImpactRatingID,
+		&i.RiskScore,
+		&i.DeterminationMethod,
+	)
+	return i, err
+}
+
 const listRiskValues = `-- name: ListRiskValues :many
 SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
 WHERE risk_value.threat_scenario_id = $1

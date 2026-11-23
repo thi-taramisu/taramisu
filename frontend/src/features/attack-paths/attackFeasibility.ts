@@ -12,53 +12,53 @@ export interface Factor {
 export const FACTORS: Factor[] = [
   {
     key: 'ap_elapsed_time',
-    label: 'Elapsed Time',
+    label: 'ui:elapsedTime',
     options: [
-      { label: '≤1 day', score: 0 },
-      { label: '≤1 week', score: 1 },
-      { label: '≤1 month', score: 4 },
-      { label: '≤6 months', score: 17 },
-      { label: '>6 months', score: 19 },
+      { label: 'ui:upToOneDay', score: 0 },
+      { label: 'ui:upToOneWeek', score: 1 },
+      { label: 'ui:upToOneMonth', score: 4 },
+      { label: 'ui:upToSixMonths', score: 17 },
+      { label: 'ui:overSixMonths', score: 19 },
     ],
   },
   {
     key: 'ap_specialist_expertise',
-    label: 'Specialist Expertise',
+    label: 'ui:specialistExpertise',
     options: [
-      { label: 'Layman', score: 0 },
-      { label: 'Proficient', score: 3 },
-      { label: 'Expert', score: 6 },
-      { label: 'Multiple experts', score: 8 },
+      { label: 'ui:layman', score: 0 },
+      { label: 'ui:proficient', score: 3 },
+      { label: 'ui:expert', score: 6 },
+      { label: 'ui:multipleExperts', score: 8 },
     ],
   },
   {
     key: 'ap_knowledge_of_item',
-    label: 'Knowledge of the Item',
+    label: 'ui:knowledgeOfTheItem',
     options: [
-      { label: 'Public', score: 0 },
-      { label: 'Restricted', score: 3 },
-      { label: 'Confidential', score: 7 },
-      { label: 'Strictly confidential', score: 11 },
+      { label: 'ui:public', score: 0 },
+      { label: 'ui:restricted', score: 3 },
+      { label: 'ui:confidential', score: 7 },
+      { label: 'ui:strictlyConfidential', score: 11 },
     ],
   },
   {
     key: 'ap_window_of_opportunity',
-    label: 'Window of Opportunity',
+    label: 'ui:windowOfOpportunity',
     options: [
-      { label: 'Unlimited', score: 0 },
-      { label: 'Easy', score: 1 },
-      { label: 'Moderate', score: 4 },
-      { label: 'Difficult / none', score: 10 },
+      { label: 'ui:unlimited', score: 0 },
+      { label: 'ui:easy', score: 1 },
+      { label: 'ui:moderate', score: 4 },
+      { label: 'ui:difficultNone', score: 10 },
     ],
   },
   {
     key: 'ap_equipment',
-    label: 'Equipment',
+    label: 'ui:equipment',
     options: [
-      { label: 'Standard', score: 0 },
-      { label: 'Specialized', score: 4 },
-      { label: 'Bespoke', score: 7 },
-      { label: 'Multiple bespoke', score: 9 },
+      { label: 'ui:standard', score: 0 },
+      { label: 'ui:specialized', score: 4 },
+      { label: 'ui:bespoke', score: 7 },
+      { label: 'ui:multipleBespoke', score: 9 },
     ],
   },
 ]
@@ -84,10 +84,10 @@ export function summarize(scores: FactorScores) {
 
 /** Labels and colour tokens of the feasibility levels. */
 export const FEASIBILITY: Record<AttackFeasibility, { label: string; classes: string }> = {
-  HIGH: { label: 'High', classes: 'border-feasibility-high-border bg-feasibility-high text-feasibility-high-foreground' },
-  MEDIUM: { label: 'Medium', classes: 'border-feasibility-medium-border bg-feasibility-medium text-feasibility-medium-foreground' },
-  LOW: { label: 'Low', classes: 'border-feasibility-low-border bg-feasibility-low text-feasibility-low-foreground' },
-  VERY_LOW: { label: 'Very low', classes: 'border-feasibility-very-low-border bg-feasibility-very-low text-feasibility-very-low-foreground' },
+  HIGH: { label: 'ui:high', classes: 'border-feasibility-high-border bg-feasibility-high text-feasibility-high-foreground' },
+  MEDIUM: { label: 'ui:medium', classes: 'border-feasibility-medium-border bg-feasibility-medium text-feasibility-medium-foreground' },
+  LOW: { label: 'ui:low', classes: 'border-feasibility-low-border bg-feasibility-low text-feasibility-low-foreground' },
+  VERY_LOW: { label: 'ui:veryLow', classes: 'border-feasibility-very-low-border bg-feasibility-very-low text-feasibility-very-low-foreground' },
 }
 
 /** Solid dot per feasibility level; always shown next to the level's label. */

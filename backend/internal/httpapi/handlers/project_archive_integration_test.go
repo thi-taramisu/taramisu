@@ -32,7 +32,7 @@ func TestProjectArchivePostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	mux := httpapi.New(queries, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
 	owner := fixture.Token(t, nil)

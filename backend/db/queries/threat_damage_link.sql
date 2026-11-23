@@ -18,3 +18,10 @@ DELETE FROM threat_damage_link l
 WHERE l.id = $1
   AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
   AND EXISTS(SELECT 1 FROM damage_scenario d WHERE d.id = l.damage_scenario_id AND d.item_definition_id = $2);
+
+-- name: GetThreatDamageLinkForDelete :one
+SELECT l.* FROM threat_damage_link l
+WHERE l.id = $1
+  AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
+  AND EXISTS(SELECT 1 FROM damage_scenario d WHERE d.id = l.damage_scenario_id AND d.item_definition_id = $2)
+FOR UPDATE OF l;

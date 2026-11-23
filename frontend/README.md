@@ -125,3 +125,24 @@ React Flow out of the initial bundle.
 Build with Node 24 and `npm run build`, then serve the static `dist/` directory. Configure the web server to serve `index.html` for
 application routes so direct links and browser refreshes work. Unknown application routes show the React not-found page; the static SPA
 fallback can still return HTTP 200. `npm run preview` is for local verification of this build.
+
+## Element display IDs
+
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3, AP-100 and IT-1.
+Mock data and newly created mock elements use this format directly.
+Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
+Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
+by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Localization checks
+
+Run `npm run check:localization` from `frontend/`. Frontend PR lint runs the same command.
+The English and German resources in the registered common and UI namespaces must have matching keys,
+nonempty string translations and matching interpolation expressions. The check reports unknown literal
+keys in `t(...)` and `i18n.t(...)`, including conditional branches and plural keys. Reviewers should
+verify computed keys, variable-based lookups and translation quality.
+
+Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
+Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
+The exception applies only to hardcoded text on that line.

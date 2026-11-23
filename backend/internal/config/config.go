@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -24,6 +25,8 @@ type Config struct {
 	AuthentikToken            string
 	IAMUserCacheTTL           time.Duration
 	AuthentikMetadataCacheTTL time.Duration
+	LogLevel                  slog.Level
+	AuditRetentionAfterDelete time.Duration
 }
 
 // Load reads and validates the runtime configuration from the environment.
@@ -88,6 +91,23 @@ func Load() (Config, error) {
 		authentikMetadataCacheTTL = parsed
 	}
 
+	// Audit events of a deleted project are kept this long after its deletion (one year).
+	auditRetentionAfterDelete := 8760 * time.Hour
+	if raw := os.Getenv("AUDIT_RETENTION_AFTER_DELETE"); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed <= 0 {
+			return Config{}, fmt.Errorf("invalid AUDIT_RETENTION_AFTER_DELETE: must be a positive duration: %q", raw)
+		}
+		auditRetentionAfterDelete = parsed
+	}
+
+	logLevel := slog.LevelInfo
+	if raw := os.Getenv("LOG_LEVEL"); raw != "" {
+		if err := logLevel.UnmarshalText([]byte(raw)); err != nil {
+			return Config{}, fmt.Errorf("invalid LOG_LEVEL: must be debug, info, warn, or error: %q", raw)
+		}
+	}
+
 	return Config{
 		HTTPAddr:                  httpAddr,
 		DatabaseURL:               databaseURL,
@@ -98,6 +118,8 @@ func Load() (Config, error) {
 		AuthentikToken:            authentikToken,
 		IAMUserCacheTTL:           iamUserCacheTTL,
 		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
+		LogLevel:                  logLevel,
+		AuditRetentionAfterDelete: auditRetentionAfterDelete,
 	}, nil
 }
 

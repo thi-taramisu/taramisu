@@ -47,7 +47,7 @@ describe('archived project', () => {
 
     await screen.findByRole('region', { name: 'Assets' })
     expect(section('Assets').getByRole('link', { name: 'Headlamp on/off command' })).toBeInTheDocument()
-    expect(section('Assets').getByRole('button', { name: 'A-01 Integrity', pressed: true })).toBeDisabled()
+    expect(section('Assets').getByRole('button', { name: 'AS-1 Integrity', pressed: true })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Add Asset' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Threat Scenario' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Remove link to/ })).not.toBeInTheDocument()
@@ -111,7 +111,7 @@ describe('archived project', () => {
     expect(screen.getByLabelText('Name')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Upload image' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    expect(section('Danger Zone').getByRole('button', { name: 'Restore Project' })).toBeEnabled()
+    expect(section('Danger Zone').getByRole('button', { name: 'Unarchive Project' })).toBeEnabled()
 
     await user.click(screen.getByRole('link', { name: 'Members' }))
     expect(await screen.findByRole('button', { name: 'Add member' })).toBeEnabled()
@@ -131,7 +131,7 @@ describe('archived project', () => {
     expect(within(tree()).getByRole('button', { name: 'New' })).toBeDisabled()
 
     await user.click(screen.getByRole('link', { name: 'Settings' }))
-    const restore = within(await screen.findByRole('region', { name: 'Danger Zone' })).getByRole('button', { name: 'Restore Project' })
+    const restore = within(await screen.findByRole('region', { name: 'Danger Zone' })).getByRole('button', { name: 'Unarchive Project' })
     await user.click(restore)
     await screen.findByRole('button', { name: 'Save' })
     await user.click(await screen.findByRole('link', { name: '← Back' }))

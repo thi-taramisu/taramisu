@@ -446,3 +446,30 @@ func TestAttackPatchDistinguishesOmittedFromNull(t *testing.T) {
 func (f fakeAttackAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
 	return false, nil
 }
+
+func (f *fakeAttackPaths) GetAttackPathForUpdate(ctx context.Context, p db.GetAttackPathForUpdateParams) (db.AttackPath, error) {
+	return f.GetAttackPath(ctx, db.GetAttackPathParams(p))
+}
+
+func (f *fakeAttackPaths) GetAttackPathForDelete(ctx context.Context, p db.GetAttackPathForDeleteParams) (db.AttackPath, error) {
+	return f.GetAttackPath(ctx, db.GetAttackPathParams(p))
+}
+
+func (f *fakeRatings) GetAttackFeasibilityRatingForUpdate(ctx context.Context, p pgtype.UUID) (db.AttackFeasibilityRating, error) {
+	return f.GetAttackFeasibilityRating(ctx, p)
+}
+
+func (f *fakeRatings) GetAttackFeasibilityRatingForDelete(ctx context.Context, p pgtype.UUID) (db.AttackFeasibilityRating, error) {
+	return f.GetAttackFeasibilityRating(ctx, p)
+}
+
+func (f *fakeRatings) LockAttackPathForRating(_ context.Context, p db.LockAttackPathForRatingParams) (pgtype.UUID, error) {
+	if !f.belongs {
+		return pgtype.UUID{}, pgx.ErrNoRows
+	}
+	return p.ID, nil
+}
+
+func (f *fakeLinks) GetThreatAttackPathLinkForDelete(ctx context.Context, p db.GetThreatAttackPathLinkForDeleteParams) (db.ThreatAttackPathLink, error) {
+	return f.link(), nil
+}

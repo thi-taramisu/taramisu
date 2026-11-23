@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useEffect } from 'react'
 import { Background, ConnectionMode, Controls, ReactFlow, useNodesState, type Edge, type XYPosition } from '@xyflow/react'
 import { GraphNode, type RelationNode } from './GraphNode'
@@ -12,6 +13,7 @@ export function GraphCanvas({ nodes: initialNodes, edges, onMove, onClearSelecti
   onMove: (id: string, position: XYPosition) => void
   onClearSelection: () => void
 }) {
+  const { t } = useTranslation()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   // Changes from navigation, display mode, or mock data update labels and saved positions.
   // Pointer movement only uses onNodesChange and does not rebuild the parent graph.
@@ -19,6 +21,12 @@ export function GraphCanvas({ nodes: initialNodes, edges, onMove, onClearSelecti
 
   return (
     <ReactFlow
+      ariaLabelConfig={{
+        'controls.ariaLabel': t('ui:controlPanel'),
+        'controls.zoomIn.ariaLabel': t('ui:zoomIn'),
+        'controls.zoomOut.ariaLabel': t('ui:zoomOut'),
+        'controls.fitView.ariaLabel': t('ui:fitView'),
+      }}
       nodes={nodes}
       edges={edges}
       onNodesChange={onNodesChange}

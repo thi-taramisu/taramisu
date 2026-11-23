@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ interface AttackStepsFieldProps {
 
 /** Part of the Definition form: the ordered attacker actions (AP Definition wireframe). */
 export function AttackStepsField({ steps, onChange, actions }: AttackStepsFieldProps) {
+  const { t } = useTranslation()
   const headingId = useId()
 
   function move(index: number, by: number) {
@@ -31,9 +33,7 @@ export function AttackStepsField({ steps, onChange, actions }: AttackStepsFieldP
   return (
     <section aria-labelledby={headingId} className="overflow-hidden rounded-lg border">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-muted/50 px-4 py-2">
-        <h2 id={headingId} className="flex-1 text-sm font-medium">
-          Steps
-        </h2>
+        <h2 id={headingId} className="flex-1 text-sm font-medium">{t('ui:steps')}</h2>
         {actions}
         <Button
           type="button"
@@ -41,12 +41,10 @@ export function AttackStepsField({ steps, onChange, actions }: AttackStepsFieldP
           size="sm"
           onClick={() => onChange([...steps, { key: Math.max(0, ...steps.map((step) => step.key)) + 1, description: '' }])}
         >
-          <Plus aria-hidden="true" />
-          Add Step
-        </Button>
+          <Plus aria-hidden="true" />{t('ui:addStep')}</Button>
       </div>
       {steps.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-muted-foreground">No steps yet.</p>
+        <p className="px-4 py-3 text-sm text-muted-foreground">{t('ui:noStepsYet')}</p>
       ) : (
         <ol className="divide-y">
           {steps.map((step, index) => {
@@ -58,29 +56,29 @@ export function AttackStepsField({ steps, onChange, actions }: AttackStepsFieldP
                 </span>
                 {/* Reads like the list of the wireframe, also when read-only; an empty step keeps its border, so it is clear where to type. */}
                 <Textarea
-                  aria-label={`Step ${number}`}
+                  aria-label={t('ui:stepNumber', { number })}
                   value={step.description}
                   className={`min-h-8 resize-none bg-transparent py-1 text-sm enabled:hover:border-input disabled:bg-transparent md:text-sm dark:bg-transparent dark:disabled:bg-transparent ${step.description.trim() ? 'border-transparent' : ''}`}
                   onChange={(event) => onChange(steps.map((s) => (s.key === step.key ? { ...s, description: event.target.value } : s)))}
                 />
                 <div className="flex shrink-0 items-center text-muted-foreground">
                   {/* aria-disabled instead of disabled keeps the focus on the button when the step reaches the end. */}
-                  <Button type="button" variant="ghost" size="icon-xs" aria-label={`Move step ${number} up`} title="Move up" aria-disabled={index === 0} className={index === 0 ? 'opacity-40' : undefined} onClick={() => move(index, -1)}>
+                  <Button type="button" variant="ghost" size="icon-xs" aria-label={t('ui:moveStepNumberUp', { number })} title={t('ui:moveUp')} aria-disabled={index === 0} className={index === 0 ? 'opacity-40' : undefined} onClick={() => move(index, -1)}>
                     <ArrowUp aria-hidden="true" />
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label={`Move step ${number} down`}
-                    title="Move down"
+                    aria-label={t('ui:moveStepNumberDown', { number })}
+                    title={t('ui:moveDown')}
                     aria-disabled={index === steps.length - 1}
                     className={index === steps.length - 1 ? 'opacity-40' : undefined}
                     onClick={() => move(index, 1)}
                   >
                     <ArrowDown aria-hidden="true" />
                   </Button>
-                  <Button type="button" variant="ghost" size="icon-xs" aria-label={`Remove step ${number}`} title="Remove step" onClick={() => onChange(steps.filter((s) => s.key !== step.key))}>
+                  <Button type="button" variant="ghost" size="icon-xs" aria-label={t('ui:removeStepNumber', { number })} title={t('ui:removeStep')} onClick={() => onChange(steps.filter((s) => s.key !== step.key))}>
                     <X aria-hidden="true" />
                   </Button>
                 </div>

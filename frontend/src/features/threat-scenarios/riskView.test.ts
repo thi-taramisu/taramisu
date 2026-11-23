@@ -3,12 +3,12 @@ import type { ThreatScenarioRisks } from '../../api/models/threatScenario'
 import { riskView } from './riskView'
 
 type Ratings = ThreatScenarioRisks['damageScenarios'][number]['impactRatings']
-const cause = { asset: { id: 'a-01', code: 'A-01', name: 'Asset' }, property: 'I' as const }
-const ds = (id: string, impactRatings: Ratings, targeted = true) => ({ id, code: id.toUpperCase(), name: 'Damage', targetedCauses: targeted ? [cause] : [], impactRatings })
+const cause = { asset: { id: 'a-01', code: 'AS-1', name: 'Asset' }, property: 'I' as const }
+const ds = (id: string, impactRatings: Ratings, targeted = true) => ({ id, code: id.toUpperCase().replace(/-0+(?=\d)/, '-'), name: 'Damage', targetedCauses: targeted ? [cause] : [], impactRatings })
 const rating = (id: string, impact_category: Ratings[number]['impact_category'], rating_value: Ratings[number]['rating_value']) => ({ id, impact_category, rating_value })
 const ap = (id: string, feasibility: ThreatScenarioRisks['attackPaths'][number]['feasibility'], isPartial = false) => ({
   id,
-  code: id.toUpperCase(),
+  code: id.toUpperCase().replace(/-0+(?=\d)/, '-'),
   name: id,
   feasibility,
   isPartial,
@@ -60,8 +60,8 @@ describe('riskView', () => {
     })
 
     expect(result.groups.map((group) => [group.damageScenario.code, group.counts, group.max])).toEqual([
-      ['DS-01', true, 3],
-      ['DS-02', false, 5],
+      ['DS-1', true, 3],
+      ['DS-2', false, 5],
     ])
     expect(result.max).toBe(3)
   })
