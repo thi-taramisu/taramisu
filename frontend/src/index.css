@@ -1,11 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "../theme-font.css";
 
 @import "./styles/tailwind.css";
-@import "./styles/themes/neutral.css";
-@import "./styles/themes/ocean.css";
-@import "./styles/themes/iris.css";
+@import "../theme.css";
 @import "./styles/tara.css";
 @import "./styles/base.css";

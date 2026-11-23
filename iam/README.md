@@ -63,14 +63,14 @@ for validation, approval, and tests.
 
 The login and enrollment screens use the frontend’s Neutral, Ocean and Iris palettes in light and dark mode.
 The frontend and Authentik share a browser origin through the Compose proxy. The flow template loads
-the frontend’s Geist stylesheet and the same preference initializer as the app. An open login tab
+the frontend’s shared palette and font stylesheet and the same preference initializer as the app. An open login tab
 picks up preference changes made in another tab. A fresh browser uses light Neutral.
 
-Edit colours and radius in `frontend/src/styles/themes/` and Authentik control styles in
-`iam/branding/branding.yaml.template`. From the repository root, run
-`python3 iam/branding/generate.py` and include the updated blueprint with the source change.
-Run `python3 iam/branding/generate.py --check` to detect drift. When adding a palette, update the generator
-and preference initializer together. Apply changes with the usual Compose startup.
+Edit shared colours and radius in `frontend/src/styles/themes/` and Authentik control styles in
+`iam/blueprints/branding.yaml`. Rebuild the frontend to publish palette changes at `/theme.css`.
+Apply blueprint changes with the usual Compose startup. If the shared stylesheet is unavailable,
+login controls fall back to browser system colours.
 
 After an Authentik upgrade, verify the flow template, shadow parts and form controls against a provisioned
-stack. From `frontend/`, run `AUTHENTIK_THEME_TEST_URL=http://localhost npm run test:e2e -- e2e/authentik-theme.spec.ts`.
+stack. From `frontend/`, install the test browsers with `npx playwright install chromium firefox`,
+then run `AUTHENTIK_THEME_TEST_URL=http://localhost npm run test:e2e -- e2e/authentik-theme.spec.ts`.

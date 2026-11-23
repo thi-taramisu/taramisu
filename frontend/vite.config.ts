@@ -8,10 +8,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     rolldownOptions: {
-      input: { app: 'index.html', 'theme-font': 'theme-font.css' },
+      input: { app: 'index.html', 'theme': 'theme.css' },
       output: {
-        assetFileNames: asset => asset.names.includes('theme-font.css')
-          ? 'theme-font.css'
+        assetFileNames: asset => asset.names.includes('theme.css')
+          ? 'theme.css'
           : 'assets/[name]-[hash][extname]',
       },
     },

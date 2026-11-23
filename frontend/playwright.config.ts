@@ -20,6 +20,11 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    ...(STACK_URL ? [{
+      name: 'firefox',
+      testMatch: '**/authentik-theme.spec.ts',
+      use: devices['Desktop Firefox'],
+    }] : []),
   ],
   webServer: STACK_URL ? undefined : {
     command: `npm run preview -- --host 127.0.0.1 --port ${PORT} --strictPort`,

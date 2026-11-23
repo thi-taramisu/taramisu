@@ -22,7 +22,6 @@ migrate-diff: init
 migrate-validate: init
 	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
 test:
-	python3 ../iam/branding/generate.py --check
 	sh dev_test.sh
 test-stack:
 	python3 stack_test.py
