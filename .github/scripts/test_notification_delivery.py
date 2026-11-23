@@ -33,8 +33,8 @@ class DeliveryTests(unittest.TestCase):
         send.assert_called_once()
         payload = send.call_args.args[1]
         embed, = payload["embeds"]
-        self.assertEqual(embed["author"]["name"], "🌙 Evening issue digest (1 new issue)")
-        issues, pulls = embed["description"].split("\n\n**Approved PRs awaiting merge**\n")
+        self.assertTrue(embed["description"].startswith("**🌙 Evening issue digest (1 new issue)**\n\n"))
+        issues, pulls = embed["description"].split("\n\n**🕒 Approved PRs awaiting merge**\n\n")
         self.assertIn("[#42]", issues)
         self.assertIn("[#54]", pulls)
         self.assertIn("View all 9", pulls)

@@ -27,14 +27,18 @@ def digest_batches(issues, now=None, pr_section=""):
         while pending and len(batch) < 10:
             item = pending[0]
             line = digest_line(item)
-            if lines and len("\n".join([*lines, line]) + pr_section) > 4096:
+            count = len(batch) + 1
+            noun = "issue" if count == 1 else "issues"
+            title = f"**{heading} ({count} new {noun})**"
+            description = "\n".join([title, "", *lines, line]) + pr_section
+            if lines and len(description) > 4096:
                 break
             batch.append(pending.pop(0))
             lines.append(line)
+            batch_description = description
         yield batch, {
             "allowed_mentions": NO_MENTIONS,
-            "embeds": [{"author": {"name": f"{heading} ({len(batch)} new {'issue' if len(batch) == 1 else 'issues'})"},
-                        "description": "\n".join(lines) + pr_section, "color": ISSUE_COLOR}],
+            "embeds": [{"description": batch_description, "color": ISSUE_COLOR}],
         }
         pr_section = ""
 
@@ -78,7 +82,7 @@ def deliver_digest(github, environ, now):
                     print("Approved PR lookup failed; sending issue digest.", file=sys.stderr)
                 else:
                     if pulls:
-                        lines = ["", "", "**Approved PRs awaiting merge**"]
+                        lines = ["", "", "**🕒 Approved PRs awaiting merge**", ""]
                         lines.extend(digest_line(pull) for pull in pulls)
                         if total > len(pulls):
                             lines.append(f"[View all {total} approved PRs]({url})")
