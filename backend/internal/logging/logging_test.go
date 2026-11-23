@@ -33,7 +33,7 @@ func TestSentryLogDelivery(t *testing.T) {
 			payloads <- string(body)
 			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
 		}),
-	}, &console)
+	}, &console, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestAuditLogsStayLocal(t *testing.T) {
 					return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
 				})
 			}
-			logger, flush, err := New(options, &console)
+			logger, flush, err := New(options, &console, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,6 +103,9 @@ func TestAuditLogsStayLocal(t *testing.T) {
 				}
 			}
 			logger.Info("ordinary application log")
+			logger.Info("request", "actor", "private-request")
+			logger.Warn("access denied", "actor", "private-denial")
+			logger.Error("unexpected error", "error", "private-input")
 			if !flush(5 * time.Second) {
 				t.Fatal("Sentry flush timed out")
 			}
@@ -110,7 +113,7 @@ func TestAuditLogsStayLocal(t *testing.T) {
 			for len(payloads) > 0 {
 				remote.WriteString(<-payloads)
 			}
-			for _, expected := range []string{"audit", "member.updated", "private-actor", "private-project", "private-member", "private-user"} {
+			for _, expected := range []string{"audit", "member.updated", "private-actor", "private-project", "private-member", "private-user", "private-request", "private-denial", "private-input"} {
 				if !strings.Contains(console.String(), expected) {
 					t.Errorf("console missing audit data %q", expected)
 				}
@@ -134,7 +137,7 @@ func TestAuditLogsStayLocal(t *testing.T) {
 func TestLocalLogging(t *testing.T) {
 	t.Setenv("SENTRY_DSN", "https://public@example.com/1")
 	var output bytes.Buffer
-	logger, flush, err := New(sentry.ClientOptions{}, &output)
+	logger, flush, err := New(sentry.ClientOptions{}, &output, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +148,7 @@ func TestLocalLogging(t *testing.T) {
 }
 
 func TestInvalidDSN(t *testing.T) {
-	if _, _, err := New(sentry.ClientOptions{Dsn: "invalid"}, io.Discard); err == nil {
+	if _, _, err := New(sentry.ClientOptions{Dsn: "invalid"}, io.Discard, nil); err == nil {
 		t.Fatal("expected invalid DSN to fail")
 	}
 }

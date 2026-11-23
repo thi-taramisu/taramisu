@@ -10,14 +10,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
 type Queries interface {
 	handlers.StatusReader
 	handlers.ProjectAccessStore
 	handlers.TaraProjectStore
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 }
@@ -51,6 +62,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
+	mux.Use(logging.Middleware)
 	mux.Use(func(next http.Handler) http.Handler {
 		protected := manager.Require(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +89,19 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	huma.Get(api, "/health/ready", h.Ready)
 	handlers.NewTaraProject(queries, queries).Register(api)
 	handlers.NewItemDefinitions(queries, queries).Register(api)
+	handlers.NewAssets(queries, queries).Register(api)
+	handlers.NewAssetCybersecurityProperties(queries, queries).Register(api)
+	handlers.NewDamageScenarioAssetProperties(queries, queries).Register(api)
+	handlers.NewThreatScenarioAssetProperties(queries, queries).Register(api)
 	handlers.NewRiskValues(queries, queries).Register(api)
 	handlers.NewRiskTreatmentDecisions(queries, queries).Register(api)
 	handlers.NewProjectMembers(queries, queries, o.directory).Register(api)
+	handlers.NewAttackPath(queries, queries).Register(api)
+	handlers.NewAttackFeasibilityRating(queries, queries).Register(api)
+	handlers.NewThreatAttackPathLink(queries, queries).Register(api)
+	handlers.NewDamageScenario(queries, queries).Register(api)
+	handlers.NewImpactRating(queries, queries).Register(api)
+	handlers.NewThreatDamageLink(queries, queries).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,

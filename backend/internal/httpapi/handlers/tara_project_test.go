@@ -24,12 +24,24 @@ type fakeProjects struct {
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
 	statusReaderFunc
+	handlers.AttackPathStore
+	handlers.AttackFeasibilityRatingStore
+	handlers.ThreatAttackPathLinkStore
+	handlers.DamageScenarioStore
+	handlers.ImpactRatingStore
+	handlers.ThreatDamageLinkStore
 	handlers.ProjectAccessStore
 	handlers.ProjectMemberStore
 	handlers.ItemDefinitionStore
+	handlers.AssetStore
+	handlers.AssetCybersecurityPropertyStore
+	handlers.DamagePropertyLinkStore
+	handlers.ThreatPropertyLinkStore
 	project   db.TaraProject
 	found     bool
 	deleteErr error
+	audit     auditRecorder
+	deletedBy db.Actor
 	// role is the caller's role returned by GetProjectRole; empty means no role.
 	role       db.ProjectRole
 	roleQuery  db.GetProjectRoleParams
@@ -65,6 +77,10 @@ func (f *fakeProjects) CreateTaraProject(_ context.Context, a db.CreateTaraProje
 	f.createdFor = a.OwnerID
 	p := f.project
 	return db.CreateTaraProjectRow{ID: p.ID, Name: a.Name, Description: a.Description, CreatedAt: p.CreatedAt}, nil
+}
+
+func (f *fakeProjects) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+	return f.GetTaraProject(ctx, id)
 }
 
 func (f *fakeProjects) GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
@@ -106,14 +122,15 @@ func (f *fakeProjects) UpdateTaraProject(_ context.Context, a db.UpdateTaraProje
 	return p, nil
 }
 
-func (f *fakeProjects) DeleteTaraProject(context.Context, pgtype.UUID) (int64, error) {
+func (f *fakeProjects) DeleteTaraProject(_ context.Context, actor db.Actor, _ pgtype.UUID) error {
+	f.deletedBy = actor
 	if f.deleteErr != nil {
-		return 0, f.deleteErr
+		return f.deleteErr
 	}
 	if !f.found {
-		return 0, nil
+		return db.ErrProjectNotFound
 	}
-	return 1, nil
+	return nil
 }
 
 func TestTaraProjectRoutes(t *testing.T) {
@@ -302,19 +319,60 @@ func TestTaraProjectListUsesCallerAndGroups(t *testing.T) {
 	}
 }
 
-func TestTaraProjectDeleteIsAudited(t *testing.T) {
+// TestTaraProjectDeletePassesTheCaller checks that the deletion hands the caller to the store, which
+// records it in the audit history (covered against PostgreSQL in TestAuditHistoryPostgres).
+func TestTaraProjectDeletePassesTheCaller(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
-	h := httpapi.New(newFakeProjects(true), manager)
-	entries := captureAudit(t, func() {
-		req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+	store := newFakeProjects(true)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+projectID, http.NoBody)
+	req.Header.Set("Authorization", bearer)
+	rr := httptest.NewRecorder()
+	httpapi.New(store, manager).ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent || store.deletedBy.UserID != testUUIDValue(t, authtest.UserID) {
+		t.Fatalf("delete: %d, actor %v; want 204 by %s", rr.Code, store.deletedBy.UserID, authtest.UserID)
+	}
+}
+
+// TestTaraProjectChangesAreAudited checks which change each operation hands to the store; the stored
+// events are covered against PostgreSQL in TestAuditContentPostgres.
+func TestTaraProjectChangesAreAudited(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	store := newFakeProjects(true)
+	h := httpapi.New(store, manager)
+	for _, c := range []struct {
+		method, path, body string
+		want               int
+	}{
+		{http.MethodPost, "/api/v1/projects", `{"name":"new"}`, http.StatusCreated},
+		{http.MethodPatch, "/api/v1/projects/" + projectID, `{"name":"proj"}`, http.StatusOK}, // unchanged
+		{http.MethodPatch, "/api/v1/projects/" + projectID, `{"name":"renamed"}`, http.StatusOK},
+		{http.MethodPut, "/api/v1/projects/" + projectID, `{"name":"proj","description":"other"}`, http.StatusOK},
+	} {
+		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", bearer)
 		rr := httptest.NewRecorder()
 		h.ServeHTTP(rr, req)
-		if rr.Code != http.StatusNoContent {
-			t.Fatalf("delete: %d %s", rr.Code, rr.Body.String())
+		if rr.Code != c.want {
+			t.Fatalf("%s %s: %d, want %d: %s", c.method, c.path, rr.Code, c.want, rr.Body.String())
 		}
-	})
-	if len(entries) != 1 || entries[0]["event"] != "project.deleted" || entries[0]["project"] != projectID || entries[0]["actor"] != authtest.UserID {
-		t.Fatalf("delete audit = %v", entries)
+	}
+	got := store.audit.changes
+	want := []string{"project.created", "project.updated", "project.updated"}
+	if len(got) != len(want) {
+		t.Fatalf("changes = %+v, want %v", got, want)
+	}
+	for i, event := range want {
+		if got[i].Event != event {
+			t.Errorf("change %d = %s, want %s", i, got[i].Event, event)
+		}
+	}
+	if got[0].After == nil || got[1].Before == nil || got[2].After == nil {
+		t.Errorf("changes = %+v, want after for created and before/after for updated", got)
+	}
+	for _, actor := range store.audit.actors {
+		if actor.UserID != testUUIDValue(t, authtest.UserID) {
+			t.Errorf("actor = %v, want the caller %s", actor.UserID, authtest.UserID)
+		}
 	}
 }

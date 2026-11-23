@@ -1,26 +1,30 @@
-﻿
-import { FolderKanban, Star } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Star } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ProjectImage } from './ProjectImage'
 
 type ProjectCardProps = {
+  projectId: string
   name: string
   description: string
+  image?: string
   favorite: boolean
   onToggleFavorite: () => void
 }
 
 export function ProjectCard({
+  projectId,
   name,
   description,
+  image,
   favorite,
   onToggleFavorite,
 }: ProjectCardProps) {
+  const { t } = useTranslation()
   return (
     <Card className="w-64 overflow-hidden py-0">
-      <div className="flex h-32 items-center justify-center bg-muted">
-        <FolderKanban className="size-12 text-muted-foreground" />
-      </div>
+      <ProjectImage projectId={projectId} image={image} className="h-32 w-full" />
 
       <CardContent className="flex items-center justify-between gap-3 py-4">
         <div className="min-w-0">
@@ -37,8 +41,8 @@ export function ProjectCard({
           onClick={onToggleFavorite}
           aria-label={
             favorite
-              ? `Remove ${name} from favorites`
-              : `Add ${name} to favorites`
+              ? t('ui:removeFavorite', { name: name })
+              : t('ui:addFavorite', { name: name })
           }
           aria-pressed={favorite}
         >

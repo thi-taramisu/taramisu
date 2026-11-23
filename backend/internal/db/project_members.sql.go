@@ -56,7 +56,7 @@ WHERE a.tara_project_id = $1 AND a.id = $2
       SELECT 1 FROM project_role_assignment o
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id, a.project_role
+RETURNING a.id, a.project_role, a.user_id, a.group_id
 `
 
 type DeleteProjectMemberParams struct {
@@ -67,13 +67,20 @@ type DeleteProjectMemberParams struct {
 type DeleteProjectMemberRow struct {
 	ID          pgtype.UUID
 	ProjectRole ProjectRole
+	UserID      pgtype.UUID
+	GroupID     pgtype.UUID
 }
 
 // Remove an assignment unless it is the last user Owner (same rule as UpdateProjectMemberRole).
 func (q *Queries) DeleteProjectMember(ctx context.Context, arg DeleteProjectMemberParams) (DeleteProjectMemberRow, error) {
 	row := q.db.QueryRow(ctx, deleteProjectMember, arg.ProjectID, arg.ID)
 	var i DeleteProjectMemberRow
-	err := row.Scan(&i.ID, &i.ProjectRole)
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectRole,
+		&i.UserID,
+		&i.GroupID,
+	)
 	return i, err
 }
 
@@ -160,15 +167,68 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID pgtype.UUID)
 	return items, nil
 }
 
+const listProjectRoleAssignments = `-- name: ListProjectRoleAssignments :many
+SELECT id, project_role, user_id, group_id FROM project_role_assignment
+WHERE tara_project_id = $1
+ORDER BY assigned_at, id
+`
+
+type ListProjectRoleAssignmentsRow struct {
+	ID          pgtype.UUID
+	ProjectRole ProjectRole
+	UserID      pgtype.UUID
+	GroupID     pgtype.UUID
+}
+
+// The project's role assignments with internal IDs, for the audit event of a project deletion.
+func (q *Queries) ListProjectRoleAssignments(ctx context.Context, taraProjectID pgtype.UUID) ([]ListProjectRoleAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, listProjectRoleAssignments, taraProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProjectRoleAssignmentsRow
+	for rows.Next() {
+		var i ListProjectRoleAssignmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectRole,
+			&i.UserID,
+			&i.GroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockTaraProject = `-- name: LockTaraProject :one
+SELECT id FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
+`
+
+// Serializes membership changes per project. The Store's membership methods take this lock before
+// the guarded statement, so two Owners cannot downgrade or remove each other at the same moment.
+// NO KEY UPDATE still conflicts with itself and with deleting the project, but not with the
+// KEY SHARE locks that foreign key checks take, so content can be written in the meantime.
+func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, lockTaraProject, id)
+	var id_2 pgtype.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
+const lockTaraProjectForDelete = `-- name: LockTaraProjectForDelete :one
 SELECT id FROM tara_project WHERE id = $1 FOR UPDATE
 `
 
-// Serializes membership changes per project. Store.UpdateProjectMemberRole and
-// Store.DeleteProjectMember take this lock before the guarded statement, so two Owners cannot
-// downgrade or remove each other at the same moment.
-func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, lockTaraProject, id)
+// Locks the project for its deletion. Taking FOR UPDATE at once, instead of upgrading from
+// NO KEY UPDATE at the DELETE, makes concurrent content inserts wait instead of deadlocking.
+func (q *Queries) LockTaraProjectForDelete(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, lockTaraProjectForDelete, id)
 	var id_2 pgtype.UUID
 	err := row.Scan(&id_2)
 	return id_2, err
@@ -183,7 +243,7 @@ WHERE previous.id = a.id AND a.tara_project_id = $2 AND a.id = $3
       SELECT 1 FROM project_role_assignment o
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id, previous.project_role AS previous_role
+RETURNING a.id, previous.project_role AS previous_role, a.user_id, a.group_id
 `
 
 type UpdateProjectMemberRoleParams struct {
@@ -195,16 +255,23 @@ type UpdateProjectMemberRoleParams struct {
 type UpdateProjectMemberRoleRow struct {
 	ID           pgtype.UUID
 	PreviousRole ProjectRole
+	UserID       pgtype.UUID
+	GroupID      pgtype.UUID
 }
 
 // Change a role unless that would remove the last user Owner. Group Owners do not count,
 // because their membership can change in Authentik. Returns no row if the assignment does not
 // exist or is protected; the handler tells both cases apart with GetProjectMember.
-// previous_role is the role before the change (the joined row is read before the update), for the audit log.
+// previous_role is the role before the change (the joined row is read before the update), for the audit history.
 func (q *Queries) UpdateProjectMemberRole(ctx context.Context, arg UpdateProjectMemberRoleParams) (UpdateProjectMemberRoleRow, error) {
 	row := q.db.QueryRow(ctx, updateProjectMemberRole, arg.Role, arg.ProjectID, arg.ID)
 	var i UpdateProjectMemberRoleRow
-	err := row.Scan(&i.ID, &i.PreviousRole)
+	err := row.Scan(
+		&i.ID,
+		&i.PreviousRole,
+		&i.UserID,
+		&i.GroupID,
+	)
 	return i, err
 }
 

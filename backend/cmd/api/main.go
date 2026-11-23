@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
@@ -46,7 +45,8 @@ func exitCode() int {
 		}
 		options.HTTPTransport = transport
 	}
-	logger, flush, err := logging.New(options, os.Stderr)
+	logLevel := new(slog.LevelVar)
+	logger, flush, err := logging.New(options, os.Stderr, logLevel)
 	if err != nil {
 		slog.Error("initialize logging", "error", err)
 		return 1
@@ -57,18 +57,19 @@ func exitCode() int {
 			slog.New(slog.NewJSONHandler(os.Stderr, nil)).Warn("Sentry flush timed out")
 		}
 	}()
-	if err := run(); err != nil {
+	if err := run(logLevel); err != nil {
 		slog.Error("server stopped", "error", err)
 		return 1
 	}
 	return 0
 }
 
-func run() error {
+func run(logLevel *slog.LevelVar) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+	logLevel.Set(cfg.LogLevel)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Once shutdown starts, restore default signal handling so a second signal terminates immediately.
@@ -79,6 +80,10 @@ func run() error {
 	}
 	defer closePool(pool, poolCloseTimeout)
 	queries := db.NewStore(pool)
+	// Deferred after closePool, so the cleanup is cancelled before the pool closes, also when run returns early.
+	purgeCtx, stopPurge := context.WithCancel(ctx)
+	defer stopPurge()
+	go purgeAuditEvents(purgeCtx, queries, cfg.AuditRetentionAfterDelete, auditCleanupInterval, auditCleanupRetry)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,
@@ -103,7 +108,7 @@ func run() error {
 	}
 	handler := httpapi.New(queries, iam, opts...)
 	if os.Getenv("SENTRY_DSN") != "" {
-		handler = sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle(handler)
+		handler = logging.WithSentryHub(handler)
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)

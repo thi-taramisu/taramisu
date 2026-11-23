@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	sentryhttp "github.com/getsentry/sentry-go/http"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestTunnelLogDelivery(t *testing.T) {
@@ -32,7 +32,7 @@ func TestTunnelLogDelivery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger, flush, err := New(sentry.ClientOptions{Dsn: "https://public@o1.ingest.de.sentry.io/42", HTTPTransport: transport}, io.Discard)
+	logger, flush, err := New(sentry.ClientOptions{Dsn: "https://public@o1.ingest.de.sentry.io/42", HTTPTransport: transport}, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,11 +69,13 @@ func TestPanicRequestPrivacy(t *testing.T) {
 			}
 			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
 		}),
-	}, io.Discard)
+	}, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := sentryhttp.New(sentryhttp.Options{}).Handle(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router := chi.NewRouter()
+	router.Use(Middleware)
+	router.Post("/api/v1/me", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Error(err)
@@ -81,21 +83,25 @@ func TestPanicRequestPrivacy(t *testing.T) {
 		if len(body) == 0 {
 			t.Error("request body missing")
 		}
-		panic("request privacy check")
-	}))
+		panic("private-panic")
+	})
 	request := httptest.NewRequest(http.MethodPost, "https://app.example/api/v1/me?token=private-query", strings.NewReader(`{"password":"private-body"}`))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer private-token")
 	request.Header.Set("Cookie", "session=private-cookie")
-	handler.ServeHTTP(httptest.NewRecorder(), request)
+	response := httptest.NewRecorder()
+	WithSentryHub(router).ServeHTTP(response, request)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", response.Code)
+	}
 	if !flush(5 * time.Second) {
 		t.Fatal("flush timed out")
 	}
 	body := payload.String()
-	if !strings.Contains(body, "request privacy check") || !strings.Contains(body, "/api/v1/me") {
+	if !strings.Contains(body, "panic while handling request") || !strings.Contains(body, "/api/v1/me") {
 		t.Fatalf("panic or route context missing: %s", body)
 	}
-	for _, secret := range []string{"private-query", "private-body", "private-token", "private-cookie"} {
+	for _, secret := range []string{"private-query", "private-body", "private-token", "private-cookie", "private-panic"} {
 		if strings.Contains(body, secret) {
 			t.Errorf("request secret leaked: %s", secret)
 		}
