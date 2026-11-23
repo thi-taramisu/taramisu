@@ -95,6 +95,56 @@ func (q *Queries) GetAttackPath(ctx context.Context, arg GetAttackPathParams) (A
 	return i, err
 }
 
+const getAttackPathForDelete = `-- name: GetAttackPathForDelete :one
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE
+`
+
+type GetAttackPathForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAttackPathForDelete(ctx context.Context, arg GetAttackPathForDeleteParams) (AttackPath, error) {
+	row := q.db.QueryRow(ctx, getAttackPathForDelete, arg.ID, arg.ItemDefinitionID)
+	var i AttackPath
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Title,
+		&i.AnalysisApproach,
+		&i.IsPartialEarlyStage,
+		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
+	)
+	return i, err
+}
+
+const getAttackPathForUpdate = `-- name: GetAttackPathForUpdate :one
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE
+`
+
+type GetAttackPathForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAttackPathForUpdate(ctx context.Context, arg GetAttackPathForUpdateParams) (AttackPath, error) {
+	row := q.db.QueryRow(ctx, getAttackPathForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i AttackPath
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Title,
+		&i.AnalysisApproach,
+		&i.IsPartialEarlyStage,
+		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
+	)
+	return i, err
+}
+
 const listAttackPaths = `-- name: ListAttackPaths :many
 SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path
 WHERE item_definition_id = $1

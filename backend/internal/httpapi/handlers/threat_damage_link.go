@@ -12,6 +12,8 @@ import (
 )
 
 type ThreatDamageLinkStore interface {
+	Auditor
+	GetThreatDamageLinkForDelete(context.Context, db.GetThreatDamageLinkForDeleteParams) (db.ThreatDamageLink, error)
 	CreateThreatDamageLink(context.Context, db.CreateThreatDamageLinkParams) (db.ThreatDamageLink, error)
 	ListThreatDamageLinks(context.Context, db.ListThreatDamageLinksParams) ([]db.ThreatDamageLink, error)
 	DeleteThreatDamageLink(context.Context, db.DeleteThreatDamageLinkParams) (int64, error)
@@ -92,8 +94,16 @@ func (h *ThreatDamageLink) Create(ctx context.Context, in *CreateThreatDamageLin
 	if err != nil {
 		return nil, err
 	}
-	l, err := h.store.CreateThreatDamageLink(ctx, db.CreateThreatDamageLinkParams{
-		ThreatScenarioID: threatID, DamageScenarioID: damageID, ItemDefinitionID: itemID,
+	var l db.ThreatDamageLink
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		l, err = h.store.CreateThreatDamageLink(ctx, db.CreateThreatDamageLinkParams{
+			ThreatScenarioID: threatID, DamageScenarioID: damageID, ItemDefinitionID: itemID,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetThreatDamageLink, projectIDFromContext(ctx), l.ID, toThreatDamageLinkBody(l)), nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, huma.Error422UnprocessableEntity("threat scenario or damage scenario not found in this item definition")
@@ -136,12 +146,25 @@ func (h *ThreatDamageLink) Delete(ctx context.Context, in *ThreatDamageLinkIDInp
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteThreatDamageLink(ctx, db.DeleteThreatDamageLinkParams{ID: id, ItemDefinitionID: itemID})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetThreatDamageLinkForDelete(ctx, db.GetThreatDamageLinkForDeleteParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteThreatDamageLink(ctx, db.DeleteThreatDamageLinkParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetThreatDamageLink, projectIDFromContext(ctx), before.ID, toThreatDamageLinkBody(before)), nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, huma.Error404NotFound("link not found")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("link not found")
 	}
 	return nil, nil
 }

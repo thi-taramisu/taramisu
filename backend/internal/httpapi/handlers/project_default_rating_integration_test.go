@@ -32,7 +32,7 @@ func TestProjectDefaultRatingPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	owner := fixture.Token(t, nil)
 	api := httpapi.New(queries, fixture.Manager)
@@ -192,7 +192,7 @@ func TestProjectDefaultRatingPostgres(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+owner)
 		rr := httptest.NewRecorder()
-		httpapi.New(db.New(sp), fixture.Manager).ServeHTTP(rr, req)
+		httpapi.New(db.NewStore(sp), fixture.Manager).ServeHTTP(rr, req)
 		if rr.Code != 422 {
 			t.Fatalf("missing inputs: %d: %s", rr.Code, rr.Body.String())
 		}

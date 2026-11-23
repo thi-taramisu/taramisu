@@ -68,6 +68,83 @@ func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID p
 	return i, err
 }
 
+const getAttackFeasibilityRatingForDelete = `-- name: GetAttackFeasibilityRatingForDelete :one
+SELECT id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+FOR UPDATE
+`
+
+func (q *Queries) GetAttackFeasibilityRatingForDelete(ctx context.Context, attackPathID pgtype.UUID) (AttackFeasibilityRating, error) {
+	row := q.db.QueryRow(ctx, getAttackFeasibilityRatingForDelete, attackPathID)
+	var i AttackFeasibilityRating
+	err := row.Scan(
+		&i.ID,
+		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
+		&i.ApElapsedTime,
+		&i.ApSpecialistExpertise,
+		&i.ApKnowledgeOfItem,
+		&i.ApWindowOfOpportunity,
+		&i.ApEquipment,
+		&i.ApTotalScore,
+		&i.FeasibilityRating,
+		&i.Rationale,
+	)
+	return i, err
+}
+
+const getAttackFeasibilityRatingForUpdate = `-- name: GetAttackFeasibilityRatingForUpdate :one
+SELECT id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+FOR NO KEY UPDATE
+`
+
+func (q *Queries) GetAttackFeasibilityRatingForUpdate(ctx context.Context, attackPathID pgtype.UUID) (AttackFeasibilityRating, error) {
+	row := q.db.QueryRow(ctx, getAttackFeasibilityRatingForUpdate, attackPathID)
+	var i AttackFeasibilityRating
+	err := row.Scan(
+		&i.ID,
+		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
+		&i.ApElapsedTime,
+		&i.ApSpecialistExpertise,
+		&i.ApKnowledgeOfItem,
+		&i.ApWindowOfOpportunity,
+		&i.ApEquipment,
+		&i.ApTotalScore,
+		&i.FeasibilityRating,
+		&i.Rationale,
+	)
+	return i, err
+}
+
+const lockAttackPathForRating = `-- name: LockAttackPathForRating :one
+SELECT id FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE
+`
+
+type LockAttackPathForRatingParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) LockAttackPathForRating(ctx context.Context, arg LockAttackPathForRatingParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAttackPathForRating, arg.ID, arg.ItemDefinitionID)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const updateAttackFeasibilityRating = `-- name: UpdateAttackFeasibilityRating :one
 WITH proposed AS (
     SELECT current.attack_path_id,

@@ -136,3 +136,15 @@ DELETE FROM attack_feasibility_rating AS current WHERE current.attack_path_id = 
 
 -- name: AttackPathBelongsToItem :one
 SELECT EXISTS(SELECT 1 FROM attack_path WHERE id = $1 AND item_definition_id = $2) AS belongs;
+
+-- name: GetAttackFeasibilityRatingForUpdate :one
+SELECT * FROM attack_feasibility_rating WHERE attack_path_id = $1
+FOR NO KEY UPDATE;
+
+-- name: GetAttackFeasibilityRatingForDelete :one
+SELECT * FROM attack_feasibility_rating WHERE attack_path_id = $1
+FOR UPDATE;
+
+-- name: LockAttackPathForRating :one
+SELECT id FROM attack_path WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE;

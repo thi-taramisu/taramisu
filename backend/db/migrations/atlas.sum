@@ -1,8 +1,9 @@
-h1:5DmY1Qhtd+dy8fqPUgLpatSB+o+Q2y+t3Pf0fS251kQ=
+h1:8fbjaeOai6LW1VHmB7Ka432jFzCkIBFp8tgA2DlqcfI=
 20261012165909_init.sql h1:koE5GXCqezciG9bFLXbsC6H5XId/Kat1zarzDqWlM8s=
 20261012170309_seed_service_status.sql h1:32ht785eU+HJ7HhWvc1FEOhUymnK8wEGal/1Z3jPZkQ=
 20261018123707_initial-schema.sql h1:ChRaZyx9EMHJqAt5BHbZG4My5VVwmaKmIR2kg40O1UU=
 20261108170000_project_roles.sql h1:JhwqM/gb8ib5YBACXiEO7IJ1emxF2yaFnOS4ZAZKqhU=
 20261109185346_item_definition_fields_and_cascade.sql h1:g71x1ho1r4toGtmp4Vjb2rxKXI5g3n5xeY2X8rhSud4=
-20261115120000_rating_methods.sql h1:+LdcSU+N5LqvxiG3xfRwsSpD3rav66uGVgNoyQMuMEA=
-20261117171241_project_default_rating_method.sql h1:qMJp7Ii3+gauEqYb2V+/PK+doBCTNlSON+pdS+t2rbc=
+20261111214452_audit_event.sql h1:FhVOfWYhnC7Fn4brRe0gd4Tsba1QNYgdXYuQesUZ2Ws=
+20261115120000_rating_methods.sql h1:RGKDZ9NaRUA+l3fu54ziW2W68Rc03L2mUtzT4yelF/o=
+20261117171241_project_default_rating_method.sql h1:nRCHkrbtY5yb3WKX/DiBDKtOBwYq91PFWFN/d0d33es=

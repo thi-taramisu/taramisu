@@ -26,13 +26,19 @@ The sidebar can be expanded or collapsed.
 
 The Search entry is currently a placeholder.
 
+## Display mode
+
+Use the sun or moon button in the header to switch between light and dark mode. Open **Colour schemes**
+to apply **Neutral**, **Ocean** or **Iris** throughout the app. The browser saves both choices independently.
+The default is light mode with Neutral. The mode button also works with Tab followed by Space or Enter.
+
 ## Creating a project
 
 1. Open the Projects page.
 2. Select **Create Project** in the sidebar.
 3. Enter a project name.
 4. Optionally select **Upload image** and choose a PNG, JPEG or WebP file
-   up to 5 MB. Check the preview; select **Remove** to create without an image.
+   up to 5 MB. If you skip the upload or select **Remove**, TARAmisu generates a cover image locally.
 5. Select **Create** or press Enter.
 
 A project name is required. Empty names and names containing only
@@ -67,9 +73,18 @@ Archived projects are not shown in the Favorites section.
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Archive Project**.
+4. Confirm with **Archive Project** in the dialog.
 
 The project is removed from the active overview and appears in
 the Archive view.
+
+An archived project is read-only for all members. Its elements
+and general settings can be viewed but not changed, and a notice
+below the project header says so. Members can still be managed.
+
+Project owners can also archive a project from its settings:
+open **Settings**, select **Archive Project** under
+**Danger Zone**, and confirm in the dialog.
 
 ### Restoring a project
 
@@ -77,18 +92,27 @@ the Archive view.
 2. Locate the archived project.
 3. Select **Restore Project**.
 
-The project returns to the active overview.
+The project returns to the active overview and can be edited
+again.
 
 Its previous favorite status is preserved.
+
+In the project settings, owners can select **Restore Project**
+instead.
 
 ## Deleting a project
 
 1. Locate the project in the active project overview.
 2. Open its action menu.
 3. Select **Delete Project**.
-4. Confirm the action in the confirmation dialog.
+4. Read the warning and select **Delete Project** in the dialog.
+5. Type the project name and select **Delete Project** again.
 
 Select **Cancel** to keep the project.
+
+Project owners can also delete a project from its settings:
+open **Settings** and select **Delete Project** under
+**Danger Zone**. After the deletion, the project list opens.
 
 Deletion currently affects only temporary frontend state.
 
@@ -100,8 +124,8 @@ TARAmisu workspace.
 Other mock projects are displayed in the overview but do not
 yet provide functional workspace navigation.
 
-The Headlamp example is protected from deletion and archiving
-in the current preview.
+The Headlamp example can be archived and deleted like any other
+project. Reload the page to restore it.
 
 ## Known limitations
 

@@ -15,6 +15,10 @@ import (
 // AttackFeasibilityRatingStore exposes the sqlc operations used by the HTTP handlers.
 // The write queries calculate feasibility; table constraints validate method inputs.
 type AttackFeasibilityRatingStore interface {
+	Auditor
+	GetAttackFeasibilityRatingForUpdate(context.Context, pgtype.UUID) (db.AttackFeasibilityRating, error)
+	GetAttackFeasibilityRatingForDelete(context.Context, pgtype.UUID) (db.AttackFeasibilityRating, error)
+	LockAttackPathForRating(context.Context, db.LockAttackPathForRatingParams) (pgtype.UUID, error)
 	GetAttackFeasibilityRating(context.Context, pgtype.UUID) (db.AttackFeasibilityRating, error)
 	UpsertAttackFeasibilityRating(context.Context, db.UpsertAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error)
 	UpdateAttackFeasibilityRating(context.Context, db.UpdateAttackFeasibilityRatingParams) (db.AttackFeasibilityRating, error)
@@ -161,7 +165,7 @@ func (h *AttackFeasibilityRating) Get(ctx context.Context, in *FeasibilityRating
 }
 
 func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRatingInput) (*AttackFeasibilityRatingOutput, error) {
-	id, _, err := h.ratingPath(ctx, &in.FeasibilityRatingPath)
+	id, itemID, err := h.ratingPath(ctx, &in.FeasibilityRatingPath)
 	if err != nil {
 		return nil, err
 	}
@@ -172,24 +176,45 @@ func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRat
 	// never from the project default that may have changed since creation.
 	// Save method and inputs together. SQL derives the result, ignoring a supplied
 	// feasibility_rating; constraints reject missing or incompatible method inputs.
-	r, err := h.store.UpsertAttackFeasibilityRating(ctx, db.UpsertAttackFeasibilityRatingParams{
-		AttackPathID:           id,
-		RatingMethod:           in.Body.RatingMethod.Value,
-		CvssAttackVector:       in.Body.CvssAttackVector,
-		CvssAttackComplexity:   in.Body.CvssAttackComplexity,
-		CvssPrivilegesRequired: in.Body.CvssPrivilegesRequired,
-		CvssUserInteraction:    in.Body.CvssUserInteraction,
-		CvssScope:              in.Body.CvssScope,
-		AttackVector:           in.Body.AttackVector,
+	var r db.AttackFeasibilityRating
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		if _, err := h.store.LockAttackPathForRating(ctx, db.LockAttackPathForRatingParams{ID: id, ItemDefinitionID: itemID}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return db.Change{}, huma.Error404NotFound("attack path not found")
+			}
+			return db.Change{}, err
+		}
+		before, err := h.store.GetAttackFeasibilityRatingForUpdate(ctx, id)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return db.Change{}, err
+		}
+		created := errors.Is(err, pgx.ErrNoRows)
+		r, err = h.store.UpsertAttackFeasibilityRating(ctx, db.UpsertAttackFeasibilityRatingParams{
+			AttackPathID:           id,
+			RatingMethod:           in.Body.RatingMethod.Value,
+			CvssAttackVector:       in.Body.CvssAttackVector,
+			CvssAttackComplexity:   in.Body.CvssAttackComplexity,
+			CvssPrivilegesRequired: in.Body.CvssPrivilegesRequired,
+			CvssUserInteraction:    in.Body.CvssUserInteraction,
+			CvssScope:              in.Body.CvssScope,
+			AttackVector:           in.Body.AttackVector,
 
-		ApElapsedTime:         in.Body.ApElapsedTime,
-		ApSpecialistExpertise: in.Body.ApSpecialistExpertise,
-		ApKnowledgeOfItem:     in.Body.ApKnowledgeOfItem,
-		ApWindowOfOpportunity: in.Body.ApWindowOfOpportunity,
-		ApEquipment:           in.Body.ApEquipment,
-		ApTotalScore:          in.Body.ApTotalScore,
-		FeasibilityRating:     in.Body.FeasibilityRating,
-		Rationale:             in.Body.Rationale,
+			ApElapsedTime:         in.Body.ApElapsedTime,
+			ApSpecialistExpertise: in.Body.ApSpecialistExpertise,
+			ApKnowledgeOfItem:     in.Body.ApKnowledgeOfItem,
+			ApWindowOfOpportunity: in.Body.ApWindowOfOpportunity,
+			ApEquipment:           in.Body.ApEquipment,
+			ApTotalScore:          in.Body.ApTotalScore,
+			FeasibilityRating:     in.Body.FeasibilityRating,
+			Rationale:             in.Body.Rationale,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if created {
+			return db.Created(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(r)), nil
+		}
+		return db.Updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(before), toRatingBody(r)), nil
 	})
 	if err != nil {
 		return nil, mapRatingError(err)
@@ -210,39 +235,50 @@ func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRat
 	// Pass both presence flags and values to SQL. It locks the current row, merges
 	// the patch, and recalculates feasibility in the same statement. A method switch
 	// must clear old inputs and supply the new inputs together to satisfy constraints.
-	r, err := h.store.UpdateAttackFeasibilityRating(ctx, db.UpdateAttackFeasibilityRatingParams{
-		AttackPathID:              id,
-		SetRatingMethod:           b.RatingMethod.Set,
-		RatingMethod:              b.RatingMethod.Value,
-		SetCvssAttackVector:       b.CvssAttackVector.Set,
-		CvssAttackVector:          b.CvssAttackVector.Value,
-		SetCvssAttackComplexity:   b.CvssAttackComplexity.Set,
-		CvssAttackComplexity:      b.CvssAttackComplexity.Value,
-		SetCvssPrivilegesRequired: b.CvssPrivilegesRequired.Set,
-		CvssPrivilegesRequired:    b.CvssPrivilegesRequired.Value,
-		SetCvssUserInteraction:    b.CvssUserInteraction.Set,
-		CvssUserInteraction:       b.CvssUserInteraction.Value,
-		SetCvssScope:              b.CvssScope.Set,
-		CvssScope:                 b.CvssScope.Value,
-		SetAttackVector:           b.AttackVector.Set,
-		AttackVector:              b.AttackVector.Value,
+	var r db.AttackFeasibilityRating
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetAttackFeasibilityRatingForUpdate(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		r, err = h.store.UpdateAttackFeasibilityRating(ctx, db.UpdateAttackFeasibilityRatingParams{
+			AttackPathID:              id,
+			SetRatingMethod:           b.RatingMethod.Set,
+			RatingMethod:              b.RatingMethod.Value,
+			SetCvssAttackVector:       b.CvssAttackVector.Set,
+			CvssAttackVector:          b.CvssAttackVector.Value,
+			SetCvssAttackComplexity:   b.CvssAttackComplexity.Set,
+			CvssAttackComplexity:      b.CvssAttackComplexity.Value,
+			SetCvssPrivilegesRequired: b.CvssPrivilegesRequired.Set,
+			CvssPrivilegesRequired:    b.CvssPrivilegesRequired.Value,
+			SetCvssUserInteraction:    b.CvssUserInteraction.Set,
+			CvssUserInteraction:       b.CvssUserInteraction.Value,
+			SetCvssScope:              b.CvssScope.Set,
+			CvssScope:                 b.CvssScope.Value,
+			SetAttackVector:           b.AttackVector.Set,
+			AttackVector:              b.AttackVector.Value,
 
-		SetApElapsedTime:         b.ApElapsedTime.Set,
-		ApElapsedTime:            b.ApElapsedTime.Value,
-		SetApSpecialistExpertise: b.ApSpecialistExpertise.Set,
-		ApSpecialistExpertise:    b.ApSpecialistExpertise.Value,
-		SetApKnowledgeOfItem:     b.ApKnowledgeOfItem.Set,
-		ApKnowledgeOfItem:        b.ApKnowledgeOfItem.Value,
-		SetApWindowOfOpportunity: b.ApWindowOfOpportunity.Set,
-		ApWindowOfOpportunity:    b.ApWindowOfOpportunity.Value,
-		SetApEquipment:           b.ApEquipment.Set,
-		ApEquipment:              b.ApEquipment.Value,
-		SetApTotalScore:          b.ApTotalScore.Set,
-		ApTotalScore:             b.ApTotalScore.Value,
-		SetFeasibilityRating:     b.FeasibilityRating.Set,
-		FeasibilityRating:        b.FeasibilityRating.Value,
-		SetRationale:             b.Rationale.Set,
-		Rationale:                b.Rationale.Value,
+			SetApElapsedTime:         b.ApElapsedTime.Set,
+			ApElapsedTime:            b.ApElapsedTime.Value,
+			SetApSpecialistExpertise: b.ApSpecialistExpertise.Set,
+			ApSpecialistExpertise:    b.ApSpecialistExpertise.Value,
+			SetApKnowledgeOfItem:     b.ApKnowledgeOfItem.Set,
+			ApKnowledgeOfItem:        b.ApKnowledgeOfItem.Value,
+			SetApWindowOfOpportunity: b.ApWindowOfOpportunity.Set,
+			ApWindowOfOpportunity:    b.ApWindowOfOpportunity.Value,
+			SetApEquipment:           b.ApEquipment.Set,
+			ApEquipment:              b.ApEquipment.Value,
+			SetApTotalScore:          b.ApTotalScore.Set,
+			ApTotalScore:             b.ApTotalScore.Value,
+			SetFeasibilityRating:     b.FeasibilityRating.Set,
+			FeasibilityRating:        b.FeasibilityRating.Value,
+			SetRationale:             b.Rationale.Set,
+			Rationale:                b.Rationale.Value,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(before), toRatingBody(r)), nil
 	})
 	if err != nil {
 		return nil, mapRatingError(err)
@@ -255,12 +291,25 @@ func (h *AttackFeasibilityRating) Delete(ctx context.Context, in *FeasibilityRat
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteAttackFeasibilityRating(ctx, id)
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetAttackFeasibilityRatingForDelete(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteAttackFeasibilityRating(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), before.ID, toRatingBody(before)), nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, huma.Error404NotFound("attack feasibility rating not found")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("attack feasibility rating not found")
 	}
 	return nil, nil
 }

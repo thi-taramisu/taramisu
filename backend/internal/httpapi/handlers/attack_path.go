@@ -13,6 +13,9 @@ import (
 )
 
 type AttackPathStore interface {
+	Auditor
+	GetAttackPathForUpdate(context.Context, db.GetAttackPathForUpdateParams) (db.AttackPath, error)
+	GetAttackPathForDelete(context.Context, db.GetAttackPathForDeleteParams) (db.AttackPath, error)
 	CreateAttackPath(context.Context, db.CreateAttackPathParams) (db.AttackPath, error)
 	GetAttackPath(context.Context, db.GetAttackPathParams) (db.AttackPath, error)
 	ListAttackPaths(context.Context, db.ListAttackPathsParams) ([]db.AttackPath, error)
@@ -137,7 +140,15 @@ func (h *AttackPath) Create(ctx context.Context, in *CreateAttackPathInput) (*Cr
 	}
 	params := attackPathParams(itemID, in.Body.AttackPathInputBody)
 	params.InitialRatingMethod = in.Body.InitialRatingMethod
-	p, err := h.store.CreateAttackPath(ctx, params)
+	var p db.AttackPath
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		p, err = h.store.CreateAttackPath(ctx, params)
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(p)), nil
+	})
 	if err != nil {
 		return nil, mapAttackPathError(err)
 	}
@@ -181,13 +192,24 @@ func (h *AttackPath) Replace(ctx context.Context, in *ReplaceAttackPathInput) (*
 		return nil, err
 	}
 	created := attackPathParams(itemID, in.Body)
-	p, err := h.store.ReplaceAttackPath(ctx, db.ReplaceAttackPathParams{
-		ID:                       id,
-		ItemDefinitionID:         itemID,
-		Title:                    created.Title,
-		AnalysisApproach:         created.AnalysisApproach,
-		IsPartialEarlyStage:      created.IsPartialEarlyStage,
-		AttackStepsAndWeaknesses: created.AttackStepsAndWeaknesses,
+	var p db.AttackPath
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetAttackPathForUpdate(ctx, db.GetAttackPathForUpdateParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		p, err = h.store.ReplaceAttackPath(ctx, db.ReplaceAttackPathParams{
+			ID:                       id,
+			ItemDefinitionID:         itemID,
+			Title:                    created.Title,
+			AnalysisApproach:         created.AnalysisApproach,
+			IsPartialEarlyStage:      created.IsPartialEarlyStage,
+			AttackStepsAndWeaknesses: created.AttackStepsAndWeaknesses,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(before), toAttackPathBody(p)), nil
 	})
 	if err != nil {
 		return nil, mapAttackPathError(err)
@@ -208,7 +230,18 @@ func (h *AttackPath) Update(ctx context.Context, in *UpdateAttackPathInput) (*At
 	if v := in.Body.AttackStepsAndWeaknesses.Value; v != nil {
 		params.AttackStepsAndWeaknesses = *v
 	}
-	p, err := h.store.UpdateAttackPath(ctx, params)
+	var p db.AttackPath
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetAttackPathForUpdate(ctx, db.GetAttackPathForUpdateParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		p, err = h.store.UpdateAttackPath(ctx, params)
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAttackPath, projectIDFromContext(ctx), p.ID, toAttackPathBody(before), toAttackPathBody(p)), nil
+	})
 	if err != nil {
 		return nil, mapAttackPathError(err)
 	}
@@ -220,12 +253,25 @@ func (h *AttackPath) Delete(ctx context.Context, in *AttackPathIDInput) (*struct
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteAttackPath(ctx, db.DeleteAttackPathParams{ID: id, ItemDefinitionID: itemID})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetAttackPathForDelete(ctx, db.GetAttackPathForDeleteParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteAttackPath(ctx, db.DeleteAttackPathParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetAttackPath, projectIDFromContext(ctx), before.ID, toAttackPathBody(before)), nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, huma.Error404NotFound("attack path not found")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("attack path not found")
 	}
 	return nil, nil
 }

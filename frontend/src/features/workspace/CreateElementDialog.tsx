@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ListTree } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -18,12 +19,16 @@ interface CreateElementDialogProps {
   onOpenChange: (open: boolean) => void
   /** Gets the focus back on close; opened from a menu, the dialog would otherwise drop it after Cancel. */
   returnFocusTo?: HTMLButtonElement | null
+  /** Name to start with, e.g. typed into a search before. */
+  initialName?: string
   namePlaceholder: string
   nameMaxLength?: number
   /** Where the new element shows up, e.g. in the tree. */
   hint: string
   /** Shown when `onCreate` rejects. */
   errorMessage: string
+  /** Keeps the name and the other fields as they are, e.g. when the element exists and only a later step is retried. */
+  locked?: boolean
   /** Creates the element with the trimmed name; resolves to undefined if the other fields are invalid. */
   onCreate: (name: string, form: HTMLFormElement) => Promise<CreatedElement | undefined>
   /** Resets the other fields after "Create & add another" and on close. */
@@ -42,17 +47,20 @@ export function CreateElementDialog({
   open,
   onOpenChange,
   returnFocusTo,
+  initialName = '',
   namePlaceholder,
   nameMaxLength,
   hint,
   errorMessage,
+  locked = false,
   onCreate,
   onReset,
   children,
 }: CreateElementDialogProps) {
+  const { t } = useTranslation()
   const id = useId()
   const navigate = useNavigate()
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [nameError, setNameError] = useState<string>()
   const [created, setCreated] = useState<string>()
   const [pending, setPending] = useState(false)
@@ -88,7 +96,7 @@ export function CreateElementDialog({
     if (pending) return
     const trimmed = name.trim()
     if (!trimmed) {
-      setNameError('Name is required.')
+      setNameError('ui:nameRequired')
       return
     }
     setPending(true)
@@ -98,7 +106,7 @@ export function CreateElementDialog({
       if (!element) return
       if (another) {
         reset()
-        setCreated(`${element.name} created.`)
+        setCreated(element.name)
       } else {
         close()
         navigate(element.path)
@@ -127,12 +135,13 @@ export function CreateElementDialog({
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
-            <Label htmlFor={`${id}-name`}>Name *</Label>
+            <Label htmlFor={`${id}-name`}>{t('ui:requiredName')}</Label>
             <Input
               id={`${id}-name`}
               value={name}
               required
               maxLength={nameMaxLength}
+              readOnly={locked}
               placeholder={namePlaceholder}
               onChange={(event) => {
                 setName(event.target.value)
@@ -144,11 +153,13 @@ export function CreateElementDialog({
             />
             {nameError && (
               <p id={`${id}-name-error`} role="alert" className="text-sm text-destructive">
-                {nameError}
+                {t(nameError)}
               </p>
             )}
           </div>
-          {children}
+          <fieldset disabled={locked} className="contents">
+            {children}
+          </fieldset>
           <p className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
             <ListTree aria-hidden="true" className="size-3.5" />
             {hint}
@@ -158,10 +169,10 @@ export function CreateElementDialog({
               {errorMessage}
             </p>
           )}
-          <DialogFooter className="items-center">
-            <output className="mr-auto text-sm text-muted-foreground">{created}</output>
+          <DialogFooter className="items-center sm:flex-wrap">
+            <output className="w-full text-sm text-muted-foreground">{created && t('ui:created', { name: created })}</output>
             <Button type="button" variant="ghost" disabled={pending} onClick={() => handleOpenChange(false)}>
-              Cancel
+              {t('ui:cancel')}
             </Button>
             <Button
               type="button"
@@ -173,11 +184,11 @@ export function CreateElementDialog({
                 formRef.current?.requestSubmit()
               }}
             >
-              Create &amp; add another
+              {t('ui:createAnother')}
             </Button>
             {/* aria-disabled instead of disabled keeps the focus on the button while the request runs. */}
             <Button type="submit" aria-disabled={pending}>
-              Create &amp; open
+              {t('ui:createOpen')}
             </Button>
           </DialogFooter>
         </form>
