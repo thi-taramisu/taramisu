@@ -51,3 +51,15 @@ RETURNING *;
 DELETE FROM risk_value WHERE risk_value.threat_scenario_id = sqlc.arg(threat_scenario_id)
   AND risk_value.id = sqlc.arg(id)
 RETURNING id;
+
+-- name: GetRiskValueForUpdate :one
+SELECT * FROM risk_value
+WHERE risk_value.threat_scenario_id = sqlc.arg(threat_scenario_id)
+  AND risk_value.id = sqlc.arg(id)
+FOR NO KEY UPDATE;
+
+-- name: GetRiskValueForDelete :one
+SELECT * FROM risk_value
+WHERE risk_value.threat_scenario_id = sqlc.arg(threat_scenario_id)
+  AND risk_value.id = sqlc.arg(id)
+FOR UPDATE;

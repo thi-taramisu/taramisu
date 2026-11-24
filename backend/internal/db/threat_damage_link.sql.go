@@ -52,6 +52,26 @@ func (q *Queries) DeleteThreatDamageLink(ctx context.Context, arg DeleteThreatDa
 	return result.RowsAffected(), nil
 }
 
+const getThreatDamageLinkForDelete = `-- name: GetThreatDamageLinkForDelete :one
+SELECT l.id, l.threat_scenario_id, l.damage_scenario_id FROM threat_damage_link l
+WHERE l.id = $1
+  AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
+  AND EXISTS(SELECT 1 FROM damage_scenario d WHERE d.id = l.damage_scenario_id AND d.item_definition_id = $2)
+FOR UPDATE OF l
+`
+
+type GetThreatDamageLinkForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetThreatDamageLinkForDelete(ctx context.Context, arg GetThreatDamageLinkForDeleteParams) (ThreatDamageLink, error) {
+	row := q.db.QueryRow(ctx, getThreatDamageLinkForDelete, arg.ID, arg.ItemDefinitionID)
+	var i ThreatDamageLink
+	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.DamageScenarioID)
+	return i, err
+}
+
 const listThreatDamageLinks = `-- name: ListThreatDamageLinks :many
 SELECT l.id, l.threat_scenario_id, l.damage_scenario_id FROM threat_damage_link l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id

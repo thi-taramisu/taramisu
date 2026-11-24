@@ -179,3 +179,85 @@ func TestRegisterRejectsWithoutProjectOnProjectPaths(t *testing.T) {
 	handlers.Register(api, huma.Operation{OperationID: "list", Method: http.MethodGet, Path: "/api/v1/projects"},
 		handlers.WithoutProject(), echoRole)
 }
+
+func TestProjectAccessDenialsAreLogged(t *testing.T) {
+	items := "/api/v1/item-definitions/"
+	for _, tc := range []struct {
+		name, method, path string
+		role               db.ProjectRole
+		operation, level   string // empty: nothing logged
+		status             float64
+	}{
+		{"allowed", http.MethodGet, items + knownItemID + "/things", db.ProjectRoleVIEWER, "", "", 0},
+		{"role too low", http.MethodPost, items + knownItemID + "/things", db.ProjectRoleVIEWER, "edit-item", "WARN", http.StatusForbidden},
+		{"no role", http.MethodGet, items + knownItemID + "/things", "", "read-item", "INFO", http.StatusNotFound},
+		{"malformed id", http.MethodGet, items + "not-a-uuid/things", db.ProjectRoleOWNER, "", "", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler, _, bearer := newAccessAPI(t, fakeAccess{role: tc.role})
+			entries := captureLog(t, "access denied", func() {
+				req := httptest.NewRequest(tc.method, tc.path, http.NoBody)
+				req.Header.Set("Authorization", bearer)
+				handler.ServeHTTP(httptest.NewRecorder(), req)
+			})
+			if tc.operation == "" {
+				if len(entries) != 0 {
+					t.Fatalf("unexpected access denied entry: %v", entries)
+				}
+				return
+			}
+			if len(entries) != 1 {
+				t.Fatalf("got %d access denied entries, want 1", len(entries))
+			}
+			e := entries[0]
+			if e["operation"] != tc.operation || e["actor"] != authtest.UserID || e["level"] != tc.level || e["status"] != tc.status {
+				t.Errorf("entry = %v, want operation %s, actor %s, level %s, status %v", e, tc.operation, authtest.UserID, tc.level, tc.status)
+			}
+		})
+	}
+}
+
+func TestUnexpectedHandlerErrorsAreLoggedNotReturned(t *testing.T) {
+	mux := chi.NewRouter()
+	api := humachi.New(mux, huma.DefaultConfig("test", "1.0.0"))
+	handlers.Register(api, huma.Operation{OperationID: "broken", Method: http.MethodGet, Path: "/broken"},
+		handlers.WithoutProject(), func(context.Context, *struct{}) (*struct{}, error) {
+			return nil, errors.New(`relation "secret_table" does not exist`)
+		})
+	handlers.Register(api, huma.Operation{OperationID: "mapped", Method: http.MethodGet, Path: "/mapped"},
+		handlers.WithoutProject(), func(context.Context, *struct{}) (*struct{}, error) {
+			return nil, huma.Error409Conflict("already exists")
+		})
+
+	rr := httptest.NewRecorder()
+	entries := captureLog(t, "unexpected error", func() {
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/broken", http.NoBody))
+	})
+	if rr.Code != http.StatusInternalServerError || strings.Contains(rr.Body.String(), "secret_table") {
+		t.Fatalf("response = %d %s, want 500 without the error text", rr.Code, rr.Body.String())
+	}
+	if len(entries) != 1 || entries[0]["operation"] != "broken" || !strings.Contains(entries[0]["error"].(string), "secret_table") {
+		t.Fatalf("log entries = %v, want one entry with the operation and the error", entries)
+	}
+
+	rr = httptest.NewRecorder()
+	entries = captureLog(t, "unexpected error", func() {
+		mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/mapped", http.NoBody))
+	})
+	if rr.Code != http.StatusConflict || len(entries) != 0 {
+		t.Fatalf("mapped error: status %d, log entries %v; want 409 and no entry", rr.Code, entries)
+	}
+
+	// A client that went away is not a server error.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	serveCancelled := func() {
+		mux.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/broken", http.NoBody).WithContext(ctx))
+	}
+	if entries := captureLog(t, "request cancelled", serveCancelled); len(entries) != 1 || entries[0]["level"] != "INFO" {
+		t.Fatalf("cancelled request entries = %v, want one INFO entry", entries)
+	}
+	if entries := captureLog(t, "unexpected error", serveCancelled); len(entries) != 0 {
+		t.Fatalf("cancelled request logged as unexpected error: %v", entries)
+	}
+}

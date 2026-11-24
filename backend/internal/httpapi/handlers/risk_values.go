@@ -11,6 +11,9 @@ import (
 )
 
 type RiskValueStore interface {
+	Auditor
+	GetRiskValueForUpdate(context.Context, db.GetRiskValueForUpdateParams) (db.RiskValue, error)
+	GetRiskValueForDelete(context.Context, db.GetRiskValueForDeleteParams) (db.RiskValue, error)
 	CreateRiskValue(context.Context, db.CreateRiskValueParams) (db.RiskValue, error)
 	GetRiskValue(context.Context, db.GetRiskValueParams) (db.RiskValue, error)
 	ReplaceRiskValue(context.Context, db.ReplaceRiskValueParams) (db.RiskValue, error)
@@ -98,7 +101,15 @@ func (h *RiskValues) Get(ctx context.Context, in *RiskResourcePath) (*RiskValueO
 }
 func (h *RiskValues) Create(ctx context.Context, in *CreateRiskValueInput) (*CreateRiskValueOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
-	row, err := h.store.CreateRiskValue(ctx, db.CreateRiskValueParams{ThreatScenarioID: scenario, ImpactRatingID: riskUUID(in.Body.ImpactRatingID), RiskScore: in.Body.RiskScore, DeterminationMethod: in.Body.DeterminationMethod})
+	var row db.RiskValue
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		row, err = h.store.CreateRiskValue(ctx, db.CreateRiskValueParams{ThreatScenarioID: scenario, ImpactRatingID: riskUUID(in.Body.ImpactRatingID), RiskScore: in.Body.RiskScore, DeterminationMethod: in.Body.DeterminationMethod})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, toRiskValue(row)), nil
+	})
 	if err != nil {
 		return nil, riskError(err)
 	}
@@ -107,7 +118,18 @@ func (h *RiskValues) Create(ctx context.Context, in *CreateRiskValueInput) (*Cre
 }
 func (h *RiskValues) Replace(ctx context.Context, in *ReplaceRiskValueInput) (*RiskValueOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
-	row, err := h.store.ReplaceRiskValue(ctx, db.ReplaceRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: riskUUID(in.Body.ImpactRatingID), RiskScore: in.Body.RiskScore, DeterminationMethod: in.Body.DeterminationMethod})
+	var row db.RiskValue
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetRiskValueForUpdate(ctx, db.GetRiskValueForUpdateParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		row, err = h.store.ReplaceRiskValue(ctx, db.ReplaceRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: riskUUID(in.Body.ImpactRatingID), RiskScore: in.Body.RiskScore, DeterminationMethod: in.Body.DeterminationMethod})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, toRiskValue(before), toRiskValue(row)), nil
+	})
 	if err != nil {
 		return nil, riskError(err)
 	}
@@ -119,7 +141,18 @@ func (h *RiskValues) Patch(ctx context.Context, in *PatchRiskValueInput) (*RiskV
 	}
 
 	scenario := riskUUID(in.ThreatScenarioID)
-	row, err := h.store.PatchRiskValue(ctx, db.PatchRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: optionalRiskUUID(in.Body.ImpactRatingID.Value), RiskScore: in.Body.RiskScore.Value, DeterminationMethod: in.Body.DeterminationMethod.Value})
+	var row db.RiskValue
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetRiskValueForUpdate(ctx, db.GetRiskValueForUpdateParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		row, err = h.store.PatchRiskValue(ctx, db.PatchRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: optionalRiskUUID(in.Body.ImpactRatingID.Value), RiskScore: in.Body.RiskScore.Value, DeterminationMethod: in.Body.DeterminationMethod.Value})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, toRiskValue(before), toRiskValue(row)), nil
+	})
 	if err != nil {
 		return nil, riskError(err)
 	}
@@ -127,7 +160,16 @@ func (h *RiskValues) Patch(ctx context.Context, in *PatchRiskValueInput) (*RiskV
 }
 func (h *RiskValues) Delete(ctx context.Context, in *RiskResourcePath) (*struct{}, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
-	_, err := h.store.DeleteRiskValue(ctx, db.DeleteRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetRiskValueForDelete(ctx, db.GetRiskValueForDeleteParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if _, err := h.store.DeleteRiskValue(ctx, db.DeleteRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)}); err != nil {
+			return db.Change{}, err
+		}
+		return db.Deleted(db.TargetRiskValue, projectIDFromContext(ctx), before.ID, toRiskValue(before)), nil
+	})
 	if err != nil {
 		return nil, riskError(err)
 	}
