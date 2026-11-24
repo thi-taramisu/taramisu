@@ -18,6 +18,7 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/llm"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
 // After SIGTERM, shutdownTimeout bounds how long in-flight requests may finish and poolCloseTimeout how long
@@ -29,17 +30,19 @@ const (
 )
 
 func main() {
-	if err := run(); err != nil {
+	logLevel := logging.Setup(os.Stderr)
+	if err := run(logLevel); err != nil {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(logLevel *slog.LevelVar) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+	logLevel.Set(cfg.LogLevel)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Once shutdown starts, restore default signal handling so a second signal terminates immediately.
@@ -50,6 +53,10 @@ func run() error {
 	}
 	defer closePool(pool, poolCloseTimeout)
 	queries := db.NewStore(pool)
+	// Deferred after closePool, so the cleanup is cancelled before the pool closes, also when run returns early.
+	purgeCtx, stopPurge := context.WithCancel(ctx)
+	defer stopPurge()
+	go purgeAuditEvents(purgeCtx, queries, cfg.AuditRetentionAfterDelete, auditCleanupInterval, auditCleanupRetry)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,

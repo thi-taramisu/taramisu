@@ -239,3 +239,27 @@ func TestAssetCybersecurityPropertyValidation(t *testing.T) {
 		}
 	}
 }
+
+func (f *propertyErrorStore) GetAssetCybersecurityPropertyForUpdate(ctx context.Context, p db.GetAssetCybersecurityPropertyForUpdateParams) (db.AssetCybersecurityProperty, error) {
+	return f.GetAssetCybersecurityProperty(ctx, db.GetAssetCybersecurityPropertyParams(p))
+}
+
+func (f *propertyErrorStore) GetAssetCybersecurityPropertyForDelete(ctx context.Context, p db.GetAssetCybersecurityPropertyForDeleteParams) (db.AssetCybersecurityProperty, error) {
+	return f.GetAssetCybersecurityProperty(ctx, db.GetAssetCybersecurityPropertyParams(p))
+}
+
+func (f *propertyErrorStore) GetDamageScenarioAssetPropertyForUpdate(ctx context.Context, p db.GetDamageScenarioAssetPropertyForUpdateParams) (db.DamageScenarioAssetProperty, error) {
+	return f.GetDamageScenarioAssetProperty(ctx, db.GetDamageScenarioAssetPropertyParams(p))
+}
+
+func (f *propertyErrorStore) GetDamageScenarioAssetPropertyForDelete(ctx context.Context, p db.GetDamageScenarioAssetPropertyForDeleteParams) (db.DamageScenarioAssetProperty, error) {
+	return f.GetDamageScenarioAssetProperty(ctx, db.GetDamageScenarioAssetPropertyParams(p))
+}
+
+func (f *propertyErrorStore) GetThreatScenarioAssetPropertyForUpdate(ctx context.Context, p db.GetThreatScenarioAssetPropertyForUpdateParams) (db.ThreatScenarioAssetProperty, error) {
+	return f.GetThreatScenarioAssetProperty(ctx, db.GetThreatScenarioAssetPropertyParams(p))
+}
+
+func (f *propertyErrorStore) GetThreatScenarioAssetPropertyForDelete(ctx context.Context, p db.GetThreatScenarioAssetPropertyForDeleteParams) (db.ThreatScenarioAssetProperty, error) {
+	return f.GetThreatScenarioAssetProperty(ctx, db.GetThreatScenarioAssetPropertyParams(p))
+}

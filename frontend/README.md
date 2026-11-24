@@ -31,16 +31,18 @@ src/
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health/live on the real backend
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
+  features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/threat-scenarios/   # threat scenario pages: Definition with targets and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
+  features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
-  test/renderApp.tsx           # renders the app with a fresh mock item API and query cache
+  test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
@@ -55,6 +57,10 @@ Branches start expanded; navigating to a hidden descendant reveals its ancestors
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
+
+Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
+parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 
 ## API client
 
@@ -80,8 +86,8 @@ src/api/
   queries/backend.ts       # REAL: hooks on the client (health, current user)
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
-  services/                # service interfaces the views use (e.g. ItemService)
-  queries/items.ts         # TanStack Query hooks on the services
+  services/                # service interfaces the views use (e.g. ItemService, ProjectService)
+  queries/items.ts, queries/projects.ts # TanStack Query hooks on the services
   ApiProvider.tsx          # provides the client and the service implementations
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
@@ -89,7 +95,11 @@ src/api/
 `src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
 `ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
-that has no service yet (project list, project settings, example project).
+that has no service yet (project settings, example project).
+
+Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
+instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
+can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
 
 ## UI components
 
@@ -115,3 +125,24 @@ React Flow out of the initial bundle.
 Build with Node 24 and `npm run build`, then serve the static `dist/` directory. Configure the web server to serve `index.html` for
 application routes so direct links and browser refreshes work. Unknown application routes show the React not-found page; the static SPA
 fallback can still return HTTP 200. `npm run preview` is for local verification of this build.
+
+## Element display IDs
+
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3, AP-100 and IT-1.
+Mock data and newly created mock elements use this format directly.
+Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
+Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
+by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Localization checks
+
+Run `npm run check:localization` from `frontend/`. Frontend PR lint runs the same command.
+The English and German resources in the registered common and UI namespaces must have matching keys,
+nonempty string translations and matching interpolation expressions. The check reports unknown literal
+keys in `t(...)` and `i18n.t(...)`, including conditional branches and plural keys. Reviewers should
+verify computed keys, variable-based lookups and translation quality.
+
+Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
+Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
+The exception applies only to hardcoded text on that line.

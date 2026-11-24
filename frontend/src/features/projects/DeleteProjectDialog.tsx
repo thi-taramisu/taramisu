@@ -1,4 +1,5 @@
-﻿import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -70,6 +71,7 @@ function DeleteProjectForm({
   onContinue: () => void
   onConfirm: () => void
 }) {
+  const { t } = useTranslation()
   const inputId = useId()
   const [confirmation, setConfirmation] = useState('')
   const matches = projectName !== '' && confirmation === projectName
@@ -89,11 +91,10 @@ function DeleteProjectForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <AlertDialogHeader>
         {/* Keep repeated spaces visible, as the name must be typed exactly, and break long names. */}
-        <AlertDialogTitle className="whitespace-pre-wrap wrap-anywhere">Delete {projectName}</AlertDialogTitle>
+        <AlertDialogTitle className="whitespace-pre-wrap wrap-anywhere">{t('ui:deleteNamed', { name: projectName })}</AlertDialogTitle>
         {step === 'acknowledge' && (
           <AlertDialogDescription>
-            This will permanently delete the project, including all of its items, their content, and its stored
-            files. Everything will be permanently lost and cannot be restored.
+            {t('ui:deleteProjectFullWarning')}
           </AlertDialogDescription>
         )}
       </AlertDialogHeader>
@@ -102,7 +103,7 @@ function DeleteProjectForm({
         <div className="space-y-2">
           <Label htmlFor={inputId}>
             <span className="whitespace-pre-wrap wrap-anywhere">
-              To confirm, type &quot;{projectName}&quot; in the box below
+              {t('ui:confirmProjectName', { name: projectName })}
             </span>
           </Label>
           <Input
@@ -117,7 +118,7 @@ function DeleteProjectForm({
       )}
 
       <AlertDialogFooter>
-        <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+        <AlertDialogCancel type="button">{t('ui:cancel')}</AlertDialogCancel>
 
         {step === 'acknowledge' ? (
           <Button
@@ -125,7 +126,7 @@ function DeleteProjectForm({
             variant="destructive"
             onClick={onContinue}
           >
-            Delete Project
+            {t('ui:deleteProject')}
           </Button>
         ) : (
           <Button
@@ -133,7 +134,7 @@ function DeleteProjectForm({
             variant="destructive"
             disabled={!matches}
           >
-            Delete Project
+            {t('ui:deleteProject')}
           </Button>
         )}
       </AlertDialogFooter>
