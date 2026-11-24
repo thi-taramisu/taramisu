@@ -55,3 +55,28 @@ export function findNodePath(type: EntityType, id: string, nodes: TreeNode[]): T
   }
   return undefined
 }
+
+/** Every occurrence, because an analysis element can have several parents. */
+export function findNodePaths(type: EntityType, id: string, nodes: readonly TreeNode[]): TreeNode[][] {
+  return nodes.flatMap((node) => {
+    if (node.type === type && node.id === id) return [[node]]
+    return findNodePaths(type, id, node.children ?? []).map((path) => [node, ...path])
+  })
+}
+
+/** Names and display codes may change; a path is identified by its types and technical IDs. */
+export function hierarchyPathKey(path: readonly TreeNode[]): string {
+  return JSON.stringify(path.map(({ type, id }) => [type, id]))
+}
+
+export function selectedHierarchyPath(paths: TreeNode[][], search: string): TreeNode[] | undefined {
+  const selected = new URLSearchParams(search).get('hierarchy')
+  return paths.find((path) => hierarchyPathKey(path) === selected) ?? paths[0]
+}
+
+/** Keep unrelated query parameters and only carry a hierarchy when a choice was needed. */
+export function hierarchySearch(search: string, path: readonly TreeNode[], shared = false): string {
+  const params = new URLSearchParams(search)
+  if (shared || params.has('hierarchy')) params.set('hierarchy', hierarchyPathKey(path))
+  return params.size ? `?${params}` : ''
+}

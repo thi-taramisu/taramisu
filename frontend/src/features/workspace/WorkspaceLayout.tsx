@@ -33,7 +33,12 @@ export function WorkspaceLayout() {
         <Switch
           id="graph-view"
           checked={graphView}
-          onCheckedChange={(checked) => setSearchParams(checked ? { view: 'graph' } : {})}
+          onCheckedChange={(checked) => {
+            const next = new URLSearchParams(searchParams)
+            if (checked) next.set('view', 'graph')
+            else next.delete('view')
+            setSearchParams(next)
+          }}
         />
         <Label htmlFor="graph-view">{t('navigation.graph')}</Label>
       </ProjectHeader>

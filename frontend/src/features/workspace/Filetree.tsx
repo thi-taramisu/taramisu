@@ -4,7 +4,7 @@ import { matchPath, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { EntityType, TreeNode } from '../../api/models/tree'
-import { entityPath, entityTitle } from './entities'
+import { entityPath, entityTitle, findNodePaths, selectedHierarchyPath, hierarchyPathKey, hierarchySearch } from './entities'
 import { FiletreeLink } from './FiletreeLink'
 import { useTranslation } from 'react-i18next'
 
@@ -29,22 +29,29 @@ interface BranchProps {
   projectId: string
   selectedPath: string
   search: string
+  ancestors: readonly TreeNode[]
+  nodes: readonly TreeNode[]
+  activeKey: string
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
 }
 
-function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: BranchProps) {
+function FiletreeBranch({ node, projectId, selectedPath, search, ancestors, nodes, activeKey, onKeyDown }: BranchProps) {
   const { t } = useTranslation()
-  const [branch, setBranch] = useState({ selectedPath, expanded: true })
+  const selection = `${selectedPath}:${activeKey}`
+  const [branch, setBranch] = useState({ selectedPath: selection, expanded: true })
+  const path = [...ancestors, node]
+  const selected = hierarchyPathKey(path) === activeKey
+  const linkSearch = hierarchySearch(search, path, findNodePaths(node.type, node.id, nodes).length > 1)
   const hasChildren = Boolean(node.children?.length)
   const Icon = icons[node.type]
 
   // Reveal a newly selected entity; tab switches must preserve manual collapse choices.
-  const reveal = branch.selectedPath !== selectedPath && node.children && containsRoute(node.children, projectId, selectedPath)
+  const reveal = branch.selectedPath !== selection && node.children && containsRoute(node.children, projectId, selectedPath)
   const expanded = branch.expanded || Boolean(reveal)
-  if (branch.selectedPath !== selectedPath) setBranch({ selectedPath, expanded })
+  if (branch.selectedPath !== selection) setBranch({ selectedPath: selection, expanded })
 
   return (
-    <Collapsible asChild open={expanded} onOpenChange={(open) => setBranch({ selectedPath, expanded: open })}>
+    <Collapsible asChild open={expanded} onOpenChange={(open) => setBranch({ selectedPath: selection, expanded: open })}>
       <li>
         <div data-filetree-row className="flex min-w-0 items-center gap-0.5 rounded-md">
           {hasChildren ? (
@@ -61,13 +68,13 @@ function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: Br
               </Button>
             </CollapsibleTrigger>
           ) : <span aria-hidden="true" className="w-6 shrink-0" />}
-          <FiletreeLink node={node} projectId={projectId} search={search} icon={Icon} onKeyDown={onKeyDown} />
+          <FiletreeLink node={node} projectId={projectId} search={linkSearch} selected={selected} icon={Icon} onKeyDown={onKeyDown} />
         </div>
         {hasChildren && (
           <CollapsibleContent asChild forceMount hidden={!expanded}>
             <ul className="mt-[3px] ml-3 space-y-[3px] border-l border-sidebar-border pl-1">
               {node.children?.map((child) => (
-                <FiletreeBranch key={`${child.type}/${child.id}`} node={child} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={onKeyDown} />
+                <FiletreeBranch key={`${child.type}/${child.id}`} node={child} ancestors={path} nodes={nodes} activeKey={activeKey} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={onKeyDown} />
               ))}
             </ul>
           </CollapsibleContent>
@@ -82,6 +89,10 @@ export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; pro
   const { t } = useTranslation()
   const { pathname, search } = useLocation()
   const selectedPath = matchPath('/projects/:projectId/:type/:entityId/*', pathname)?.pathnameBase ?? pathname
+  const match = matchPath('/projects/:projectId/:type/:entityId/*', pathname)
+  const paths = match ? findNodePaths(match.params.type as EntityType, match.params.entityId ?? '', nodes) : []
+  const active = selectedHierarchyPath(paths, search)
+  const activeKey = active ? hierarchyPathKey(active) : ''
   const root = useRef<HTMLUListElement>(null)
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -124,7 +135,7 @@ export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; pro
   return (
     <ul ref={root} className="space-y-[3px]">
       {nodes.map((node) => (
-        <FiletreeBranch key={`${node.type}/${node.id}`} node={node} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={handleKeyDown} />
+        <FiletreeBranch key={`${node.type}/${node.id}`} node={node} ancestors={[]} nodes={nodes} activeKey={activeKey} projectId={projectId} selectedPath={selectedPath} search={search} onKeyDown={handleKeyDown} />
       ))}
     </ul>
   )

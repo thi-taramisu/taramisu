@@ -1,4 +1,5 @@
 {
+  "selectHierarchyPath": "Select hierarchy path",
   "colourScheme": "Colour scheme",
   "backendPending": "Checking backend…",
   "backendError": "Backend error: {{detail}}",

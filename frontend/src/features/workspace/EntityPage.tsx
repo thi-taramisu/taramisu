@@ -3,7 +3,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { NavLink, Outlet, useParams, useSearchParams } from 'react-router-dom'
 import { useProjectTree } from '../../api/queries/items'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES, findNodePath, formatEntityId } from './entities'
+import { ENTITY_TYPES, findNodePaths, selectedHierarchyPath, formatEntityId } from './entities'
 import { EntityBreadcrumbs } from './EntityBreadcrumbs'
 
 const RelationGraphView = lazy(() => import('../graph/RelationGraphView').then((module) => ({ default: module.RelationGraphView })))
@@ -33,7 +33,8 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
   const { data: tree, isPending } = useProjectTree(projectId)
   const { tabs } = ENTITY_TYPES[type]
   const label = t(`entities.${type}`)
-  const path = tree && findNodePath(type, entityId, tree)
+  const paths = tree ? findNodePaths(type, entityId, tree) : []
+  const path = selectedHierarchyPath(paths, `?${searchParams}`)
   const node = path?.at(-1)
   // `||`, not `??`: an empty code from the API (not assigned yet) falls back to the tree node's code.
   const displayCode = code || node?.code
@@ -41,7 +42,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <EntityBreadcrumbs projectId={projectId} path={path ?? [{
+      <EntityBreadcrumbs projectId={projectId} paths={paths} path={path ?? [{
         type, id: entityId, name: isPending ? t('ui:loading') : t('ui:pathUnavailable'),
       }]} />
       <div className="flex items-start gap-4">
@@ -63,7 +64,7 @@ export function EntityPage({ type, name, code, actions, tabLabels = {}, tabCount
             {tabs.map((tab) => (
               <NavLink
                 key={tab.path}
-                to={tab.path}
+                to={{ pathname: tab.path, search: searchParams.toString() }}
                 end
                 className={({ isActive }) =>
                   `-mb-px inline-flex items-center gap-1.5 border-b-2 pb-2 text-sm ${isActive ? 'border-primary font-medium' : 'border-transparent text-muted-foreground'}`

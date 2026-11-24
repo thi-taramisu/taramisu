@@ -1,4 +1,5 @@
 {
+  "selectHierarchyPath": "Hierarchiepfad auswählen",
   "colourScheme": "Farbschema",
   "backendPending": "Backend wird geprüft…",
   "backendError": "Backend-Fehler: {{detail}}",
