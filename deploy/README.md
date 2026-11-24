@@ -58,7 +58,8 @@ Current local addresses:
 - API Swagger UI: <http://localhost/api/docs> (OpenAPI spec: <http://localhost/openapi.json>)
 - Authentik (via proxy): <http://localhost/auth/if/admin/>
 
-`APP_URL` defaults to `http://localhost` and defines the public origin and OIDC callback (`${APP_URL}/auth/callback`).
+`APP_URL` defaults to `http://localhost` and defines the public origin, OIDC callback (`${APP_URL}/auth/callback`),
+and post-logout return URL (`${APP_URL}/projects`).
 Authentik runs under `AUTHENTIK_WEB__PATH=/auth/` behind NGINX (`location /auth/`), so the public OIDC issuer is
 `${APP_URL}/auth/application/o/taramisu/`, while the Go API fetches JWKS keys internally via
 `http://authentik-server:9000/auth/application/o/taramisu/jwks/`.
