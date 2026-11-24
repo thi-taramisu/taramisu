@@ -16,6 +16,7 @@ on:
           - api
           - frontend
           - docs
+          - storage-bootstrap
   push:
     branches: [main]
     tags: ['v*.*.*']
@@ -71,9 +72,10 @@ jobs:
               {'image': 'api', 'context': 'backend', 'file': 'backend/Dockerfile'},
               {'image': 'frontend', 'context': 'frontend', 'file': 'frontend/Dockerfile'},
               {'image': 'docs', 'context': '.', 'file': 'docs/docusaurus/Dockerfile'},
+              {'image': 'storage-bootstrap', 'context': 'storage', 'file': 'storage/Dockerfile'},
           ]
           selection = os.environ['INPUT_IMAGE']
-          if selection not in ('all', 'api', 'frontend', 'docs'):
+          if selection not in ('all', 'api', 'frontend', 'docs', 'storage-bootstrap'):
               raise SystemExit('Unknown image selection')
           if selection != 'all':
               images = [image for image in images if image['image'] == selection]

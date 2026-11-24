@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
+import { exampleProject } from '../../api/mocks/data/headlamp'
 import type { DamageScenario } from '../../api/models/damageScenario'
 import {
   useDamageScenario,
@@ -14,6 +15,7 @@ import { AssetPropertyToggles } from '../assets/AssetPropertyToggles'
 import { CiaProperties } from '../items/RiskBadge'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
+import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { formatEntityId } from '../workspace/entities'
 
 /** Relations tab of a damage scenario ("DS Relation" wireframe): the assets leading to it and its threat scenarios. */
@@ -99,6 +101,10 @@ function Relations({ projectId, scenario }: { projectId: string; scenario: Damag
         onAdd={(id) => threatLink.mutate({ id, linked: true })}
         onRemove={(id) => threatLink.mutate({ id, linked: false })}
         rows={threats}
+        // Opened on this damage scenario's page, the dialog starts linked to it.
+        renderCreateDialog={(dialog) => (
+          <CreateThreatScenarioDialog {...dialog} projectId={projectId} projectName={exampleProject.name} lockedItemId={scenario.item_definition_id} />
+        )}
       />
       <p className="text-xs text-muted-foreground">
         {t('ui:relationsHint')}

@@ -32,7 +32,11 @@ def main():
     args = parser.parse_args()
     image = args.api_image
     if not image:
-        model = json.loads(run("docker", "compose", "--env-file", str(ROOT / "iam/.env"), "-f", str(ROOT / "deploy/compose.yaml"), "config", "--format", "json").stdout)
+        model = json.loads(run(
+            "docker", "compose", "--env-file", str(ROOT / "iam/.env"),
+            "--env-file", str(ROOT / "storage/.env"),
+            "-f", str(ROOT / "deploy/compose.yaml"), "config", "--format", "json",
+        ).stdout)
         image = model["services"]["api"]["image"]
         run("docker", "image", "inspect", image)
     prefix = "sentry-smoke-" + uuid.uuid4().hex[:10]

@@ -443,6 +443,10 @@ func TestAttackPatchDistinguishesOmittedFromNull(t *testing.T) {
 	}
 }
 
+func (f fakeAttackAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeAttackPaths) GetAttackPathForUpdate(ctx context.Context, p db.GetAttackPathForUpdateParams) (db.AttackPath, error) {
 	return f.GetAttackPath(ctx, db.GetAttackPathParams(p))
 }

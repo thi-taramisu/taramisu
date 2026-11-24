@@ -47,6 +47,7 @@ jobs:
     permissions:
       contents: write # Dedicated digest state branch; never writes main.
       issues: read
+      pull-requests: read
     steps:
       - name: Check out trusted default branch code
         uses: actions/checkout@v7

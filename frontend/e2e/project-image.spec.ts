@@ -6,7 +6,7 @@ const image = {
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9S8AAAAASUVORK5CYII=', 'base64'),
 }
 
-test('project image survives dialog close, favoriting, archive and restore', async ({ page }) => {
+test('project image survives dialog close, favoriting, archive and unarchive', async ({ page }) => {
   await page.goto('/projects')
   await page.getByRole('button', { name: 'Create Project', exact: true }).click()
   const dialog = page.getByRole('dialog')
@@ -29,7 +29,7 @@ test('project image survives dialog close, favoriting, archive and restore', asy
   await page.getByRole('alertdialog').getByRole('button', { name: 'Archive Project' }).click()
   await page.getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(page.locator('main img')).toHaveAttribute('src', source!)
-  await page.getByRole('button', { name: 'Restore Image project' }).click()
+  await page.getByRole('button', { name: 'Unarchive Image project', exact: true }).click()
   await page.getByRole('button', { name: 'Projects', exact: true }).click()
   await expect(row.locator('img')).toHaveAttribute('src', source!)
   await expect(favoriteImage).toHaveAttribute('src', source!)

@@ -20,6 +20,11 @@ export interface ThreatScenario {
   technical_notes: string | null
 }
 
+/** POST body: title, owning item and the damage scenarios the threat scenario leads to; the other fields follow on its page. */
+export type ThreatScenarioBody = Pick<ThreatScenario, 'item_definition_id' | 'title'> & {
+  damage_scenario_ids: string[]
+}
+
 /** PATCH body: only the given fields change. */
 export type PatchThreatScenarioBody = Partial<Pick<ThreatScenario, 'title' | 'cause_of_compromise' | 'elicitation_method' | 'technical_notes'>>
 
