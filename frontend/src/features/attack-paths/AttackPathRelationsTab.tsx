@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
+import { exampleProject } from '../../api/mocks/data/headlamp'
 import type { AttackPath } from '../../api/models/attackPath'
 import { useAttackPath, useAttackPathRelations, useItemThreatScenarios, useSetAttackPathThreatLink } from '../../api/queries/items'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
+import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** Relations tab of an attack path ("AP Relations" wireframe): the threat scenarios it realizes. */
 export function AttackPathRelationsTab() {
@@ -42,6 +45,16 @@ function Relations({ projectId, path }: { projectId: string; path: AttackPath })
         onAdd={(id) => link.mutate({ id, linked: true })}
         onRemove={(id) => link.mutate({ id, linked: false })}
         rows={threatScenarios}
+        renderCreateDialog={(dialog) => (
+          <CreateThreatScenarioDialog
+            {...dialog}
+            projectId={projectId}
+            projectName={exampleProject.name}
+            lockedItemId={path.item_definition_id}
+            onCreated={(created) => link.mutateAsync({ id: created.id, linked: true })}
+            onCreatedError={(created) => t('ui:createdLinkError', { code: formatEntityId(created.code) })}
+          />
+        )}
       />
       <p className="text-xs text-muted-foreground">{t('ui:removingALinkDoesNotDeleteTheElement')}</p>
     </div>

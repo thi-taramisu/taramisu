@@ -26,6 +26,7 @@ export function AppHeader({ collapsed, onToggleSidebar }: AppHeaderProps) {
       >
         <Menu />
       </Button>
+      {/* i18n-allow-next-line */}
       <span className="text-xl font-semibold">TARAmisu</span>
       <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-3">
         <LanguageSelector />
