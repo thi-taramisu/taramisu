@@ -71,7 +71,7 @@ describe('create threat scenario', () => {
     expect(await screen.findByRole('heading', { name: 'Forged dimming command, Threat Scenario TS-4' })).toBeInTheDocument()
   })
 
-  it('requires a name and a linked damage scenario', async () => {
+  it('requires a name and creates it without links in "Unassigned" of the item', async () => {
     const { user, api } = renderApp(`${project}/damage-scenarios/ds-01`)
     const dialog = await openDialog(user)
 
@@ -80,10 +80,13 @@ describe('create threat scenario', () => {
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Forged dimming command')
     await user.click(await within(dialog).findByRole('button', { name: `Remove ${DS01}` }))
+    expect(within(dialog).getByText('Will appear in "Unassigned" of the item until it is linked.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Link at least one damage scenario.')
-    expect(await api.content.threatScenarios('headlamp', 'i-01')).toHaveLength(3)
+    expect(await screen.findByRole('heading', { name: /^Forged dimming command, Threat Scenario/ })).toBeInTheDocument()
+    const unassigned = within(await within(tree()).findByRole('list', { name: 'Threat Scenarios in Headlamp system' }))
+    expect(unassigned.getByRole('link', { name: /Forged dimming command/ })).toHaveAttribute('aria-current', 'page')
+    expect(await api.content.threatScenarios('headlamp', 'i-01')).toHaveLength(4)
   })
 
   it('drops the linked damage scenarios when another item is chosen', async () => {

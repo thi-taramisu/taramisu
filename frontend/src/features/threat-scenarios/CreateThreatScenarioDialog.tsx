@@ -22,11 +22,9 @@ export function CreateThreatScenarioDialog(props: CreateLinkedElementDialogProps
           namePlaceholder: t('ui:threatNamePlaceholder'),
           hint: t('ui:threatTreeHint'),
           linksLoading: t('ui:damageScenariosLoading'),
-          linkRequired: t('ui:damageScenarioRequired'),
           createError: t('ui:createThreatError'),
           noItem: t('ui:damageScenariosNoItem'),
           linksLoadError: t('ui:damageScenariosLoadError'),
-          notInTree: (count) => t('ui:damageScenariosNotInTree', { count }),
         },
         create: (itemId, title, linkIds) => createThreatScenario.mutateAsync({ item_definition_id: itemId, title, damage_scenario_ids: linkIds }),
       }}

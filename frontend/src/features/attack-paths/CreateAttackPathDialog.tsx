@@ -22,11 +22,9 @@ export function CreateAttackPathDialog(props: CreateLinkedElementDialogProps<Att
           namePlaceholder: t('ui:attackPathNamePlaceholder'),
           hint: t('ui:attackPathTreeHint'),
           linksLoading: t('ui:threatScenariosLoading'),
-          linkRequired: t('ui:threatScenarioRequired'),
           createError: t('ui:createAttackPathError'),
           noItem: t('ui:threatScenariosNoItem'),
           linksLoadError: t('ui:threatScenariosLoadError'),
-          notInTree: (count) => t('ui:threatScenariosNotInTree', { count }),
         },
         create: (itemId, title, linkIds) => createAttackPath.mutateAsync({ item_definition_id: itemId, title, threat_scenario_ids: linkIds }),
       }}

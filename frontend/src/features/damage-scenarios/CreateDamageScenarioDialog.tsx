@@ -126,7 +126,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
           ? t('ui:damageItemNeededHint')
           : (assets ? linked : links).length > 0
             ? t('ui:damageTreeHint')
-            : t('ui:damageUnassignedHint')
+            : t('ui:unassignedHint')
       }
       errorMessage={
         unfinished
