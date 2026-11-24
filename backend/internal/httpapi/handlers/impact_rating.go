@@ -13,6 +13,9 @@ import (
 )
 
 type ImpactRatingStore interface {
+	Auditor
+	GetImpactRatingForUpdate(context.Context, db.GetImpactRatingForUpdateParams) (db.ImpactRating, error)
+	GetImpactRatingForDelete(context.Context, db.GetImpactRatingForDeleteParams) (db.ImpactRating, error)
 	CreateImpactRating(context.Context, db.CreateImpactRatingParams) (db.ImpactRating, error)
 	GetImpactRating(context.Context, db.GetImpactRatingParams) (db.ImpactRating, error)
 	ListImpactRatings(context.Context, db.ListImpactRatingsParams) ([]db.ImpactRating, error)
@@ -143,14 +146,22 @@ func (h *ImpactRating) Create(ctx context.Context, in *CreateImpactRatingInput) 
 	if err != nil {
 		return nil, err
 	}
-	r, err := h.store.CreateImpactRating(ctx, db.CreateImpactRatingParams{
-		DamageScenarioID:           scenarioID,
-		ItemDefinitionID:           itemID,
-		ImpactCategory:             in.Body.ImpactCategory,
-		RatingValue:                in.Body.RatingValue,
-		IsOmittedByPm1507:          in.Body.IsOmittedByPm1507,
-		OmissionOrRatingRationale:  in.Body.OmissionOrRatingRationale,
-		ReusedFromFunctionalSafety: in.Body.ReusedFromFunctionalSafety,
+	var r db.ImpactRating
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		r, err = h.store.CreateImpactRating(ctx, db.CreateImpactRatingParams{
+			DamageScenarioID:           scenarioID,
+			ItemDefinitionID:           itemID,
+			ImpactCategory:             in.Body.ImpactCategory,
+			RatingValue:                in.Body.RatingValue,
+			IsOmittedByPm1507:          in.Body.IsOmittedByPm1507,
+			OmissionOrRatingRationale:  in.Body.OmissionOrRatingRationale,
+			ReusedFromFunctionalSafety: in.Body.ReusedFromFunctionalSafety,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, toImpactRatingBody(r)), nil
 	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
@@ -198,15 +209,26 @@ func (h *ImpactRating) Replace(ctx context.Context, in *ReplaceImpactRatingInput
 	if err != nil {
 		return nil, err
 	}
-	r, err := h.store.ReplaceImpactRating(ctx, db.ReplaceImpactRatingParams{
-		ID:                         ids.id,
-		DamageScenarioID:           ids.damageScenarioID,
-		ItemDefinitionID:           ids.itemID,
-		ImpactCategory:             in.Body.ImpactCategory,
-		RatingValue:                in.Body.RatingValue,
-		IsOmittedByPm1507:          in.Body.IsOmittedByPm1507,
-		OmissionOrRatingRationale:  in.Body.OmissionOrRatingRationale,
-		ReusedFromFunctionalSafety: in.Body.ReusedFromFunctionalSafety,
+	var r db.ImpactRating
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetImpactRatingForUpdate(ctx, db.GetImpactRatingForUpdateParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		r, err = h.store.ReplaceImpactRating(ctx, db.ReplaceImpactRatingParams{
+			ID:                         ids.id,
+			DamageScenarioID:           ids.damageScenarioID,
+			ItemDefinitionID:           ids.itemID,
+			ImpactCategory:             in.Body.ImpactCategory,
+			RatingValue:                in.Body.RatingValue,
+			IsOmittedByPm1507:          in.Body.IsOmittedByPm1507,
+			OmissionOrRatingRationale:  in.Body.OmissionOrRatingRationale,
+			ReusedFromFunctionalSafety: in.Body.ReusedFromFunctionalSafety,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, toImpactRatingBody(before), toImpactRatingBody(r)), nil
 	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
@@ -219,16 +241,27 @@ func (h *ImpactRating) Update(ctx context.Context, in *UpdateImpactRatingInput) 
 	if err != nil {
 		return nil, err
 	}
-	r, err := h.store.UpdateImpactRating(ctx, db.UpdateImpactRatingParams{
-		ID:                           ids.id,
-		DamageScenarioID:             ids.damageScenarioID,
-		ItemDefinitionID:             ids.itemID,
-		ImpactCategory:               in.Body.ImpactCategory,
-		RatingValue:                  in.Body.RatingValue,
-		IsOmittedByPm1507:            in.Body.IsOmittedByPm1507,
-		SetOmissionOrRatingRationale: in.Body.OmissionOrRatingRationale.Set,
-		OmissionOrRatingRationale:    in.Body.OmissionOrRatingRationale.Value,
-		ReusedFromFunctionalSafety:   in.Body.ReusedFromFunctionalSafety,
+	var r db.ImpactRating
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetImpactRatingForUpdate(ctx, db.GetImpactRatingForUpdateParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		r, err = h.store.UpdateImpactRating(ctx, db.UpdateImpactRatingParams{
+			ID:                           ids.id,
+			DamageScenarioID:             ids.damageScenarioID,
+			ItemDefinitionID:             ids.itemID,
+			ImpactCategory:               in.Body.ImpactCategory,
+			RatingValue:                  in.Body.RatingValue,
+			IsOmittedByPm1507:            in.Body.IsOmittedByPm1507,
+			SetOmissionOrRatingRationale: in.Body.OmissionOrRatingRationale.Set,
+			OmissionOrRatingRationale:    in.Body.OmissionOrRatingRationale.Value,
+			ReusedFromFunctionalSafety:   in.Body.ReusedFromFunctionalSafety,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetImpactRating, projectIDFromContext(ctx), r.ID, toImpactRatingBody(before), toImpactRatingBody(r)), nil
 	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
@@ -241,12 +274,22 @@ func (h *ImpactRating) Delete(ctx context.Context, in *ImpactRatingIDInput) (*st
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteImpactRating(ctx, db.DeleteImpactRatingParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetImpactRatingForDelete(ctx, db.GetImpactRatingForDeleteParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteImpactRating(ctx, db.DeleteImpactRatingParams{ID: ids.id, DamageScenarioID: ids.damageScenarioID, ItemDefinitionID: ids.itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetImpactRating, projectIDFromContext(ctx), before.ID, toImpactRatingBody(before)), nil
+	})
 	if err != nil {
 		return nil, mapImpactRatingError(err)
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("impact rating not found")
 	}
 	return nil, nil
 }

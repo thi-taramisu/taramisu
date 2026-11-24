@@ -2,6 +2,8 @@
 
 New issues are summarized at **09:00 and 19:00 Europe/Berlin** (CET/CEST, adjusting for daylight saving) using their current labels.
 Empty channels stay silent; digests include titles and links without pings.
+The first message in each active channel also lists up to eight open, approved PRs with matching labels,
+with a link to the full list when more qualify.
 The initial lookback is 24 hours; later runs catch up from the last delivery.
 Labels added after an issue has been processed do not send another entry.
 

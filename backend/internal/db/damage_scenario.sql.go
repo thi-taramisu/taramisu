@@ -82,6 +82,52 @@ func (q *Queries) GetDamageScenario(ctx context.Context, arg GetDamageScenarioPa
 	return i, err
 }
 
+const getDamageScenarioForDelete = `-- name: GetDamageScenarioForDelete :one
+SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE
+`
+
+type GetDamageScenarioForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetDamageScenarioForDelete(ctx context.Context, arg GetDamageScenarioForDeleteParams) (DamageScenario, error) {
+	row := q.db.QueryRow(ctx, getDamageScenarioForDelete, arg.ID, arg.ItemDefinitionID)
+	var i DamageScenario
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Title,
+		&i.FunctionalityAdverseRelation,
+		&i.RoadUserHarmDescription,
+	)
+	return i, err
+}
+
+const getDamageScenarioForUpdate = `-- name: GetDamageScenarioForUpdate :one
+SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE
+`
+
+type GetDamageScenarioForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetDamageScenarioForUpdate(ctx context.Context, arg GetDamageScenarioForUpdateParams) (DamageScenario, error) {
+	row := q.db.QueryRow(ctx, getDamageScenarioForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i DamageScenario
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Title,
+		&i.FunctionalityAdverseRelation,
+		&i.RoadUserHarmDescription,
+	)
+	return i, err
+}
+
 const listDamageScenarios = `-- name: ListDamageScenarios :many
 SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario
 WHERE item_definition_id = $1

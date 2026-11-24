@@ -346,3 +346,19 @@ func TestRiskProjectPermissions(t *testing.T) {
 		})
 	}
 }
+
+func (f *riskFake) GetRiskValueForUpdate(ctx context.Context, p db.GetRiskValueForUpdateParams) (db.RiskValue, error) {
+	return f.GetRiskValue(ctx, db.GetRiskValueParams(p))
+}
+
+func (f *riskFake) GetRiskValueForDelete(ctx context.Context, p db.GetRiskValueForDeleteParams) (db.RiskValue, error) {
+	return f.GetRiskValue(ctx, db.GetRiskValueParams(p))
+}
+
+func (f *riskFake) GetRiskTreatmentDecisionForUpdate(ctx context.Context, p db.GetRiskTreatmentDecisionForUpdateParams) (db.RiskTreatmentDecision, error) {
+	return f.GetRiskTreatmentDecision(ctx, db.GetRiskTreatmentDecisionParams(p))
+}
+
+func (f *riskFake) GetRiskTreatmentDecisionForDelete(ctx context.Context, p db.GetRiskTreatmentDecisionForDeleteParams) (db.RiskTreatmentDecision, error) {
+	return f.GetRiskTreatmentDecision(ctx, db.GetRiskTreatmentDecisionParams(p))
+}

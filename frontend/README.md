@@ -35,8 +35,8 @@ src/
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
-  features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
+  features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
@@ -171,3 +171,16 @@ Successful damage scenario and impact rating saves update the query cache immedi
 related views in the background. A failed refresh keeps the saved data. Logout or an account change
 cancels pending project queries and clears project and analysis data from the cache; token refresh
 preserves it.
+
+## Localization checks
+
+Run `npm run check:localization` from `frontend/`. Frontend PR lint runs the same command.
+The English and German resources in the registered common and UI namespaces must have matching keys,
+nonempty string translations and matching interpolation expressions. The check reports unknown literal
+keys in `t(...)` and `i18n.t(...)`, including conditional branches and plural keys. Reviewers should
+verify computed keys, variable-based lookups and translation quality.
+
+Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
+Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
+The exception applies only to hardcoded text on that line.
