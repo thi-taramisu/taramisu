@@ -154,12 +154,12 @@ func (s *assetStore) UpdateAsset(context.Context, db.UpdateAssetParams) (db.Asse
 func TestAssetAuthorization(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, route := range []struct {
-		method, path string
-		status       int
+		method, path  string
+		status, calls int
 	}{
-		{"GET", assetCollection, 200}, {"GET", assetPath, 200},
-		{"POST", assetCollection, 201}, {"PUT", assetPath, 200},
-		{"PATCH", assetPath, 200}, {"DELETE", assetPath, 204},
+		{"GET", assetCollection, 200, 1}, {"GET", assetPath, 200, 1},
+		{"POST", assetCollection, 201, 1}, {"PUT", assetPath, 200, 2},
+		{"PATCH", assetPath, 200, 2}, {"DELETE", assetPath, 204, 2},
 	} {
 		for _, access := range []struct {
 			name   string
@@ -184,7 +184,7 @@ func TestAssetAuthorization(t *testing.T) {
 				r := assetRequest(t, httpapi.New(s, manager), access.token, route.method, route.path, strings.NewReader(assetJSON))
 				calls := 0
 				if want < 400 {
-					calls = 1
+					calls = route.calls
 				}
 				if r.Code != want || s.calls != calls {
 					t.Fatalf("got %d, want %d; calls %d, want %d: %s", r.Code, want, s.calls, calls, r.Body)
@@ -192,4 +192,12 @@ func TestAssetAuthorization(t *testing.T) {
 			})
 		}
 	}
+}
+
+func (f *assetStore) GetAssetForUpdate(ctx context.Context, p db.GetAssetForUpdateParams) (db.Asset, error) {
+	return f.GetAsset(ctx, db.GetAssetParams(p))
+}
+
+func (f *assetStore) GetAssetForDelete(ctx context.Context, p db.GetAssetForDeleteParams) (db.Asset, error) {
+	return f.GetAsset(ctx, db.GetAssetParams(p))
 }

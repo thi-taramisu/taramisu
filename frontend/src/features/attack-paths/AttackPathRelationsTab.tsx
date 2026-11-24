@@ -1,7 +1,7 @@
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import type { AttackPath } from '../../api/models/attackPath'
 import { useAttackPath, useAttackPathRelations, useItemThreatScenarios, useSetAttackPathThreatLink } from '../../api/queries/items'
-import { LINK_SAVE_ERROR } from '../relations/messages'
 import { RelationSection } from '../relations/RelationSection'
 import { RelationsQueryStatus } from '../relations/RelationsQueryStatus'
 
@@ -15,6 +15,7 @@ export function AttackPathRelationsTab() {
 }
 
 function Relations({ projectId, path }: { projectId: string; path: AttackPath }) {
+  const { t } = useTranslation()
   const relations = useAttackPathRelations(projectId, path.id)
   // Links stay within the item that owns the attack path.
   const itemThreats = useItemThreatScenarios(projectId, path.item_definition_id)
@@ -30,18 +31,19 @@ function Relations({ projectId, path }: { projectId: string; path: AttackPath })
         projectId={projectId}
         type="threat-scenarios"
         direction="up"
-        title="Threat Scenarios"
-        elementLabel="Threat Scenario"
+        title={t('ui:relationThreatsTitle')}
+        pluralLabel={t('ui:relationThreatsPlural')}
+        elementLabel={t('entities.threat-scenarios')}
         candidates={itemThreats.data?.filter((threat) => !threatScenarios.some((linked) => linked.id === threat.id)) ?? []}
         candidatesLoading={itemThreats.isPending}
-        candidatesError={itemThreats.isLoadingError ? 'The threat scenarios of this item could not be loaded.' : undefined}
+        candidatesError={itemThreats.isLoadingError ? t('ui:loadItemThreatsError') : undefined}
         pending={link.isPending}
-        error={link.isError ? LINK_SAVE_ERROR : undefined}
+        error={link.isError ? t('ui:saveRelationError') : undefined}
         onAdd={(id) => link.mutate({ id, linked: true })}
         onRemove={(id) => link.mutate({ id, linked: false })}
         rows={threatScenarios}
       />
-      <p className="text-xs text-muted-foreground">Removing a link does not delete the element.</p>
+      <p className="text-xs text-muted-foreground">{t('ui:removingALinkDoesNotDeleteTheElement')}</p>
     </div>
   )
 }

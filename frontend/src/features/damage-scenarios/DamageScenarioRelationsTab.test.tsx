@@ -172,7 +172,7 @@ describe('damage scenario relations', () => {
     await remove(user, 'Assets', A01)
 
     expect(await section('Assets').findByText('No assets linked yet.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario DS-1' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })).toBeInTheDocument()
     await waitFor(() => expect(within(tree()).queryByRole('link', { name: /DS-1/ })).not.toBeInTheDocument())
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({ code: 'DS-1' })
   })

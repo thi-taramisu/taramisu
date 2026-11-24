@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { entityPath, entityTitle } from './entities'
 import { FiletreeLink } from './FiletreeLink'
+import { useTranslation } from 'react-i18next'
 
 const icons = {
   items: Folder,
@@ -32,6 +33,7 @@ interface BranchProps {
 }
 
 function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: BranchProps) {
+  const { t } = useTranslation()
   const [branch, setBranch] = useState({ selectedPath, expanded: true })
   const hasChildren = Boolean(node.children?.length)
   const Icon = icons[node.type]
@@ -52,7 +54,7 @@ function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: Br
                 variant="ghost"
                 size="icon-xs"
                 className="size-6 rounded-md"
-                aria-label={`${expanded ? 'Collapse' : 'Expand'} ${entityTitle(node)}`}
+                aria-label={t(expanded ? 'navigation.collapseElement' : 'navigation.expandElement', { name: entityTitle(node) })}
                 onKeyDown={onKeyDown}
               >
                 <ChevronRight aria-hidden="true" className={`size-3.5 transition-transform motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`} />
@@ -77,6 +79,7 @@ function FiletreeBranch({ node, projectId, selectedPath, search, onKeyDown }: Br
 
 /** Disclosure navigation: native Tab/Enter/Space, with optional arrow-key navigation. */
 export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; projectId: string }) {
+  const { t } = useTranslation()
   const { pathname, search } = useLocation()
   const selectedPath = matchPath('/projects/:projectId/:type/:entityId/*', pathname)?.pathnameBase ?? pathname
   const root = useRef<HTMLUListElement>(null)
@@ -116,7 +119,7 @@ export function Filetree({ nodes, projectId }: { nodes: readonly TreeNode[]; pro
     target?.focus()
   }
 
-  if (nodes.length === 0) return <p className="px-2 py-3 text-sm text-muted-foreground">No project elements yet.</p>
+  if (nodes.length === 0) return <p className="px-2 py-3 text-sm text-muted-foreground">{t('ui:noElements')}</p>
 
   return (
     <ul ref={root} className="space-y-[3px]">

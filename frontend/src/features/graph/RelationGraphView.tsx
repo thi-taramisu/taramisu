@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { MarkerType, type Edge, type XYPosition } from '@xyflow/react'
@@ -5,7 +6,7 @@ import { ArrowRight, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { ENTITY_TYPES, entityPath } from '../workspace/entities'
+import { entityPath } from '../workspace/entities'
 import { elementKey, graphNeighborhood, type GraphElement } from './graphModel'
 import type { RelationNode } from './GraphNode'
 import { GraphCanvas } from './GraphCanvas'
@@ -16,6 +17,7 @@ import '@xyflow/react/dist/style.css'
 
 /** Local graph prototype: the query string carries focus and display mode through tree navigation. */
 export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const minimal = params.get('graphMode') === 'minimal'
@@ -29,15 +31,15 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
   if (!graph.data) {
     if (graph.isError) return (
       <div role="alert" className="grid justify-items-start gap-3 rounded-lg border p-6">
-        <p>The graph could not be loaded. Relations may be incomplete.</p>
-        <Button variant="outline" onClick={() => void graph.refetch()}>Retry</Button>
+        <p>{t('ui:theGraphCouldNotBeLoadedRelationsMayBeIncomplete')}</p>
+        <Button variant="outline" onClick={() => void graph.refetch()}>{t('ui:retry')}</Button>
       </div>
     )
-    return <output>Loading graph…</output>
+    return <output>{t('ui:loadingGraph')}</output>
   }
   const visible = graphNeighborhood(graph.data, focus)
   const active = visible.elements.find((element) => element.key === focus)
-  if (!active) return <p className="rounded-lg border border-dashed p-6 text-muted-foreground">No graph data for this element.</p>
+  if (!active) return <p className="rounded-lg border border-dashed p-6 text-muted-foreground">{t('ui:noGraphDataForThisElement')}</p>
 
   const connected = visible.elements.filter((element) => element.key !== focus)
   // Match the threat-centered wireframe; other elements keep parents left and consequences right.
@@ -75,7 +77,7 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
       sourceHandle: vertical ? (start.y < end.y ? 'bottom' : 'top') : (start.x < end.x ? 'right' : 'left'),
       targetHandle: vertical ? (start.y < end.y ? 'top' : 'bottom') : (start.x < end.x ? 'left' : 'right'),
       type: 'smoothstep',
-      label: riskText(relation.risk),
+      label: riskText(t, relation.risk),
       style: { stroke: color, strokeWidth: 2, strokeDasharray: relation.risk === null ? '5 5' : undefined },
       labelStyle: { fill: 'var(--foreground)', fontSize: 10 },
       labelBgStyle: { fill: 'var(--background)' },
@@ -94,12 +96,12 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
   }
 
   return (
-    <section aria-label="Relation graph" className="flex min-h-[600px] flex-1 flex-col overflow-hidden rounded-xl border bg-background">
+    <section aria-label={t('ui:relationGraph')} className="flex min-h-[600px] flex-1 flex-col overflow-hidden rounded-xl border bg-background">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold">Relations</span>
+          <span className="text-sm font-semibold">{t('navigation.tabs.relations')}</span>
           <span className={`rounded-full border px-2 py-0.5 text-xs ${riskClasses[active.risk ?? 0] ?? 'text-muted-foreground'}`}>
-            {riskText(active.risk)}{active.risk !== null && ' · highest related'}
+            {riskText(t, active.risk)}{active.risk !== null && t('ui:highestRelated')}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -109,11 +111,11 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
             else next.delete('graphMode')
             setParams(next, { replace: true })
           }} />
-          <Label htmlFor="graph-minimal">Minimal view</Label>
-          <Button variant="ghost" size="sm" aria-label="Reset graph layout" onClick={() => {
+          <Label htmlFor="graph-minimal">{t('ui:minimalView')}</Label>
+          <Button variant="ghost" size="sm" aria-label={t('ui:resetGraphLayout')} onClick={() => {
             setLayouts((previous) => ({ ...previous, [layoutKey]: {} }))
             setResetVersion((value) => value + 1)
-          }}><RotateCcw aria-hidden="true" />Reset layout</Button>
+          }}><RotateCcw aria-hidden="true" />{t('ui:resetLayout')}</Button>
         </div>
       </div>
       <div className="relative min-h-[480px] flex-1" style={{ height: 'min(65vh, 720px)' }}>
@@ -128,35 +130,35 @@ export function RelationGraphView({ type }: { type: GraphElement['type'] }) {
           onClearSelection={() => setSelected(null)}
         />
         {inspected && (
-          <aside aria-label="Selected graph element" className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100%-1.5rem)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl">
+          <aside aria-label={t('ui:selectedGraphElement')} className="absolute top-3 right-3 z-10 w-72 max-w-[calc(100%-1.5rem)] rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{ENTITY_TYPES[inspected.type].label} · {formatEntityId(inspected.code)}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t(`entities.${inspected.type}`)} · {formatEntityId(inspected.code)}</p>
                 <h2 className="mt-1 text-sm font-semibold">{inspected.name}</h2>
               </div>
-              <Button variant="ghost" size="icon-xs" aria-label="Close element details" onClick={() => setSelected(null)}><X aria-hidden="true" /></Button>
+              <Button variant="ghost" size="icon-xs" aria-label={t('ui:closeElementDetails')} onClick={() => setSelected(null)}><X aria-hidden="true" /></Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{riskText(inspected.risk)}{inspected.risk !== null && ' · highest related risk'}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{riskText(t, inspected.risk)}{inspected.risk !== null && t('ui:highestRelatedRisk')}</p>
             <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" asChild><Link to={destination(inspected, true)}>Edit</Link></Button>
-              <Button size="sm" asChild><Link to={destination(inspected)}>Jump to <ArrowRight aria-hidden="true" /></Link></Button>
+              <Button variant="outline" size="sm" asChild><Link to={destination(inspected, true)}>{t('ui:edit')}</Link></Button>
+              <Button size="sm" asChild><Link to={destination(inspected)}>{t('ui:jumpTo')} <ArrowRight aria-hidden="true" /></Link></Button>
             </div>
-            <p className="mt-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Related to</p>
+            <p className="mt-4 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{t('ui:relatedTo')}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {related.map((element) => (
                 <Link key={element.key} to={destination(element)} className="rounded-full border bg-muted px-2 py-1 text-xs hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring" title={element.name}>
                   {formatEntityId(element.code) ?? element.name}
                 </Link>
               ))}
-              {related.length === 0 && <span className="text-xs text-muted-foreground">No linked elements.</span>}
+              {related.length === 0 && <span className="text-xs text-muted-foreground">{t('ui:noLinkedElementsText')}</span>}
             </div>
           </aside>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-3 text-[11px] text-muted-foreground">
-        <span>Mock data · Drag nodes to arrange · Click for details</span>
-        {[1, 2, 3, 4, 5].map((risk) => <span key={risk} className="flex items-center gap-1"><span className={`size-2.5 rounded-full border ${riskClasses[risk]}`} />Risk {risk}</span>)}
-        <span>Dashed = not rated</span>
+        <span>{t('ui:mockDataDragNodesToArrangeClickForDetails')}</span>
+        {[1, 2, 3, 4, 5].map((risk) => <span key={risk} className="flex items-center gap-1"><span className={`size-2.5 rounded-full border ${riskClasses[risk]}`} />{t('ui:risk')} {risk}</span>)}
+        <span>{t('ui:dashedNotRated')}</span>
       </div>
     </section>
   )

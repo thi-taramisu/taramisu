@@ -410,6 +410,20 @@ func TestAuditContentPostgres(t *testing.T) {
 		t.Fatalf("audit history:\n got %+v\nwant %+v", got, want)
 	}
 
+	auditItem := call("setup-audit-item", http.MethodPost, items, `{"name":"Audit fixture","scope_type":"ITEM"}`, http.StatusCreated)
+	covered := map[string]bool{}
+	content := resourceAuditFixture{
+		t: t, ctx: ctx, pool: pool, serve: serve, handler: handler,
+		failing: httpapi.New(rejectAuditInsert{store}, fixture.Manager),
+		project: projectID, actor: userID, rollbackOperations: covered,
+	}
+	auditItemID := auditItem["id"].(string)
+	content.exerciseAssetAudit(auditItemID)
+	content.exerciseDamageAudit(auditItemID)
+	content.exerciseAttackAudit(auditItemID)
+	content.exerciseRiskAudit(auditItemID)
+	call("teardown-audit-item", http.MethodDelete, items+"/"+auditItemID, "", http.StatusNoContent)
+
 	// Every operation declared as audited writes an event.
 	members := projectPath + "/members"
 	team := call("add-project-member", http.MethodPost, members, `{"group_id":"`+teamGroupID+`","role":"VIEWER"}`, http.StatusCreated)
@@ -448,7 +462,6 @@ func TestAuditContentPostgres(t *testing.T) {
 	// Membership changes and project deletion run in db.Store methods, not through handlers.Auditor,
 	// so the wrapper cannot reach them; TestAuditHistoryPostgres covers their rejected changes.
 	storeMethods := map[string]bool{"add-project-member": true, "update-project-member": true, "remove-project-member": true, "delete-tara-project": true}
-	covered := map[string]bool{}
 	for _, r := range rollbacks {
 		// The 500 must come from the injected failure after the change, not from an earlier error.
 		logged := captureLog(t, "unexpected error", func() {

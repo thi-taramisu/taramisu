@@ -81,6 +81,52 @@ func (q *Queries) GetAsset(ctx context.Context, arg GetAssetParams) (Asset, erro
 	return i, err
 }
 
+const getAssetForDelete = `-- name: GetAssetForDelete :one
+SELECT id, item_definition_id, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE
+`
+
+type GetAssetForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetForDelete(ctx context.Context, arg GetAssetForDeleteParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, getAssetForDelete, arg.ID, arg.ItemDefinitionID)
+	var i Asset
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Name,
+		&i.Description,
+		&i.IdentificationSource,
+	)
+	return i, err
+}
+
+const getAssetForUpdate = `-- name: GetAssetForUpdate :one
+SELECT id, item_definition_id, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE
+`
+
+type GetAssetForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetForUpdate(ctx context.Context, arg GetAssetForUpdateParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, getAssetForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i Asset
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.Name,
+		&i.Description,
+		&i.IdentificationSource,
+	)
+	return i, err
+}
+
 const listAssets = `-- name: ListAssets :many
 SELECT id, item_definition_id, name, description, identification_source FROM asset
 WHERE item_definition_id = $1

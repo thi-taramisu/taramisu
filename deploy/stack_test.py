@@ -135,7 +135,7 @@ def _run(
 
 def run_compose(*args: str, check: bool = True, new_session: bool = False) -> subprocess.CompletedProcess[str]:
     files = [arg for path in COMPOSE_FILES for arg in ("-f", str(path))]
-    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), *files, *args]
+    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), "--env-file", str(REPO_ROOT / "storage" / ".env"), *files, *args]
     return _run(cmd, check, COMPOSE_TIMEOUT, new_session)
 
 

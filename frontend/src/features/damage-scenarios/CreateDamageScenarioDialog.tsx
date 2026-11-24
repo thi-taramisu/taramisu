@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { matchPath, useLocation } from 'react-router-dom'
@@ -50,6 +51,7 @@ interface CreateDamageScenarioDialogProps {
  * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
+  const { t } = useTranslation()
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
@@ -58,7 +60,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const [chosenLinks, setChosenLinks] = useState<AssetLink[]>()
   const itemId = lockedItemId ?? chosenItemId ?? defaults.itemId
   const links = chosenLinks ?? defaults.links
-  const [linkError, setLinkError] = useState<string>()
+  const [linkError, setLinkError] = useState<{ key: string; code?: string }>()
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
@@ -90,16 +92,16 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
     if (unfinished) return finish(unfinished)
     // The links only count once the assets are there, so "Link at least one asset" would be wrong.
     if (!assets) {
-      setLinkError('The assets are still loading.')
+      setLinkError({ key: 'ui:assetsLoading' })
       return undefined
     }
     if (linked.length === 0) {
-      setLinkError('Link at least one asset.')
+      setLinkError({ key: 'ui:assetRequired' })
       return undefined
     }
     const empty = linked.find((link) => link.properties.length === 0)
     if (empty) {
-      setLinkError(`Select at least one property of ${formatEntityId(empty.asset.code)}.`)
+      setLinkError({ key: 'ui:propertyRequired', code: formatEntityId(empty.asset.code) })
       return undefined
     }
     const scenario = await createDamageScenario.mutateAsync({
@@ -112,18 +114,18 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
 
   return (
     <CreateElementDialog
-      title="New Damage Scenario"
-      description={`in project ${projectName} · description and impact follow on the damage scenario page`}
+      title={t('ui:newDamageScenario')}
+      description={t('ui:damageContext', { name: projectName })}
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
       initialName={initialName}
-      namePlaceholder="e.g. Loss of cell balancing"
-      hint="Will appear in the tree below each linked asset."
+      namePlaceholder={t('ui:damageNamePlaceholder')}
+      hint={t('ui:damageTreeHint')}
       errorMessage={
         unfinished
-          ? (onCreatedError?.(unfinished) ?? `${formatEntityId(unfinished.code)} was created, but the next step failed. Please try again.`)
-          : 'The damage scenario could not be created. Please try again.'
+          ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
+          : t('ui:createDamageError')
       }
       locked={Boolean(unfinished)}
       onCreate={create}
@@ -134,7 +136,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       }}
     >
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-item`}>Item</Label>
+        <Label htmlFor={`${id}-item`}>{t('entities.items')}</Label>
         <NativeSelect
           id={`${id}-item`}
           value={itemId}
@@ -154,7 +156,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
         </NativeSelect>
       </div>
       <fieldset className="grid gap-2 border-t pt-4" aria-describedby={linkError ? `${id}-link-error` : undefined}>
-        <legend className="mb-2 text-sm font-medium">Link to</legend>
+        <legend className="mb-2 text-sm font-medium">{t('ui:linkTo')}</legend>
         {linked.length > 0 && (
           <ul className="grid justify-items-start gap-2">
             {linked.map(({ asset, properties }) => (
@@ -174,7 +176,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
         />
         {linkError && (
           <p id={`${id}-link-error`} role="alert" className="text-sm text-destructive">
-            {linkError}
+            {t(linkError.key, { code: linkError.code })}
           </p>
         )}
       </fieldset>
@@ -191,13 +193,14 @@ interface AssetLinkChipProps {
 
 /** Linked asset as in the wireframe, with its C / I / A properties to link (DS Relation wireframe). */
 function AssetLinkChip({ asset, properties, onChange, onRemove }: AssetLinkChipProps) {
+  const { t } = useTranslation()
   return (
     <li className="flex items-center gap-3 rounded-full border bg-muted/50 py-1 pr-1 pl-3 text-sm">
       <span>
         <span className="font-mono text-xs text-muted-foreground">{formatEntityId(asset.code)}</span> {asset.name}
       </span>
       <AssetPropertyToggles asset={asset} selected={properties} onChange={onChange} />
-      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`Remove ${formatEntityId(asset.code)} ${asset.name}`} onClick={onRemove}>
+      <Button type="button" variant="ghost" size="icon-xs" className="rounded-full" aria-label={`${t('ui:remove')} ${formatEntityId(asset.code)} ${asset.name}`} onClick={onRemove}>
         <X aria-hidden="true" />
       </Button>
     </li>

@@ -10,6 +10,7 @@ entries:
       domain: authentik-default
       default: true
     attrs:
+      flow_authentication: null
       branding_title: Taramisu
       branding_logo: /static/dist/assets/icons/blank.svg
       branding_favicon: /static/dist/assets/icons/blank.svg
@@ -29,7 +30,12 @@ entries:
           font-family: var(--pf-global--FontFamily--text);
         }
         ak-flow-executor::part(branding),
-        ak-flow-executor::part(footer) {
+        ak-flow-executor::part(footer),
+        ak-flow-executor::part(locale-select) {
+          display: none;
+        }
+        /* The flow heading already identifies Taramisu; omit the redundant application hint. */
+        :host(ak-stage-identification) form.pf-c-form > p:first-child {
           display: none;
         }
         ak-flow-executor::part(login) {

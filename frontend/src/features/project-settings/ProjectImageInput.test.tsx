@@ -17,6 +17,14 @@ describe('ProjectImageInput', () => {
     vi.restoreAllMocks()
   })
 
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', '/image.png"><img src=x onerror=alert(1)>'])(
+    'does not render an unsafe image source: %s',
+    (source) => {
+      render(<ProjectImageInput defaultValue={source} />)
+      expect(screen.queryByAltText('Preview')).not.toBeInTheDocument()
+    },
+  )
+
   it('submits the removal of the saved image', async () => {
     const user = userEvent.setup()
     const removeImage = renderWithSavedImage()

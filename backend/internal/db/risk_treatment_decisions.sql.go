@@ -91,6 +91,58 @@ func (q *Queries) GetRiskTreatmentDecision(ctx context.Context, arg GetRiskTreat
 	return i, err
 }
 
+const getRiskTreatmentDecisionForDelete = `-- name: GetRiskTreatmentDecisionForDelete :one
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+WHERE risk_treatment_decision.threat_scenario_id = $1
+  AND risk_treatment_decision.id = $2
+FOR UPDATE
+`
+
+type GetRiskTreatmentDecisionForDeleteParams struct {
+	ThreatScenarioID pgtype.UUID
+	ID               pgtype.UUID
+}
+
+func (q *Queries) GetRiskTreatmentDecisionForDelete(ctx context.Context, arg GetRiskTreatmentDecisionForDeleteParams) (RiskTreatmentDecision, error) {
+	row := q.db.QueryRow(ctx, getRiskTreatmentDecisionForDelete, arg.ThreatScenarioID, arg.ID)
+	var i RiskTreatmentDecision
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.RiskValueID,
+		&i.TreatmentOption,
+		&i.DecisionRationale,
+		&i.IsCybersecurityClaim,
+	)
+	return i, err
+}
+
+const getRiskTreatmentDecisionForUpdate = `-- name: GetRiskTreatmentDecisionForUpdate :one
+SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
+WHERE risk_treatment_decision.threat_scenario_id = $1
+  AND risk_treatment_decision.id = $2
+FOR NO KEY UPDATE
+`
+
+type GetRiskTreatmentDecisionForUpdateParams struct {
+	ThreatScenarioID pgtype.UUID
+	ID               pgtype.UUID
+}
+
+func (q *Queries) GetRiskTreatmentDecisionForUpdate(ctx context.Context, arg GetRiskTreatmentDecisionForUpdateParams) (RiskTreatmentDecision, error) {
+	row := q.db.QueryRow(ctx, getRiskTreatmentDecisionForUpdate, arg.ThreatScenarioID, arg.ID)
+	var i RiskTreatmentDecision
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.RiskValueID,
+		&i.TreatmentOption,
+		&i.DecisionRationale,
+		&i.IsCybersecurityClaim,
+	)
+	return i, err
+}
+
 const listRiskTreatmentDecisions = `-- name: ListRiskTreatmentDecisions :many
 SELECT id, threat_scenario_id, risk_value_id, treatment_option, decision_rationale, is_cybersecurity_claim FROM risk_treatment_decision
 WHERE risk_treatment_decision.threat_scenario_id = $1

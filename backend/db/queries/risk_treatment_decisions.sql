@@ -44,3 +44,15 @@ RETURNING *;
 DELETE FROM risk_treatment_decision WHERE risk_treatment_decision.threat_scenario_id = sqlc.arg(threat_scenario_id)
   AND risk_treatment_decision.id = sqlc.arg(id)
 RETURNING id;
+
+-- name: GetRiskTreatmentDecisionForUpdate :one
+SELECT * FROM risk_treatment_decision
+WHERE risk_treatment_decision.threat_scenario_id = sqlc.arg(threat_scenario_id)
+  AND risk_treatment_decision.id = sqlc.arg(id)
+FOR NO KEY UPDATE;
+
+-- name: GetRiskTreatmentDecisionForDelete :one
+SELECT * FROM risk_treatment_decision
+WHERE risk_treatment_decision.threat_scenario_id = sqlc.arg(threat_scenario_id)
+  AND risk_treatment_decision.id = sqlc.arg(id)
+FOR UPDATE;
