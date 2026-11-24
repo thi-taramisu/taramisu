@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -5,20 +6,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
 import { useSetThreatTargets, useThreatScenario, useThreatScenarioRelations, useUpdateThreatScenario } from '../../api/queries/items'
+import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
 import { hasSameTargets } from './targetSelection'
 import { ThreatTargetsField } from './ThreatTargetsField'
 
-const ELICITATION_METHODS: { value: ElicitationMethod; label: string }[] = [
-  { value: 'GROUP_DISCUSSION', label: 'Group Discussion' },
-  { value: 'MALICIOUS_USE_CASE', label: 'Malicious Use Case' },
-  { value: 'EVITA', label: 'EVITA' },
-  { value: 'TVRA', label: 'TVRA' },
-  { value: 'PASTA', label: 'PASTA' },
-  { value: 'STRIDE', label: 'STRIDE' },
-  { value: 'OTHER', label: 'Other' },
+const ELICITATION_METHODS: ElicitationMethod[] = [
+  'GROUP_DISCUSSION', 'MALICIOUS_USE_CASE', 'EVITA', 'TVRA', 'PASTA', 'STRIDE', 'OTHER',
 ]
 
 interface FormValues {
@@ -43,15 +40,16 @@ function toValues(scenario: ThreatScenario): FormValues {
 
 /** Definition tab of a threat scenario ("TS Definition" wireframe): the fields of the data model and the targets, saved together. */
 export function ThreatScenarioDefinitionTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: scenario } = useThreatScenario(projectId, entityId)
   const relations = useThreatScenarioRelations(projectId, entityId)
   if (!scenario) return null
   if (!relations.data) {
     return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The targets could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:loadTargetsError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading targets…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingTargets')}</output>
     )
   }
   // Remount on threat scenario change so the form starts from the saved values.
@@ -59,6 +57,7 @@ export function ThreatScenarioDefinitionTab() {
 }
 
 function DefinitionForm({ projectId, scenario, relations }: { projectId: string; scenario: ThreatScenario; relations: ThreatScenarioRelations }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(scenario))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
@@ -72,6 +71,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
   const [titleError, setTitleError] = useState<string>()
   const updateScenario = useUpdateThreatScenario(projectId, scenario.id)
   const saveTargets = useSetThreatTargets(projectId, scenario.id)
+  const { canEdit } = useProjectAccess(projectId)
   const [status, setStatus] = useState<SaveStatus>('idle')
   // Set once the fields are saved, so a failure of the targets after them does not say nothing was saved.
   const [fieldsSaved, setFieldsSaved] = useState(false)
@@ -90,9 +90,14 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (!targetsDirty) setTargets(relations.targets)
   }
 
+  // Keeps Save disabled while a request runs.
+  function keepPending() {
+    setStatus((prev) => (prev === 'pending' ? prev : 'idle'))
+  }
+
   function change(next: Partial<FormValues>) {
     setValues((prev) => ({ ...prev, ...next }))
-    setStatus('idle')
+    keepPending()
     if ('title' in next) setTitleError(undefined)
   }
 
@@ -101,7 +106,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     event.preventDefault()
     const title = values.title.trim()
     if (!title) {
-      setTitleError('Name is required.')
+      setTitleError('ui:nameRequired')
       return
     }
     setStatus('pending')
@@ -114,7 +119,8 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
           elicitation_method: values.elicitation_method || null,
           technical_notes: values.technical_notes || null,
         })
-        setValues(toValues(result))
+        // Takes over the saved values only where nothing was edited while saving.
+        setValues((current) => (current === values ? toValues(result) : current))
         setSaved(toValues(result))
         setFieldsSaved(true)
       } catch {
@@ -125,7 +131,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
     if (targetsDirty) {
       try {
         const result = await saveTargets.mutateAsync(currentTargets)
-        setTargets(result.targets)
+        setTargets((current) => (current === targets ? result.targets : current))
         setSavedTargets(result.targets)
       } catch {
         setStatus('targets-failed')
@@ -137,84 +143,84 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-title`}>Name *</Label>
-        <Input
-          id={`${id}-title`}
-          value={values.title}
-          required
-          onChange={(event) => change({ title: event.target.value })}
-          aria-invalid={Boolean(titleError)}
-          aria-describedby={titleError ? `${id}-title-error` : undefined}
+      {/* Read-only projects show the fields and targets disabled and no Save. */}
+      <fieldset disabled={!canEdit} className="contents">
+        <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
+          <Input
+            id={`${id}-title`}
+            value={values.title}
+            required
+            onChange={(event) => change({ title: event.target.value })}
+            aria-invalid={Boolean(titleError)}
+            aria-describedby={titleError ? `${id}-title-error` : undefined}
+          />
+          {titleError && (
+            <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
+              {t(titleError)}
+            </p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-cause`}>{t('ui:compromiseCause')}</Label>
+          <Input
+            id={`${id}-cause`}
+            value={values.cause_of_compromise}
+            placeholder={t('ui:compromisePlaceholder')}
+            onChange={(event) => change({ cause_of_compromise: event.target.value })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-elicitation`}>{t('ui:elicitation')}</Label>
+          <NativeSelect
+            id={`${id}-elicitation`}
+            value={values.elicitation_method}
+            onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
+            className={cn('w-full', !values.elicitation_method && 'text-muted-foreground')}
+          >
+            <NativeSelectOption value="">{t('ui:select')}</NativeSelectOption>
+            {ELICITATION_METHODS.map((method) => (
+              <NativeSelectOption key={method} value={method}>
+                {t(`ui:elicitationMethods.${method}`)}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${id}-notes`}>{t('ui:technicalNotes')}</Label>
+          <Textarea
+            id={`${id}-notes`}
+            value={values.technical_notes}
+            placeholder={t('ui:technicalNotesPlaceholder')}
+            onChange={(event) => change({ technical_notes: event.target.value })}
+          />
+        </div>
+        <ThreatTargetsField
+          damageScenarios={relations.damageScenarios}
+          value={currentTargets}
+          onChange={(next) => {
+            setTargets(next)
+            keepPending()
+          }}
+          relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
         />
-        {titleError && (
-          <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-            {titleError}
-          </p>
-        )}
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-cause`}>Cause of Compromise</Label>
-        <Input
-          id={`${id}-cause`}
-          value={values.cause_of_compromise}
-          placeholder="How the property is compromised, e.g. spoofing, tampering or denial of service"
-          onChange={(event) => change({ cause_of_compromise: event.target.value })}
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-elicitation`}>Elicitation</Label>
-        <NativeSelect
-          id={`${id}-elicitation`}
-          value={values.elicitation_method}
-          onChange={(event) => change({ elicitation_method: event.target.value as FormValues['elicitation_method'] })}
-          className="w-full"
-        >
-          <NativeSelectOption value="">Not set</NativeSelectOption>
-          {ELICITATION_METHODS.map((method) => (
-            <NativeSelectOption key={method.value} value={method.value}>
-              {method.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-notes`}>Technical Notes</Label>
-        <Textarea
-          id={`${id}-notes`}
-          value={values.technical_notes}
-          placeholder="Interdependencies, attackers, tools and attack surfaces"
-          onChange={(event) => change({ technical_notes: event.target.value })}
-        />
-      </div>
-      <ThreatTargetsField
-        damageScenarios={relations.damageScenarios}
-        value={currentTargets}
-        onChange={(next) => {
-          setTargets(next)
-          setStatus('idle')
-        }}
-        relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
-      />
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!dirty || status === 'pending'}>
-          Save
-        </Button>
-        <output aria-live="polite" className="text-sm text-muted-foreground">
-          {status === 'saved' && !dirty && 'Saved.'}
-        </output>
-        {status === 'fields-failed' && (
-          <p role="alert" className="text-sm text-destructive">
-            The threat scenario could not be saved. Please try again.
-          </p>
-        )}
-        {status === 'targets-failed' && (
-          <p role="alert" className="text-sm text-destructive">
-            {fieldsSaved ? 'The fields were saved, but the targets could not be saved.' : 'The targets could not be saved.'} Please try again.
-          </p>
-        )}
-      </div>
+      </fieldset>
+      {canEdit && (
+        <div className="flex items-center gap-3">
+          <Button type="submit" disabled={!dirty || status === 'pending'}>{t('ui:save')}</Button>
+          <output aria-live="polite" className="text-sm text-muted-foreground">
+            {status === 'saved' && !dirty && t('ui:saved')}
+          </output>
+          {status === 'fields-failed' && (
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveThreatError')}</p>
+          )}
+          {status === 'targets-failed' && (
+            <p role="alert" className="text-sm text-destructive">
+              {t(fieldsSaved ? 'ui:fieldsSavedTargetsError' : 'ui:saveTargetsError')} </p>
+          )}
+        </div>
+      )}
     </form>
   )
 }

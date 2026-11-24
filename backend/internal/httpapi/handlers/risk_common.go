@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -60,8 +59,7 @@ func riskError(err error) error {
 			return huma.Error422UnprocessableEntity("risk score or treatment claim violates the risk constraints")
 		}
 	}
-	slog.Error("risk database operation failed", "error", err)
-	return huma.Error500InternalServerError("could not process risk resource")
+	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 func riskOperation(id, method, path, summary string) huma.Operation {
 	status := http.StatusOK

@@ -29,3 +29,11 @@ RETURNING *;
 
 -- name: DeleteDamageScenario :execrows
 DELETE FROM damage_scenario WHERE id = $1 AND item_definition_id = $2;
+
+-- name: GetDamageScenarioForUpdate :one
+SELECT * FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE;
+
+-- name: GetDamageScenarioForDelete :one
+SELECT * FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE;

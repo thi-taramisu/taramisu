@@ -1,6 +1,7 @@
 name: taramisu
 
 include:
+  - ./compose.storage.yaml
   - ./compose.backend.yaml
   - ./compose.iam.yaml
   - ./compose.frontend.yaml
@@ -18,6 +19,8 @@ networks:
   app-db:
     internal: true
   iam-db:
+    internal: true
+  storage:
     internal: true
   llm:
     internal: true

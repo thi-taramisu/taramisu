@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { type FormEvent, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import { CIA_PROPERTIES } from './ciaProperties'
 
 /** Dialog to add an asset to the current item. */
 export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<unknown> }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle')
 
@@ -50,40 +52,40 @@ export function AddAssetDialog({ onAdd }: { onAdd: (asset: NewAsset) => Promise<
       <DialogTrigger asChild>
         <Button>
           <Plus aria-hidden="true" />
-          Add Asset
+          {t('ui:addAsset')}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>Add Asset</DialogTitle>
-            <DialogDescription>Saved in the mock data until the asset API exists.</DialogDescription>
+            <DialogTitle>{t('ui:addAsset')}</DialogTitle>
+            <DialogDescription>{t('ui:mockAssetHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
-            <Label htmlFor="asset-name">Name</Label>
+            <Label htmlFor="asset-name">{t('ui:name')}</Label>
             <Input id="asset-name" name="name" required />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="asset-component">Component</Label>
+            <Label htmlFor="asset-component">{t('ui:component')}</Label>
             <Input id="asset-component" name="component" required />
           </div>
           <fieldset className="grid gap-2">
-            <legend className="mb-2 text-sm font-medium">Cybersecurity properties</legend>
+            <legend className="mb-2 text-sm font-medium">{t('ui:cybersecurityProperties')}</legend>
             {CIA_PROPERTIES.map((p) => (
               <Label key={p.value} className="font-normal">
                 <input type="checkbox" name={p.value} />
-                {p.label}
+                {t(p.label)}
               </Label>
             ))}
           </fieldset>
           {state === 'error' && (
             <p role="alert" className="text-sm text-destructive">
-              The asset could not be added. Please try again.
+              {t('ui:addAssetError')}
             </p>
           )}
           <DialogFooter>
             <Button type="submit" disabled={state === 'saving'}>
-              Save
+              {t('ui:save')}
             </Button>
           </DialogFooter>
         </form>

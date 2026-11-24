@@ -93,6 +93,58 @@ func (q *Queries) GetAssetCybersecurityProperty(ctx context.Context, arg GetAsse
 	return i, err
 }
 
+const getAssetCybersecurityPropertyForDelete = `-- name: GetAssetCybersecurityPropertyForDelete :one
+SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+JOIN asset a ON a.id = p.asset_id
+WHERE p.id = $1 AND a.id = $2
+    AND a.item_definition_id = $3
+FOR UPDATE OF p
+`
+
+type GetAssetCybersecurityPropertyForDeleteParams struct {
+	ID               pgtype.UUID
+	AssetID          pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetCybersecurityPropertyForDelete(ctx context.Context, arg GetAssetCybersecurityPropertyForDeleteParams) (AssetCybersecurityProperty, error) {
+	row := q.db.QueryRow(ctx, getAssetCybersecurityPropertyForDelete, arg.ID, arg.AssetID, arg.ItemDefinitionID)
+	var i AssetCybersecurityProperty
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.PropertyType,
+		&i.Description,
+	)
+	return i, err
+}
+
+const getAssetCybersecurityPropertyForUpdate = `-- name: GetAssetCybersecurityPropertyForUpdate :one
+SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+JOIN asset a ON a.id = p.asset_id
+WHERE p.id = $1 AND a.id = $2
+    AND a.item_definition_id = $3
+FOR NO KEY UPDATE OF p
+`
+
+type GetAssetCybersecurityPropertyForUpdateParams struct {
+	ID               pgtype.UUID
+	AssetID          pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetCybersecurityPropertyForUpdate(ctx context.Context, arg GetAssetCybersecurityPropertyForUpdateParams) (AssetCybersecurityProperty, error) {
+	row := q.db.QueryRow(ctx, getAssetCybersecurityPropertyForUpdate, arg.ID, arg.AssetID, arg.ItemDefinitionID)
+	var i AssetCybersecurityProperty
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.PropertyType,
+		&i.Description,
+	)
+	return i, err
+}
+
 const listAssetCybersecurityProperties = `-- name: ListAssetCybersecurityProperties :many
 SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
 JOIN asset a ON a.id = p.asset_id
