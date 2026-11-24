@@ -27,8 +27,8 @@ import {
 import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
-// MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
-// once the item routes (#83) are in `backend/openapi.json`.
+// MOCK: in-memory item API for tests and the example project, which the real item service (`../items.ts`)
+// serves from it.
 
 function seed(): Map<string, StoredItem> {
   const [headlamp] = exampleProject.tree

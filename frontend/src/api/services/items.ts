@@ -6,8 +6,8 @@ import type { DamageScenarioService } from './damageScenarios'
 import type { AttackPathService } from './attackPaths'
 import type { ThreatScenarioService } from './threatScenarios'
 
-// Services of the item views. Only the mock in `../mocks/mockItemApi.ts` implements them so far; the
-// real implementation wraps the openapi-fetch client once the routes are in `backend/openapi.json`.
+// Services of the item views. `../items.ts` implements them on the openapi-fetch client (item definitions only),
+// `../mocks/mockItemApi.ts` in memory (tests and the example project).
 
 /**
  * CRUD of item definitions, 1:1 with `/projects/{project_id}/item-definitions` (#83). Calls reject

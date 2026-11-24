@@ -33,7 +33,7 @@ describe('GeneralSettings', () => {
 
     expect(screen.getByLabelText('Name')).toHaveValue('Battery Security')
     expect(within(screen.getByRole('banner')).getByText('Battery Security')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '← Back' })).toHaveAttribute('href', '/projects')
+    expect(screen.getByRole('link', { name: '← Back' })).toHaveAttribute('href', '/projects/battery-security')
   })
 
   it('saves a new name and description and shows them in the header', async () => {

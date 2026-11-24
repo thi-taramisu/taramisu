@@ -1,5 +1,4 @@
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { exampleProject } from '../api/mocks/data/headlamp'
 import { isNotFound } from '../api/errors'
 import { useProject } from '../api/queries/projects'
 import { ArchivedProjectBanner } from '../features/projects/ArchivedProjectBanner'
@@ -18,8 +17,6 @@ export function ProjectSettingsPage() {
   const { projectId = '' } = useParams()
   const project = useProject(projectId)
   if (isNotFound(project.error)) return <NotFoundPage />
-  // Only the example project has a workspace so far (#250).
-  const back = projectId === exampleProject.id ? `/projects/${projectId}` : '/projects'
 
   return (
     <div className="flex h-screen flex-col">
@@ -27,7 +24,7 @@ export function ProjectSettingsPage() {
       <ArchivedProjectBanner projectId={projectId} />
       <div className="flex min-h-0 flex-1">
         <nav aria-label={t('navigation.settings')} className="w-56 shrink-0 space-y-1 border-r p-3">
-          <Link to={back} className="mb-3 block text-sm text-muted-foreground hover:underline">
+          <Link to={`/projects/${projectId}`} className="mb-3 block text-sm text-muted-foreground hover:underline">
             ← {t('navigation.back')}
           </Link>
           <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">{t('navigation.settings')}</h2>

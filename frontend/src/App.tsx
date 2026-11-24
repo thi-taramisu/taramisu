@@ -22,6 +22,7 @@ import { ThreatScenarioRisksTab } from './features/threat-scenarios/ThreatScenar
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
+import { ExampleProjectOnly } from './features/workspace/ExampleProjectOnly'
 import { Placeholder } from './features/workspace/Placeholder'
 import { WorkspaceLayout } from './features/workspace/WorkspaceLayout'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
@@ -38,11 +39,11 @@ const PAGES: Partial<Record<EntityType, ReactNode>> = {
   'attack-paths': <AttackPathPage />,
 }
 
-// Tabs that already have content, everything else renders a placeholder.
+// Tabs that already have content, everything else renders a placeholder. Real items only have their definition.
 const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/': <ItemDefinitionTab />,
-  'items/assets': <ItemAssetsTab />,
-  'items/risks': <ItemRisksTab />,
+  'items/assets': <ExampleProjectOnly tab="assets"><ItemAssetsTab /></ExampleProjectOnly>,
+  'items/risks': <ExampleProjectOnly tab="risks"><ItemRisksTab /></ExampleProjectOnly>,
   'damage-scenarios/': <DamageScenarioDefinitionTab />,
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
   'damage-scenarios/relations': <DamageScenarioRelationsTab />,

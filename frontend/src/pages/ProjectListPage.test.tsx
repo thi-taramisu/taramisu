@@ -329,14 +329,11 @@ describe('Main Page project management', () => {
     expect(screen.getByRole('menuitem', { name: 'Delete Project' })).not.toHaveAttribute('data-disabled')
   })
 
-  it('opens the workspace of the example project and the settings of the others', async () => {
+  it('opens the workspace of every project', async () => {
     await renderAt('/projects')
 
     expect(screen.getByRole('link', { name: 'Headlamp System (example)' })).toHaveAttribute('href', '/projects/headlamp')
-    expect(screen.getByRole('link', { name: 'Battery Security settings' })).toHaveAttribute(
-      'href',
-      '/projects/battery-security/settings',
-    )
+    expect(screen.getByRole('link', { name: 'Battery Security' })).toHaveAttribute('href', '/projects/battery-security')
   })
 
   it('shows an error with a retry when the projects cannot be loaded', async () => {
