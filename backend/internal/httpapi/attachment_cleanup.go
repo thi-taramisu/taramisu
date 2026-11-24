@@ -10,9 +10,9 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
-// RunCleanup resumes persisted deletions at startup and every minute. Multiple
+// RunCleanup resumes persisted deletions at startup and every minute.
 // Pending uploads get a ten-minute grace period, beyond the two-minute request timeout.
-// API replicas may process the same row: both S3 and metadata deletes are idempotent.
+// Multiple API replicas may process the same row: both S3 and metadata deletes are idempotent.
 func (h *Attachments) RunCleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
