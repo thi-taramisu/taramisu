@@ -54,13 +54,20 @@ entity independently expandable, highlights the active entity on its subpages, a
 Entries show the element name only; the code (e.g. `A-01`) stays in the accessible names of tree links and toggles, so screen readers
 can tell same-named elements apart. The element's page header shows its ID as `#` plus the number (e.g. `A-01` → `#01`) next to the type.
 Branches start expanded; navigating to a hidden descendant reveals its ancestors. Use Tab to reach links and disclosure buttons, Enter to
-follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
-moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
-on leave; reduced-motion preferences disable the animation.
+follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links and "Unassigned" toggles; Arrow
+Right expands a branch or moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover
+or keyboard focus and reset on leave; reduced-motion preferences disable the animation.
+
+An item with elements that have no link upwards yet ends with an "Unassigned" section (Flexible Definition wireframe) that counts them:
+damage scenarios without an asset, threat scenarios without a damage scenario and attack paths without a threat scenario, grouped by type.
+Items without such elements have no section. The mock API derives the section from the links (`ItemContentService.unassigned`), so an
+element moves to its linked positions as soon as it is linked and back once its last link is removed. Damage scenarios created without
+assets start there.
 
 Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
 Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
 parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
+Elements in an "Unassigned" section get an "Unassigned" step after their item, as in the tree; it has no page, so it is not a link.
 
 ## API client
 

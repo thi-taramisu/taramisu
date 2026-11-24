@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { EntityType } from '../../api/models/tree'
 import { useItemScenarios, useProjectTree } from '../../api/queries/items'
 import { CreateElementDialog } from './CreateElementDialog'
-import { entityPath, findNode, formatEntityId } from './entities'
+import { entityPath, formatEntityId } from './entities'
 import { ItemSelectField } from './ItemSelectField'
 import { LinkToField } from './LinkToField'
 import { usePageContext } from './usePageContext'
@@ -38,13 +38,10 @@ interface DialogTexts {
   namePlaceholder: string
   hint: string
   linksLoading: string
-  linkRequired: string
   createError: string
   /** The project has no item, so there is nothing to link to. */
   noItem: string
   linksLoadError: string
-  /** Elements of the item that cannot be linked because they are not in the tree. */
-  notInTree: (count: number) => string
 }
 
 interface Config<T extends CreatedEntity> {
@@ -62,8 +59,7 @@ interface Config<T extends CreatedEntity> {
 /**
  * "+ New → …" dialog for elements that hang below other elements (interactive wireframe): name, owning item
  * and the elements one level up. Defaults to the item and, on the page of such an element, to that element.
- * At least one link is needed, as the tree has no place for unlinked elements yet; for the same reason only
- * elements that are in the tree themselves can be linked.
+ * Links are optional: without them the element is created in "Unassigned" of the item.
  */
 export function CreateLinkedElementDialog<T extends CreatedEntity>({
   config,
@@ -88,11 +84,7 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
   const linkIds = chosenLinkIds ?? (context.type === link.type && context.itemId === itemId ? [context.entityId] : [])
   const [linkError, setLinkError] = useState<string>()
   const itemScenarios = useItemScenarios(projectId, itemId, link.type)
-  const itemElements = itemScenarios.data
-  // Below an element that is not in the tree, the new one would not be in the tree either.
-  const itemNode = items.find((item) => item.id === itemId)
-  const candidates = itemElements?.filter((element) => Boolean(itemNode && findNode(link.type, element.id, itemNode.children ?? [])))
-  const hidden = (itemElements?.length ?? 0) - (candidates?.length ?? 0)
+  const candidates = itemScenarios.data
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
   const [unfinished, setUnfinished] = useState<T>()
   const noItem = tree.isSuccess && items.length === 0
@@ -123,13 +115,14 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
       setLinkError(loadError)
       return undefined
     }
-    // The links only count once the candidates are there, so "Link at least one …" would be wrong.
-    if (!candidates) {
-      setLinkError(texts.linksLoading)
+    // Without links nothing waits for the candidates anymore, but the owning item still has to be known.
+    if (!itemId) {
+      setLinkError(t('ui:itemsLoading'))
       return undefined
     }
-    if (linked.length === 0) {
-      setLinkError(texts.linkRequired)
+    // The chosen links only count once the candidates are there; creating before would leave it unassigned by accident.
+    if (linkIds.length > 0 && !candidates) {
+      setLinkError(texts.linksLoading)
       return undefined
     }
     return finish(await config.create(itemId, name, linked.map((element) => element.id)))
@@ -144,7 +137,8 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder={texts.namePlaceholder}
-      hint={texts.hint}
+      // Matches the chips once the candidates are there; until then the chosen links say where it will appear.
+      hint={(candidates ? linked : linkIds).length > 0 ? texts.hint : t('ui:unassignedHint')}
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
@@ -176,11 +170,6 @@ export function CreateLinkedElementDialog<T extends CreatedEntity>({
         onRemove={(element) => changeLinks(linkIds.filter((id) => id !== element.id))}
         error={linkError ?? loadError}
       />
-      {hidden > 0 && (
-        <p className="-mt-2 text-xs text-muted-foreground">
-          {texts.notInTree(hidden)}
-        </p>
-      )}
     </CreateElementDialog>
   )
 }

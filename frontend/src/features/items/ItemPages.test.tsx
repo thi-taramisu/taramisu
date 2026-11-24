@@ -2,6 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { renderApp } from '../../test/renderApp'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
+import { i18n } from '../../i18n'
+import { ApiError } from '../../api/errors'
 
 const project = '/projects/headlamp'
 
@@ -23,6 +25,23 @@ describe('sidebar tree', () => {
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
     expect(within(tree()).getByRole('link', { name: 'AP-2 Malicious device on the OBD-II connector' })).toBeInTheDocument()
+  })
+
+  it('shows an error instead of an empty "Unassigned" when its elements cannot be loaded', async () => {
+    const api = createMockItemApi()
+    api.content.unassigned = () => Promise.reject(new ApiError(500, 'server'))
+    renderApp(project, api)
+
+    expect(await screen.findByText('The elements could not be loaded.')).toBeInTheDocument()
+  })
+
+  it('shows the item without "Unassigned" when the item is gone meanwhile', async () => {
+    const api = createMockItemApi()
+    api.content.unassigned = () => Promise.reject(new ApiError(404, 'gone'))
+    renderApp(project, api)
+
+    expect(await within(tree()).findByRole('link', { name: 'Headlamp system' })).toBeInTheDocument()
+    expect(within(tree()).queryByRole('button', { name: /^Unassigned in/ })).not.toBeInTheDocument()
   })
 })
 
@@ -89,7 +108,7 @@ describe('delete item', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Delete item' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Delete "Headlamp system"?' })
-    expect(dialog).toHaveTextContent('4 assets and 4 elements below them')
+    expect(dialog).toHaveTextContent('This also deletes its 4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths.')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
@@ -119,11 +138,42 @@ describe('delete item', () => {
     const dialog = screen.getByRole('alertdialog')
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be loaded')
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeDisabled()
+    // The unassigned elements are loaded, but counting only them would leave out the assets and the rest.
+    expect(within(dialog).queryByText(/This also deletes/)).not.toBeInTheDocument()
 
     failing = false
     await user.click(within(dialog).getByRole('button', { name: 'Retry' }))
-    expect(await within(dialog).findByText(/4 assets and 4 elements below them/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Delete item' })).toBeEnabled()
+  })
+
+  it('counts an element shown below several parents once', async () => {
+    const api = createMockItemApi()
+    // DS-1 with TS-1, AP-1 and AP-2 below it is now shown below AS-1 and AS-2.
+    await api.damageScenarios.linkAsset('headlamp', 'ds-01', 'a-02', ['I'])
+    const { user } = renderApp(`${project}/items/i-01`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    expect(await within(screen.getByRole('alertdialog')).findByText(/4 assets, 1 damage scenario, 3 threat scenarios, and 3 attack paths/)).toBeInTheDocument()
+  })
+
+  it('names the unassigned elements of an item without assets', async () => {
+    const api = createMockItemApi()
+    const extra = await api.items.create('headlamp', { name: 'Extra item', scope_type: 'ITEM' })
+    await api.damageScenarios.create('headlamp', { item_definition_id: extra.id, title: 'Glare', asset_properties: [] })
+    const { user } = renderApp(`${project}/items/${extra.id}`, api)
+
+    await user.click(await screen.findByRole('button', { name: 'Delete item' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete "Extra item"?' })
+    expect(await within(dialog).findByText(/This also deletes its 1 damage scenario\. /)).toBeInTheDocument()
+  })
+
+  it('names what is deleted in the chosen language', async () => {
+    await i18n.changeLanguage('de')
+    const { user } = renderApp(`${project}/items/i-01`)
+
+    await user.click(await screen.findByRole('button', { name: 'Item löschen' }))
+    expect(await within(screen.getByRole('alertdialog')).findByText(/Dabei werden auch 4 Assets, 1 Schadensszenario, 3 Bedrohungsszenarien und 3 Angriffspfade des Items gelöscht\./)).toBeInTheDocument()
   })
 
   it('deletes an item with nothing below it without a warning', async () => {

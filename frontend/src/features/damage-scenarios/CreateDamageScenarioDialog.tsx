@@ -40,11 +40,12 @@ interface CreateDamageScenarioDialogProps {
 
 /**
  * "+ New → Damage Scenario" wireframe: name, owning item and the asset properties whose compromise leads to it.
- * Defaults to the item and asset of the current page; the tree has no place for unlinked damage scenarios yet.
+ * Defaults to the item and asset of the current page; without assets it is created in "Unassigned" of the item.
  */
 export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, initialName, lockedItemId, onCreated, onCreatedError }: CreateDamageScenarioDialogProps) {
   const { t } = useTranslation()
-  const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
+  const tree = useProjectTree(projectId)
+  const items = (tree.data ?? []).filter((node) => node.type === 'items')
   const defaults = useContextDefaults(items)
   // Only the user's choices are stored, so defaults that arrive later (the tree loads after opening) still apply.
   const [chosenItemId, setChosenItemId] = useState<string>()
@@ -52,6 +53,11 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const itemId = lockedItemId ?? chosenItemId ?? defaults.itemId
   const links = chosenLinks ?? defaults.links
   const [linkError, setLinkError] = useState<{ key: string; code?: string }>()
+  // Create was tried without an item; the message is derived, so it goes away once the items are there.
+  const [itemMissing, setItemMissing] = useState(false)
+  const itemError = itemMissing && !itemId
+    ? (tree.isPending ? 'ui:itemsLoading' : tree.isError ? 'ui:loadItemsError' : 'ui:itemRequired')
+    : undefined
   const { data: assets } = useItemAssets(projectId, itemId)
   const createDamageScenario = useCreateDamageScenario(projectId)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
@@ -81,13 +87,14 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
 
   async function create(name: string) {
     if (unfinished) return finish(unfinished)
-    // The links only count once the assets are there, so "Link at least one asset" would be wrong.
-    if (!assets) {
-      setLinkError({ key: 'ui:assetsLoading' })
+    // Without links nothing waits for the assets anymore, but the owning item still has to be known.
+    if (!itemId) {
+      setItemMissing(true)
       return undefined
     }
-    if (linked.length === 0) {
-      setLinkError({ key: 'ui:assetRequired' })
+    // The chosen links only count once the assets are there; creating before would leave it unassigned by accident.
+    if (links.length > 0 && !assets) {
+      setLinkError({ key: 'ui:assetsLoading' })
       return undefined
     }
     const empty = linked.find((link) => link.properties.length === 0)
@@ -112,7 +119,15 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       returnFocusTo={returnFocusTo}
       initialName={initialName}
       namePlaceholder={t('ui:damageNamePlaceholder')}
-      hint={t('ui:damageTreeHint')}
+      // Matches the asset chips once the assets are there; until then the chosen links say where it will appear.
+      // Without an item (none in the project, or they could not be loaded) it cannot appear anywhere yet.
+      hint={
+        !itemId && !tree.isPending
+          ? t('ui:damageItemNeededHint')
+          : (assets ? linked : links).length > 0
+            ? t('ui:damageTreeHint')
+            : t('ui:unassignedHint')
+      }
       errorMessage={
         unfinished
           ? (onCreatedError?.(unfinished) ?? t('ui:createdNextStepError', { code: formatEntityId(unfinished.code) }))
@@ -122,6 +137,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       onCreate={create}
       onReset={() => {
         setUnfinished(undefined)
+        setItemMissing(false)
         setChosenItemId(undefined)
         changeLinks(undefined)
       }}
@@ -130,6 +146,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
         items={items}
         value={itemId}
         locked={Boolean(lockedItemId)}
+        error={itemError && t(itemError)}
         onChange={(next) => {
           setChosenItemId(next)
           // Assets belong to one item, so its links do not carry over.

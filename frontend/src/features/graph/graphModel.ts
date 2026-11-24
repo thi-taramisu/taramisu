@@ -37,7 +37,8 @@ export function buildRelationGraph(items: { tree: TreeNode; risks: RiskGroup[] }
   }
   function visit(node: TreeNode, parent: TreeNode | undefined, paths: Set<string>) {
     const key = add(node)
-    if (node.type === 'attack-paths') paths.add(key)
+    // Only paths below a threat can carry its rating; an unassigned path is not linked to the threat a risk row names.
+    if (node.type === 'attack-paths' && parent) paths.add(key)
     if (parent) {
       const parentKey = elementKey(parent.type, parent.id)
       // Attack paths lead to threats; threats lead to damage. The tree is ordered the other way.
@@ -45,6 +46,8 @@ export function buildRelationGraph(items: { tree: TreeNode; risks: RiskGroup[] }
       else link(parentKey, key)
     }
     node.children?.forEach((child) => visit(child, node, paths))
+    // Unassigned elements have no link upwards, so they are visited without the item as their parent.
+    node.unassigned?.forEach((child) => visit(child, undefined, paths))
   }
   for (const { tree, risks } of items) {
     const itemPaths = new Set<string>()

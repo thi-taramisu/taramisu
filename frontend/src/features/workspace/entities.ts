@@ -41,6 +41,16 @@ export function entityPath(projectId: string, type: EntityType, id: string) {
   return `/projects/${projectId}/${type}/${id}`
 }
 
+/** Everything the tree shows below a node: its children and, for items, the "Unassigned" section. */
+export function nodesBelow(node: TreeNode): TreeNode[] {
+  return [...(node.children ?? []), ...(node.unassigned ?? [])]
+}
+
+/** Whether the item's "Unassigned" section lists the element itself, i.e. the element has no link upwards yet. */
+export function isUnassignedIn(item: TreeNode, type: EntityType, id: string): boolean {
+  return item.unassigned?.some((node) => node.type === type && node.id === id) ?? false
+}
+
 /** First occurrence of the entity in the tree, depth-first. */
 export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeNode | undefined {
   return findNodePath(type, id, nodes)?.at(-1)
@@ -50,7 +60,7 @@ export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeN
 export function findNodePath(type: EntityType, id: string, nodes: TreeNode[]): TreeNode[] | undefined {
   for (const node of nodes) {
     if (node.type === type && node.id === id) return [node]
-    const path = node.children && findNodePath(type, id, node.children)
+    const path = findNodePath(type, id, nodesBelow(node))
     if (path) return [node, ...path]
   }
   return undefined

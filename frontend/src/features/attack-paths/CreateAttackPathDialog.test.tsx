@@ -50,37 +50,38 @@ describe('create attack path', () => {
     expect(await screen.findByRole('heading', { name: 'Replay via the OBD port, Attack Path AP-4' })).toBeInTheDocument()
   })
 
-  it('offers only threat scenarios that are in the tree, so the new attack path is shown there too', async () => {
+  it('offers the unassigned threat scenarios of the item as well', async () => {
     const { user } = renderApp(`${project}/items/i-01`)
     const dialog = await openDialog(user)
 
     await user.click(await addButton(dialog))
 
     expect(await screen.findByRole('menuitem', { name: TS01 })).toBeInTheDocument()
-    // TS-2 and TS-3 lead to no damage scenario, so they are not in the tree.
-    expect(screen.queryByRole('menuitem', { name: /TS-2|TS-3/ })).not.toBeInTheDocument()
-    expect(within(dialog).getByText('2 threat scenarios are not in the tree yet and cannot be linked here.')).toBeInTheDocument()
+    // TS-2 and TS-3 lead to no damage scenario, so they are in "Unassigned".
+    expect(screen.getAllByRole('menuitem', { name: /TS-2|TS-3/ })).toHaveLength(2)
   })
 
-  it('does not start linked to a threat scenario of the page that is not in the tree', async () => {
+  it('starts linked to an unassigned threat scenario of the page', async () => {
     const { user } = renderApp(`${project}/threat-scenarios/ts-02`)
     const dialog = await openDialog(user)
 
-    await within(dialog).findByText('2 threat scenarios are not in the tree yet and cannot be linked here.')
-    expect(within(dialog).queryByRole('button', { name: /^Remove TS-2/ })).not.toBeInTheDocument()
+    expect(await within(dialog).findByRole('button', { name: /^Remove TS-2/ })).toBeInTheDocument()
+    expect(within(dialog).getByText('Will appear in the tree below each linked threat scenario.')).toBeInTheDocument()
   })
 
-  it('requires a linked threat scenario', async () => {
+  it('creates an attack path without links in "Unassigned" of the item', async () => {
     const { user, api } = renderApp(`${project}/items/i-01`)
     const dialog = await openDialog(user)
+    await addButton(dialog)
+    expect(within(dialog).getByText('Will appear in "Unassigned" of the item until it is linked.')).toBeInTheDocument()
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Replay via the OBD port')
-    // Before the threat scenarios are loaded, Create would say they are still loading.
-    await addButton(dialog)
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Link at least one threat scenario.')
-    expect(await api.content.attackPaths('headlamp', 'i-01')).toHaveLength(3)
+    expect(await screen.findByRole('heading', { name: /^Replay via the OBD port, Attack Path/ })).toBeInTheDocument()
+    const unassigned = within(await within(tree()).findByRole('list', { name: 'Attack Paths in Headlamp system' }))
+    expect(unassigned.getByRole('link', { name: /Replay via the OBD port/ })).toHaveAttribute('aria-current', 'page')
+    expect(await api.content.unassigned('headlamp', 'i-01')).toContainEqual(expect.objectContaining({ name: 'Replay via the OBD port' }))
   })
 
   it('shows an error and keeps the dialog open when creating fails', async () => {

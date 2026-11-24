@@ -52,6 +52,25 @@ describe('relation graph', () => {
     expect(graph.elements.find((el) => el.id === 'ap2')?.risk).toBeNull()
     expect(graph.relations.some((edge) => edge.source === 'attack-paths:ap2' && edge.target === 'threat-scenarios:second-threat')).toBe(false)
   })
+  it('includes unassigned elements with the elements below them but without a relation to the item', () => {
+    const item: TreeNode = { type: 'items', id: 'item', name: 'Item', children: [], unassigned: [damage] }
+    const graph = buildRelationGraph([{ tree: item, risks: [] }])
+    expect(graph.elements.map((el) => el.id).toSorted()).toEqual(['ap1', 'ap2', 'ds', 'item', 'ts'])
+    expect(graph.relations.map((edge) => edge.id).toSorted()).toEqual([
+      'attack-paths:ap1->threat-scenarios:ts',
+      'attack-paths:ap2->threat-scenarios:ts',
+      'threat-scenarios:ts->damage-scenarios:ds',
+    ])
+  })
+  it('does not relate an unassigned attack path to the threat its old risk row names', () => {
+    const unlinked: TreeNode = { type: 'attack-paths', id: 'ap2', code: 'AP-2', name: 'Rated path' }
+    const item: TreeNode = { type: 'items', id: 'item', name: 'Item', children: [
+      { type: 'assets', id: 'asset', name: 'Asset', children: [{ ...damage, children: [{ type: 'threat-scenarios', id: 'ts', code: 'TS-1', name: 'Threat' }] }] },
+    ], unassigned: [unlinked] }
+    const graph = buildRelationGraph([{ tree: item, risks }])
+    expect(graph.elements.find((el) => el.id === 'ap2')?.risk).toBeNull()
+    expect(graph.relations.some((edge) => edge.source === 'attack-paths:ap2')).toBe(false)
+  })
   it('shows neighbors and asset context, and supports moving to another focus', () => {
     const graph = buildRelationGraph([{ tree, risks }])
     const threat = graphNeighborhood(graph, elementKey('threat-scenarios', 'ts'))

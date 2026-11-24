@@ -32,6 +32,21 @@ function renderTree(path = project, tree = nodes) {
   )
 }
 
+const withUnassigned: TreeNode[] = [
+  {
+    ...nodes[0],
+    unassigned: [
+      { type: 'damage-scenarios', id: 'ds-02', code: 'DS-2', name: 'Unsafe cell operation', children: [
+        { type: 'threat-scenarios', id: 'ts-01', code: 'TS-1', name: 'Firmware tampering' },
+      ] },
+      { type: 'threat-scenarios', id: 'ts-02', code: 'TS-2', name: 'Replayed command' },
+      { type: 'attack-paths', id: 'ap-01', code: 'AP-1', name: 'Manipulated firmware' },
+    ],
+  },
+  { type: 'items', id: 'i-02', name: 'Rear lights', children: [], unassigned: [] },
+]
+const unassignedSection = (item: string) => screen.getByRole('button', { name: new RegExp(`^Unassigned in ${item},`) })
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Filetree', () => {
@@ -170,6 +185,69 @@ describe('Filetree', () => {
 
     expect(screen.getAllByRole('link', { name: 'DS-1 Loss of light' })).toHaveLength(1)
     expect(occurrences[1]).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  describe('Unassigned', () => {
+    it('lists the unassigned elements of each item by type and counts them', () => {
+      renderTree(project, withUnassigned)
+
+      expect(unassignedSection('IT-1 Headlamp')).toHaveAccessibleName('Unassigned in IT-1 Headlamp, 3 elements')
+      expect(unassignedSection('IT-1 Headlamp')).toHaveAttribute('aria-expanded', 'true')
+      const damage = within(screen.getByRole('list', { name: 'Damage Scenarios in IT-1 Headlamp' }))
+      expect(damage.getByRole('link', { name: 'DS-2 Unsafe cell operation' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-02`)
+      // Linked to the unassigned damage scenario, so it is shown below it and not on its own.
+      expect(damage.getByRole('link', { name: 'TS-1 Firmware tampering' })).toBeInTheDocument()
+      expect(within(screen.getByRole('list', { name: 'Threat Scenarios in IT-1 Headlamp' })).getAllByRole('link').map((link) => link.textContent)).toEqual(['TS-2 Replayed command'])
+      expect(within(screen.getByRole('list', { name: 'Attack Paths in IT-1 Headlamp' })).getByRole('link', { name: 'AP-1 Manipulated firmware' })).toBeInTheDocument()
+    })
+
+    it('shows no section for items whose elements are all linked', () => {
+      renderTree(project, withUnassigned)
+
+      expect(screen.getAllByRole('button', { name: /^Unassigned in/ })).toHaveLength(1)
+      expect(screen.queryByRole('button', { name: /^Unassigned in Rear lights/ })).not.toBeInTheDocument()
+      // Nothing else is below the item, so it has nothing to expand either.
+      expect(screen.queryByRole('button', { name: /Rear lights$/ })).not.toBeInTheDocument()
+    })
+
+    it('collapses the section and reveals it when one of its elements is opened', async () => {
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter initialEntries={[project]}>
+          <Filetree projectId="test-project" nodes={withUnassigned} />
+          <Link to={`${project}/attack-paths/ap-01/rating`}>Open attack path</Link>
+        </MemoryRouter>,
+      )
+
+      await user.click(unassignedSection('IT-1 Headlamp'))
+      expect(unassignedSection('IT-1 Headlamp')).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('link', { name: 'DS-2 Unsafe cell operation' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('link', { name: 'Open attack path' }))
+      expect(unassignedSection('IT-1 Headlamp')).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByRole('link', { name: 'AP-1 Manipulated firmware' })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it('moves into and out of the section with the arrow keys', async () => {
+      const user = userEvent.setup()
+      renderTree(project, withUnassigned)
+      screen.getByRole('link', { name: 'AS-2 Firmware' }).focus()
+
+      await user.keyboard('{ArrowDown}')
+      expect(unassignedSection('IT-1 Headlamp')).toHaveFocus()
+      await user.keyboard('{ArrowRight}')
+      expect(screen.getByRole('link', { name: 'DS-2 Unsafe cell operation' })).toHaveFocus()
+      await user.keyboard('{ArrowDown}{ArrowDown}')
+      expect(screen.getByRole('link', { name: 'TS-2 Replayed command' })).toHaveFocus()
+      await user.keyboard('{ArrowLeft}')
+      expect(unassignedSection('IT-1 Headlamp')).toHaveFocus()
+      await user.keyboard('{ArrowLeft}')
+      expect(unassignedSection('IT-1 Headlamp')).toHaveAttribute('aria-expanded', 'false')
+      await user.keyboard('{ArrowDown}')
+      expect(screen.getByRole('link', { name: 'Rear lights' })).toHaveFocus()
+      await user.keyboard('{ArrowUp}{ArrowLeft}')
+      expect(screen.getByRole('link', { name: 'IT-1 Headlamp' })).toHaveFocus()
+    })
   })
 
   it('shows an empty state without navigation controls', () => {

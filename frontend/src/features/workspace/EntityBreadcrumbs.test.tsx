@@ -79,6 +79,30 @@ describe('Entity breadcrumbs', () => {
     expect(breadcrumbs().getAllByRole('listitem')).toHaveLength(3)
   })
 
+  it('shows the "Unassigned" section of the item as a step without a link', async () => {
+    renderPage('threat-scenarios/ts-02')
+    await breadcrumbs().findByText('TS-2 Replayed headlamp command on the CAN bus')
+    const steps = breadcrumbs().getAllByRole('listitem')
+    expect(steps.map((step) => step.textContent)).toEqual(['Headlamp system', '/Unassigned', '/TS-2 Replayed headlamp command on the CAN bus'])
+    expect(within(steps[1]).queryByRole('link')).not.toBeInTheDocument()
+    expect(breadcrumbs().getAllByRole('link')).toHaveLength(1)
+  })
+
+  it('keeps the "Unassigned" step for elements below an unassigned one and drops it once that is linked', async () => {
+    const api = createMockItemApi()
+    await api.damageScenarios.unlinkAsset('headlamp', 'ds-01', 'a-01')
+    const queryClient = renderPage('threat-scenarios/ts-01', api)
+    await breadcrumbs().findByText('Unassigned')
+    expect(breadcrumbs().getAllByRole('listitem').map((step) => step.textContent)).toEqual([
+      'Headlamp system', '/Unassigned', '/DS-1 Headlamp turns off while driving at night', '/TS-1 Spoofed headlamp command on the CAN bus',
+    ])
+
+    await api.damageScenarios.linkAsset('headlamp', 'ds-01', 'a-01', ['I'])
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['projects', 'headlamp'] }) })
+    expect(await breadcrumbs().findByRole('link', { name: 'AS-1 Headlamp on/off command' })).toBeInTheDocument()
+    expect(breadcrumbs().queryByText('Unassigned')).not.toBeInTheDocument()
+  })
+
   it('supports native Tab/Enter navigation and hides separators from assistive technology', async () => {
     const user = userEvent.setup()
     renderPage('damage-scenarios/ds-01')

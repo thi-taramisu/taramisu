@@ -72,16 +72,35 @@ export function linkedThreatScenarios(entry: StoredItem, damageScenarioId: strin
   )
 }
 
+function attackPathNode(path: AttackPath): TreeNode {
+  return { type: 'attack-paths', id: path.id, code: path.code, name: path.title }
+}
+
 function threatScenarioNode(entry: StoredItem, threat: ThreatScenario): TreeNode {
-  const paths: TreeNode[] = entry.attackPaths
+  const paths = entry.attackPaths
     .filter((path) => entry.threatAttackPathLinks.some((link) => link.threat_scenario_id === threat.id && link.attack_path_id === path.id))
-    .map((path) => ({ type: 'attack-paths', id: path.id, code: path.code, name: path.title }))
+    .map(attackPathNode)
   return { type: 'threat-scenarios', id: threat.id, code: threat.code, name: threat.title, children: paths.length ? paths : undefined }
 }
 
 function damageScenarioNode(entry: StoredItem, scenario: DamageScenario): TreeNode {
   const threats = linkedThreatScenarios(entry, scenario.id).map((threat) => threatScenarioNode(entry, threat))
   return { type: 'damage-scenarios', id: scenario.id, code: scenario.code, name: scenario.title, children: threats.length ? threats : undefined }
+}
+
+/**
+ * Elements without a link upwards, with the elements below them. Derived from the links on every call,
+ * so an element leaves "Unassigned" as soon as it is linked and comes back when its last link is removed.
+ */
+export function unassignedNodes(entry: StoredItem): TreeNode[] {
+  const damageScenarios = entry.damageScenarios.filter((ds) => !entry.damageScenarioLinks.some((link) => link.damage_scenario_id === ds.id))
+  const threats = entry.threatScenarios.filter((threat) => !entry.threatDamageLinks.some((link) => link.threat_scenario_id === threat.id))
+  const paths = entry.attackPaths.filter((path) => !entry.threatAttackPathLinks.some((link) => link.attack_path_id === path.id))
+  return [
+    ...damageScenarios.map((ds) => damageScenarioNode(entry, ds)),
+    ...threats.map((threat) => threatScenarioNode(entry, threat)),
+    ...paths.map(attackPathNode),
+  ]
 }
 
 /** True if the loss of the asset property leads to a damage scenario linked to the threat scenario. */

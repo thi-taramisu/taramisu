@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
+import { isNotFound } from '../errors'
 import type { CiaProperty, NewAsset } from '../models/asset'
 import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
@@ -14,6 +15,7 @@ const keys = {
   tree: (projectId: string) => ['projects', projectId, 'tree'] as const,
   item: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId] as const,
   children: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'children'] as const,
+  unassigned: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'unassigned'] as const,
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
   threatScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'threat-scenarios'] as const,
@@ -30,7 +32,7 @@ const keys = {
   attackPathRelations: (projectId: string, id: string) => ['projects', projectId, 'attack-paths', id, 'relations'] as const,
 }
 
-/** Sidebar tree: the items of the project with the elements below them. */
+/** Sidebar tree: the items of the project with the elements below them and their unassigned elements. */
 export function useProjectTree(projectId: string, { enabled = true } = {}) {
   const api = useApi()
   return useQuery({
@@ -39,13 +41,18 @@ export function useProjectTree(projectId: string, { enabled = true } = {}) {
     queryFn: async (): Promise<TreeNode[]> => {
       const items = await api.items.list(projectId)
       return Promise.all(
-        items.map(async (item) => ({
-          type: 'items' as const,
-          id: item.id,
-          name: item.name,
+        items.map(async (item) => {
           // One item failing (e.g. deleted meanwhile) must not hide the whole tree.
-          children: await api.content.children(projectId, item.id).catch(() => []),
-        })),
+          const [children, unassigned] = await Promise.all([
+            api.content.children(projectId, item.id).catch(() => []),
+            // Other failures must not look like "nothing unassigned", which would hide the unlinked elements.
+            api.content.unassigned(projectId, item.id).catch((error: unknown) => {
+              if (isNotFound(error)) return []
+              throw error
+            }),
+          ])
+          return { type: 'items' as const, id: item.id, name: item.name, children, unassigned }
+        }),
       )
     },
   })
@@ -58,6 +65,16 @@ export function useItemChildren(projectId: string, itemId: string, { enabled = t
     enabled,
     queryKey: keys.children(projectId, itemId),
     queryFn: () => api.content.children(projectId, itemId),
+  })
+}
+
+/** The unassigned elements of one item. Unlike the tree, a failed request is an error and not an empty list. */
+export function useItemUnassigned(projectId: string, itemId: string, { enabled = true } = {}) {
+  const api = useApi()
+  return useQuery({
+    enabled,
+    queryKey: keys.unassigned(projectId, itemId),
+    queryFn: () => api.content.unassigned(projectId, itemId),
   })
 }
 
