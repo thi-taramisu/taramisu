@@ -287,6 +287,12 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 		attachmentError(w, 413, "file exceeds 10 MiB")
 		return
 	}
+	var fileError *os.PathError
+	if errors.As(err, &fileError) && fileError.Op == "write" {
+		slog.Error("attachment upload buffer failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "upload buffer unavailable")
+		return
+	}
 	if err != nil || n == 0 {
 		attachmentError(w, 400, "empty or incomplete file")
 		return
