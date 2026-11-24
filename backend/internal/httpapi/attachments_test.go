@@ -68,7 +68,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "complete-failure", "complete-ambiguous", "upload-restart", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
+	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "complete-failure", "complete-ambiguous", "upload-restart", "upload-project-deleted", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -164,6 +164,33 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 			}
 			data := []byte("attachment content\n")
+			if scenario == "upload-project-deleted" {
+				tracked.afterPut = func() { exec("DELETE FROM tara_project WHERE id=$1", project) }
+				check(request("POST", base, user, data, ""), 404)
+				var orphaned bool
+				if e = tx.QueryRow(ctx, "SELECT project_id IS NULL AND delete_pending FROM attachment WHERE s3_object_key=$1", tracked.key).Scan(&orphaned); e != nil || !orphaned {
+					t.Fatalf("lost cleanup intent: %v %v", orphaned, e)
+				}
+				if e = h.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if tracked.deletes != 0 {
+					t.Fatal("fresh orphan bypassed upload grace")
+				}
+				exec("UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE s3_object_key=$1", tracked.key)
+				if e = h.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				var count int
+				if e = tx.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE s3_object_key=$1", tracked.key).Scan(&count); e != nil || count != 0 {
+					t.Fatalf("orphan not cleaned: %d %v", count, e)
+				}
+				if body, e := objects.Get(ctx, tracked.key); e == nil {
+					_ = body.Close()
+					t.Fatal("orphaned object")
+				}
+				return
+			}
 			if scenario != "flow" && !strings.HasPrefix(scenario, "delete-") {
 				database.failInsert = scenario == "insert-failure"
 				database.failComplete = scenario == "complete-failure" || scenario == "upload-restart"

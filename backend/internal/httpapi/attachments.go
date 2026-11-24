@@ -329,6 +329,10 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 		return
 	}
 	a, err = h.queries.CompleteAttachmentUpload(r.Context(), db.CompleteAttachmentUploadParams{ID: a.ID, ProjectID: project})
+	if errors.Is(err, pgx.ErrNoRows) {
+		attachmentError(w, http.StatusNotFound, "upload no longer available")
+		return
+	}
 	if err != nil {
 		// An ambiguous database response may have committed. Never delete its object here.
 		attachmentError(w, 503, "database unavailable")
