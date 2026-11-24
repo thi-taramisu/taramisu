@@ -22,7 +22,7 @@ x-authentik: &authentik
     test: [CMD, ak, healthcheck]
     interval: 5s
     timeout: 5s
-    start_period: 120s
+    start_period: 300s
     retries: 12
 
 services:
