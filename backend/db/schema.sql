@@ -38,6 +38,7 @@ CREATE TABLE tara_project (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     description text,
+    archived_at timestamptz,
     default_rating_method text CHECK (default_rating_method IN ('ATTACK_POTENTIAL', 'CVSS', 'ATTACK_VECTOR')),
     created_at timestamptz NOT NULL DEFAULT now()
 );

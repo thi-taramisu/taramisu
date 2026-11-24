@@ -38,6 +38,26 @@ export function titleRef({ id, code, title }: { id: string; code: string; title:
   return { id, code, name: title }
 }
 
+/** Item entry of the project; 404 like the item routes. */
+export function findItem(db: Map<string, StoredItem>, projectId: string, itemId: string) {
+  const entry = db.get(itemId)
+  if (!entry || entry.item.tara_project_id !== projectId) throw new ApiError(404, 'Item definition not found.')
+  return entry
+}
+
+/** Next display ID such as TS-4, counted over all items of the mock as for the other elements. */
+export function nextCode(prefix: 'TS' | 'AP', codes: string[]) {
+  return `${prefix}-${Math.max(0, ...codes.map((code) => Number(code.slice(prefix.length + 1)))) + 1}`
+}
+
+/** Rejects ids that are not elements of the item or are given twice, as a POST with links would (422). */
+export function validateLinkIds(ids: string[], known: { id: string }[], label: string) {
+  for (const id of ids) {
+    if (!known.some((element) => element.id === id)) throw new ApiError(422, `${label} ${id} is not part of the item.`)
+  }
+  if (new Set(ids).size !== ids.length) throw new ApiError(422, `Each ${label.toLowerCase()} can only be linked once.`)
+}
+
 /** Renames every occurrence of an element in the tree; shared elements appear below several parents. */
 export function renameNodes(nodes: TreeNode[], node: Pick<TreeNode, 'type' | 'id' | 'name'>) {
   for (const child of nodes) {
@@ -127,11 +147,4 @@ export function removeThreatAttackPathLink(entry: StoredItem, threatScenarioId: 
   removeLink(entry, entry.threatAttackPathLinks, isThreatAttackPathLink(threatScenarioId, attackPathId))
 }
 
-/** Runs `fn` like a request: async, with a copy of the result, errors as rejections. */
-export function run<T>(fn: () => T): Promise<T> {
-  try {
-    return Promise.resolve(structuredClone(fn()))
-  } catch (error) {
-    return Promise.reject(error)
-  }
-}
+export { run } from './request'

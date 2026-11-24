@@ -61,7 +61,9 @@ func (h *ProjectMembers) Register(api huma.API) {
 		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary, Description: description,
 			Tags: []string{"Project members"}, Security: []map[string][]string{{"bearer": {}}}}
 	}
-	project := func(permission Permission) Access { return InProject(h.access, ScopeProject("id"), permission) }
+	project := func(permission Permission) Access {
+		return InProject(h.access, ScopeProject("id"), permission).AllowArchived()
+	}
 	Register(api, op("list-project-members", http.MethodGet, collection, "List project members",
 		"Any project role. Names and email addresses are omitted when Authentik is unavailable."), project(PermRead), h.List)
 	create := op("add-project-member", http.MethodPost, collection, "Add a project member",

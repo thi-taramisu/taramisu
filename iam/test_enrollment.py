@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import json
 import os
 import unittest
 import urllib.parse
@@ -9,9 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from uuid import uuid4
 
+from django.conf import settings
+from django.forms.models import model_to_dict
 from requests import Session
 
 from authentik.core.models import User
+from authentik.flows.models import Flow, FlowStageBinding
+from authentik.policies.models import PolicyBinding
+from authentik.stages.identification.models import IdentificationStage
+from authentik.providers.oauth2.models import AccessToken
 
 BASE = f"http://authentik-server:9000{os.environ.get('AUTHENTIK_WEB__PATH', '').rstrip('/')}"
 
@@ -24,12 +31,20 @@ class EnrollmentTest(unittest.TestCase):
             lambda: User.objects.filter(username__istartswith=self.prefix).delete()
         )
 
-    def begin(self, slug="taramisu-enrollment", client=None):
+    def begin(self, slug="taramisu-enrollment", client=None, query=""):
         client = client or Session()
-        client.get(f"{BASE}/if/flow/{slug}/", timeout=20).raise_for_status()
-        url = f"{BASE}/api/v3/flows/executor/{slug}/"
-        client.get(url, timeout=20).raise_for_status()
-        return client, url
+        for _ in range(5):
+            client.get(f"{BASE}/if/flow/{slug}/?{query}", timeout=20).raise_for_status()
+            url = f"{BASE}/api/v3/flows/executor/{slug}/?" + urllib.parse.urlencode({"query": query})
+            response = client.get(url, timeout=20)
+            response.raise_for_status()
+            challenge = response.json()
+            if challenge["component"] != "xak-flow-redirect":
+                return client, url
+            target = urllib.parse.urlparse(challenge["to"])
+            slug = target.path.rstrip("/").split("/")[-1]
+            query = target.query
+        self.fail("Language routing did not converge")
 
     def post(self, flow, **data):
         client, url = flow
@@ -47,8 +62,8 @@ class EnrollmentTest(unittest.TestCase):
             password=self.password, password_repeat=self.password,
         )
 
-    def login(self, identifier, user=None):
-        flow = self.begin("default-authentication-flow")
+    def login(self, identifier, user=None, client=None):
+        flow = self.begin("default-authentication-flow", client)
         result = self.post(flow, component="ak-stage-identification", uid_field=identifier)
         if result["component"] == "ak-stage-password":
             result = self.post(flow, component="ak-stage-password", password=self.password)
@@ -62,6 +77,121 @@ class EnrollmentTest(unittest.TestCase):
         return User.objects.create_user(
             username=self.prefix + suffix, email=email, password=self.password,
         )
+
+    def language_client(self, language):
+        client = Session()
+        # The app selection must override the browser's preference and a stale IAM cookie.
+        client.headers["Accept-Language"] = "en" if language == "de" else "de"
+        client.cookies.set(settings.LANGUAGE_COOKIE_NAME, "en" if language == "de" else "de")
+        response = client.get(
+            f"{BASE}/application/o/authorize/",
+            params={
+                "client_id": "taramisu", "response_type": "code",
+                "redirect_uri": "http://localhost/auth/callback",
+                "code_challenge": "A" * 43, "code_challenge_method": "S256",
+                "ui_locales": language,
+            }, allow_redirects=False, timeout=20,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.cookies.get(settings.LANGUAGE_COOKIE_NAME), language)
+        self.assertEqual(
+            urllib.parse.parse_qs(urllib.parse.urlparse(response.headers["Location"]).query)["locale"],
+            [language],
+        )
+        # Drop the deliberately stale hostless cookie; use the server's scoped cookie.
+        client.cookies.clear(domain="", path="/", name=settings.LANGUAGE_COOKIE_NAME)
+        return client
+
+    def test_localized_authentication_security_bindings(self):
+        self.maxDiff = None
+
+        def policies(target, *, german_flow=False):
+            bindings = PolicyBinding.objects.filter(target=target)
+            if german_flow:
+                bindings = bindings.exclude(policy__name="taramisu-german-language", order=0)
+            result = []
+            for binding in bindings.order_by("order", "policy_id", "group_id", "user_id"):
+                settings = model_to_dict(binding, exclude=("target", "expires"))
+                if binding.expiring:
+                    settings["expires"] = binding.expires
+                result.append(settings)
+            return result
+
+        def flow_settings(slug, redirect, identification, *, german=False):
+            flow = Flow.objects.get(slug=slug)
+            identify = IdentificationStage.objects.get(name=identification)
+            stages = []
+            bindings = FlowStageBinding.objects.filter(target=flow).exclude(stage__name=redirect)
+            for binding in bindings.order_by("order", "stage__name"):
+                stage = binding.stage.name
+                if binding.stage_id == identify.pk:
+                    stage = model_to_dict(identify, exclude=("stage_ptr", "name", "enrollment_flow"))
+                stages.append((binding.order, stage, binding.policy_engine_mode,
+                               binding.evaluate_on_plan, binding.re_evaluate_policies,
+                               binding.invalid_response_action, policies(binding)))
+            return flow.policy_engine_mode, policies(flow, german_flow=german), stages
+
+        self.assertEqual(
+            flow_settings("default-authentication-flow", "taramisu-redirect-authentication-de",
+                          "default-authentication-identification"),
+            flow_settings("default-authentication-de", "taramisu-redirect-authentication-en",
+                          "taramisu-authentication-identification-de", german=True),
+        )
+
+    def test_localized_login_registration_and_validation(self):
+        for language in ("en", "de"):
+            with self.subTest(language=language):
+                german = language == "de"
+                client = self.language_client(language)
+                login = self.begin("default-authentication-flow", client)
+                challenge = client.get(login[1], timeout=20).json()
+                self.assertEqual(challenge["component"], "ak-stage-identification")
+                self.assertEqual(challenge["flow_info"]["title"],
+                                 "Bei Taramisu anmelden" if german else "Sign in to Taramisu")
+                enrollment_slug = urllib.parse.urlparse(challenge["enroll_url"]).path.rstrip("/").split("/")[-1]
+                flow = self.begin(enrollment_slug, client)
+                challenge = client.get(flow[1], timeout=20).json()
+                self.assertEqual(challenge["flow_info"]["title"],
+                                 "Für Taramisu registrieren" if german else "Register for Taramisu")
+                self.assertEqual([field["label"] for field in challenge["fields"]],
+                                 ["Benutzername", "Name", "E-Mail-Adresse", "Passwort", "Passwort bestätigen"]
+                                 if german else ["Username", "Name", "Email", "Password", "Confirm password"])
+                username = self.prefix + "-" + language
+                data = dict(component="ak-stage-prompt", username=" " + username + " ",
+                            email=username + "@example.com", name="Language test",
+                            password=self.password, password_repeat=self.password)
+                for changes, expected in (
+                    ({"password": "short", "password_repeat": "short"},
+                     "Verwende mindestens 12 Zeichen" if german else "Use at least 12 characters"),
+                    ({"username": "invalid@name"},
+                     "Verwende Buchstaben" if german else "Use letters"),
+                ):
+                    result = self.post(flow, **(data | changes))
+                    self.assertIn(expected, json.dumps(result, ensure_ascii=False))
+                    self.assertFalse(User.objects.filter(username=username).exists())
+                result = self.post(flow, **(data | {"password_repeat": "different"}))
+                self.assertIn("Passwörter stimmen nicht überein" if german else "Passwords don't match.",
+                              json.dumps(result, ensure_ascii=False))
+                result = self.post(flow, **data)
+                self.assertIn("Ein Administrator muss dein Konto freigeben" if german
+                              else "An administrator must approve your account", json.dumps(result, ensure_ascii=False))
+                user = User.objects.get(username=username)
+                self.assertFalse(user.is_active)
+                for candidate, email, expected in (
+                    (username, username + "-other@example.com",
+                     "Dieser Benutzername ist bereits vergeben." if german else "Username is already taken."),
+                    (username + "-other", user.email.upper(),
+                     "Diese E-Mail-Adresse wird bereits verwendet." if german else "Email address is already in use."),
+                ):
+                    result = self.enroll(candidate, email, self.begin(client=self.language_client(language)))
+                    self.assertIn(expected, json.dumps(result, ensure_ascii=False))
+                user.is_active = True
+                user.save()
+                self.seed("-collision-" + language, user.email)
+                _, result = self.login(user.email, client=self.language_client(language))
+                self.assertEqual(result["component"], "ak-stage-access-denied")
+                self.assertIn("Diese Anmeldekennung ist nicht eindeutig" if german
+                              else "This login identifier is ambiguous", json.dumps(result, ensure_ascii=False))
 
     def test_approval_and_identifier_validation(self):
         username = self.prefix + "-Mixed"
@@ -212,6 +342,7 @@ class EnrollmentTest(unittest.TestCase):
             params={
                 "client_id": "taramisu",
                 "response_type": "code",
+                "scope": "openid",
                 "redirect_uri": "http://localhost/auth/callback",
                 "code_challenge": challenge2,
                 "code_challenge_method": "S256",
@@ -253,6 +384,25 @@ class EnrollmentTest(unittest.TestCase):
             resp_bad_redirect.status_code == 302 and bad_redirect_loc.startswith("http://localhost:4444/"),
             f"Expected unapproved localhost redirect_uri to be rejected, got redirect to {bad_redirect_loc}",
         )
+
+        # Standard RP-initiated logout accepts only the registered return URL.
+        logout_params = {"id_token_hint": tokens["id_token"],
+                         "post_logout_redirect_uri": "https://untrusted.example/logout"}
+        response = client.get(f"{BASE}/application/o/taramisu/end-session/",
+                              params=logout_params, allow_redirects=False, timeout=20)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(AccessToken.objects.filter(user=user).exists())
+        logout_params["post_logout_redirect_uri"] = "http://localhost/projects"
+        response = client.get(f"{BASE}/application/o/taramisu/end-session/",
+                              params=logout_params, allow_redirects=False, timeout=20)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AccessToken.objects.filter(user=user).exists())
+        target = urllib.parse.urlparse(response.headers["Location"])
+        client.get(urllib.parse.urljoin(BASE + "/", response.headers["Location"]), timeout=20).raise_for_status()
+        result = client.get(f"{BASE}/api/v3/flows/executor/{target.path.rstrip('/').split('/')[-1]}/",
+                            params={"query": target.query}, timeout=20).json()
+        self.assertEqual(result["component"], "xak-flow-redirect")
+        self.assertEqual(result["to"], "http://localhost/projects")
 
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(EnrollmentTest)

@@ -12,7 +12,6 @@ import (
 )
 
 const getProjectRole = `-- name: GetProjectRole :one
-
 SELECT a.project_role
 FROM project_role_assignment a
 LEFT JOIN iam_group g ON g.id = a.group_id
@@ -28,7 +27,6 @@ type GetProjectRoleParams struct {
 	GroupIds  []string
 }
 
-// Project authorization (see docs/internal/architecture/iam/project-roles.md).
 // Highest role of the caller in a project, from a direct assignment or one of the caller's
 // Authentik groups (taramisu_groups claim). Returns no row when the caller has no role.
 func (q *Queries) GetProjectRole(ctx context.Context, arg GetProjectRoleParams) (ProjectRole, error) {
@@ -63,4 +61,17 @@ func (q *Queries) ProjectIDForThreatScenario(ctx context.Context, id pgtype.UUID
 	var tara_project_id pgtype.UUID
 	err := row.Scan(&tara_project_id)
 	return tara_project_id, err
+}
+
+const projectIsArchived = `-- name: ProjectIsArchived :one
+
+SELECT (archived_at IS NOT NULL)::boolean AS archived FROM tara_project WHERE id = $1
+`
+
+// Project authorization (see docs/internal/architecture/iam/project-roles.md).
+func (q *Queries) ProjectIsArchived(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, projectIsArchived, id)
+	var archived bool
+	err := row.Scan(&archived)
+	return archived, err
 }

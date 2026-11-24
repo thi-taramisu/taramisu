@@ -634,6 +634,7 @@ type TaraProject struct {
 	ID                  pgtype.UUID
 	Name                string
 	Description         *string
+	ArchivedAt          pgtype.Timestamptz
 	DefaultRatingMethod *string
 	CreatedAt           pgtype.Timestamptz
 }

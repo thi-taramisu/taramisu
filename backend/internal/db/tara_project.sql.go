@@ -11,16 +11,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveTaraProject = `-- name: ArchiveTaraProject :one
+UPDATE tara_project SET archived_at = COALESCE(archived_at, now()) WHERE id = $1 RETURNING id, name, description, archived_at, default_rating_method, created_at
+`
+
+func (q *Queries) ArchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
+	row := q.db.QueryRow(ctx, archiveTaraProject, id)
+	var i TaraProject
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.ArchivedAt,
+		&i.DefaultRatingMethod,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createTaraProject = `-- name: CreateTaraProject :one
 WITH project AS (
     INSERT INTO tara_project (name, description, default_rating_method)
     VALUES ($1, $2, $3)
-    RETURNING id, name, description, default_rating_method, created_at
+    RETURNING id, name, description, archived_at, default_rating_method, created_at
 ), owner AS (
     INSERT INTO project_role_assignment (tara_project_id, user_id, project_role)
     SELECT id, $4, 'OWNER' FROM project
 )
-SELECT id, name, description, default_rating_method, created_at FROM project
+SELECT id, name, description, archived_at, default_rating_method, created_at FROM project
 `
 
 type CreateTaraProjectParams struct {
@@ -34,6 +52,7 @@ type CreateTaraProjectRow struct {
 	ID                  pgtype.UUID
 	Name                string
 	Description         *string
+	ArchivedAt          pgtype.Timestamptz
 	DefaultRatingMethod *string
 	CreatedAt           pgtype.Timestamptz
 }
@@ -52,6 +71,7 @@ func (q *Queries) CreateTaraProject(ctx context.Context, arg CreateTaraProjectPa
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.ArchivedAt,
 		&i.DefaultRatingMethod,
 		&i.CreatedAt,
 	)
@@ -77,7 +97,7 @@ func (q *Queries) DeleteTaraProject(ctx context.Context, id pgtype.UUID) (Delete
 }
 
 const getTaraProject = `-- name: GetTaraProject :one
-SELECT id, name, description, default_rating_method, created_at FROM tara_project WHERE id = $1
+SELECT id, name, description, archived_at, default_rating_method, created_at FROM tara_project WHERE id = $1
 `
 
 func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
@@ -87,6 +107,7 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.ArchivedAt,
 		&i.DefaultRatingMethod,
 		&i.CreatedAt,
 	)
@@ -94,7 +115,7 @@ func (q *Queries) GetTaraProject(ctx context.Context, id pgtype.UUID) (TaraProje
 }
 
 const getTaraProjectForUpdate = `-- name: GetTaraProjectForUpdate :one
-SELECT id, name, description, default_rating_method, created_at FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
+SELECT id, name, description, archived_at, default_rating_method, created_at FROM tara_project WHERE id = $1 FOR NO KEY UPDATE
 `
 
 // The project before a settings change, locked until the transaction ends (see LockTaraProject).
@@ -105,6 +126,7 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.ArchivedAt,
 		&i.DefaultRatingMethod,
 		&i.CreatedAt,
 	)
@@ -112,11 +134,12 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 }
 
 const listTaraProjects = `-- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.default_rating_method, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.archived_at, p.default_rating_method, p.created_at, max(a.project_role)::project_role AS role
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
-WHERE a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[])
+WHERE (a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[]))
+AND ($3::boolean IS NULL OR (p.archived_at IS NOT NULL) = $3::boolean)
 GROUP BY p.id
 ORDER BY p.created_at DESC, p.id
 `
@@ -124,12 +147,14 @@ ORDER BY p.created_at DESC, p.id
 type ListTaraProjectsParams struct {
 	UserID   pgtype.UUID
 	GroupIds []string
+	Archived *bool
 }
 
 type ListTaraProjectsRow struct {
 	ID                  pgtype.UUID
 	Name                string
 	Description         *string
+	ArchivedAt          pgtype.Timestamptz
 	DefaultRatingMethod *string
 	CreatedAt           pgtype.Timestamptz
 	Role                ProjectRole
@@ -137,7 +162,7 @@ type ListTaraProjectsRow struct {
 
 // List only projects the caller has a role in, with the caller's highest role.
 func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsParams) ([]ListTaraProjectsRow, error) {
-	rows, err := q.db.Query(ctx, listTaraProjects, arg.UserID, arg.GroupIds)
+	rows, err := q.db.Query(ctx, listTaraProjects, arg.UserID, arg.GroupIds, arg.Archived)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +174,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 			&i.ID,
 			&i.Name,
 			&i.Description,
+			&i.ArchivedAt,
 			&i.DefaultRatingMethod,
 			&i.CreatedAt,
 			&i.Role,
@@ -164,7 +190,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 }
 
 const replaceTaraProject = `-- name: ReplaceTaraProject :one
-UPDATE tara_project SET name = $2, description = $3, default_rating_method = $4 WHERE id = $1 RETURNING id, name, description, default_rating_method, created_at
+UPDATE tara_project SET name = $2, description = $3, default_rating_method = $4 WHERE id = $1 RETURNING id, name, description, archived_at, default_rating_method, created_at
 `
 
 type ReplaceTaraProjectParams struct {
@@ -186,6 +212,25 @@ func (q *Queries) ReplaceTaraProject(ctx context.Context, arg ReplaceTaraProject
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.ArchivedAt,
+		&i.DefaultRatingMethod,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const unarchiveTaraProject = `-- name: UnarchiveTaraProject :one
+UPDATE tara_project SET archived_at = NULL WHERE id = $1 RETURNING id, name, description, archived_at, default_rating_method, created_at
+`
+
+func (q *Queries) UnarchiveTaraProject(ctx context.Context, id pgtype.UUID) (TaraProject, error) {
+	row := q.db.QueryRow(ctx, unarchiveTaraProject, id)
+	var i TaraProject
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.ArchivedAt,
 		&i.DefaultRatingMethod,
 		&i.CreatedAt,
 	)
@@ -198,7 +243,7 @@ SET name = COALESCE($1, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END,
     default_rating_method = CASE WHEN $4::boolean THEN $5::text ELSE default_rating_method END
 WHERE id = $6
-RETURNING id, name, description, default_rating_method, created_at
+RETURNING id, name, description, archived_at, default_rating_method, created_at
 `
 
 type UpdateTaraProjectParams struct {
@@ -224,6 +269,7 @@ func (q *Queries) UpdateTaraProject(ctx context.Context, arg UpdateTaraProjectPa
 		&i.ID,
 		&i.Name,
 		&i.Description,
+		&i.ArchivedAt,
 		&i.DefaultRatingMethod,
 		&i.CreatedAt,
 	)

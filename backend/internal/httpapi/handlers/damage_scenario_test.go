@@ -321,6 +321,8 @@ func TestDamageRoutesRequireAuthentication(t *testing.T) {
 	}
 }
 
+func (f *fakeDamage) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
+
 func (f *fakeDamage) GetDamageScenarioForUpdate(ctx context.Context, p db.GetDamageScenarioForUpdateParams) (db.DamageScenario, error) {
 	return f.GetDamageScenario(ctx, db.GetDamageScenarioParams(p))
 }

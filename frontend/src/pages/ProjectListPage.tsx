@@ -165,17 +165,13 @@ export function ProjectListPage() {
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
                             <ProjectImage projectId={project.id} image={project.image} className="size-14 rounded-md" />
-                            {project.id === exampleProject.id ? (
-                              <Link
-                                to={`/projects/${project.id}`}
-                                aria-label={t('ui:exampleProjectName', { name: project.name })}
-                                className="min-w-0 flex-1 hover:opacity-80"
-                              >
-                                {projectDetails}
-                              </Link>
-                            ) : (
-                              projectDetails
-                            )}
+                            <Link
+                              to={`/projects/${project.id}`}
+                              aria-label={project.id === exampleProject.id ? t('ui:exampleProjectName', { name: project.name }) : project.name}
+                              className="min-w-0 flex-1 hover:opacity-80"
+                            >
+                              {projectDetails}
+                            </Link>
 
                             <Button
                               type="button"

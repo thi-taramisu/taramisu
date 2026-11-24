@@ -59,6 +59,7 @@ jobs:
               - 'deploy/**'
               - 'iam/**'
               - 'proxy/**'
+              - 'storage/**'
               # deploy/dev.sh also builds and waits for the frontend and docs images.
               - 'frontend/**'
               - 'docs/docusaurus/**'
@@ -295,6 +296,9 @@ jobs:
 
       - name: Multi-replica & failover test
         run: make -C deploy test-stack
+
+      - name: Storage integration test
+        run: make -C deploy test-storage
 
       - name: Compose logs on failure
         if: failure()

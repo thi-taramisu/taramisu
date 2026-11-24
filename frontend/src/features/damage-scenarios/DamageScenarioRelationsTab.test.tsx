@@ -67,7 +67,7 @@ describe('damage scenario relations', () => {
     expect(dialog.queryByRole('button', { name: /TS-1/ })).not.toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-2/ })).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-3/ })).toBeInTheDocument()
-    expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeDisabled()
+    expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeEnabled()
   })
 
   it('links one threat scenario to several damage scenarios', async () => {

@@ -187,8 +187,8 @@ it('keeps the threat definition and relations translated when switching with an 
 })
 
 it.each([
-  ['en', 'New', ['Item', 'Damage Scenario', 'Asset', 'Threat Scenario', 'Attack Path']],
-  ['de', 'Neu', ['Item', 'Schadensszenario', 'Asset', 'Bedrohungsszenario', 'Angriffspfad']],
+  ['en', 'New', ['Item', 'Damage Scenario', 'Threat Scenario', 'Attack Path', 'Asset']],
+  ['de', 'Neu', ['Item', 'Schadensszenario', 'Bedrohungsszenario', 'Angriffspfad', 'Asset']],
 ] as const)('uses consistent glossary labels in the %s new-element menu', async (language, button, labels) => {
   await i18n.changeLanguage(language)
   const { user } = renderApp('/projects/headlamp/items/i-01')

@@ -37,6 +37,7 @@ export function useProjectAccess(projectId: string) {
 function useStoreProject() {
   const queryClient = useQueryClient()
   return (project: Project) => {
+    void queryClient.invalidateQueries({ queryKey: ['search'] })
     queryClient.setQueryData(keys.project(project.id), project)
     queryClient.setQueryData<Project[]>(keys.list, (projects) => {
       if (!projects) return projects
@@ -102,6 +103,7 @@ export function useDeleteProject() {
     onSuccess: (_, projectId) => {
       queryClient.setQueryData<Project[]>(keys.list, (projects) => projects?.filter((p) => p.id !== projectId))
       queryClient.removeQueries({ queryKey: keys.project(projectId) })
+      void queryClient.invalidateQueries({ queryKey: ['search'] })
       return queryClient.invalidateQueries({ queryKey: keys.list })
     },
   })
