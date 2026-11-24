@@ -192,7 +192,11 @@ func TestAttachmentsIntegration(t *testing.T) {
 						})
 					}
 				}
-				check(request("POST", base, user, data, ""), 503)
+				status := 503
+				if scenario == "put-failure" {
+					status = 500
+				}
+				check(request("POST", base, user, data, ""), status)
 				if tracked.deletes != 0 {
 					t.Fatal("error path deleted an object")
 				}
@@ -318,7 +322,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				t.Fatal("incorrect pagination")
 			}
 			tracked.failGet = true
-			check(request("GET", location, user, nil, ""), 503)
+			check(request("GET", location, user, nil, ""), 500)
 			tracked.failGet = false
 			for _, tag := range []string{etag, "W/" + etag, `"other", ` + etag, "*"} {
 				w = request("GET", location, user, nil, tag)

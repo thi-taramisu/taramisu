@@ -8389,8 +8389,11 @@
           "422": {
             "description": "Invalid project ID"
           },
+          "500": {
+            "description": "Storage operation failed"
+          },
           "503": {
-            "description": "Database or storage unavailable"
+            "description": "Database unavailable"
           }
         },
         "security": [
@@ -8466,8 +8469,11 @@
           "422": {
             "description": "Invalid project ID"
           },
+          "500": {
+            "description": "Storage operation failed"
+          },
           "503": {
-            "description": "Database or storage unavailable"
+            "description": "Database unavailable"
           }
         },
         "security": [
@@ -8524,8 +8530,11 @@
           "422": {
             "description": "Invalid project ID"
           },
+          "500": {
+            "description": "Storage operation failed"
+          },
           "503": {
-            "description": "Database or storage unavailable"
+            "description": "Database unavailable"
           }
         },
         "security": [
@@ -8596,8 +8605,11 @@
           "422": {
             "description": "Invalid project ID"
           },
+          "500": {
+            "description": "Storage operation failed"
+          },
           "503": {
-            "description": "Database or storage unavailable"
+            "description": "Database unavailable"
           }
         },
         "security": [

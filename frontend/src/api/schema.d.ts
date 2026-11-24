@@ -5807,7 +5807,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Database or storage unavailable */
+            /** @description Storage operation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Database unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5892,7 +5899,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Database or storage unavailable */
+            /** @description Storage operation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Database unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5966,7 +5980,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Database or storage unavailable */
+            /** @description Storage operation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Database unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -6036,7 +6057,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Database or storage unavailable */
+            /** @description Storage operation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Database unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

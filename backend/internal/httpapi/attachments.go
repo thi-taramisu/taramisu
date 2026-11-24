@@ -72,7 +72,7 @@ func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAc
 	} {
 		op := huma.Operation{Method: route.method, Path: route.path, OperationID: route.id, Summary: route.summary, Security: []map[string][]string{{"bearer": {}}},
 			Parameters: []*huma.Param{{Name: "project_id", In: "path", Required: true, Schema: &huma.Schema{Type: "string", Format: "uuid"}}},
-			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "422": {Description: "Invalid project ID"}, "404": {Description: "Not found"}, "503": {Description: "Database or storage unavailable"}},
+			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "422": {Description: "Invalid project ID"}, "404": {Description: "Not found"}, "500": {Description: "Storage operation failed"}, "503": {Description: "Database unavailable"}},
 		}
 		schema := api.OpenAPI().Components.Schemas.Schema(reflect.TypeOf(attachmentMetadata{}), true, "Attachment")
 		if strings.Contains(route.path, "{attachment_id}") {
@@ -230,7 +230,8 @@ func (h *Attachments) serve(w http.ResponseWriter, r *http.Request, userID strin
 	}
 	body, err := h.objects.Get(ctx, key)
 	if err != nil {
-		attachmentError(w, 503, "storage unavailable")
+		slog.Error("attachment storage operation failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "storage unavailable")
 		return
 	}
 	defer func() {
@@ -274,7 +275,8 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 	}
 	file, err := os.CreateTemp("", "taramisu-upload-*")
 	if err != nil {
-		attachmentError(w, 503, "upload buffer unavailable")
+		slog.Error("attachment upload buffer failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "upload buffer unavailable")
 		return
 	}
 	defer func() { _ = file.Close(); _ = os.Remove(file.Name()) }()
@@ -300,7 +302,8 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 	sample := make([]byte, 512)
 	count, err := file.ReadAt(sample, 0)
 	if err != nil && !errors.Is(err, io.EOF) {
-		attachmentError(w, 503, "upload buffer unavailable")
+		slog.Error("attachment upload buffer failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "upload buffer unavailable")
 		return
 	}
 	contentType := strings.Split(http.DetectContentType(sample[:count]), ";")[0]
@@ -309,7 +312,8 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 		return
 	}
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
-		attachmentError(w, 503, "upload buffer unavailable")
+		slog.Error("attachment upload buffer failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "upload buffer unavailable")
 		return
 	}
 	key := uuid.New()
@@ -320,7 +324,8 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 		return
 	}
 	if err = h.objects.Put(r.Context(), key.String(), contentType, n, file); err != nil {
-		attachmentError(w, 503, "storage unavailable")
+		slog.Error("attachment storage operation failed", "error", err)
+		attachmentError(w, http.StatusInternalServerError, "storage unavailable")
 		return
 	}
 	a, err = h.queries.CompleteAttachmentUpload(r.Context(), db.CompleteAttachmentUploadParams{ID: a.ID, ProjectID: project})
