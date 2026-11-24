@@ -1,10 +1,19 @@
-import type { PatchThreatScenarioBody, ThreatScenario, ThreatScenarioRelations, ThreatScenarioRisks, ThreatTarget } from '../models/threatScenario'
+import type {
+  PatchThreatScenarioBody,
+  ThreatScenario,
+  ThreatScenarioBody,
+  ThreatScenarioRelations,
+  ThreatScenarioRisks,
+  ThreatTarget,
+} from '../models/threatScenario'
 
 /**
  * Threat scenarios with their links. Mocked until the threat scenario endpoints exist; calls reject
  * with an `ApiError` like the item service.
  */
 export interface ThreatScenarioService {
+  /** Rejects with 422 if a damage scenario is not one of the item or is given twice. */
+  create(projectId: string, body: ThreatScenarioBody): Promise<ThreatScenario>
   get(projectId: string, threatScenarioId: string): Promise<ThreatScenario>
   update(projectId: string, threatScenarioId: string, body: PatchThreatScenarioBody): Promise<ThreatScenario>
   relations(projectId: string, threatScenarioId: string): Promise<ThreatScenarioRelations>
