@@ -64,12 +64,19 @@ Auth values: public means no login, user means logged in, and read, write and ma
 [project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
+Projects (#248): the list, creating, renaming (Settings, General) and deleting use `/api/v1/projects`. Favorites, archive, owner and
+image are mocked in memory until the backend has them. Every project opens its workspace, and the settings' Back link leads there.
+
+Items (#250): projects from the backend show their items from `/api/v1/projects/{project_id}/item-definitions` in the tree, without
+elements below them. "+ New" offers only items, the Definition tab edits the item, and the Assets and Risks tabs are
+placeholders. The example project (`headlamp`) keeps its mocked content.
+
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
 `&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.
-Items come from the item API in `frontend/src/api/`, an in-memory mock
-(`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
-item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
+Items come from the item API in `frontend/src/api/`: the backend's item routes, and for the example project an in-memory mock
+(`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`).
+The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 The damage scenario Relations tab (#185) links assets (with C / I / A) and threat scenarios of the owning item through the mock API. It is
 built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
@@ -140,3 +147,9 @@ The canvas handles pointer updates internally and saves positions when the drag 
 are determined by the default relation layout and remain fixed when nodes move, including across a neighbor.
 Moving a node never changes the source/target entities, arrow direction, or risk of a relation.
 It does not edit relations, calculate risk, persist layout, or connect to a graph backend. It is a local prototype for wireframe review.
+
+## Damage scenarios in real projects (#252)
+
+The existing flat damage-scenario URL remains unchanged. The service resolves its owning item through the selected project's
+item definitions and uses item-scoped backend routes. Real unlinked scenarios are visible below their item in the tree.
+Deleting returns to that item. The Headlamp example stays in its separate mock store.

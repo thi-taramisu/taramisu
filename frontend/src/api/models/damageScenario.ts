@@ -1,15 +1,15 @@
+import type { components } from '../schema'
 import type { CiaProperty } from './asset'
 import type { EntityRef } from './tree'
 
-// Damage scenarios follow `DAMAGE_SCENARIO` and `IMPACT_RATING` of the data model. A damage scenario
-// belongs to one item; several assets can lead to it. Not in the backend spec yet.
+type Schemas = components['schemas']
 
-export interface DamageScenario {
-  id: string
-  item_definition_id: string
-  /** Display ID such as DS-01; not in the DB schema yet (as for assets). */
+// View models normalize optional backend fields to null. Damage scenarios belong to one item;
+// several asset properties can lead to a scenario. Relations resolve backend property IDs.
+
+export type DamageScenario = Omit<Schemas['DamageScenarioBody'], 'functionality_adverse_relation' | 'road_user_harm_description'> & {
+  /** Empty until the backend supplies a display code. */
   code: string
-  title: string
   functionality_adverse_relation: string | null
   road_user_harm_description: string | null
 }
@@ -26,7 +26,7 @@ export type DamageScenarioBody = Pick<DamageScenario, 'item_definition_id' | 'ti
 }
 
 /** PATCH body: only the given fields change. */
-export type PatchDamageScenarioBody = Partial<Pick<DamageScenario, 'title' | 'functionality_adverse_relation' | 'road_user_harm_description'>>
+export type PatchDamageScenarioBody = Schemas['UpdateDamageScenarioInputBody']
 
 /** Asset linked to a damage scenario: `properties` are those of the asset, `linkedProperties` lead to the damage. */
 export interface LinkedAsset extends EntityRef {
@@ -40,9 +40,9 @@ export interface DamageScenarioRelations {
   threatScenarios: EntityRef[]
 }
 
-export type ImpactCategory = 'SAFETY' | 'FINANCIAL' | 'OPERATIONAL' | 'PRIVACY'
+export type ImpactCategory = Schemas['ImpactRatingFields']['impact_category']
 
-export type ImpactRatingValue = 'SEVERE' | 'MAJOR' | 'MODERATE' | 'NEGLIGIBLE' | 'OMITTED'
+export type ImpactRatingValue = NonNullable<Schemas['ImpactRatingFields']['rating_value']>
 
 export interface ImpactRating {
   id: string

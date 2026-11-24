@@ -31,10 +31,9 @@ const keys = {
 }
 
 /** Sidebar tree: the items of the project with the elements below them. */
-export function useProjectTree(projectId: string, { enabled = true } = {}) {
+export function useProjectTree(projectId: string) {
   const api = useApi()
   return useQuery({
-    enabled,
     queryKey: keys.tree(projectId),
     queryFn: async (): Promise<TreeNode[]> => {
       const items = await api.items.list(projectId)
@@ -66,9 +65,9 @@ export function useItem(projectId: string, itemId: string) {
   return useQuery({ queryKey: keys.item(projectId, itemId), queryFn: () => api.items.get(projectId, itemId) })
 }
 
-export function useItemAssets(projectId: string, itemId: string) {
+export function useItemAssets(projectId: string, itemId: string, { enabled = true } = {}) {
   const api = useApi()
-  return useQuery({ queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
+  return useQuery({ enabled, queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
 }
 
 export function useItemRisks(projectId: string, itemId: string) {
@@ -164,21 +163,34 @@ export function useCreateDamageScenario(projectId: string) {
   return useMutation({ mutationFn: (body: DamageScenarioBody) => api.damageScenarios.create(projectId, body), onSuccess: invalidate })
 }
 
-export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
+export function useDeleteDamageScenario(projectId: string, damageScenarioId: string) {
   const api = useApi()
+  const queryClient = useQueryClient()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({
+    mutationFn: () => api.damageScenarios.delete(projectId, damageScenarioId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: keys.damageScenario(projectId, damageScenarioId) })
+      return invalidate()
+    },
+  })
+}
+
+export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const storeSaved = useStoreSaved(projectId, keys.damageScenario(projectId, damageScenarioId))
+  return useMutation({
     mutationFn: (body: PatchDamageScenarioBody) => api.damageScenarios.update(projectId, damageScenarioId, body),
-    onSuccess: invalidate,
+    onSuccess: storeSaved,
   })
 }
 
 export function useUpdateImpactRatings(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const invalidate = useInvalidateProject(projectId)
+  const storeSaved = useStoreSaved(projectId, keys.impactRatings(projectId, damageScenarioId))
   return useMutation({
     mutationFn: (body: ImpactRatingBody[]) => api.damageScenarios.updateImpactRatings(projectId, damageScenarioId, body),
-    onSuccess: invalidate,
+    onSuccess: storeSaved,
   })
 }
 

@@ -45,8 +45,10 @@ src/
   test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
-All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
-`/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
+All routes from the concept exist, most of them as placeholders. Start at `/projects` and open a project, or the hard-coded example project,
+e.g. `/projects/headlamp/items/i-01` for the item pages. The project list and the items of a project come from the backend
+(`/api/v1/projects`, `/api/v1/projects/{project_id}/item-definitions`); assets, risks and scenarios exist only in the example project,
+which the mock APIs serve, so its changes last until reload.
 The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
@@ -84,6 +86,9 @@ forwards the full URI. So the base URL is only the origin: same origin by defaul
 src/api/
   client.ts, schema.d.ts   # REAL: openapi-fetch client, types generated from backend/openapi.json
   queries/backend.ts       # REAL: hooks on the client (health, current user)
+  projects.ts              # REAL: ProjectService on /api/v1/projects, with mocked extras (see below)
+  items.ts                 # REAL: ItemService on /api/v1/projects/{project_id}/item-definitions (see below)
+  unwrap.ts                # turns openapi-fetch results into data or an ApiError
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
   services/                # service interfaces the views use (e.g. ItemService, ProjectService)
@@ -92,10 +97,18 @@ src/api/
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
 
-`src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
-`ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
-model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
-that has no service yet (project settings, example project).
+`ApiProvider` decides between real and mock services: by default it provides the real client, project and item services and the mock
+scenario services; tests pass mocks through its `api` prop. Once a route is in the spec, implement its service on the client (rejecting
+with `ApiError` and the HTTP status), derive the model from `components['schemas']` in `schema.d.ts`, and use it as the default in
+`ApiProvider`.
+
+Project fields the backend does not have yet (`favorite`, `archived`, `owner`, `image`) come from `mocks/mockProjectExtras.ts`, kept in
+memory by project ID and reset on reload; each is marked with the issue that moves it to the backend. The example project (`headlamp`) is
+served by the mock project and item APIs until it exists in the backend; the real services hand its calls to them
+(`isExampleProject` in `mocks/data/headlamp.ts`). Real items have nothing below them yet: their content is empty, the Assets and Risks tabs
+are placeholders (`features/workspace/ExampleProjectOnly.tsx`) and "+ New" offers only items. The E2E tests run without a backend and stub
+`/api/v1/projects` and the item routes with `e2e/support/projectsApi.ts` and `e2e/support/itemsApi.ts`. Components never import from
+`mocks/` except for data that has no service yet (project settings, example project).
 
 Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
 instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
@@ -133,6 +146,31 @@ Mock data and newly created mock elements use this format directly.
 Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
 Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
 by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Damage scenario API (#252)
+
+Damage scenarios and impact ratings use the typed backend client for real projects. Headlamp remains an isolated mock example.
+This integration builds on the item and project CRUD services from #250 and #248.
+
+The New menu can create a damage scenario in an existing item. Backend scenarios without asset links appear directly below their item.
+Definition changes use PATCH; deleting a scenario removes its ratings and links and returns to the item.
+The real creation flow permits an initially unlinked scenario while asset creation is integrated in #251.
+
+The adapter resolves the owning item within the selected project and loads complete paginated collections.
+Relations translate C/I/A selections to backend cybersecurity-property IDs. Impact ratings are read per scenario and saved per
+category with POST or PUT, including incomplete drafts and clearing a rating. Retrying a partial save reuses stored rows.
+If the initial asset links fail, creation removes the newly created scenario before reporting the error.
+Backend errors retain their HTTP status and never switch a real request to mock data.
+
+The backend does not provide display codes yet, so none are synthesized. Existing threat links display their technical IDs
+until threat-scenario CRUD supplies names. Frontend API and browser tests intercept HTTP requests using the OpenAPI contract;
+they do not replace a deployed-backend acceptance test.
+
+Analysis content is editable by owners and editors only; archived projects remain read-only.
+Successful damage scenario and impact rating saves update the query cache immediately, then refresh
+related views in the background. A failed refresh keeps the saved data. Logout or an account change
+cancels pending project queries and clears project and analysis data from the cache; token refresh
+preserves it.
 
 ## Localization checks
 

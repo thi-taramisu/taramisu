@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
+import { isExampleProject } from '../../api/mocks/data/headlamp'
 import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
 
@@ -21,6 +22,7 @@ interface NewElementMenuProps {
 /** "+ New" button above the element tree (Add Items wireframes). */
 export function NewElementMenu({ projectId, projectName, disabled = false }: NewElementMenuProps) {
   const { t } = useTranslation()
+  const canCreateMockElements = isExampleProject(projectId)
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
   const [threatScenarioDialog, setThreatScenarioDialog] = useState({ open: false, key: 0 })
@@ -43,17 +45,21 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.damage-scenarios')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            {t('entities.threat-scenarios')}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            {t('entities.attack-paths')}
-          </DropdownMenuItem>
-          {OTHER_TYPES.map((label) => (
-            <DropdownMenuItem key={label} disabled>
-              {t(`entities.${label}`)}
-            </DropdownMenuItem>
-          ))}
+          {canCreateMockElements && (
+            <>
+              <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+                {t('entities.threat-scenarios')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+                {t('entities.attack-paths')}
+              </DropdownMenuItem>
+              {OTHER_TYPES.map((label) => (
+                <DropdownMenuItem key={label} disabled>
+                  {t(`entities.${label}`)}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <CreateItemDialog
@@ -74,7 +80,7 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           returnFocusTo={newButton}
         />
       )}
-      {threatScenarioDialog.key > 0 && (
+      {canCreateMockElements && threatScenarioDialog.key > 0 && (
         <CreateThreatScenarioDialog
           key={`threat-scenario-${threatScenarioDialog.key}`}
           projectId={projectId}
@@ -84,7 +90,7 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           returnFocusTo={newButton}
         />
       )}
-      {attackPathDialog.key > 0 && (
+      {canCreateMockElements && attackPathDialog.key > 0 && (
         <CreateAttackPathDialog
           key={`attack-path-${attackPathDialog.key}`}
           projectId={projectId}

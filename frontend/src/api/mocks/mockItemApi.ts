@@ -27,8 +27,8 @@ import {
 import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
-// MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
-// once the item routes (#83) are in `backend/openapi.json`.
+// MOCK: in-memory item API for tests and the example project, which the real item service (`../items.ts`)
+// serves from it.
 
 function seed(): Map<string, StoredItem> {
   const [headlamp] = exampleProject.tree
@@ -217,6 +217,17 @@ export function createMockItemApi(): ItemApi {
           }
           return scenario
         }),
+      delete: (projectId, damageScenarioId) => run(() => {
+        const { entry } = findDamageScenario(projectId, damageScenarioId)
+        entry.damageScenarios = entry.damageScenarios.filter((row) => row.id !== damageScenarioId)
+        entry.damageScenarioLinks = entry.damageScenarioLinks.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.threatDamageLinks = entry.threatDamageLinks.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.impactRatings = entry.impactRatings.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.risks = entry.risks.map((group) => ({
+          ...group, rows: group.rows.filter((row) => row.damageScenario?.id !== damageScenarioId),
+        }))
+        syncLinks(entry)
+      }),
       get: (projectId, damageScenarioId) => run(() => findDamageScenario(projectId, damageScenarioId).scenario),
       update: (projectId, damageScenarioId, body) =>
         run(() => {

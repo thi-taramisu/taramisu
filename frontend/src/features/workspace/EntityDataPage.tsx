@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { isNotFound } from '../../api/errors'
@@ -10,11 +11,12 @@ interface EntityDataPageProps {
   type: EntityType
   projectId: string
   entity: UseQueryResult<{ code: string; title: string }>
+  actions?: ReactNode
   tabCounts?: Record<string, number>
 }
 
 /** Page of an element loaded from its API, with the not-found, loading and error states around `EntityPage`. */
-export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDataPageProps) {
+export function EntityDataPage({ type, projectId, entity, tabCounts, actions }: EntityDataPageProps) {
   const { t } = useTranslation()
 
   if (isNotFound(entity.error)) {
@@ -43,12 +45,15 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
       code={formatEntityId(entity.data.code)}
       tabCounts={tabCounts}
       actions={
-        // A failed refetch keeps the loaded element, so unsaved edits in the tabs survive.
-        entity.isError && (
+        <>
+        {actions}
+        {/* A failed refetch keeps the loaded element, so unsaved edits in the tabs survive. */}
+        {entity.isError && (
           <p role="alert" className="self-center text-sm text-destructive">
             {t(`ui:entityStates.${type}.refreshError`)}
           </p>
-        )
+        )}
+        </>
       }
     />
   )

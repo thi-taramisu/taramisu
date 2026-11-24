@@ -1,7 +1,11 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { createApiClient, type ApiClient } from './client'
+import { createItemApi } from './items'
 import { createMockItemApi } from './mocks/mockItemApi'
-import { createMockProjectApi } from './mocks/mockProjectApi'
+import { createExampleProjectApi } from './mocks/mockProjectApi'
+import { createMockProjectExtras } from './mocks/mockProjectExtras'
+import { createProjectApi } from './projects'
 import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
@@ -10,8 +14,8 @@ import type { ThreatScenarioService } from './services/threatScenarios'
 import { useAuth } from '@/auth/useAuth'
 
 /**
- * Everything the app reads from the backend. `client` always talks to the real backend; the services
- * are mocks until their routes are in `backend/openapi.json` (see `main.tsx`).
+ * Everything the app reads from the backend. Projects, items, damage scenarios and impact ratings use
+ * the real backend. The example project stays mocked. Tests pass mocks through `api`.
  */
 export interface Api {
   client: ApiClient
@@ -32,9 +36,31 @@ export function ApiProvider({
   api?: Partial<Api>
   children: ReactNode
 }) {
-  const { accessToken, signOut } = useAuth()
-  const defaultMocks = useMemo(() => createMockItemApi(), [])
-  const defaultProjects = useMemo(() => createMockProjectApi(), [])
+  const { accessToken, signOut, status, user } = useAuth()
+  const queryClient = useQueryClient()
+  const session = status === 'authenticated' ? user?.sub ?? 'authenticated' : null
+  const previousSession = useRef(session)
+
+  useEffect(() => {
+    const previous = previousSession.current
+    previousSession.current = session
+    if (previous === null || previous === session) return
+    const filter = {
+      predicate: (query: { queryKey: readonly unknown[] }) =>
+        query.queryKey[0] === 'projects' || query.queryKey[0] === 'project-list',
+    }
+    // Cancel first so a late response cannot restore private data after logout or an account switch.
+    void queryClient.cancelQueries(filter)
+    // Reset also notifies mounted views; removing alone leaves their last result visible.
+    for (const query of queryClient.getQueryCache().findAll(filter)) query.reset()
+    queryClient.removeQueries(filter)
+  }, [session, queryClient])
+  // Created once, so the mocked parts survive a new token (and with it a new client).
+  const itemMocks = useMemo(() => createMockItemApi(), [])
+  const projectMocks = useMemo(
+    () => ({ extras: createMockProjectExtras(), example: createExampleProjectApi() }),
+    [],
+  )
 
   const client = useMemo(
     () =>
@@ -47,16 +73,18 @@ export function ApiProvider({
       }),
     [accessToken, api?.client, signOut],
   )
+  const defaultProjects = useMemo(() => createProjectApi(client, projectMocks), [client, projectMocks])
+  const defaultItems = useMemo(() => createItemApi(client, itemMocks), [client, itemMocks])
 
   const value = useMemo<Api>(
     () => ({
       client,
       projects: api?.projects ?? defaultProjects,
-      items: api?.items ?? defaultMocks.items,
-      content: api?.content ?? defaultMocks.content,
-      damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
-      threatScenarios: api?.threatScenarios ?? defaultMocks.threatScenarios,
-      attackPaths: api?.attackPaths ?? defaultMocks.attackPaths,
+      items: api?.items ?? defaultItems.items,
+      content: api?.content ?? defaultItems.content,
+      damageScenarios: api?.damageScenarios ?? defaultItems.damageScenarios,
+      threatScenarios: api?.threatScenarios ?? defaultItems.threatScenarios,
+      attackPaths: api?.attackPaths ?? defaultItems.attackPaths,
     }),
     [
       api?.attackPaths,
@@ -66,7 +94,7 @@ export function ApiProvider({
       api?.projects,
       api?.threatScenarios,
       client,
-      defaultMocks,
+      defaultItems,
       defaultProjects,
     ],
   )

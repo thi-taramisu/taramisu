@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { stubProjectsApi } from './support/projectsApi.ts'
+
+// `vite preview` runs without the backend; the example project is listed once the project list loads.
+test.beforeEach(async ({ page }) => {
+  await stubProjectsApi(page)
+})
 
 test('defaults to light even with a dark system preference; persists across pages and reloads', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
