@@ -29,7 +29,7 @@ export function useProjectAccess(projectId: string) {
   const { data: project } = useProject(projectId)
   return {
     archived: project?.archived ?? false,
-    canEdit: project !== undefined && !project.archived,
+    canEdit: project !== undefined && !project.archived && (project.role === 'OWNER' || project.role === 'EDITOR'),
   }
 }
 

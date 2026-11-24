@@ -166,19 +166,19 @@ export function useDeleteDamageScenario(projectId: string, damageScenarioId: str
 
 export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const invalidate = useInvalidateProject(projectId)
+  const storeSaved = useStoreSaved(projectId, keys.damageScenario(projectId, damageScenarioId))
   return useMutation({
     mutationFn: (body: PatchDamageScenarioBody) => api.damageScenarios.update(projectId, damageScenarioId, body),
-    onSuccess: invalidate,
+    onSuccess: storeSaved,
   })
 }
 
 export function useUpdateImpactRatings(projectId: string, damageScenarioId: string) {
   const api = useApi()
-  const invalidate = useInvalidateProject(projectId)
+  const storeSaved = useStoreSaved(projectId, keys.impactRatings(projectId, damageScenarioId))
   return useMutation({
     mutationFn: (body: ImpactRatingBody[]) => api.damageScenarios.updateImpactRatings(projectId, damageScenarioId, body),
-    onSuccess: invalidate,
+    onSuccess: storeSaved,
   })
 }
 

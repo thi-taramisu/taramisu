@@ -165,3 +165,9 @@ Backend errors retain their HTTP status and never switch a real request to mock 
 The backend does not provide display codes yet, so none are synthesized. Existing threat links display their technical IDs
 until threat-scenario CRUD supplies names. Frontend API and browser tests intercept HTTP requests using the OpenAPI contract;
 they do not replace a deployed-backend acceptance test.
+
+Analysis content is editable by owners and editors only; archived projects remain read-only.
+Successful damage scenario and impact rating saves update the query cache immediately, then refresh
+related views in the background. A failed refresh keeps the saved data. Logout or an account change
+cancels pending project queries and clears project and analysis data from the cache; token refresh
+preserves it.

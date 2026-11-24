@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
@@ -7,6 +8,7 @@ import { ApiProvider, useApi } from './ApiProvider'
 describe('ApiProvider', () => {
   it('preserves mock service instances and created data across access-token changes', async () => {
     let currentToken = 'initial-token'
+    const queryClient = new QueryClient()
 
     function TestWrapper({ children }: { children: ReactNode }) {
       const authValue: AuthContextValue = {
@@ -19,7 +21,7 @@ describe('ApiProvider', () => {
       }
       return (
         <AuthContext.Provider value={authValue}>
-          <ApiProvider>{children}</ApiProvider>
+          <QueryClientProvider client={queryClient}><ApiProvider>{children}</ApiProvider></QueryClientProvider>
         </AuthContext.Provider>
       )
     }
@@ -38,9 +40,13 @@ describe('ApiProvider', () => {
     const fetchedBefore = await result.current.items.get(projectId, created.id)
     expect(fetchedBefore.name).toBe('Battery Management System')
 
+    queryClient.setQueryData(['projects', 'private', 'details'], { name: 'Private project' })
+
     // Simulate token refresh (accessToken change)
     currentToken = 'refreshed-token-123'
     rerender()
+
+    expect(queryClient.getQueryData(['projects', 'private', 'details'])).toEqual({ name: 'Private project' })
 
     // Verify the created item still exists in the mock service after token change
     const fetchedAfter = await result.current.items.get(projectId, created.id)
