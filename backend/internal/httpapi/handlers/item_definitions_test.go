@@ -36,6 +36,7 @@ type itemStore struct {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore

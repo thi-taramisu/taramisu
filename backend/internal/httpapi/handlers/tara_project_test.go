@@ -23,6 +23,7 @@ const projectID = "11111111-1111-1111-1111-111111111111"
 type fakeProjects struct {
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	statusReaderFunc
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore

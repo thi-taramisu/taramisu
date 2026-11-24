@@ -30,6 +30,7 @@ type propertyQueries struct {
 
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 
 	resourceAccess
 	handlers.ProjectMemberStore

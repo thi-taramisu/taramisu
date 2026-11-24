@@ -46,6 +46,7 @@ type fakeDamage struct {
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore

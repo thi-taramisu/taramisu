@@ -36,6 +36,7 @@ type assetStore struct {
 
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 
 	handlers.AssetStore
 	handlers.TaraProjectStore

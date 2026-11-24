@@ -42,6 +42,7 @@ type fakeAttackAccess struct {
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.DamageScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
