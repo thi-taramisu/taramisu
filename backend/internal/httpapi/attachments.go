@@ -313,21 +313,19 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 		return
 	}
 	key := uuid.New()
-	cleanup := func(parent context.Context) {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 10*time.Second)
-		defer cancel()
-		if e := h.objects.Delete(ctx, key.String()); e != nil {
-			slog.Error("cleanup attachment object", "key", key.String(), "error", e)
-		}
+	// Persist intent before storage so failed or interrupted uploads remain recoverable.
+	a, err := h.queries.CreateAttachment(r.Context(), db.CreateAttachmentParams{ProjectID: project, FileName: name, ContentType: contentType, SizeBytes: n, Sha256: hex.EncodeToString(hash.Sum(nil)), S3ObjectKey: pgtype.UUID{Bytes: key, Valid: true}, UploadedBy: user})
+	if err != nil {
+		attachmentError(w, 503, "database unavailable")
+		return
 	}
 	if err = h.objects.Put(r.Context(), key.String(), contentType, n, file); err != nil {
-		cleanup(r.Context())
 		attachmentError(w, 503, "storage unavailable")
 		return
 	}
-	a, err := h.queries.CreateAttachment(r.Context(), db.CreateAttachmentParams{ProjectID: project, FileName: name, ContentType: contentType, SizeBytes: n, Sha256: hex.EncodeToString(hash.Sum(nil)), S3ObjectKey: pgtype.UUID{Bytes: key, Valid: true}, UploadedBy: user})
+	a, err = h.queries.CompleteAttachmentUpload(r.Context(), db.CompleteAttachmentUploadParams{ID: a.ID, ProjectID: project})
 	if err != nil {
-		cleanup(r.Context())
+		// An ambiguous database response may have committed. Never delete its object here.
 		attachmentError(w, 503, "database unavailable")
 		return
 	}

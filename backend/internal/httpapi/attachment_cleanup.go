@@ -11,6 +11,7 @@ import (
 )
 
 // RunCleanup resumes persisted deletions at startup and every minute. Multiple
+// Pending uploads get a ten-minute grace period, beyond the two-minute request timeout.
 // API replicas may process the same row: both S3 and metadata deletes are idempotent.
 func (h *Attachments) RunCleanup(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)

@@ -55,13 +55,24 @@ func TestAttachmentPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !attachment.ID.Valid || !attachment.CreatedAt.Valid || attachment.DeletePending || attachment.SizeBytes != input.SizeBytes || attachment.Sha256 != input.Sha256 {
+	if !attachment.ID.Valid || !attachment.CreatedAt.Valid || !attachment.DeletePending || attachment.SizeBytes != input.SizeBytes || attachment.Sha256 != input.Sha256 {
 		t.Fatalf("incorrect persisted metadata: %+v", attachment)
+	}
+	rows, err := queries.ListAttachments(ctx, db.ListAttachmentsParams{ProjectID: project, Limit: 1})
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("upload intent visible: %v %v", rows, err)
+	}
+	if _, err = queries.CompleteAttachmentUpload(ctx, db.CompleteAttachmentUploadParams{ProjectID: otherProject, ID: attachment.ID}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("cross-project publication: %v", err)
+	}
+	attachment, err = queries.CompleteAttachmentUpload(ctx, db.CompleteAttachmentUploadParams{ProjectID: project, ID: attachment.ID})
+	if err != nil || attachment.DeletePending {
+		t.Fatalf("publish upload: %v %v", attachment, err)
 	}
 	if _, err = queries.GetAttachment(ctx, db.GetAttachmentParams{ProjectID: otherProject, ID: attachment.ID}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("cross-project lookup: %v", err)
 	}
-	rows, err := queries.ListAttachments(ctx, db.ListAttachmentsParams{ProjectID: project, Limit: 1})
+	rows, err = queries.ListAttachments(ctx, db.ListAttachmentsParams{ProjectID: project, Limit: 1})
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("list: %v %v", rows, err)
 	}
@@ -121,6 +132,14 @@ func TestAttachmentPersistence(t *testing.T) {
 		t.Fatalf("pending attachment listed: %v %v", rows, err)
 	}
 	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("fresh intent eligible for cleanup: %v %v", rows, err)
+	}
+	exec("UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE id=$1", attachment.ID)
+	if _, err = queries.CompleteAttachmentUpload(ctx, db.CompleteAttachmentUploadParams{ProjectID: project, ID: attachment.ID}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("expired intent published: %v", err)
+	}
+	rows, err = queries.ListPendingAttachmentDeletions(ctx, pgtype.UUID{Valid: true})
 	if err != nil || len(rows) != 1 || rows[0].ID != attachment.ID || !rows[0].DeletePending {
 		t.Fatalf("cleanup queue: %v %v", rows, err)
 	}
@@ -140,6 +159,10 @@ func TestAttachmentPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err = queries.CompleteAttachmentUpload(ctx, db.CompleteAttachmentUploadParams{ProjectID: project, ID: attachment.ID}); err != nil {
+		t.Fatal(err)
+	}
+	exec("UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE id=$1", attachment.ID)
 	// A rolled-back project deletion must not leave a file queued for cleanup.
 	exec("SAVEPOINT project_deletion")
 	exec("DELETE FROM tara_project WHERE id=$1", project)

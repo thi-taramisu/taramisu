@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,7 +68,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
+	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "complete-failure", "complete-ambiguous", "upload-restart", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -95,6 +96,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				exec(`INSERT INTO attachment(id,project_id,file_name,content_type,size_bytes,sha256,s3_object_key,uploaded_by,delete_pending)
                       SELECT lpad(to_hex(n),32,'0')::uuid,$1,'pending','text/plain',1,repeat('a',64),gen_random_uuid(),$2,true
                       FROM generate_series(1,105) n`, project, user)
+				exec("UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE project_id=$1", project)
 				if e = tx.QueryRow(ctx, "SELECT s3_object_key::text FROM attachment WHERE project_id=$1 ORDER BY id LIMIT 1", project).Scan(&tracked.failKey); e != nil {
 					t.Fatal(e)
 				}
@@ -163,13 +165,97 @@ func TestAttachmentsIntegration(t *testing.T) {
 			}
 			data := []byte("attachment content\n")
 			if scenario != "flow" && !strings.HasPrefix(scenario, "delete-") {
-				if scenario == "insert-failure" {
-					tracked.afterPut = func() { _ = tx.Rollback(ctx) }
-				}
+				database.failInsert = scenario == "insert-failure"
+				database.failComplete = scenario == "complete-failure" || scenario == "upload-restart"
+				database.ambiguousComplete = scenario == "complete-ambiguous"
 				tracked.failPut = scenario == "put-failure"
+				tracked.beforePut = func() {
+					var pending bool
+					if e = tx.QueryRow(ctx, "SELECT delete_pending FROM attachment WHERE s3_object_key=$1", tracked.key).Scan(&pending); e != nil || !pending {
+						t.Fatalf("upload intent missing before storage: %v %v", pending, e)
+					}
+					if e = h.cleanupPending(ctx); e != nil {
+						t.Fatal(e)
+					}
+					if tracked.deletes != 0 {
+						t.Fatal("cleanup touched an active upload")
+					}
+					if scenario == "cancelled-upload" {
+						if e = tx.Commit(ctx); e != nil {
+							t.Fatal(e)
+						}
+						database.DBTX = pool
+						t.Cleanup(func() {
+							_, _ = pool.Exec(ctx, "DELETE FROM attachment WHERE project_id=$1", project)
+							_, _ = pool.Exec(ctx, "DELETE FROM tara_project WHERE id=$1", project)
+							_, _ = pool.Exec(ctx, "DELETE FROM iam_user WHERE id=$1 OR id=$2", user, other)
+						})
+					}
+				}
 				check(request("POST", base, user, data, ""), 503)
-				if tracked.key == "" || tracked.deletes != 1 {
-					t.Fatal("failed insert did not clean up object")
+				if tracked.deletes != 0 {
+					t.Fatal("error path deleted an object")
+				}
+				if scenario == "insert-failure" {
+					if tracked.key != "" {
+						t.Fatal("storage touched before intent persisted")
+					}
+					return
+				}
+				if scenario == "complete-ambiguous" {
+					exec("UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE project_id=$1", project)
+					if e = h.cleanupPending(ctx); e != nil {
+						t.Fatal(e)
+					}
+					if tracked.deletes != 0 {
+						t.Fatal("ambiguous success deleted a visible object")
+					}
+					listed := request("GET", base, user, nil, "")
+					check(listed, 200)
+					if listed.Body.String() == "[]\n" {
+						t.Fatal("committed attachment hidden")
+					}
+					body, e := objects.Get(ctx, tracked.key)
+					if e != nil {
+						t.Fatal(e)
+					}
+					_ = body.Close()
+					return
+				}
+				listed := request("GET", base, user, nil, "")
+				check(listed, 200)
+				if listed.Body.String() != "[]\n" {
+					t.Fatal("pending upload visible")
+				}
+				if _, e = database.Exec(ctx, "UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE project_id=$1", project); e != nil {
+					t.Fatal(e)
+				}
+				cleanupDB := database.DBTX
+				if scenario == "upload-restart" {
+					if e = tx.Commit(ctx); e != nil {
+						t.Fatal(e)
+					}
+					cleanupDB = pool
+					t.Cleanup(func() {
+						_, _ = pool.Exec(ctx, "DELETE FROM tara_project WHERE id=$1", project)
+						_, _ = pool.Exec(ctx, "DELETE FROM iam_user WHERE id=$1 OR id=$2", user, other)
+					})
+				}
+				restarted := NewAttachments(db.New(cleanupDB), tracked)
+				tracked.failDelete = true
+				if e = restarted.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				var count int
+				if e = cleanupDB.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE project_id=$1", project).Scan(&count); e != nil || count != 1 {
+					t.Fatalf("lost durable intent: %d %v", count, e)
+				}
+				tracked.failDelete = false
+				if e = restarted.cleanupPending(ctx); e != nil {
+					t.Fatal(e)
+				}
+				if e = cleanupDB.QueryRow(ctx, "SELECT count(*) FROM attachment WHERE project_id=$1", project).Scan(&count); e != nil || count != 0 {
+					t.Fatalf("intent not cleaned: %d %v", count, e)
 				}
 				if body, e := objects.Get(ctx, tracked.key); e == nil {
 					_ = body.Close()
@@ -177,6 +263,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 				return
 			}
+
 			check(request("GET", base, "", nil, ""), 401)
 			check(request("POST", base, other, data, ""), 404)
 			check(request("GET", base, other, nil, ""), 404)
@@ -302,6 +389,9 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 				check(request("GET", location, user, nil, ""), 404)
 				check(request("GET", location, user, nil, etag), 404)
+				if _, e = pool.Exec(ctx, "UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE id=$1", meta.ID); e != nil {
+					t.Fatal(e)
+				}
 				// The retry loop also tolerates a still-failing dependency.
 				if scenario != "delete-restart" && scenario != "delete-replicas" {
 					if e = h.cleanupPending(ctx); e != nil {
@@ -401,11 +491,15 @@ type trackedObjects struct {
 	deletes    int
 	failPut    bool
 	failGet    bool
+	beforePut  func()
 	afterPut   func()
 }
 
 func (s *trackedObjects) Put(ctx context.Context, key, kind string, size int64, r io.ReadSeeker) error {
 	s.key = key
+	if s.beforePut != nil {
+		s.beforePut()
+	}
 	err := s.ObjectStore.Put(ctx, key, kind, size, r)
 	if err == nil && s.afterPut != nil {
 		s.afterPut()
@@ -517,8 +611,9 @@ func TestRejectUnsupportedDeclaredAttachmentType(t *testing.T) {
 // Inject deletion failures while all other SQL still uses PostgreSQL.
 type deleteFailureDB struct {
 	db.DBTX
-	fail, failMark bool
-	afterDelete    func()
+	fail, failMark                              bool
+	failInsert, failComplete, ambiguousComplete bool
+	afterDelete                                 func()
 }
 
 func (d *deleteFailureDB) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
@@ -533,4 +628,30 @@ func (d *deleteFailureDB) Exec(ctx context.Context, sql string, args ...any) (pg
 		d.afterDelete()
 	}
 	return tag, err
+}
+
+// Simulate a lost response after PostgreSQL has applied the update.
+type attachmentErrorRow struct{ row pgx.Row }
+
+func (r attachmentErrorRow) Scan(dest ...any) error {
+	if r.row != nil {
+		if err := r.row.Scan(dest...); err != nil {
+			return err
+		}
+	}
+	return errors.New("injected attachment database failure")
+}
+func (d *deleteFailureDB) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	if d.failInsert && strings.Contains(sql, "-- name: CreateAttachment") {
+		return attachmentErrorRow{}
+	}
+	if strings.Contains(sql, "-- name: CompleteAttachmentUpload") {
+		if d.failComplete {
+			return attachmentErrorRow{}
+		}
+		if d.ambiguousComplete {
+			return attachmentErrorRow{row: d.DBTX.QueryRow(ctx, sql, args...)}
+		}
+	}
+	return d.DBTX.QueryRow(ctx, sql, args...)
 }

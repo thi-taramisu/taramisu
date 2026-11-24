@@ -11,9 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeAttachmentUpload = `-- name: CompleteAttachmentUpload :one
+UPDATE attachment SET delete_pending = false
+WHERE id = $1 AND project_id = $2 AND delete_pending
+  AND created_at > now() - interval '10 minutes'
+RETURNING id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at
+`
+
+type CompleteAttachmentUploadParams struct {
+	ID        pgtype.UUID
+	ProjectID pgtype.UUID
+}
+
+func (q *Queries) CompleteAttachmentUpload(ctx context.Context, arg CompleteAttachmentUploadParams) (Attachment, error) {
+	row := q.db.QueryRow(ctx, completeAttachmentUpload, arg.ID, arg.ProjectID)
+	var i Attachment
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.S3ObjectKey,
+		&i.UploadedBy,
+		&i.DeletePending,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createAttachment = `-- name: CreateAttachment :one
-INSERT INTO attachment (project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at
+INSERT INTO attachment (project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending)
+VALUES ($1, $2, $3, $4, $5, $6, $7, true) RETURNING id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at
 `
 
 type CreateAttachmentParams struct {
@@ -130,7 +160,7 @@ func (q *Queries) ListAttachments(ctx context.Context, arg ListAttachmentsParams
 }
 
 const listPendingAttachmentDeletions = `-- name: ListPendingAttachmentDeletions :many
-SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE (delete_pending OR project_id IS NULL) AND id > $1 ORDER BY id LIMIT 100
+SELECT id, project_id, file_name, content_type, size_bytes, sha256, s3_object_key, uploaded_by, delete_pending, created_at FROM attachment WHERE (delete_pending OR project_id IS NULL) AND created_at < now() - interval '10 minutes' AND id > $1 ORDER BY id LIMIT 100
 `
 
 func (q *Queries) ListPendingAttachmentDeletions(ctx context.Context, id pgtype.UUID) ([]Attachment, error) {
