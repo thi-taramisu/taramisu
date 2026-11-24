@@ -72,7 +72,7 @@ func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAc
 	} {
 		op := huma.Operation{Method: route.method, Path: route.path, OperationID: route.id, Summary: route.summary, Security: []map[string][]string{{"bearer": {}}},
 			Parameters: []*huma.Param{{Name: "project_id", In: "path", Required: true, Schema: &huma.Schema{Type: "string", Format: "uuid"}}},
-			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "422": {Description: "Invalid project ID"}, "404": {Description: "Not found"}, "500": {Description: "Storage operation failed"}, "503": {Description: "Database unavailable"}},
+			Responses:  map[string]*huma.Response{"400": {Description: "Invalid request"}, "401": {Description: "Authentication required"}, "422": {Description: "Invalid project ID"}, "404": {Description: "Not found"}, "503": {Description: "Database unavailable"}},
 		}
 		schema := api.OpenAPI().Components.Schemas.Schema(reflect.TypeOf(attachmentMetadata{}), true, "Attachment")
 		if strings.Contains(route.path, "{attachment_id}") {
@@ -80,6 +80,7 @@ func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAc
 		}
 		switch route.id {
 		case "upload-attachment":
+			op.Responses["500"] = &huma.Response{Description: "Storage operation failed"}
 			op.RequestBody = &huma.RequestBody{Required: true, Content: map[string]*huma.MediaType{"multipart/form-data": {Schema: &huma.Schema{Type: "object", Required: []string{"file"}, Properties: map[string]*huma.Schema{"file": {Type: "string", Format: "binary"}}}}}}
 			op.Responses["201"] = &huma.Response{Description: "Created", Content: map[string]*huma.MediaType{"application/json": {Schema: schema}}}
 			op.Responses["413"] = &huma.Response{Description: "File exceeds 10 MiB"}
@@ -88,6 +89,7 @@ func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAc
 			op.Parameters = append(op.Parameters, &huma.Param{Name: "limit", In: "query", Schema: &huma.Schema{Type: "integer", Default: 100}}, &huma.Param{Name: "offset", In: "query", Schema: &huma.Schema{Type: "integer", Default: 0}})
 			op.Responses["200"] = &huma.Response{Description: "Attachments (limit 1–100, offset >= 0)", Content: map[string]*huma.MediaType{"application/json": {Schema: &huma.Schema{Type: "array", Items: schema}}}}
 		case "download-attachment":
+			op.Responses["500"] = &huma.Response{Description: "Storage operation failed"}
 			op.Parameters = append(op.Parameters, &huma.Param{Name: "If-None-Match", In: "header", Schema: &huma.Schema{Type: "string"}})
 			op.Responses["200"] = &huma.Response{Description: "File bytes; ETag is quoted SHA-256; Cache-Control: private, no-cache", Content: map[string]*huma.MediaType{"application/octet-stream": {Schema: &huma.Schema{Type: "string", Format: "binary"}}}}
 			op.Responses["304"] = &huma.Response{Description: "Unchanged; authorization revalidated"}

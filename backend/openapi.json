@@ -8389,9 +8389,6 @@
           "422": {
             "description": "Invalid project ID"
           },
-          "500": {
-            "description": "Storage operation failed"
-          },
           "503": {
             "description": "Database unavailable"
           }
@@ -8529,9 +8526,6 @@
           },
           "422": {
             "description": "Invalid project ID"
-          },
-          "500": {
-            "description": "Storage operation failed"
           },
           "503": {
             "description": "Database unavailable"
