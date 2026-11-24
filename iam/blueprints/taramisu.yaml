@@ -36,7 +36,7 @@ entries:
       access_token_validity: minutes=10
       refresh_token_validity: days=7
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
-      authentication_flow: !Find [authentik_flows.flow, [slug, default-authentication-flow]]
+      authentication_flow: null
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
       redirect_uris:
@@ -44,6 +44,12 @@ entries:
           url: !Env OIDC_REDIRECT_URI
         - matching_mode: strict
           url: http://localhost:5173/auth/callback
+        - matching_mode: strict
+          url: !Env OIDC_POST_LOGOUT_REDIRECT_URI
+          redirect_uri_type: logout
+        - matching_mode: strict
+          url: http://localhost:5173/projects
+          redirect_uri_type: logout
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-openid]]
         - !Find [authentik_providers_oauth2.scopemapping, [managed, goauthentik.io/providers/oauth2/scope-profile]]
@@ -63,12 +69,18 @@ entries:
       name: taramisu-enforce-pkce
     attrs:
       expression: |
+        from django.utils.translation import get_language
+
         # Enforce PKCE (RFC 7636) with SHA-256 for all OAuth2 authorization requests.
         if "oauth_response_type" in request.context or "oauth_grant_type" in request.context:
             challenge = request.context.get("oauth_code_challenge")
             method = request.context.get("oauth_code_challenge_method")
             if not challenge or method != "S256":
-                ak_message("PKCE code_challenge with code_challenge_method=S256 is required.")
+                ak_message(
+                    "PKCE code_challenge mit code_challenge_method=S256 ist erforderlich."
+                    if (get_language() or "en").split("-")[0] == "de"
+                    else "PKCE code_challenge with code_challenge_method=S256 is required."
+                )
                 return False
         return True
   - model: authentik_policies.policybinding

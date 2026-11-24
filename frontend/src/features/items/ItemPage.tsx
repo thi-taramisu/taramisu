@@ -3,29 +3,33 @@ import { EntityPage } from '../workspace/EntityPage'
 import { DeleteItemDialog } from './DeleteItemDialog'
 import { isNotFound } from '../../api/errors'
 import { useItem, useItemAssets } from '../../api/queries/items'
+import { useTranslation } from 'react-i18next'
+import { useProjectAccess } from '../../api/queries/projects'
 
 /** Item page: header from the item API, delete action and the asset count on the Assets tab. */
 export function ItemPage() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const item = useItem(projectId, entityId)
   const assets = useItemAssets(projectId, entityId)
+  const { canEdit } = useProjectAccess(projectId)
 
   if (isNotFound(item.error)) {
     return (
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">Item not found</h1>
-        <p className="text-sm text-muted-foreground">The item does not exist or was deleted.</p>
+        <h1 className="text-xl font-semibold">{t('ui:itemNotFound')}</h1>
+        <p className="text-sm text-muted-foreground">{t('ui:itemMissing')}</p>
         <Link to={`/projects/${projectId}`} className="text-sm hover:underline">
-          Back to project
+          {t('navigation.backToProject')}
         </Link>
       </div>
     )
   }
   if (!item.data) {
     return item.isError ? (
-      <p role="alert" className="text-sm text-destructive">The item could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:loadItemError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading item…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingItem')}</output>
     )
   }
 
@@ -38,13 +42,13 @@ export function ItemPage() {
           {/* A failed refetch keeps the loaded item, so unsaved edits in the tabs survive. */}
           {item.isError && (
             <p role="alert" className="self-center text-sm text-destructive">
-              The item could not be refreshed.
+              {t('ui:refreshItemError')}
             </p>
           )}
-          <DeleteItemDialog item={item.data} />
+          {canEdit && <DeleteItemDialog item={item.data} />}
         </>
       }
-      tabLabels={assets.data ? { assets: `Assets (${assets.data.length})` } : undefined}
+      tabLabels={assets.data ? { assets: t('navigation.assetsWithCount', { count: assets.data.length }) } : undefined}
     />
   )
 }

@@ -14,11 +14,6 @@ export const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 export type ImageError = 'type' | 'size'
 
-export const IMAGE_ERROR_MESSAGES: Record<ImageError, string> = {
-  type: 'Only PNG, JPEG and WebP images are supported.',
-  size: `Images can be at most ${MAX_IMAGE_SIZE / 1024 / 1024} MB.`,
-}
-
 /** Returns why the file can't be uploaded, or null if it can. */
 export function validateImage(file: File): ImageError | null {
   // `accept` only filters the file picker, other files can still be chosen.

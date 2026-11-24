@@ -49,7 +49,7 @@ func TestRiskPostgresLifecycle(t *testing.T) {
 	const otherImpact = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 	const damage = "ffffffff-ffff-4fff-8fff-ffffffffffff"
 	const otherDamage = "99999999-9999-4999-8999-999999999999"
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	a := &riskAPI{handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
 	createdProject := a.call("POST", "/api/v1/projects", `{"name":"Risk test"}`)

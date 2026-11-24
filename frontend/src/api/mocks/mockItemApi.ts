@@ -6,6 +6,7 @@ import type { ItemApi } from '../services/items'
 import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
 import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
+  headlampAttackFeasibilityRatings,
   headlampAttackPaths,
   headlampThreatAttackPathLinks,
   headlampThreatDamageLinks,
@@ -23,6 +24,7 @@ import {
   validateTitle,
   type StoredItem,
 } from './mockStore'
+import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
 // MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
@@ -42,7 +44,9 @@ function seed(): Map<string, StoredItem> {
     threatDamageLinks: headlampThreatDamageLinks,
     threatAttackPathLinks: headlampThreatAttackPathLinks,
     attackPaths: headlampAttackPaths,
+    attackFeasibilityRatings: headlampAttackFeasibilityRatings,
     threatTargets: headlampThreatTargets,
+    riskValues: [],
   })
   return new Map([[headlampItem.id, entry]])
 }
@@ -143,7 +147,9 @@ export function createMockItemApi(): ItemApi {
             threatDamageLinks: [],
             threatAttackPathLinks: [],
             attackPaths: [],
+            attackFeasibilityRatings: [],
             threatTargets: [],
+            riskValues: [],
           })
           return item
         }),
@@ -167,8 +173,8 @@ export function createMockItemApi(): ItemApi {
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
           const entry = find(projectId, itemId)
-          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(2))))
-          const code = `A-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`
+          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(3))))
+          const code = `AS-${Math.max(0, ...codes) + 1}`
           const asset: ItemAsset = { ...newAsset, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
           entry.assets.push(asset)
           entry.children.push({ type: 'assets', id: asset.id, code, name: asset.name })
@@ -195,7 +201,7 @@ export function createMockItemApi(): ItemApi {
           const scenario: DamageScenario = {
             id: crypto.randomUUID(),
             item_definition_id: entry.item.id,
-            code: `DS-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`,
+            code: `DS-${Math.max(0, ...codes) + 1}`,
             title: validateTitle(body.title)!,
             functionality_adverse_relation: null,
             road_user_harm_description: null,
@@ -279,5 +285,6 @@ export function createMockItemApi(): ItemApi {
         }),
     },
     threatScenarios: createMockThreatScenarioService(db),
+    attackPaths: createMockAttackPathService(db),
   }
 }

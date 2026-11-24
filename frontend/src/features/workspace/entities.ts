@@ -22,14 +22,19 @@ export const ENTITY_TYPES: Record<EntityType, { label: string; tabs: EntityTab[]
   'attack-paths': { label: 'Attack path', tabs: tabs('Definition', 'Rating', 'Relations') },
 }
 
-/** Code and name for the hierarchy's accessible names, e.g. "A-01 Firmware"; the visible tree label shows the name only. */
+/** Code and name for the hierarchy's accessible names, e.g. "AS-1 Firmware"; the visible tree label shows the name only. */
 export function entityTitle({ code, name }: Pick<TreeNode, 'code' | 'name'>) {
-  return code ? `${code} ${name}` : name
+  return code ? `${formatEntityId(code)} ${name}` : name
 }
 
-/** Element ID as shown in the detail view header: the number of the code with a hash, e.g. "A-01" → "#01". */
-export function formatEntityId(code: string) {
-  return `#${code.replace(/^[A-Z]+-/, '')}`
+/** Display IDs retain their agreed type prefix and have no padding. */
+export function formatEntityId(code: string): string
+export function formatEntityId(code: string | undefined): string | undefined
+export function formatEntityId(code: string | undefined) {
+  if (code === undefined) return undefined
+  const match = /^(AS|DS|TS|AP|IT)-?(\d+)$/.exec(code)
+  if (!match) return code
+  return `${match[1]}-${match[2].replace(/^0+(?=\d)/, '')}`
 }
 
 export function entityPath(projectId: string, type: EntityType, id: string) {
@@ -38,10 +43,15 @@ export function entityPath(projectId: string, type: EntityType, id: string) {
 
 /** First occurrence of the entity in the tree, depth-first. */
 export function findNode(type: EntityType, id: string, nodes: TreeNode[]): TreeNode | undefined {
+  return findNodePath(type, id, nodes)?.at(-1)
+}
+
+/** First matching relation path, consistent with findNode for shared entities. */
+export function findNodePath(type: EntityType, id: string, nodes: TreeNode[]): TreeNode[] | undefined {
   for (const node of nodes) {
-    if (node.type === type && node.id === id) return node
-    const found = node.children && findNode(type, id, node.children)
-    if (found) return found
+    if (node.type === type && node.id === id) return [node]
+    const path = node.children && findNodePath(type, id, node.children)
+    if (path) return [node, ...path]
   }
   return undefined
 }

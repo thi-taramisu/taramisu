@@ -15,3 +15,16 @@ body,
     @apply font-sans;
   }
 }
+
+/* Shared canvas controls follow the app theme, including lazily loaded diagrams. */
+.react-flow {
+  --xy-controls-button-background-color: var(--popover);
+  --xy-controls-button-background-color-hover: var(--accent);
+  --xy-controls-button-color: var(--popover-foreground);
+  --xy-controls-button-color-hover: var(--accent-foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-minimap-background-color: var(--muted);
+  --xy-minimap-node-background-color: var(--muted-foreground);
+  --xy-edge-label-background-color: var(--background);
+  --xy-edge-label-color: var(--foreground);
+}

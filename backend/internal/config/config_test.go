@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 func clearOIDCEnv(t *testing.T) {
 	t.Helper()
+	storageEnv(t)
 	t.Setenv("OIDC_ISSUER", "")
 	t.Setenv("OIDC_CLIENT_ID", "")
 	t.Setenv("OIDC_JWKS_URL", "")
@@ -17,6 +19,8 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("AUTHENTIK_API_TOKEN", "")
 	t.Setenv("IAM_USER_CACHE_TTL", "")
 	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
+	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("AUDIT_RETENTION_AFTER_DELETE", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -257,6 +261,116 @@ func TestLoadFailures(t *testing.T) {
 			}
 			if got := err.Error(); !strings.Contains(got, tt.wantError) {
 				t.Errorf("Load() error = %q, want it to contain %q", got, tt.wantError)
+			}
+		})
+	}
+}
+
+func storageEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("S3_ENDPOINT", "http://storage:8333")
+	t.Setenv("S3_BUCKET", "taramisu-uploads")
+	t.Setenv("S3_ACCESS_KEY", "test-backend")
+	t.Setenv("S3_SECRET_KEY", "test-secret")
+	t.Setenv("S3_REGION", "")
+}
+
+func TestS3Config(t *testing.T) {
+	storageEnv(t)
+	cfg, err := loadS3()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Endpoint != "http://storage:8333" || cfg.Region != "us-east-1" || cfg.Bucket != "taramisu-uploads" || cfg.AccessKey != "test-backend" || cfg.SecretKey != "test-secret" || !cfg.UsePathStyle {
+		t.Fatal("incorrect S3 configuration")
+	}
+	for _, key := range []string{"S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(key, "")
+			if _, err := loadS3(); err == nil || !strings.Contains(err.Error(), key) {
+				t.Fatal("missing field accepted")
+			}
+		})
+	}
+	for _, endpoint := range []string{"ftp://storage", "http:///", "http://user:secret@storage", "http://storage/bucket", "http://storage?secret=value", "http://storage/#fragment", "http://%zz"} {
+		t.Run(endpoint, func(t *testing.T) {
+			t.Setenv("S3_ENDPOINT", endpoint)
+			if _, err := loadS3(); err == nil || strings.Contains(err.Error(), "secret") {
+				t.Fatal("invalid endpoint accepted or leaked")
+			}
+		})
+	}
+	t.Setenv("S3_BUCKET", "bad:bucket*")
+	if _, err := loadS3(); err == nil {
+		t.Fatal("invalid bucket accepted")
+	}
+}
+
+func TestLoadLogLevel(t *testing.T) {
+	tests := []struct {
+		raw       string
+		want      slog.Level
+		wantError bool
+	}{
+		{raw: "", want: slog.LevelInfo},
+		{raw: "debug", want: slog.LevelDebug},
+		{raw: "WARN", want: slog.LevelWarn},
+		{raw: "error", want: slog.LevelError},
+		{raw: "verbose", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			clearOIDCEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+			t.Setenv("LOG_LEVEL", tt.raw)
+
+			cfg, err := Load()
+			if tt.wantError {
+				if err == nil || !strings.Contains(err.Error(), "invalid LOG_LEVEL") {
+					t.Fatalf("Load() error = %v, want invalid LOG_LEVEL", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.LogLevel != tt.want {
+				t.Errorf("LogLevel = %v, want %v", cfg.LogLevel, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadAuditRetention(t *testing.T) {
+	tests := []struct {
+		raw       string
+		want      time.Duration
+		wantError bool
+	}{
+		{raw: "", want: 8760 * time.Hour},
+		{raw: "720h", want: 720 * time.Hour},
+		{raw: "0s", wantError: true},
+		{raw: "-1h", wantError: true},
+		{raw: "one year", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.raw, func(t *testing.T) {
+			clearOIDCEnv(t)
+			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+			t.Setenv("AUDIT_RETENTION_AFTER_DELETE", tt.raw)
+
+			cfg, err := Load()
+			if tt.wantError {
+				if err == nil || !strings.Contains(err.Error(), "invalid AUDIT_RETENTION_AFTER_DELETE") {
+					t.Fatalf("Load() error = %v, want invalid AUDIT_RETENTION_AFTER_DELETE", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.AuditRetentionAfterDelete != tt.want {
+				t.Errorf("AuditRetentionAfterDelete = %v, want %v", cfg.AuditRetentionAfterDelete, tt.want)
 			}
 		})
 	}

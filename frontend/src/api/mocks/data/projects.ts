@@ -1,6 +1,6 @@
 import type { Project } from '../../models/project'
 
-// MOCK DATA: the project list, until the project CRUD routes (#81) exist.
+// MOCK DATA: the project list of the mock project API (`../mockProjectApi.ts`). The current user owns every project.
 
 export const mockProjects: Project[] = [
   {
@@ -9,6 +9,7 @@ export const mockProjects: Project[] = [
     description: 'Battery system TARA',
     favorite: true,
     archived: false,
+    role: 'OWNER',
     owner: 'Demo User',
     updatedAt: '2026-10-19',
   },
@@ -18,6 +19,7 @@ export const mockProjects: Project[] = [
     description: 'Headlamp cybersecurity analysis',
     favorite: true,
     archived: false,
+    role: 'OWNER',
     owner: 'Demo User',
     updatedAt: '2026-10-18',
   },
@@ -27,6 +29,7 @@ export const mockProjects: Project[] = [
     description: 'Gateway threat analysis',
     favorite: false,
     archived: false,
+    role: 'OWNER',
     owner: 'Demo User',
     updatedAt: '2026-10-16',
   },
