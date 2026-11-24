@@ -24,6 +24,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
@@ -327,6 +328,11 @@ func (h *Attachments) upload(w http.ResponseWriter, r *http.Request, project, us
 	key := uuid.New()
 	// Persist intent before storage so failed or interrupted uploads remain recoverable.
 	a, err := h.queries.CreateAttachment(r.Context(), db.CreateAttachmentParams{ProjectID: project, FileName: name, ContentType: contentType, SizeBytes: n, Sha256: hex.EncodeToString(hash.Sum(nil)), S3ObjectKey: pgtype.UUID{Bytes: key, Valid: true}, UploadedBy: user})
+	var constraintError *pgconn.PgError
+	if errors.As(err, &constraintError) && constraintError.Code == "23503" && constraintError.ConstraintName == "attachment_project_id_fkey" {
+		attachmentError(w, http.StatusNotFound, "project no longer available")
+		return
+	}
 	if err != nil {
 		attachmentError(w, 503, "database unavailable")
 		return

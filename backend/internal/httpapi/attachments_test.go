@@ -68,7 +68,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 		}
 	}()
 	objects := storage.New(cfg)
-	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "complete-failure", "complete-ambiguous", "upload-restart", "upload-project-deleted", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
+	for _, scenario := range []string{"flow", "insert-failure", "put-failure", "cancelled-upload", "complete-failure", "complete-ambiguous", "upload-restart", "upload-project-deleted", "upload-project-deleted-before-intent", "delete-db-failure", "delete-storage-failure", "delete-marker-failure", "delete-restart", "delete-replicas", "cleanup-batch", "delete-project-storage-failure", "delete-project-db-failure"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := context.Background()
 			tx, e := pool.Begin(ctx)
@@ -164,6 +164,14 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 			}
 			data := []byte("attachment content\n")
+			if scenario == "upload-project-deleted-before-intent" {
+				database.beforeCreate = func() { exec("DELETE FROM tara_project WHERE id=$1", project) }
+				check(request("POST", base, user, data, ""), 404)
+				if tracked.key != "" || tracked.deletes != 0 {
+					t.Fatal("storage touched after project disappeared")
+				}
+				return
+			}
 			if scenario == "upload-project-deleted" {
 				tracked.afterPut = func() { exec("DELETE FROM tara_project WHERE id=$1", project) }
 				check(request("POST", base, user, data, ""), 404)
@@ -641,6 +649,7 @@ func TestRejectUnsupportedDeclaredAttachmentType(t *testing.T) {
 
 // Inject deletion failures while all other SQL still uses PostgreSQL.
 type deleteFailureDB struct {
+	beforeCreate func()
 	db.DBTX
 	fail, failMark                              bool
 	failInsert, failComplete, ambiguousComplete bool
@@ -673,6 +682,9 @@ func (r attachmentErrorRow) Scan(dest ...any) error {
 	return errors.New("injected attachment database failure")
 }
 func (d *deleteFailureDB) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	if d.beforeCreate != nil && strings.Contains(sql, "-- name: CreateAttachment") {
+		d.beforeCreate()
+	}
 	if d.failInsert && strings.Contains(sql, "-- name: CreateAttachment") {
 		return attachmentErrorRow{}
 	}
