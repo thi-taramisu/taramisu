@@ -1,13 +1,6 @@
-import type { Member, ProjectDetails } from '../../models/project'
-import { exampleProject } from './headlamp'
+import type { Member } from '../../models/project'
 
-// MOCK DATA: settings of the headlamp system, until the backend has a settings endpoint.
-
-export const headlampDetails: ProjectDetails = {
-  name: exampleProject.name,
-  description: 'TARA of the headlamp system, the example project of the course.',
-  image: null,
-}
+// MOCK DATA: members of the headlamp system, until the frontend uses the member endpoints (#249).
 
 export const headlampMembers: Member[] = [
   { id: 'm-01', email: 'alex@example.com', role: 'OWNER', added: '2026-01-01' },

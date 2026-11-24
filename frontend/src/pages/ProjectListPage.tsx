@@ -16,7 +16,10 @@ import { ProjectCard } from '@/features/projects/ProjectCard'
 import { CreateProjectDialog } from '@/features/projects/CreateProjectDialog'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
+import { changeError } from '@/features/projects/changeError'
 import { exampleProject } from '@/api/mocks/data/headlamp'
+import { isUnauthorized } from '@/api/errors'
+import { SignInPrompt } from '@/auth/SignInPrompt'
 import type { Project } from '@/api/models/project'
 import { useTranslation } from 'react-i18next'
 import {
@@ -79,7 +82,8 @@ export function ProjectListPage() {
   const projects = projectsQuery.data ?? []
   const activeProjects = projects.filter((project) => !project.archived)
   const archivedProjects = projects.filter((project) => project.archived)
-  const actionFailed = mutations.some((mutation) => mutation.isError)
+  const failedMutation = mutations.find((mutation) => mutation.isError)
+  const actionFailed = failedMutation !== undefined
 
   return (
     <>
@@ -105,14 +109,17 @@ export function ProjectListPage() {
             {projectsQuery.isPending && (
               <p className="text-sm text-muted-foreground">{t('ui:loadingProjects')}</p>
             )}
-            {projectsQuery.isError && (
+            {isUnauthorized(projectsQuery.error) && (
+              <SignInPrompt>{t('ui:signInToSeeYourProjects')}</SignInPrompt>
+            )}
+            {projectsQuery.isError && !isUnauthorized(projectsQuery.error) && (
               <div className="flex items-center justify-between gap-2">
                 <p role="alert" className="text-sm text-destructive">{t('ui:theProjectsCouldNotBeLoaded')}</p>
                 <Button variant="outline" size="sm" onClick={() => void projectsQuery.refetch()}>{t('ui:retry')}</Button>
               </div>
             )}
             {actionFailed && (
-              <p role="alert" className="text-sm text-destructive">{t('ui:theChangeCouldNotBeSavedPleaseTryAgain')}</p>
+              <p role="alert" className="text-sm text-destructive">{t(changeError(failedMutation?.error))}</p>
             )}
             {activeView === 'projects' ? (
               <>
@@ -165,6 +172,7 @@ export function ProjectListPage() {
                         <Card key={project.id} className="py-3">
                           <CardHeader className="flex flex-row items-center gap-4">
                             <ProjectImage projectId={project.id} image={project.image} className="size-14 rounded-md" />
+                            {/* Only the example project has a workspace so far (#250); the others open their settings. */}
                             {project.id === exampleProject.id ? (
                               <Link
                                 to={`/projects/${project.id}`}
@@ -174,7 +182,13 @@ export function ProjectListPage() {
                                 {projectDetails}
                               </Link>
                             ) : (
-                              projectDetails
+                              <Link
+                                to={`/projects/${project.id}/settings`}
+                                aria-label={`${project.name} settings`}
+                                className="min-w-0 flex-1 hover:opacity-80"
+                              >
+                                {projectDetails}
+                              </Link>
                             )}
 
                             <Button

@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { stubProjectsApi } from './support/projectsApi.ts'
+
+test.beforeEach(async ({ page }) => {
+  await stubProjectsApi(page)
+})
 
 const image = {
   name: 'project.png',

@@ -329,6 +329,16 @@ describe('Main Page project management', () => {
     expect(screen.getByRole('menuitem', { name: 'Delete Project' })).not.toHaveAttribute('data-disabled')
   })
 
+  it('opens the workspace of the example project and the settings of the others', async () => {
+    await renderAt('/projects')
+
+    expect(screen.getByRole('link', { name: 'Headlamp System (example)' })).toHaveAttribute('href', '/projects/headlamp')
+    expect(screen.getByRole('link', { name: 'Battery Security settings' })).toHaveAttribute(
+      'href',
+      '/projects/battery-security/settings',
+    )
+  })
+
   it('shows an error with a retry when the projects cannot be loaded', async () => {
     const user = userEvent.setup()
     const projects = createMockProjectApi()
@@ -343,6 +353,17 @@ describe('Main Page project management', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByRole('button', { name: 'Actions for Battery Security' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('asks to sign in instead of showing an error when the backend answers 401', async () => {
+    const projects = createMockProjectApi()
+    projects.list = () => Promise.reject(new ApiError(401, 'Unauthorized.'))
+    renderApp('/projects', createMockItemApi(), projects)
+
+    const main = screen.getByRole('main')
+    expect(await within(main).findByText('Sign in to see your projects.')).toBeInTheDocument()
+    expect(within(main).getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
