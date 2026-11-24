@@ -20,7 +20,8 @@ export function ResizableSidebar({ label, resizeLabel, className, children }: Re
 
   return (
     <>
-      <nav id={id} aria-label={label} style={{ width }} className={cn('shrink-0 overflow-y-auto border-r', className)}>
+      {/* relative keeps absolutely positioned content such as sr-only text inside the scroll area; it would extend the page otherwise. */}
+      <nav id={id} aria-label={label} style={{ width }} className={cn('relative shrink-0 overflow-y-auto border-r', className)}>
         {children}
       </nav>
       <SidebarResizeHandle
