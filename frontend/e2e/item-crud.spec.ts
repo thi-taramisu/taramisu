@@ -13,7 +13,7 @@ test('creates, edits and deletes an item of a project from the backend', async (
 
   const tree = page.getByRole('navigation', { name: 'Project elements' })
   await tree.getByRole('button', { name: 'New' }).click()
-  await expect(page.getByRole('menuitem')).toHaveText(['Item'])
+  await expect(page.getByRole('menuitem', { name: 'Damage Scenario', exact: true })).toBeEnabled()
   await page.getByRole('menuitem', { name: 'Item' }).click()
   const dialog = page.getByRole('dialog', { name: 'New Item' })
   await dialog.getByLabel(/Name/).fill('Brake controller')
@@ -30,7 +30,7 @@ test('creates, edits and deletes an item of a project from the backend', async (
   await page.reload()
   await expect(page.getByLabel(/Boundary/)).toHaveValue('Brake ECU and its CAN interface')
   await expect(page.getByLabel(/Functions/)).toHaveValue('Braking on driver request')
-  await page.getByRole('link', { name: 'Assets' }).click()
+  await page.getByRole('link', { name: /^Assets/ }).click()
   await expect(page.getByText('Assets: not implemented yet')).toBeVisible()
 
   await page.getByRole('button', { name: 'Delete item' }).click()

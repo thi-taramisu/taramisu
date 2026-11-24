@@ -1,3 +1,4 @@
+import { isExampleProject } from '../../api/mocks/data/headlamp'
 import { useTranslation } from 'react-i18next'
 import { useId, useState } from 'react'
 import { X } from 'lucide-react'
@@ -61,7 +62,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
   const itemId = lockedItemId ?? chosenItemId ?? defaults.itemId
   const links = chosenLinks ?? defaults.links
   const [linkError, setLinkError] = useState<{ key: string; code?: string }>()
-  const { data: assets } = useItemAssets(projectId, itemId)
+  const { data: assets } = useItemAssets(projectId, itemId, { enabled: open && Boolean(itemId) })
   const createDamageScenario = useCreateDamageScenario(projectId)
   // Created, but `onCreated` failed; trying again must not create a second one with the same name.
   const [unfinished, setUnfinished] = useState<DamageScenario>()
@@ -95,7 +96,7 @@ export function CreateDamageScenarioDialog({ projectId, projectName, open, onOpe
       setLinkError({ key: 'ui:assetsLoading' })
       return undefined
     }
-    if (linked.length === 0) {
+    if (linked.length === 0 && isExampleProject(projectId)) {
       setLinkError({ key: 'ui:assetRequired' })
       return undefined
     }

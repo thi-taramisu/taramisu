@@ -146,3 +146,22 @@ Mock data and newly created mock elements use this format directly.
 Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
 Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
 by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Damage scenario API (#252)
+
+Damage scenarios and impact ratings use the typed backend client for real projects. Headlamp remains an isolated mock example.
+This integration builds on the item and project CRUD services from #250 and #248.
+
+The New menu can create a damage scenario in an existing item. Backend scenarios without asset links appear directly below their item.
+Definition changes use PATCH; deleting a scenario removes its ratings and links and returns to the item.
+The real creation flow permits an initially unlinked scenario while asset creation is integrated in #251.
+
+The adapter resolves the owning item within the selected project and loads complete paginated collections.
+Relations translate C/I/A selections to backend cybersecurity-property IDs. Impact ratings are read per scenario and saved per
+category with POST or PUT, including incomplete drafts and clearing a rating. Retrying a partial save reuses stored rows.
+If the initial asset links fail, creation removes the newly created scenario before reporting the error.
+Backend errors retain their HTTP status and never switch a real request to mock data.
+
+The backend does not provide display codes yet, so none are synthesized. Existing threat links display their technical IDs
+until threat-scenario CRUD supplies names. Frontend API and browser tests intercept HTTP requests using the OpenAPI contract;
+they do not replace a deployed-backend acceptance test.

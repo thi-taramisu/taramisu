@@ -140,3 +140,9 @@ The canvas handles pointer updates internally and saves positions when the drag 
 are determined by the default relation layout and remain fixed when nodes move, including across a neighbor.
 Moving a node never changes the source/target entities, arrow direction, or risk of a relation.
 It does not edit relations, calculate risk, persist layout, or connect to a graph backend. It is a local prototype for wireframe review.
+
+## Damage scenarios in real projects (#252)
+
+The existing flat damage-scenario URL remains unchanged. The service resolves its owning item through the selected project's
+item definitions and uses item-scoped backend routes. Real unlinked scenarios are visible below their item in the tree.
+Deleting returns to that item. The Headlamp example stays in its separate mock store.

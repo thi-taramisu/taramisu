@@ -217,6 +217,17 @@ export function createMockItemApi(): ItemApi {
           }
           return scenario
         }),
+      delete: (projectId, damageScenarioId) => run(() => {
+        const { entry } = findDamageScenario(projectId, damageScenarioId)
+        entry.damageScenarios = entry.damageScenarios.filter((row) => row.id !== damageScenarioId)
+        entry.damageScenarioLinks = entry.damageScenarioLinks.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.threatDamageLinks = entry.threatDamageLinks.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.impactRatings = entry.impactRatings.filter((row) => row.damage_scenario_id !== damageScenarioId)
+        entry.risks = entry.risks.map((group) => ({
+          ...group, rows: group.rows.filter((row) => row.damageScenario?.id !== damageScenarioId),
+        }))
+        syncLinks(entry)
+      }),
       get: (projectId, damageScenarioId) => run(() => findDamageScenario(projectId, damageScenarioId).scenario),
       update: (projectId, damageScenarioId, body) =>
         run(() => {

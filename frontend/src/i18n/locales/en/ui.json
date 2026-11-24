@@ -450,5 +450,9 @@
   "theProjectCouldNotBeLoaded": "The project could not be loaded.",
   "theProjectCouldNotBeSavedPleaseTryAgain": "The project could not be saved. Please try again.",
   "onlyOwnersCanChangeTheProject": "Only owners can change the project.",
-  "theProjectStillContainsItemDefinitionsSoItCannotBeDeletedYet": "The project still contains item definitions, so it cannot be deleted yet."
+  "theProjectStillContainsItemDefinitionsSoItCannotBeDeletedYet": "The project still contains item definitions, so it cannot be deleted yet.",
+  "deleteDamageScenario": "Delete damage scenario",
+  "deleteDamageScenarioTitle": "Delete “{{name}}”?",
+  "deleteDamageScenarioWarning": "Its impact ratings and links will also be deleted. This cannot be undone.",
+  "deleteDamageScenarioError": "The damage scenario could not be deleted. Please try again."
 }

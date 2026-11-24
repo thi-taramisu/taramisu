@@ -18,6 +18,7 @@ function withoutNulls(item: ItemDefinition) {
  * backend. Follows `backend/openapi.json`: list, create, get, update (PATCH, null clears a field) and delete.
  */
 export async function stubItemsApi(page: Page) {
+  await page.route(/\/api\/v1\/item-definitions\/[^/]+\/(damage-scenarios|assets)(\?.*)?$/, (route) => route.fulfill({ json: [] }))
   const items = new Map<string, ItemDefinition>()
   const notFound = { status: 404, json: { status: 404, title: 'Not Found', detail: 'item definition not found' } }
 

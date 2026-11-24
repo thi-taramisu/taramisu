@@ -151,6 +151,19 @@ export function useCreateDamageScenario(projectId: string) {
   return useMutation({ mutationFn: (body: DamageScenarioBody) => api.damageScenarios.create(projectId, body), onSuccess: invalidate })
 }
 
+export function useDeleteDamageScenario(projectId: string, damageScenarioId: string) {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: () => api.damageScenarios.delete(projectId, damageScenarioId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: keys.damageScenario(projectId, damageScenarioId) })
+      return invalidate()
+    },
+  })
+}
+
 export function useUpdateDamageScenario(projectId: string, damageScenarioId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)

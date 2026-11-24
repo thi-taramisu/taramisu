@@ -118,7 +118,12 @@ describe('createItemApi', () => {
     expect((await rejection(api.items.delete(projectId, ecu.id))).status).toBe(409)
   })
 
-  it('has nothing below the items of real projects, without asking the backend', async () => {
+  it('loads real assets and scenarios while other item data is still unavailable', async () => {
+    server.use(
+      http.get(`${items}/:itemId`, () => HttpResponse.json(ecu)),
+      http.get(`${baseUrl}/api/v1/item-definitions/${ecu.id}/damage-scenarios`, () => HttpResponse.json([])),
+      http.get(`${baseUrl}/api/v1/item-definitions/${ecu.id}/assets`, () => HttpResponse.json([])),
+    )
     const api = createApi()
 
     expect(await api.content.children(projectId, ecu.id)).toEqual([])

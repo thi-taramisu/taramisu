@@ -2,11 +2,11 @@ import type { ApiClient } from './client'
 import { ApiError } from './errors'
 import { isExampleProject } from './mocks/data/headlamp'
 import type { ItemApi, ItemContentService, ItemService } from './services/items'
-import { unwrap } from './unwrap'
+import { createDamageScenarioApi } from './damageScenarios'
+import { allPages, unwrap } from './unwrap'
 
-// REAL: item definitions on `/api/v1/projects/{project_id}/item-definitions`. Everything below the items
-// (assets, risks, scenarios) has no frontend adapter yet, so real items have nothing below them. The example
-// project is served completely by the mock item API until it lives in the backend.
+// REAL: item definitions and damage scenarios use their backend routes. The Headlamp example
+// is served entirely by the mock API. Other entity adapters are added in their own tickets.
 
 const collection = '/api/v1/projects/{project_id}/item-definitions'
 const member = '/api/v1/projects/{project_id}/item-definitions/{item_id}'
@@ -19,7 +19,7 @@ export function createItemApi(client: ApiClient, example: ItemApi): ItemApi {
   const items: ItemService = {
     list: async (projectId) => {
       if (isExampleProject(projectId)) return example.items.list(projectId)
-      return (await unwrap(client.GET(collection, inProject(projectId)))) ?? []
+      return allPages((offset) => unwrap(client.GET(collection, { params: { path: { project_id: projectId }, query: { limit: 100, offset } } })))
     },
     get: (projectId, itemId) => {
       if (isExampleProject(projectId)) return example.items.get(projectId, itemId)
@@ -40,9 +40,11 @@ export function createItemApi(client: ApiClient, example: ItemApi): ItemApi {
     },
   }
 
+  const damage = createDamageScenarioApi(client, items, example.damageScenarios)
+
   const content: ItemContentService = {
-    children: (projectId, itemId) => (isExampleProject(projectId) ? example.content.children(projectId, itemId) : none()),
-    assets: (projectId, itemId) => (isExampleProject(projectId) ? example.content.assets(projectId, itemId) : none()),
+    children: (projectId, itemId) => (isExampleProject(projectId) ? example.content.children(projectId, itemId) : damage.list(projectId, itemId).then((rows) => rows.map((row) => ({ type: 'damage-scenarios' as const, id: row.id, name: row.title })))),
+    assets: (projectId, itemId) => (isExampleProject(projectId) ? example.content.assets(projectId, itemId) : damage.assets(projectId, itemId)),
     addAsset: async (projectId, itemId, asset) => {
       if (isExampleProject(projectId)) return example.content.addAsset(projectId, itemId, asset)
       throw new ApiError(501, 'Assets cannot be added to this project yet.')
@@ -51,15 +53,15 @@ export function createItemApi(client: ApiClient, example: ItemApi): ItemApi {
     threatScenarios: (projectId, itemId) =>
       isExampleProject(projectId) ? example.content.threatScenarios(projectId, itemId) : none(),
     damageScenarios: (projectId, itemId) =>
-      isExampleProject(projectId) ? example.content.damageScenarios(projectId, itemId) : none(),
+      isExampleProject(projectId) ? example.content.damageScenarios(projectId, itemId) : damage.list(projectId, itemId).then((rows) => rows.map((row) => ({ id: row.id, name: row.title, code: row.code }))),
     attackPaths: (projectId, itemId) => (isExampleProject(projectId) ? example.content.attackPaths(projectId, itemId) : none()),
   }
 
-  // Scenarios and attack paths only exist in the example project, so their mocks serve every request.
+  // Threat scenarios and attack paths remain mocked until their own API integration.
   return {
     items,
     content,
-    damageScenarios: example.damageScenarios,
+    damageScenarios: damage.service,
     threatScenarios: example.threatScenarios,
     attackPaths: example.attackPaths,
   }

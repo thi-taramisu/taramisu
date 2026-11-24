@@ -450,5 +450,9 @@
   "theProjectCouldNotBeLoaded": "Das Projekt konnte nicht geladen werden.",
   "theProjectCouldNotBeSavedPleaseTryAgain": "Das Projekt konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
   "onlyOwnersCanChangeTheProject": "Nur Eigentümer können das Projekt ändern.",
-  "theProjectStillContainsItemDefinitionsSoItCannotBeDeletedYet": "Das Projekt enthält noch Item-Definitionen und kann daher noch nicht gelöscht werden."
+  "theProjectStillContainsItemDefinitionsSoItCannotBeDeletedYet": "Das Projekt enthält noch Item-Definitionen und kann daher noch nicht gelöscht werden.",
+  "deleteDamageScenario": "Schadensszenario löschen",
+  "deleteDamageScenarioTitle": "„{{name}}“ löschen?",
+  "deleteDamageScenarioWarning": "Zugehörige Auswirkungsbewertungen und Verknüpfungen werden ebenfalls gelöscht. Dies kann nicht rückgängig gemacht werden.",
+  "deleteDamageScenarioError": "Das Schadensszenario konnte nicht gelöscht werden. Bitte erneut versuchen."
 }

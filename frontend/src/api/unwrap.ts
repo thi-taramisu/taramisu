@@ -15,3 +15,13 @@ export async function unwrap<T>(call: Promise<FetchResult<T>>): Promise<T> {
   }
   return data as T
 }
+
+/** Backend collections use offset pagination; callers must not silently truncate at the default page size. */
+export async function allPages<T>(load: (offset: number) => Promise<T[] | null>): Promise<T[]> {
+  const rows: T[] = []
+  for (let offset = 0; ; offset += 100) {
+    const page = await load(offset) ?? []
+    rows.push(...page)
+    if (page.length < 100) return rows
+  }
+}

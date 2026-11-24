@@ -358,14 +358,14 @@ describe('project from the backend', () => {
   // Only items are connected for real projects so far; the example project keeps its mocked content (#250).
   const battery = '/projects/battery-security'
 
-  it('opens the workspace with the items of the project and offers only Item in the "+ New" menu', async () => {
+  it('opens the workspace with the items of the project and offers items and damage scenarios in the "+ New" menu', async () => {
     const api = createMockItemApi()
     const item = await api.items.create('battery-security', { name: 'Battery ECU', scope_type: 'ITEM' })
     const { user } = renderApp(battery, api)
 
     expect(await within(tree()).findByRole('link', { name: 'Battery ECU' })).toHaveAttribute('href', `${battery}/items/${item.id}`)
     await user.click(within(tree()).getByRole('button', { name: 'New' }))
-    expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Item'])
+    expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Item', 'Damage Scenario'])
   })
 
   it('shows Assets and Risks as placeholders, without the asset count', async () => {
@@ -377,6 +377,6 @@ describe('project from the backend', () => {
     expect(screen.queryByRole('button', { name: 'Add Asset' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Risks' }))
     expect(await screen.findByText('Risks: not implemented yet')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Assets/ })).toBeInTheDocument()
   })
 })
