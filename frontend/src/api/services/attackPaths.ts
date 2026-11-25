@@ -2,6 +2,7 @@ import type {
   AttackFeasibilityRating,
   AttackFeasibilityRatingBody,
   AttackPath,
+  AttackPathBody,
   AttackPathRelations,
   PatchAttackPathBody,
 } from '../models/attackPath'
@@ -11,6 +12,8 @@ import type {
  * reject with an `ApiError` like the item service.
  */
 export interface AttackPathService {
+  /** Rejects with 422 if a threat scenario is not one of the item or is given twice. */
+  create(projectId: string, body: AttackPathBody): Promise<AttackPath>
   get(projectId: string, attackPathId: string): Promise<AttackPath>
   update(projectId: string, attackPathId: string, body: PatchAttackPathBody): Promise<AttackPath>
   /** Null while the attack path is not rated. */

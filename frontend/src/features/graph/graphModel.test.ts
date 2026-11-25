@@ -3,20 +3,20 @@ import { buildRelationGraph, elementKey, graphNeighborhood } from './graphModel'
 import type { TreeNode } from '../../api/models/tree'
 import type { RiskGroup } from '../../api/models/risk'
 
-const damage: TreeNode = { type: 'damage-scenarios', id: 'ds', code: 'DS-01', name: 'Damage', children: [
-  { type: 'threat-scenarios', id: 'ts', code: 'TS-01', name: 'Threat', children: [
-    { type: 'attack-paths', id: 'ap1', code: 'AP-01', name: 'Unrated path' },
-    { type: 'attack-paths', id: 'ap2', code: 'AP-02', name: 'Rated path' },
+const damage: TreeNode = { type: 'damage-scenarios', id: 'ds', code: 'DS-1', name: 'Damage', children: [
+  { type: 'threat-scenarios', id: 'ts', code: 'TS-1', name: 'Threat', children: [
+    { type: 'attack-paths', id: 'ap1', code: 'AP-1', name: 'Unrated path' },
+    { type: 'attack-paths', id: 'ap2', code: 'AP-2', name: 'Rated path' },
   ] },
 ] }
 const tree: TreeNode = { type: 'items', id: 'item', name: 'Item', children: [
   { type: 'assets', id: 'asset', name: 'Asset', children: [damage] },
   { type: 'assets', id: 'other', name: 'Other asset', children: [damage] },
 ] }
-const risks: RiskGroup[] = [{ asset: { id: 'asset', code: 'A-01', name: 'Asset', properties: ['I'] }, rows: [{
-  property: 'I', damageScenario: { id: 'ds', code: 'DS-01', name: 'Damage', impact: 'Severe' },
-  threatScenario: { id: 'ts', code: 'TS-01', name: 'Threat' }, relation: 'targeted',
-  feasibility: { rating: 'Medium', attackPath: 'AP-02' }, risk: 4, treatment: null,
+const risks: RiskGroup[] = [{ asset: { id: 'asset', code: 'AS-1', name: 'Asset', properties: ['I'] }, rows: [{
+  property: 'I', damageScenario: { id: 'ds', code: 'DS-1', name: 'Damage', impact: 'Severe' },
+  threatScenario: { id: 'ts', code: 'TS-1', name: 'Threat' }, relation: 'targeted',
+  feasibility: { rating: 'Medium', attackPath: 'AP-2' }, risk: 4, treatment: null,
 }] }]
 
 describe('relation graph', () => {
@@ -47,7 +47,7 @@ describe('relation graph', () => {
     const otherTree: TreeNode = { type: 'items', id: 'second-item', name: 'Second item', children: [] }
     const otherGroup = structuredClone(risks[0])
     otherGroup.asset.id = 'second-asset'
-    otherGroup.rows[0].threatScenario = { id: 'second-threat', code: 'TS-02', name: 'Other threat' }
+    otherGroup.rows[0].threatScenario = { id: 'second-threat', code: 'TS-2', name: 'Other threat' }
     const graph = buildRelationGraph([{ tree, risks: [] }, { tree: otherTree, risks: [otherGroup] }])
     expect(graph.elements.find((el) => el.id === 'ap2')?.risk).toBeNull()
     expect(graph.relations.some((edge) => edge.source === 'attack-paths:ap2' && edge.target === 'threat-scenarios:second-threat')).toBe(false)

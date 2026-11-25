@@ -8,7 +8,7 @@
 #   sudo -u taramisu deploy/taramisu-ctl.sh --prune           # also remove taramisu images no container uses
 #
 # One release tag selects both the Git checkout (compose files, nginx config, blueprints, migrations)
-# and the api, frontend and docs images, so they always fit together.
+# and the release images, so they always fit together.
 set -eu
 cd "$(dirname "$0")"
 
@@ -65,7 +65,7 @@ ensure_env() {
 }
 
 # Server stack: compose.yaml only (no dev ports), images from GHCR instead of local builds.
-compose() { docker compose --env-file ../iam/.env -f compose.yaml "$@"; }
+compose() { docker compose --env-file ../iam/.env --env-file ../storage/.env -f compose.yaml "$@"; }
 
 # Waits until all given services report healthy. Unlike "compose up --wait" it keeps waiting
 # when a service is briefly unhealthy, e.g. while Authentik migrates its database on first start.

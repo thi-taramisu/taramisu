@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -11,10 +12,10 @@ import { useProjectAccess } from '../../api/queries/projects'
 const TEXT_FIELDS = [
   {
     key: 'functionality_adverse_relation',
-    label: 'Relation To Item Functionality',
-    placeholder: 'Which function of the item fails or behaves wrongly, and how this leads to the adverse consequence',
+    label: 'ui:functionalityRelation',
+    placeholder: 'ui:functionalityPlaceholder',
   },
-  { key: 'road_user_harm_description', label: 'Harm To Road User', placeholder: 'Harm to the road user, e.g. injury, financial loss or loss of privacy' },
+  { key: 'road_user_harm_description', label: 'ui:roadUserHarm', placeholder: 'ui:roadUserHarmPlaceholder' },
 ] as const
 
 type FormValues = Pick<DamageScenario, 'title'> & Record<(typeof TEXT_FIELDS)[number]['key'], string>
@@ -37,6 +38,7 @@ export function DamageScenarioDefinitionTab() {
 }
 
 function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: DamageScenario }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(scenario))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
@@ -60,7 +62,7 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
     event.preventDefault()
     const title = values.title.trim()
     if (!title) {
-      setTitleError('Name is required.')
+      setTitleError('ui:nameRequired')
       return
     }
     update.mutate(
@@ -83,9 +85,9 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
       {/* Read-only projects show the fields disabled and no Save. */}
       <fieldset disabled={!canEdit} className="contents">
-        <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+        <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
         <div className="grid gap-2">
-          <Label htmlFor={`${id}-title`}>Name *</Label>
+          <Label htmlFor={`${id}-title`}>{t('ui:requiredName')}</Label>
           <Input
             id={`${id}-title`}
             value={values.title}
@@ -96,17 +98,17 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
           />
           {titleError && (
             <p id={`${id}-title-error`} role="alert" className="text-sm text-destructive">
-              {titleError}
+              {t(titleError)}
             </p>
           )}
         </div>
         {TEXT_FIELDS.map((field) => (
           <div key={field.key} className="grid gap-2">
-            <Label htmlFor={`${id}-${field.key}`}>{field.label}</Label>
+            <Label htmlFor={`${id}-${field.key}`}>{t(field.label)}</Label>
             <Textarea
               id={`${id}-${field.key}`}
               value={values[field.key]}
-              placeholder={field.placeholder}
+              placeholder={t(field.placeholder)}
               onChange={(event) => change(field.key, event.target.value)}
             />
           </div>
@@ -114,16 +116,12 @@ function DefinitionForm({ projectId, scenario }: { projectId: string; scenario: 
       </fieldset>
       {canEdit && (
         <div className="flex items-center gap-3">
-          <Button type="submit" disabled={!dirty || update.isPending}>
-            Save
-          </Button>
+          <Button type="submit" disabled={!dirty || update.isPending}>{t('ui:save')}</Button>
           <output aria-live="polite" className="text-sm text-muted-foreground">
-            {update.isSuccess && !dirty && 'Saved.'}
+            {update.isSuccess && !dirty && t('ui:saved')}
           </output>
           {update.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              The damage scenario could not be saved. Please try again.
-            </p>
+            <p role="alert" className="text-sm text-destructive">{t('ui:saveDamageError')}</p>
           )}
         </div>
       )}

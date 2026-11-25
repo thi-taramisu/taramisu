@@ -3,6 +3,10 @@ import type { CiaProperty, ItemAsset } from '../models/asset'
 import type { DamageScenario, DamageScenarioRelations, ImpactRatingBody } from '../models/damageScenario'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
 import type { ItemApi } from '../services/items'
+import type { ProjectService } from '../services/projects'
+import type { SearchService } from '../services/search'
+import { createMockProjectApi } from './mockProjectApi'
+import { createMockSearchService } from './mockSearch'
 import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
 import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
@@ -97,7 +101,7 @@ function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenari
  * In-memory implementation of the item API, seeded with the headlamp example. Each call returns
  * copies, so callers cannot change the stored state by accident.
  */
-export function createMockItemApi(): ItemApi {
+export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
   const db = seed()
 
   function find(projectId: string, itemId: string) {
@@ -115,6 +119,18 @@ export function createMockItemApi(): ItemApi {
   }
 
   return {
+    projects,
+    search: createMockSearchService(projects, () => [...db.values()].flatMap((entry) => {
+      const { item, assets, damageScenarios, threatScenarios, attackPaths } = entry
+      const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
+      return [
+        { ...common, type: 'items' as const, id: item.id, name: item.name },
+        ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
+        ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
+        ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
+        ...attackPaths.map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.title })),
+      ]
+    })),
     items: {
       list: (projectId) =>
         run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),
@@ -173,8 +189,8 @@ export function createMockItemApi(): ItemApi {
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
           const entry = find(projectId, itemId)
-          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(2))))
-          const code = `A-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`
+          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(3))))
+          const code = `AS-${Math.max(0, ...codes) + 1}`
           const asset: ItemAsset = { ...newAsset, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
           entry.assets.push(asset)
           entry.children.push({ type: 'assets', id: asset.id, code, name: asset.name })
@@ -201,7 +217,7 @@ export function createMockItemApi(): ItemApi {
           const scenario: DamageScenario = {
             id: crypto.randomUUID(),
             item_definition_id: entry.item.id,
-            code: `DS-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`,
+            code: `DS-${Math.max(0, ...codes) + 1}`,
             title: validateTitle(body.title)!,
             functionality_adverse_relation: null,
             road_user_harm_description: null,

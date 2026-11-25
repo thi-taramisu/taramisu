@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -15,8 +16,9 @@ import {
 import { Button } from '@/components/ui/button'
 import type { EntityType } from '../../api/models/tree'
 import { useProjectAccess } from '../../api/queries/projects'
-import { ENTITY_TYPES, entityPath, entityTitle } from '../workspace/entities'
+import { entityPath, entityTitle } from '../workspace/entities'
 import { AddRelationDialog, type RelationEntry } from './AddRelationDialog'
+import { formatEntityId } from '../workspace/entities'
 
 /** What the section passes to its dialog for creating an element. */
 export interface RelationCreateDialogProps {
@@ -33,6 +35,8 @@ interface RelationSectionProps {
   /** Where the linked elements are in the TARA hierarchy, seen from the current element. */
   direction: 'up' | 'down'
   title: string
+  /** Plural noun used in sentences, with language-appropriate capitalization. */
+  pluralLabel: string
   /** Singular name of the linked elements, e.g. "Asset". */
   elementLabel: string
   rows: RelationEntry[]
@@ -56,11 +60,12 @@ interface RelationSectionProps {
  * "+ Add …" and remove. Knows nothing about the element it belongs to, so every Relations tab can use it.
  * In a read-only project it only lists the links.
  */
-export function RelationSection({ projectId, type, direction, title, elementLabel, rows, candidates, candidatesLoading, candidatesError, onAdd, onRemove, removeEffect = 'Only this link is removed.', renderCreateDialog, pending = false, error }: RelationSectionProps) {
+export function RelationSection({ projectId, type, direction, title, pluralLabel, elementLabel, rows, candidates, candidatesLoading, candidatesError, onAdd, onRemove, removeEffect, renderCreateDialog, pending = false, error }: RelationSectionProps) {
+  const { t } = useTranslation()
   const headingId = useId()
   const { canEdit } = useProjectAccess(projectId)
   const Arrow = direction === 'up' ? ArrowUp : ArrowDown
-  const directionHint = direction === 'up' ? 'Above in the hierarchy' : 'Below in the hierarchy'
+  const directionHint = t(direction === 'up' ? 'ui:aboveHierarchy' : 'ui:belowHierarchy')
   // Gets the focus after a removal, because the row with the remove button is gone then.
   const [addButton, setAddButton] = useState<HTMLButtonElement | null>(null)
   const removingId = useRef<string | null>(null)
@@ -86,16 +91,16 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
         <h2 id={headingId} className="flex-1 text-sm font-medium">
           {title}
         </h2>
-        {canEdit && <AddRelationDialog elementLabel={elementLabel} pluralLabel={title.toLowerCase()} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} triggerRef={setAddButton} onAdd={onAdd} onCreate={renderCreateDialog && ((name) => setCreating(({ key }) => ({ open: true, name, key: key + 1 })))} />}
+        {canEdit && <AddRelationDialog elementLabel={elementLabel} pluralLabel={pluralLabel} options={candidates} loading={candidatesLoading} loadError={candidatesError} pending={pending} triggerRef={setAddButton} onAdd={onAdd} onCreate={renderCreateDialog && ((name) => setCreating(({ key }) => ({ open: true, name, key: key + 1 })))} />}
       </div>
       {rows.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-muted-foreground">No {title.toLowerCase()} linked yet.</p>
+        <p className="px-4 py-3 text-sm text-muted-foreground">{t('ui:noLinkedElements', { elements: pluralLabel })}</p>
       ) : (
         <ul className="divide-y">
           {rows.map((row) => (
             <li key={row.id} className="px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{row.code}</span>
+                <span className="w-14 shrink-0 font-mono text-xs text-muted-foreground">{formatEntityId(row.code)}</span>
                 <div className="min-w-0 flex-1 truncate text-sm">
                   <Link to={entityPath(projectId, type, row.id)} title={row.name} className="hover:underline">
                     {row.name}
@@ -105,8 +110,7 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
                 {canEdit && (
                   <RemoveRelationButton
                     row={row}
-                    typeLabel={ENTITY_TYPES[type].label}
-                    effect={removeEffect}
+                    effect={removeEffect ?? t('ui:onlyLinkRemoved')}
                     pending={pending}
                     onRemove={() => {
                       removingId.current = row.id
@@ -140,13 +144,13 @@ export function RelationSection({ projectId, type, direction, title, elementLabe
 
 interface RemoveRelationButtonProps {
   row: RelationEntry
-  typeLabel: string
   effect: string
   pending: boolean
   onRemove: () => void
 }
 
-function RemoveRelationButton({ row, typeLabel, effect, pending, onRemove }: RemoveRelationButtonProps) {
+function RemoveRelationButton({ row, effect, pending, onRemove }: RemoveRelationButtonProps) {
+  const { t } = useTranslation()
   const name = entityTitle(row)
   const [open, setOpen] = useState(false)
 
@@ -159,8 +163,8 @@ function RemoveRelationButton({ row, typeLabel, effect, pending, onRemove }: Rem
           size="icon-sm"
           className={pending ? 'opacity-50' : undefined}
           aria-disabled={pending}
-          aria-label={`Remove link to ${name}`}
-          title="Remove link"
+          aria-label={t('ui:removeLinkTo', { name })}
+          title={t('ui:removeLink')}
         >
           <X aria-hidden="true" />
         </Button>
@@ -168,13 +172,13 @@ function RemoveRelationButton({ row, typeLabel, effect, pending, onRemove }: Rem
       {/* Returns the focus to the remove button; RelationSection moves it on once the row is gone. */}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Remove link to "{name}"?</AlertDialogTitle>
-          <AlertDialogDescription>The {typeLabel.toLowerCase()} stays in the project. {effect}</AlertDialogDescription>
+          <AlertDialogTitle>{t('ui:removeLinkTitle', { name })}</AlertDialogTitle>
+          <AlertDialogDescription>{t('ui:linkedElementStays')} {effect}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t('ui:cancel')}</AlertDialogCancel>
           <AlertDialogAction onClick={onRemove}>
-            Remove link
+            {t('ui:removeLink')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
