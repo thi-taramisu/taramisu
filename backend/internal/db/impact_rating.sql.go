@@ -98,6 +98,62 @@ func (q *Queries) GetImpactRating(ctx context.Context, arg GetImpactRatingParams
 	return i, err
 }
 
+const getImpactRatingForDelete = `-- name: GetImpactRatingForDelete :one
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+JOIN damage_scenario d ON d.id = r.damage_scenario_id
+WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
+FOR UPDATE OF r
+`
+
+type GetImpactRatingForDeleteParams struct {
+	ID               pgtype.UUID
+	DamageScenarioID pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetImpactRatingForDelete(ctx context.Context, arg GetImpactRatingForDeleteParams) (ImpactRating, error) {
+	row := q.db.QueryRow(ctx, getImpactRatingForDelete, arg.ID, arg.DamageScenarioID, arg.ItemDefinitionID)
+	var i ImpactRating
+	err := row.Scan(
+		&i.ID,
+		&i.DamageScenarioID,
+		&i.ImpactCategory,
+		&i.RatingValue,
+		&i.IsOmittedByPm1507,
+		&i.OmissionOrRatingRationale,
+		&i.ReusedFromFunctionalSafety,
+	)
+	return i, err
+}
+
+const getImpactRatingForUpdate = `-- name: GetImpactRatingForUpdate :one
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+JOIN damage_scenario d ON d.id = r.damage_scenario_id
+WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
+FOR NO KEY UPDATE OF r
+`
+
+type GetImpactRatingForUpdateParams struct {
+	ID               pgtype.UUID
+	DamageScenarioID pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetImpactRatingForUpdate(ctx context.Context, arg GetImpactRatingForUpdateParams) (ImpactRating, error) {
+	row := q.db.QueryRow(ctx, getImpactRatingForUpdate, arg.ID, arg.DamageScenarioID, arg.ItemDefinitionID)
+	var i ImpactRating
+	err := row.Scan(
+		&i.ID,
+		&i.DamageScenarioID,
+		&i.ImpactCategory,
+		&i.RatingValue,
+		&i.IsOmittedByPm1507,
+		&i.OmissionOrRatingRationale,
+		&i.ReusedFromFunctionalSafety,
+	)
+	return i, err
+}
+
 const listImpactRatings = `-- name: ListImpactRatings :many
 SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id

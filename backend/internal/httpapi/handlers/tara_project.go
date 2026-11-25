@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -13,13 +14,19 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
+// TaraProjectStore is implemented by db.Store. Changes run inside Audit.
 type TaraProjectStore interface {
+	Auditor
+	ArchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
+	UnarchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
 	CreateTaraProject(context.Context, db.CreateTaraProjectParams) (db.CreateTaraProjectRow, error)
 	GetTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error)
+	GetTaraProjectForUpdate(context.Context, pgtype.UUID) (db.TaraProject, error)
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
-	DeleteTaraProject(context.Context, pgtype.UUID) (int64, error)
+	// DeleteTaraProject also records the audit event (see db.Store).
+	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
 	AddProjectFavorite(context.Context, db.AddProjectFavoriteParams) error
 	RemoveProjectFavorite(context.Context, db.RemoveProjectFavoriteParams) error
 	IsProjectFavorite(context.Context, db.IsProjectFavoriteParams) (bool, error)
@@ -53,9 +60,11 @@ func (h *TaraProject) Register(api huma.API) {
 	Register(api, op("get-tara-project", http.MethodGet, member, "Get a TARA project"), project(PermRead), h.Get)
 	Register(api, op("replace-tara-project", http.MethodPut, member, "Replace a TARA project"), project(PermManage), h.Replace)
 	Register(api, op("update-tara-project", http.MethodPatch, member, "Partially update a TARA project"), project(PermManage), h.Update)
+	Register(api, op("archive-tara-project", http.MethodPost, member+"/archive", "Archive a TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Archive)
+	Register(api, op("unarchive-tara-project", http.MethodPost, member+"/unarchive", "Unarchive an archived TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Unarchive)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
-	Register(api, del, project(PermManage), h.Delete)
+	Register(api, del, project(PermManage).AllowArchived(), h.Delete)
 	// Favourites are personal, so every role may set them (PermRead).
 	addFavorite := op("add-tara-project-favorite", http.MethodPut, favorite, "Mark a TARA project as a favourite of the caller")
 	addFavorite.DefaultStatus = http.StatusNoContent
@@ -66,10 +75,11 @@ func (h *TaraProject) Register(api huma.API) {
 }
 
 type TaraProjectBody struct {
-	ID          string    `json:"id" format:"uuid"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	ArchivedAt  *time.Time `json:"archived_at" doc:"Archive timestamp; null for an active project"`
+	ID          string     `json:"id" format:"uuid"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 	// IsFavorite tells whether the caller marked the project as a favourite.
@@ -85,8 +95,21 @@ type TaraProjectListOutput struct {
 }
 
 type ListTaraProjectsInput struct {
-	Favorite bool `query:"favorite" doc:"Return only the caller's favourite projects."`
+	Archived OptionalBoolQuery `query:"archived" doc:"true: archived only; false: active only; omitted: both"`
+	Favorite bool              `query:"favorite" doc:"Return only the caller's favourite projects."`
 }
+
+// OptionalBoolQuery distinguishes an omitted query flag from explicit false.
+type OptionalBoolQuery struct {
+	Value bool
+	Set   bool
+}
+
+func (o OptionalBoolQuery) Schema(r huma.Registry) *huma.Schema {
+	return r.Schema(reflect.TypeFor[bool](), true, "")
+}
+func (o *OptionalBoolQuery) Receiver() reflect.Value    { return reflect.ValueOf(&o.Value).Elem() }
+func (o *OptionalBoolQuery) OnParamSet(set bool, _ any) { o.Set = set }
 
 type TaraProjectIDInput struct {
 	ID string `path:"id" format:"uuid"`
@@ -117,14 +140,24 @@ type UpdateTaraProjectInput struct {
 
 // Create stores the project and makes the caller its first Owner. Every active user may create projects.
 func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*TaraProjectOutput, error) {
-	ownerID, err := callerID(ctx)
+	actor, err := auditActor(ctx)
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
-		OwnerID:     ownerID,
+	ownerID := actor.UserID
+	var p db.CreateTaraProjectRow
+	// Calls Audit directly instead of audit(...), because the actor is also the first Owner.
+	err = h.store.Audit(ctx, actor, func(ctx context.Context) (db.Change, error) {
+		var err error
+		p, err = h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
+			Name:        in.Body.Name,
+			Description: in.Body.Description,
+			OwnerID:     ownerID,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetProject, p.ID, p.ID, projectSettings{Name: p.Name, FirstOwner: ownerID}), nil
 	})
 	if err != nil {
 		return nil, err
@@ -138,8 +171,12 @@ func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*Tar
 	if err != nil {
 		return nil, err
 	}
+	var archived *bool
+	if in.Archived.Set {
+		archived = &in.Archived.Value
+	}
 	projects, err := h.store.ListTaraProjects(ctx, db.ListTaraProjectsParams{
-		UserID: userID, GroupIds: callerGroups(ctx), OnlyFavorites: in.Favorite,
+		UserID: userID, GroupIds: callerGroups(ctx), Archived: archived, OnlyFavorites: in.Favorite,
 	})
 	if err != nil {
 		return nil, err
@@ -147,7 +184,7 @@ func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*Tar
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, ArchivedAt: p.ArchivedAt,
 		}, p.Role, p.IsFavorite))
 	}
 	return out, nil
@@ -162,23 +199,36 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 }
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
-	p, err := h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{
-		ID:          projectIDFromContext(ctx),
-		Name:        in.Body.Name,
-		Description: in.Body.Description,
+	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+		return h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{ID: id, Name: in.Body.Name, Description: in.Body.Description})
 	})
-	if err != nil {
-		return nil, mapTaraProjectError(err)
-	}
-	return h.output(ctx, p)
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
-	p, err := h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-		ID:             projectIDFromContext(ctx),
-		Name:           in.Body.Name,
-		SetDescription: in.Body.Description.Set,
-		Description:    in.Body.Description.Value,
+	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+		return h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
+			ID:             id,
+			Name:           in.Body.Name,
+			SetDescription: in.Body.Description.Set,
+			Description:    in.Body.Description.Value,
+		})
+	})
+}
+
+// changeSettings runs update and records project.updated, unless nothing changed.
+func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Context, pgtype.UUID) (db.TaraProject, error)) (*TaraProjectOutput, error) {
+	id := projectIDFromContext(ctx)
+	var p db.TaraProject
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetTaraProjectForUpdate(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		if p, err = update(ctx, id); err != nil {
+			return db.Change{}, err
+		}
+		after := projectSettings{Name: p.Name, DescriptionChanged: !sameText(before.Description, p.Description)}
+		return db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name}, after), nil
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -188,14 +238,13 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 
 func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
 	id := projectIDFromContext(ctx)
-	n, err := h.store.DeleteTaraProject(ctx, id)
+	actor, err := auditActor(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := h.store.DeleteTaraProject(ctx, actor, id); err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("project not found")
-	}
-	audit(ctx, "project.deleted", "project", id.String())
 	return nil, nil
 }
 
@@ -239,7 +288,7 @@ func parseUUID(s string) (pgtype.UUID, error) {
 }
 
 func mapTaraProjectError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, db.ErrProjectNotFound) {
 		return huma.Error404NotFound("project not found")
 	}
 	var pgErr *pgconn.PgError
@@ -250,7 +299,12 @@ func mapTaraProjectError(err error) error {
 }
 
 func toTaraProjectBody(p db.TaraProject, role db.ProjectRole, favorite bool) TaraProjectBody {
+	var archivedAt *time.Time
+	if p.ArchivedAt.Valid {
+		archivedAt = &p.ArchivedAt.Time
+	}
 	return TaraProjectBody{
+		ArchivedAt:  archivedAt,
 		ID:          p.ID.String(),
 		Name:        p.Name,
 		Description: p.Description,
@@ -260,6 +314,45 @@ func toTaraProjectBody(p db.TaraProject, role db.ProjectRole, favorite bool) Tar
 	}
 }
 
+func (h *TaraProject) Archive(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	return h.changeArchiveState(ctx, "project.archived", h.store.ArchiveTaraProject)
+}
+
+func (h *TaraProject) Unarchive(ctx context.Context, _ *TaraProjectIDInput) (*TaraProjectOutput, error) {
+	return h.changeArchiveState(ctx, "project.unarchived", h.store.UnarchiveTaraProject)
+}
+
+func (h *TaraProject) changeArchiveState(ctx context.Context, event string, update func(context.Context, pgtype.UUID) (db.TaraProject, error)) (*TaraProjectOutput, error) {
+	id := projectIDFromContext(ctx)
+	var p db.TaraProject
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetTaraProjectForUpdate(ctx, id)
+		if err != nil {
+			return db.Change{}, err
+		}
+		if p, err = update(ctx, id); err != nil || before.ArchivedAt.Valid == p.ArchivedAt.Valid {
+			return db.Change{}, err
+		}
+		return db.Change{
+			Event: event, ProjectID: id, TargetType: db.TargetProject, TargetID: id,
+			Before: map[string]bool{"archived": before.ArchivedAt.Valid},
+			After:  map[string]bool{"archived": p.ArchivedAt.Valid},
+		}, nil
+	})
+	if err != nil {
+		return nil, mapTaraProjectError(err)
+	}
+	return h.output(ctx, p)
+}
+
 func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole, favorite bool) *TaraProjectOutput {
 	return &TaraProjectOutput{Body: toTaraProjectBody(p, role, favorite)}
+}
+
+// sameText reports whether two optional texts are equal; nil equals only nil.
+func sameText(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

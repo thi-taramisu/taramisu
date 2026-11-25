@@ -46,15 +46,22 @@ and shadcn/ui components.
 
 ## State management
 
-Project data is initialized from local mock data.
+Project data comes from the mock project API (`src/api/mocks/mockProjectApi.ts`)
+through the hooks in `src/api/queries/projects.ts`. The project list and the
+project settings share it, so archiving or deleting in one place shows up in
+the other.
 
-Creating, deleting, favoriting, archiving, and restoring projects
-modifies local React state.
+Creating, deleting, favoriting, archiving, and restoring projects changes the
+in-memory mock. Changes last until reload.
 
-No persistence mechanism is implemented in this feature.
+Every project, including the Headlamp example, can be archived and deleted.
 
-The Headlamp example is protected from deletion and archiving
-to preserve the existing example workspace.
+An archived project is read-only until an owner restores it. Its workspace
+and general settings show a banner and the forms disabled; the workspace
+also disables New and hides the delete and link actions. The Danger Zone
+and the members stay available until the backend (#233) defines which
+actions are allowed while archived.
+The workspace and settings of a deleted project show "Page not found".
 
 ## Navigation
 
@@ -108,10 +115,10 @@ are separate follow-up work and are not part of this initial Main Page PR.
 
 Project creation reuses `ProjectImageInput` and its PNG/JPEG/WebP and
 5 MB validation from the project settings. The selected file is passed to
-`ProjectListPage`, which owns a separate object URL for the project lifetime.
+the mock project API, which owns a separate object URL for the project lifetime.
 The dialog preview URL can therefore be revoked when the dialog closes
-without breaking the project image. Project URLs are released on deletion
-and when the overview unmounts. Archiving and favoriting preserve the image.
+without breaking the project image. Project URLs are released on deletion.
+Archiving and favoriting preserve the image.
 
 `ProjectImage` renders a cover on favorite cards and a compact thumbnail in
 the active and archived lists, with a folder fallback for projects without images.

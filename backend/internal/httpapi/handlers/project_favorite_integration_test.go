@@ -41,7 +41,7 @@ func TestProjectFavoritesPostgres(t *testing.T) {
 	}()
 	queries := db.New(tx)
 	fixture := authtest.NewFixture(t, queries)
-	handler := httpapi.New(queries, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
+	handler := httpapi.New(db.NewStore(tx), fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
 
 	// alice creates the project. bob is the user the fake directory finds as new@example.com.
 	alice := "Bearer " + fixture.Token(t, nil)

@@ -29,7 +29,7 @@ The rows follow the features planned in the [wireframe concept](../../concepts/w
 | Apply AI assistant suggestions | – | ✓ | ✓ |
 | Change project settings: name, description, image, default rating method, AI toggle | – | – | ✓ |
 | Add or remove members and groups; change their roles | – | – | ✓ |
-| Archive, restore, or delete the project | – | – | ✓ |
+| Archive, unarchive, or delete the project | – | – | ✓ |
 
 Actions that need no project role:
 
@@ -113,6 +113,21 @@ Checklist for every endpoint:
 - [ ] Keep the record's parent in every SQL `WHERE` clause so a record cannot be reached through another project.
 - [ ] Test `401` without a token, `404` for a non-member, `403` for a role that is too low, and success for the lowest allowed role.
 
+## Archived projects
+
+The implementation for #233 adds an archive check to shared project authorization. An archived
+project is readable by its members. After the normal role check succeeds, all project settings
+and analysis-content writes return `409 Conflict`; this includes child-resource writes resolved
+through an item definition or threat scenario. A database error fails closed.
+
+Owners may archive, unarchive, delete the project, and manage its members while archived. Members may
+still leave under the existing last-Owner rules. These maintenance operations explicitly declare
+`.AllowArchived()`; all other project writes inherit protection. Archive state is read on each write
+request, without caching. An in-flight request authorized before the archive operation may finish.
+
+Both archive and unarchive are idempotent. Project responses expose a nullable `archived_at` timestamp;
+the project list supports `archived=true` or `archived=false`, with omission returning both states.
+
 ## Permissions
 
 | Permission | Roles | Used for |
@@ -185,17 +200,21 @@ blueprint). Revoking access faster would need a check against Authentik on every
 
 ## Audit
 
-The API writes one structured log entry (`audit` message) for each of these events:
+Proposed decision ([#218](https://github.com/thi-taramisu/taramisu/issues/218)): the API stores one event in the audit history for each
+of these changes, in the same transaction as the change. Rejected changes (for example the `409` for the last Owner) store
+nothing.
 
 | Event | Recorded values |
 | --- | --- |
-| Member added | Actor, project, member ID, user or group, role |
-| Role changed, including ownership transfer | Actor, project, member ID, user or group, role before and after |
-| Member removed or left the project | Actor, project, member ID, user or group, role before; whether the actor removed themselves |
-| Project deleted | Actor, project |
+| `member.added` | Actor, project, member ID; after: role, user or group |
+| `member.role_changed`, including ownership transfer | Actor, project, member ID; role before and after, user or group |
+| `member.removed`, including leaving the project | Actor, project, member ID; before: role, user or group. When someone left, the actor is that user |
+| `project.deleted` | Actor, project; before: name and role assignments (role, user or group) |
 
-Actor, user, and group are IDs, never names or email addresses. The log entry carries the timestamp. A persistent audit
-history in the database is not part of this specification.
+Actor, user, and group are internal IDs, never names or email addresses. Events are kept for the project's lifetime and one
+year after its deletion; at first only operators read them. Each event is also written as an `audit` log line with IDs and
+roles only. The table, retention, readers, and further events (such as `project.created`, which records the first Owner) are
+described in [Audit and logging](../audit.md).
 
 ## User interface
 

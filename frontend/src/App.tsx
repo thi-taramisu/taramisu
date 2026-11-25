@@ -1,14 +1,25 @@
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
+import { AttackPathDefinitionTab } from './features/attack-paths/AttackPathDefinitionTab'
+import { AttackPathPage } from './features/attack-paths/AttackPathPage'
+import { AttackPathRatingTab } from './features/attack-paths/AttackPathRatingTab'
+import { AttackPathRelationsTab } from './features/attack-paths/AttackPathRelationsTab'
 import { DamageScenarioDefinitionTab } from './features/damage-scenarios/DamageScenarioDefinitionTab'
 import { DamageScenarioImpactTab } from './features/damage-scenarios/DamageScenarioImpactTab'
 import { DamageScenarioPage } from './features/damage-scenarios/DamageScenarioPage'
+import { DamageScenarioRelationsTab } from './features/damage-scenarios/DamageScenarioRelationsTab'
 import { ItemDefinitionTab } from './features/items/ItemDefinitionTab'
 import { ItemPage } from './features/items/ItemPage'
 import { ItemRisksTab } from './features/items/ItemRisksTab'
 import { GeneralSettings } from './features/project-settings/GeneralSettings'
 import { MembersSettings } from './features/project-settings/MembersSettings'
+import { SearchProvider } from './features/search/SearchProvider'
+import { ThreatScenarioDefinitionTab } from './features/threat-scenarios/ThreatScenarioDefinitionTab'
+import { ThreatScenarioPage } from './features/threat-scenarios/ThreatScenarioPage'
+import { ThreatScenarioRelationsTab } from './features/threat-scenarios/ThreatScenarioRelationsTab'
+import { ThreatScenarioRisksTab } from './features/threat-scenarios/ThreatScenarioRisksTab'
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
@@ -24,6 +35,8 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 const PAGES: Partial<Record<EntityType, ReactNode>> = {
   items: <ItemPage />,
   'damage-scenarios': <DamageScenarioPage />,
+  'threat-scenarios': <ThreatScenarioPage />,
+  'attack-paths': <AttackPathPage />,
 }
 
 // Tabs that already have content, everything else renders a placeholder.
@@ -33,38 +46,48 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/risks': <ItemRisksTab />,
   'damage-scenarios/': <DamageScenarioDefinitionTab />,
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
+  'damage-scenarios/relations': <DamageScenarioRelationsTab />,
+  'threat-scenarios/': <ThreatScenarioDefinitionTab />,
+  'threat-scenarios/risks': <ThreatScenarioRisksTab />,
+  'threat-scenarios/relations': <ThreatScenarioRelationsTab />,
+  'attack-paths/': <AttackPathDefinitionTab />,
+  'attack-paths/rating': <AttackPathRatingTab />,
+  'attack-paths/relations': <AttackPathRelationsTab />,
 }
 
 // Route concept: docs/internal/frontend-routes.md
 export default function App() {
+  const { t } = useTranslation()
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/projects" replace />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route path="/design-sheet.html" element={<Navigate to="/design-system/colors" replace />} />
-      <Route path="/design-system/colors" element={<ColorSchemesPage />} />
-      <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />
-      <Route path="/projects" element={<ProjectListPage />} />
-      <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />}>
-        <Route index element={<GeneralSettings />} />
-        <Route path="members" element={<MembersSettings />} />
-      </Route>
-      <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
-        <Route index element={<Placeholder title="Select an element in the tree" />} />
-        {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
-          <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
-            {ENTITY_TYPES[type].tabs.map(({ path, label }) => {
-              const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={label} />
-              return path ? (
-                <Route key={path} path={path} element={element} />
-              ) : (
-                <Route key="index" index element={element} />
-              )
-            })}
-          </Route>
-        ))}
-      </Route>
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <SearchProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/design-sheet.html" element={<Navigate to="/design-system/colors" replace />} />
+        <Route path="/design-system/colors" element={<ColorSchemesPage />} />
+        <Route path="/design-system/colors/:schemeId" element={<ColorSchemesPage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
+        <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />}>
+          <Route index element={<GeneralSettings />} />
+          <Route path="members" element={<MembersSettings />} />
+        </Route>
+        <Route path="/projects/:projectId" element={<WorkspaceLayout />}>
+          <Route index element={<Placeholder title={t('ui:selectTreeElement')} />} />
+          {(Object.keys(ENTITY_TYPES) as EntityType[]).map((type) => (
+            <Route key={type} path={`${type}/:entityId`} element={PAGES[type] ?? <EntityPage type={type} />}>
+              {ENTITY_TYPES[type].tabs.map(({ path }) => {
+                const element = TAB_CONTENT[`${type}/${path}`] ?? <Placeholder title={t(`navigation.tabs.${path || 'definition'}`)} />
+                return path ? (
+                  <Route key={path} path={path} element={element} />
+                ) : (
+                  <Route key="index" index element={element} />
+                )
+              })}
+            </Route>
+          ))}
+        </Route>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </SearchProvider>
   )
 }

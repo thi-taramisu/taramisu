@@ -27,11 +27,11 @@ describe('ItemAssetsTab', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const row = (await screen.findByRole('cell', { name: 'LED driver config' })).closest('tr')!
-    expect(within(row).getByText('A-05')).toBeInTheDocument()
+    expect(within(row).getByText('AS-5')).toBeInTheDocument()
     expect(within(row).getByText('Power switch actuator')).toBeInTheDocument()
     expect(within(row).getByLabelText('Properties I')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets (5)' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'A-05 LED driver config' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'AS-5 LED driver config' })).toBeInTheDocument()
     expect(await api.content.assets('headlamp', 'i-01')).toHaveLength(5)
   })
 })

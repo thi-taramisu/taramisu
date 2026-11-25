@@ -1,5 +1,8 @@
 -- Project authorization (see docs/internal/architecture/iam/project-roles.md).
 
+-- name: ProjectIsArchived :one
+SELECT (archived_at IS NOT NULL)::boolean AS archived FROM tara_project WHERE id = $1;
+
 -- Highest role of the caller in a project, from a direct assignment or one of the caller's
 -- Authentik groups (taramisu_groups claim). Returns no row when the caller has no role.
 -- name: GetProjectRole :one

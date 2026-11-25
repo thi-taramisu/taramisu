@@ -29,3 +29,11 @@ RETURNING *;
 -- name: DeleteAsset :one
 DELETE FROM asset WHERE id = sqlc.arg(id) AND item_definition_id = sqlc.arg(item_definition_id)
 RETURNING id;
+
+-- name: GetAssetForUpdate :one
+SELECT * FROM asset WHERE id = sqlc.arg(id) AND item_definition_id = sqlc.arg(item_definition_id)
+FOR NO KEY UPDATE;
+
+-- name: GetAssetForDelete :one
+SELECT * FROM asset WHERE id = sqlc.arg(id) AND item_definition_id = sqlc.arg(item_definition_id)
+FOR UPDATE;
