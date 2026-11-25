@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -79,8 +80,11 @@ func (s *Store) ExportProject(ctx context.Context, id pgtype.UUID) (ProjectExpor
 		return ProjectExport{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"); err != nil {
-		return ProjectExport{}, err
+	// A Store built on a pgx.Tx (as in tests) is already inside a transaction, where the level can no longer be set.
+	if _, inTx := s.conn.(pgx.Tx); !inTx {
+		if _, err := tx.Exec(ctx, "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"); err != nil {
+			return ProjectExport{}, err
+		}
 	}
 	return s.WithTx(tx).ExportProject(ctx, id)
 }

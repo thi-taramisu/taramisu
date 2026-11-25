@@ -8672,6 +8672,7 @@
         "tags": [
           "Project Export"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       }
     },

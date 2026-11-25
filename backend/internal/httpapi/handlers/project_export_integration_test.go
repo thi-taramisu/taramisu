@@ -48,7 +48,7 @@ func TestProjectExportPostgres(t *testing.T) {
 	fixture := authtest.NewFixture(t, queries)
 	alice := "Bearer " + fixture.Token(t, nil)
 	bob := "Bearer " + fixture.Token(t, map[string]any{"sub": "export-bob"})
-	handler := httpapi.New(queries, fixture.Manager)
+	handler := httpapi.New(db.NewStore(tx), fixture.Manager)
 	get := func(bearer, id string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/"+id+"/export", http.NoBody)
 		req.Header.Set("Authorization", bearer)

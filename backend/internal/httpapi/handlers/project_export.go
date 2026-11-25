@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
@@ -109,7 +111,14 @@ func (h *ProjectExport) Export(ctx context.Context, _ *TaraProjectIDInput) (*Pro
 	if err != nil {
 		return nil, mapTaraProjectError(err)
 	}
-	audit(ctx, "project.exported", "project", data.Project.ID.String())
+	// An export changes nothing, so it has no audit history entry; it is only logged.
+	slog.InfoContext(ctx, "audit",
+		"event", "project.exported",
+		"actor", auth.UserFromContext(ctx).ID,
+		"project", data.Project.ID.String(),
+		"target_type", "project",
+		"target", data.Project.ID.String(),
+	)
 	return &ProjectExportOutput{
 		ContentDisposition: `attachment; filename="project-` + data.Project.ID.String() + `.json"`,
 		Body:               buildProjectExport(data, time.Now().UTC()),
