@@ -1429,6 +1429,723 @@
         ],
         "type": "object"
       },
+      "ProjectImportAsset": {
+        "additionalProperties": false,
+        "properties": {
+          "cybersecurity_properties": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportAssetProperty"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "identification_source": {
+            "enum": [
+              "ITEM_DEF",
+              "IMPACT_RATING",
+              "THREAT_DERIVED",
+              "CATALOGUE"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "item_definition_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectImportAssetProperty": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "property_type": {
+            "enum": [
+              "CONFIDENTIALITY",
+              "INTEGRITY",
+              "AVAILABILITY"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "property_type"
+        ],
+        "type": "object"
+      },
+      "ProjectImportAttackPath": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_approach": {
+            "enum": [
+              "TOP_DOWN",
+              "BOTTOM_UP"
+            ],
+            "type": "string"
+          },
+          "attack_steps_and_weaknesses": {},
+          "feasibility_rating": {
+            "$ref": "#/components/schemas/ProjectImportFeasibilityRating"
+          },
+          "id": {
+            "description": "Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "is_partial_early_stage": {
+            "type": "boolean"
+          },
+          "item_definition_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "ProjectImportBody": {
+        "additionalProperties": false,
+        "properties": {
+          "exported_at": {
+            "description": "Ignored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "format_version": {
+            "description": "Version of this document format. The server accepts only the version it writes on export.",
+            "examples": [
+              1
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectImportInfo"
+          }
+        },
+        "required": [
+          "format_version",
+          "project"
+        ],
+        "type": "object"
+      },
+      "ProjectImportDamageLink": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_cybersecurity_property_id": {
+            "description": "The id of a cybersecurity property of this item.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "compromise_mechanism_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "damage_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_cybersecurity_property_id"
+        ],
+        "type": "object"
+      },
+      "ProjectImportDamageScenario": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_property_links": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportDamageLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "functionality_adverse_relation": {
+            "type": "string"
+          },
+          "id": {
+            "description": "Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "impact_ratings": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportImpactRating"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "item_definition_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "road_user_harm_description": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "ProjectImportFeasibilityRating": {
+        "additionalProperties": false,
+        "properties": {
+          "ap_elapsed_time": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ap_equipment": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ap_knowledge_of_item": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ap_specialist_expertise": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ap_total_score": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "ap_window_of_opportunity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "attack_path_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "feasibility_rating": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "VERY_LOW"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProjectImportImpactRating": {
+        "additionalProperties": false,
+        "properties": {
+          "damage_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "impact_category": {
+            "enum": [
+              "SAFETY",
+              "FINANCIAL",
+              "OPERATIONAL",
+              "PRIVACY"
+            ],
+            "type": "string"
+          },
+          "is_omitted_by_pm_15_07": {
+            "type": "boolean"
+          },
+          "omission_or_rating_rationale": {
+            "type": "string"
+          },
+          "rating_value": {
+            "enum": [
+              "SEVERE",
+              "MAJOR",
+              "MODERATE",
+              "NEGLIGIBLE",
+              "OMITTED"
+            ],
+            "type": "string"
+          },
+          "reused_from_functional_safety": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "impact_category"
+        ],
+        "type": "object"
+      },
+      "ProjectImportInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "description": "Ignored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectImportItem": {
+        "additionalProperties": false,
+        "properties": {
+          "architectural_design": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportAsset"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "attack_paths": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportAttackPath"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "boundary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "description": "Ignored.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "cybersecurity_specs_wp_10_01": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "damage_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportDamageScenario"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "functions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "item_definition_wp_09_01": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lifecycle_phase": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "operational_environment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope_type": {
+            "enum": [
+              "ITEM",
+              "COMPONENT"
+            ],
+            "type": "string"
+          },
+          "tara_project_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "threat_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportThreatScenario"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "scope_type"
+        ],
+        "type": "object"
+      },
+      "ProjectImportRiskValue": {
+        "additionalProperties": false,
+        "properties": {
+          "determination_method": {
+            "enum": [
+              "RISK_MATRIX",
+              "RISK_FORMULA"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "impact_rating_id": {
+            "description": "The id of an impact rating of this item.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "risk_score": {
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "threat_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "impact_rating_id",
+          "risk_score",
+          "determination_method"
+        ],
+        "type": "object"
+      },
+      "ProjectImportThreatAttackLink": {
+        "additionalProperties": false,
+        "properties": {
+          "attack_path_id": {
+            "description": "The id of an attack path of this item.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "threat_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attack_path_id"
+        ],
+        "type": "object"
+      },
+      "ProjectImportThreatDamageLink": {
+        "additionalProperties": false,
+        "properties": {
+          "damage_scenario_id": {
+            "description": "The id of a damage scenario of this item.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "threat_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "damage_scenario_id"
+        ],
+        "type": "object"
+      },
+      "ProjectImportThreatPropertyLink": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_cybersecurity_property_id": {
+            "description": "The id of a cybersecurity property of this item.",
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "threat_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_cybersecurity_property_id"
+        ],
+        "type": "object"
+      },
+      "ProjectImportThreatScenario": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregated_attack_feasibility": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "VERY_LOW"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset_property_links": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportThreatPropertyLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "attack_path_links": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportThreatAttackLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "cause_of_compromise": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "damage_scenario_links": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportThreatDamageLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "elicitation_method": {
+            "enum": [
+              "GROUP_DISCUSSION",
+              "MALICIOUS_USE_CASE",
+              "EVITA",
+              "TVRA",
+              "PASTA",
+              "STRIDE",
+              "OTHER"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "item_definition_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "max_risk_score": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "risk_treatment_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportTreatmentDecision"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "risk_values": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectImportRiskValue"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "technical_notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "ProjectImportTreatmentDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "decision_rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "is_cybersecurity_claim": {
+            "type": "boolean"
+          },
+          "risk_value_id": {
+            "description": "The id of a risk value of the same threat scenario.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threat_scenario_id": {
+            "description": "Ignored: the position in the document tells where the record belongs.",
+            "type": "string"
+          },
+          "treatment_option": {
+            "enum": [
+              "AVOIDING",
+              "REDUCING",
+              "SHARING",
+              "RETAINING"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "treatment_option"
+        ],
+        "type": "object"
+      },
       "ProjectMember": {
         "additionalProperties": false,
         "properties": {
@@ -8167,6 +8884,53 @@
         ]
       }
     },
+    "/api/v1/projects/import": {
+      "post": {
+        "description": "Creates a new project from a document in the format of the project export, so an exported project can be imported again. The caller becomes the first Owner. The import is complete or not at all; a document that breaks a reference or a rule is rejected with 422 and the place in the document. Every record gets a new ID: an id is only the key that other records use to refer to it. Fields that the server sets itself are optional and ignored.",
+        "operationId": "import-tara-project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectImportBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Import a TARA project",
+        "tags": [
+          "Project Import"
+        ]
+      }
+    },
     "/api/v1/projects/{id}": {
       "delete": {
         "operationId": "delete-tara-project",
@@ -11283,6 +12047,10 @@
     {
       "description": "Export a whole TARA project as one JSON document.",
       "name": "Project Export"
+    },
+    {
+      "description": "Create a TARA project from a JSON document.",
+      "name": "Project Import"
     },
     {
       "description": "Give users and Authentik groups a role in a project.",

@@ -12,7 +12,7 @@ import (
 
 // auditedOperations record their changes in the audit history (docs/internal/architecture/audit.md).
 var auditedOperations = []string{
-	"create-tara-project", "replace-tara-project", "update-tara-project", "delete-tara-project",
+	"create-tara-project", "import-tara-project", "replace-tara-project", "update-tara-project", "delete-tara-project",
 	"archive-tara-project", "unarchive-tara-project",
 	"add-project-member", "update-project-member", "remove-project-member",
 	"create-item-definition", "replace-item-definition", "update-item-definition", "delete-item-definition",

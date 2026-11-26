@@ -18,6 +18,7 @@ const (
 	EventMemberRoleChanged = "member.role_changed"
 	EventMemberRemoved     = "member.removed"
 	EventProjectDeleted    = TargetProject + ".deleted"
+	EventProjectImported   = TargetProject + ".imported"
 )
 
 // Target types of audit events.

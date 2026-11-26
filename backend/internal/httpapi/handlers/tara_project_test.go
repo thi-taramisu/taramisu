@@ -47,6 +47,9 @@ type fakeProjects struct {
 	roleQuery  db.GetProjectRoleParams
 	listQuery  db.ListTaraProjectsParams
 	createdFor pgtype.UUID
+	// imported and importErr are what ImportProject received and the error it returns.
+	imported  db.ProjectImport
+	importErr error
 }
 
 func newFakeProjects(found bool) *fakeProjects {
@@ -77,6 +80,12 @@ func (f *fakeProjects) CreateTaraProject(_ context.Context, a db.CreateTaraProje
 	f.createdFor = a.OwnerID
 	p := f.project
 	return db.CreateTaraProjectRow{ID: p.ID, Name: a.Name, Description: a.Description, CreatedAt: p.CreatedAt}, nil
+}
+
+func (f *fakeProjects) ImportProject(_ context.Context, actor db.Actor, in db.ProjectImport) (db.CreateTaraProjectRow, error) {
+	f.imported, f.createdFor = in, actor.UserID
+	p := f.project
+	return db.CreateTaraProjectRow{ID: p.ID, Name: in.Name, Description: in.Description, CreatedAt: p.CreatedAt}, f.importErr
 }
 
 func (f *fakeProjects) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
