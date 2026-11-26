@@ -1,12 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type ReactNode, type Ref } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { EntityRef } from '../../api/models/tree'
-
-// Names creating as in the wireframe; element types without a create dialog follow with their tickets.
-const SEARCH_LABEL = 'Search by name, ID, or type a new name'
+import { formatEntityId } from '../workspace/entities'
 
 /** A linked element or one that can be linked. */
 export interface RelationEntry extends EntityRef {
@@ -35,12 +34,13 @@ interface AddRelationDialogProps {
 
 /** "+ Add …" dialog ("Add Damage Scenario" wireframe): search and link an existing element of the item. */
 export function AddRelationDialog({ elementLabel, pluralLabel, options, loading = false, loadError, onAdd, pending = false, triggerRef, onCreate }: AddRelationDialogProps) {
+  const { t } = useTranslation()
   const id = useId()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const title = `Add ${elementLabel}`
+  const title = t('ui:addRelation', { element: elementLabel })
   const term = search.trim().toLowerCase()
-  const matches = options.filter((option) => `${option.code} ${option.name}`.toLowerCase().includes(term))
+  const matches = options.filter((option) => `${formatEntityId(option.code)} ${option.name}`.toLowerCase().includes(term))
 
   function handleOpenChange(next: boolean) {
     setOpen(next && !pending)
@@ -58,23 +58,23 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
       <DialogContent className="gap-0 p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="sr-only">Link an existing {elementLabel.toLowerCase()} of this item.</DialogDescription>
+          <DialogDescription className="sr-only">{t('ui:linkExistingDescription')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 p-4">
-          <Input aria-label={SEARCH_LABEL} placeholder={SEARCH_LABEL} value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Input aria-label={t('ui:searchRelations')} placeholder={t('ui:searchRelations')} value={search} onChange={(event) => setSearch(event.target.value)} />
           <div className="grid gap-1">
             <h3 id={`${id}-existing`} className="font-medium">
-              Link existing in this item
+              {t('ui:linkExistingInItem')}
             </h3>
             {loadError ? (
               <p role="alert" className="py-2 text-sm text-destructive">
                 {loadError}
               </p>
             ) : loading ? (
-              <output className="py-2 text-muted-foreground">Loading…</output>
+              <output className="py-2 text-muted-foreground">{t('ui:loading')}</output>
             ) : matches.length === 0 ? (
               <p className="py-2 text-muted-foreground">
-                {term ? `No ${pluralLabel} match "${search.trim()}".` : `No ${pluralLabel} left to link.`}
+                {t(term ? 'ui:noRelationMatches' : 'ui:noRemainingRelations', { elements: pluralLabel, search: search.trim() })}
               </p>
             ) : (
               <ul aria-labelledby={`${id}-existing`} className="max-h-64 overflow-y-auto">
@@ -89,7 +89,7 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
                         onAdd(option.id)
                       }}
                     >
-                      <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{option.code}</span>{' '}
+                      <span className="w-14 shrink-0 text-left font-mono text-xs text-muted-foreground">{formatEntityId(option.code)}</span>{' '}
                       <span className="text-left">{option.name}</span>{' '}
                       {option.details && <span className="ml-auto shrink-0">{option.details}</span>}
                     </Button>
@@ -113,7 +113,7 @@ export function AddRelationDialog({ elementLabel, pluralLabel, options, loading 
             }}
           >
             <Plus aria-hidden="true" />
-            {onCreate && term ? `Create "${search.trim()}" as new ${elementLabel}…` : `Create new ${elementLabel}…`}
+            {t(onCreate && term ? 'ui:createNamedRelatedElement' : 'ui:createRelatedElement', { element: elementLabel, name: search.trim() })}
           </Button>
         </DialogFooter>
       </DialogContent>

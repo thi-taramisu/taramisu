@@ -8,6 +8,11 @@ The additional design reference routes are `/design-system/colors` (all schemes)
 `iris`). The project list and workspace link to them. Pages and Filetree navigation render in the browser through React Router.
 Deployment serves the static Vite build with an SPA fallback; see the [frontend README](../../frontend/README.md#client-rendering-and-deployment).
 
+The interface supports English and German through the header's language selector (#256; [ADR 0004](adr/0004-frontend-internationalization.md)).
+Working navigation, dialogs, forms, validation, and accessibility labels use translations, including controls backed by mock services.
+Stored data, internal design previews, demo diagrams, and unfinished-feature placeholders remain unchanged.
+Switching language keeps the same URLs and entered values. Authentik manages its own language separately.
+
 ## Basis
 
 The elements follow the ISO/SAE 21434 steps in the project scope (see course slides):
@@ -88,6 +93,13 @@ Assets are created in the "New Asset" dialog ("+ New → Asset", or "Add Asset" 
 is required; item and C / I / A properties are optional (the wireframe's "Component / Interface" is not in the data model either), and a similar existing asset of the item is pointed out.
 "Create & open" opens the new asset's Definition tab.
 
+Threat scenarios and attack paths are created in the "New Threat Scenario" and "New Attack Path" dialogs (#332), from "+ New" or from
+"Create new …" on a Relations tab (with the item fixed). Both ask for the name, the item and the elements one level up: damage scenarios for
+a threat scenario, threat scenarios for an attack path. On the page of such an element, the dialog starts linked to it. At least one link is
+required, as for damage scenarios, because the tree has no place for unlinked elements yet; for the same reason, only elements that are in
+the tree can be linked. The other fields follow on the element's page. The dialogs share `CreateLinkedElementDialog` and the item and "Link
+to" fields in `frontend/src/features/workspace/`.
+
 ## Decisions
 
 These were the open questions in the first draft of this page. The wireframes answer most of them:
@@ -108,11 +120,22 @@ These were the open questions in the first draft of this page. The wireframes an
 ## Open questions
 
 1. **Auth and session:** token handling, the login flow and route guards depend on the IAM decision (#46).
-2. **Language:** English only, or German as well?
-3. **Read-only sharing:** is a public read-only link per project wanted?
-4. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
-5. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
+2. **Read-only sharing:** is a public read-only link per project wanted?
+3. **Archive:** the project list wireframe has an "Archive" entry. Separate route (`/projects/archive`) or a filter on `/projects`?
+4. **Unassigned elements:** "Flexible Definition" in the wireframes adds an "Unassigned" group to the tree for elements without a parent.
    They still get the same flat URLs, so no extra route is needed.
+
+## Global Spotlight search (#193)
+
+Search is a shared overlay, without its own URL. It is available from the project-list sidebar, project workspace/settings header,
+and Ctrl/Cmd + K on any route. Opening within `/projects/:projectId/*` applies a removable project filter; other routes start globally.
+Selecting a result closes the overlay and opens `/projects/:projectId` or the existing `entityPath` for that element. Element URLs stay flat.
+Accessible mock projects can open an empty workspace as well as the Headlamp example; unknown projects show the not-found page.
+Settings are available only for the Headlamp example, so other project headers hide the Settings link.
+
+The search service reads the live mock stores, including unlinked elements. It combines project and entity-type filters, deduplicates
+shared elements and paginates results. Real cross-project authorization/search remains the backend work in #240; display IDs
+depend on #239. The frontend service interface is a proposal for that integration, not an existing OpenAPI endpoint.
 
 ## Local graph prototype (#184)
 

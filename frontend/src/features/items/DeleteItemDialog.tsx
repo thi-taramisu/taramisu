@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -21,12 +22,9 @@ function countBelow(nodes: readonly TreeNode[] = []): number {
   return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)
 }
 
-function plural(n: number, word: string) {
-  return `${n} ${word}${n === 1 ? '' : 's'}`
-}
-
 /** Confirmation before deleting an item; not in the wireframes, built from the shadcn AlertDialog. */
 export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
+  const { t } = useTranslation()
   const projectId = item.tara_project_id
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
@@ -55,36 +53,36 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
       <AlertDialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Trash2 aria-hidden="true" />
-          Delete item
+          {t('ui:deleteItem')}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete "{item.name}"?</AlertDialogTitle>
+          <AlertDialogTitle>{t('ui:deleteItemTitle', { name: item.name })}</AlertDialogTitle>
           <AlertDialogDescription>
             {assets + others > 0
-              ? `This also deletes its ${plural(assets, 'asset')} and ${plural(others, 'element')} below them (damage scenarios, threat scenarios, attack paths). `
+              ? t('ui:deleteItemChildren', { assets: t('ui:assetCount', { count: assets }), elements: t('ui:elementCount', { count: others }) })
               : ''}
-            This cannot be undone.
+            {t('ui:cannotUndo')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {children.isError && (
           <div className="flex items-center justify-between gap-2">
             <p role="alert" className="text-sm text-destructive">
-              The elements below this item could not be loaded.
+              {t('ui:loadChildrenError')}
             </p>
             <Button variant="outline" size="sm" onClick={() => void children.refetch()}>
-              Retry
+              {t('ui:retry')}
             </Button>
           </div>
         )}
         {deleteItem.isError && (
           <p role="alert" className="text-sm text-destructive">
-            The item could not be deleted. Please try again.
+            {t('ui:deleteItemError')}
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t('ui:cancel')}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={!children.isSuccess || deleteItem.isPending}
@@ -94,7 +92,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
               handleDelete()
             }}
           >
-            Delete item
+            {t('ui:deleteItem')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -96,6 +96,60 @@ func (q *Queries) GetDamageScenarioAssetProperty(ctx context.Context, arg GetDam
 	return i, err
 }
 
+const getDamageScenarioAssetPropertyForDelete = `-- name: GetDamageScenarioAssetPropertyForDelete :one
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+JOIN damage_scenario d ON d.id = l.damage_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = $1 AND d.item_definition_id = $2
+    AND a.item_definition_id = $2
+FOR UPDATE OF l
+`
+
+type GetDamageScenarioAssetPropertyForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetDamageScenarioAssetPropertyForDelete(ctx context.Context, arg GetDamageScenarioAssetPropertyForDeleteParams) (DamageScenarioAssetProperty, error) {
+	row := q.db.QueryRow(ctx, getDamageScenarioAssetPropertyForDelete, arg.ID, arg.ItemDefinitionID)
+	var i DamageScenarioAssetProperty
+	err := row.Scan(
+		&i.ID,
+		&i.DamageScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.CompromiseMechanismNote,
+	)
+	return i, err
+}
+
+const getDamageScenarioAssetPropertyForUpdate = `-- name: GetDamageScenarioAssetPropertyForUpdate :one
+SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
+JOIN damage_scenario d ON d.id = l.damage_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = $1 AND d.item_definition_id = $2
+    AND a.item_definition_id = $2
+FOR NO KEY UPDATE OF l
+`
+
+type GetDamageScenarioAssetPropertyForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetDamageScenarioAssetPropertyForUpdate(ctx context.Context, arg GetDamageScenarioAssetPropertyForUpdateParams) (DamageScenarioAssetProperty, error) {
+	row := q.db.QueryRow(ctx, getDamageScenarioAssetPropertyForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i DamageScenarioAssetProperty
+	err := row.Scan(
+		&i.ID,
+		&i.DamageScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.CompromiseMechanismNote,
+	)
+	return i, err
+}
+
 const listDamageScenarioAssetProperties = `-- name: ListDamageScenarioAssetProperties :many
 SELECT l.id, l.damage_scenario_id, l.asset_cybersecurity_property_id, l.compromise_mechanism_note FROM damage_scenario_asset_property l
 JOIN damage_scenario d ON d.id = l.damage_scenario_id

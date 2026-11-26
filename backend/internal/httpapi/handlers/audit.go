@@ -2,28 +2,41 @@ package handlers
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/thi-taramisu/taramisu/backend/internal/auth"
+	"github.com/thi-taramisu/taramisu/backend/internal/db"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
-// audit writes one structured log entry for a change listed in the specification's "Audit" section.
-// It records IDs only, never names or email addresses.
-func audit(ctx context.Context, event string, attrs ...any) {
-	args := make([]any, 0, 4+len(attrs))
-	args = append(args, "event", event, "actor", auth.UserFromContext(ctx).ID)
-	slog.InfoContext(ctx, "audit", append(args, attrs...)...)
+// Auditor runs a change and records it in the audit history in one transaction (db.Store.Audit).
+// Store calls made with the context passed to change take part in that transaction.
+type Auditor interface {
+	Audit(ctx context.Context, actor db.Actor, change func(ctx context.Context) (db.Change, error)) error
 }
 
-// memberAttrs describes the member a change applies to, followed by extra key-value pairs.
-func memberAttrs(projectID pgtype.UUID, m ProjectMember, extra ...any) []any {
-	attrs := []any{"project", projectID.String(), "member", m.ID, "member_type", m.Type}
-	if m.UserID != nil {
-		attrs = append(attrs, "user", *m.UserID)
+// audit runs change for the caller in ctx and records the db.Change it returns. Inside change, use
+// only the context it receives; build the change with db.Created, db.Updated, or db.Deleted.
+func audit(ctx context.Context, a Auditor, change func(ctx context.Context) (db.Change, error)) error {
+	actor, err := auditActor(ctx)
+	if err != nil {
+		return err
 	}
-	if m.GroupID != nil {
-		attrs = append(attrs, "group", *m.GroupID)
+	return a.Audit(ctx, actor, change)
+}
+
+// auditActor returns who makes the change in ctx, for the audit history.
+func auditActor(ctx context.Context) (db.Actor, error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return db.Actor{}, err
 	}
-	return append(attrs, extra...)
+	return db.Actor{UserID: userID, RequestID: logging.RequestID(ctx)}, nil
+}
+
+// projectSettings is what project.created and project.updated record. The description is free text,
+// so only whether it changed is recorded.
+type projectSettings struct {
+	Name               string      `json:"name"`
+	DescriptionChanged bool        `json:"description_changed,omitempty"`
+	FirstOwner         pgtype.UUID `json:"first_owner,omitzero"` // iam_user.id; project.created only
 }

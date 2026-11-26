@@ -49,3 +49,17 @@ DELETE FROM asset_cybersecurity_property p USING asset a
 WHERE p.id = sqlc.arg(id) AND a.id = p.asset_id AND a.id = sqlc.arg(asset_id)
     AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING p.id;
+
+-- name: GetAssetCybersecurityPropertyForUpdate :one
+SELECT p.* FROM asset_cybersecurity_property p
+JOIN asset a ON a.id = p.asset_id
+WHERE p.id = sqlc.arg(id) AND a.id = sqlc.arg(asset_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR NO KEY UPDATE OF p;
+
+-- name: GetAssetCybersecurityPropertyForDelete :one
+SELECT p.* FROM asset_cybersecurity_property p
+JOIN asset a ON a.id = p.asset_id
+WHERE p.id = sqlc.arg(id) AND a.id = sqlc.arg(asset_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR UPDATE OF p;

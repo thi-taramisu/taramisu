@@ -8,6 +8,7 @@ import { createApiClient } from '../../api/client'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { EntityPage } from './EntityPage'
+import { formatEntityId } from './entities'
 
 function renderPage(path: string, api = createMockItemApi()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -36,7 +37,7 @@ describe('Entity breadcrumbs', () => {
     const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', properties: ['I'] })
     const user = userEvent.setup()
     renderPage(`assets/${asset.id}`, api)
-    await breadcrumbs().findByText(`${asset.code} Firmware`)
+    await breadcrumbs().findByText(`${formatEntityId(asset.code)} Firmware`)
     const parent = breadcrumbs().getByRole('link', { name: 'New headlamp' })
     expect(parent).toHaveAttribute('href', `/projects/headlamp/items/${item.id}`)
     expect(screen.getByRole('navigation', { name: 'Breadcrumbs' })).not.toHaveTextContent(item.id)
@@ -48,15 +49,15 @@ describe('Entity breadcrumbs', () => {
   it('shows the full path on tabs, with IDs, and follows parent links while preserving view parameters', async () => {
     const user = userEvent.setup()
     renderPage('attack-paths/ap-01/rating?view=graph&filter=open')
-    const current = await breadcrumbs().findByText('AP-01 Compromised navigation ECU via cellular')
+    const current = await breadcrumbs().findByText('AP-1 Compromised navigation ECU via cellular')
     expect(current).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumbs().queryByRole('link', { name: /AP-01/ })).not.toBeInTheDocument()
+    expect(breadcrumbs().queryByRole('link', { name: /AP-1/ })).not.toBeInTheDocument()
     expect(breadcrumbs().getAllByRole('listitem')).toHaveLength(5)
     expect(breadcrumbs().getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', '/projects/headlamp/items/i-01?view=graph&filter=open')
-    const parent = breadcrumbs().getByRole('link', { name: /TS-01/ })
+    const parent = breadcrumbs().getByRole('link', { name: /TS-1/ })
     await user.click(parent)
-    expect(breadcrumbs().getByText('TS-01 Spoofed headlamp command on the CAN bus')).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumbs().queryByText(/AP-01/)).not.toBeInTheDocument()
+    expect(breadcrumbs().getByText('TS-1 Spoofed headlamp command on the CAN bus')).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumbs().queryByText(/AP-1/)).not.toBeInTheDocument()
     await user.click(breadcrumbs().getByRole('link', { name: 'Headlamp system' }))
     expect(breadcrumbs().getByText('Headlamp system')).toHaveAttribute('aria-current', 'page')
     expect(breadcrumbs().queryByRole('link')).not.toBeInTheDocument()
@@ -65,23 +66,23 @@ describe('Entity breadcrumbs', () => {
   it('updates names and relation paths when the shared tree refreshes, choosing the first shared occurrence', async () => {
     const api = createMockItemApi()
     const queryClient = renderPage('assets/a-01', api)
-    await breadcrumbs().findByText('A-01 Headlamp on/off command')
+    await breadcrumbs().findByText('AS-1 Headlamp on/off command')
     const longName = 'Renamed asset '.repeat(40)
-    const shared: TreeNode = { type: 'assets', id: 'a-01', code: 'A-01', name: longName }
+    const shared: TreeNode = { type: 'assets', id: 'a-01', code: 'AS-1', name: longName }
     vi.spyOn(api.content, 'children').mockResolvedValue([
-      { type: 'assets', id: 'a-02', code: 'A-02', name: 'New parent', children: [shared] },
+      { type: 'assets', id: 'a-02', code: 'AS-2', name: 'New parent', children: [shared] },
       shared,
     ])
     await act(async () => { await queryClient.invalidateQueries({ queryKey: ['projects', 'headlamp'] }) })
-    expect(await breadcrumbs().findByText(`A-01 ${longName.trim()}`)).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumbs().getByRole('link', { name: 'A-02 New parent' })).toBeInTheDocument()
+    expect(await breadcrumbs().findByText(`AS-1 ${longName.trim()}`)).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumbs().getByRole('link', { name: 'AS-2 New parent' })).toBeInTheDocument()
     expect(breadcrumbs().getAllByRole('listitem')).toHaveLength(3)
   })
 
   it('supports native Tab/Enter navigation and hides separators from assistive technology', async () => {
     const user = userEvent.setup()
     renderPage('damage-scenarios/ds-01')
-    await breadcrumbs().findByText('DS-01 Headlamp turns off while driving at night')
+    await breadcrumbs().findByText('DS-1 Headlamp turns off while driving at night')
     const parents = breadcrumbs().getAllByRole('link')
     await user.tab()
     expect(parents[0]).toHaveFocus()
@@ -91,27 +92,27 @@ describe('Entity breadcrumbs', () => {
       expect(separator).toHaveAttribute('aria-hidden', 'true')
     }
     await user.keyboard('{Enter}')
-    expect(breadcrumbs().getByText('A-01 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
-    expect(breadcrumbs().queryByText(/DS-01/)).not.toBeInTheDocument()
+    expect(breadcrumbs().getByText('AS-1 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumbs().queryByText(/DS-1/)).not.toBeInTheDocument()
   })
 
   it('keeps a loaded trail on a failed refresh and recovers after the element disappears and returns', async () => {
     const api = createMockItemApi()
     const queryClient = renderPage('assets/a-01', api)
-    await breadcrumbs().findByText('A-01 Headlamp on/off command')
+    await breadcrumbs().findByText('AS-1 Headlamp on/off command')
     const list = vi.spyOn(api.items, 'list').mockRejectedValue(new Error('Offline'))
     const refresh = () => act(async () => {
       await queryClient.invalidateQueries({ queryKey: ['projects', 'headlamp'] })
     })
     await refresh()
-    expect(breadcrumbs().getByText('A-01 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumbs().getByText('AS-1 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
     list.mockRestore()
     const children = vi.spyOn(api.content, 'children').mockResolvedValue([])
     await refresh()
     expect(await breadcrumbs().findByText('Path unavailable')).toHaveAttribute('aria-current', 'page')
     children.mockRestore()
     await refresh()
-    expect(await breadcrumbs().findByText('A-01 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
+    expect(await breadcrumbs().findByText('AS-1 Headlamp on/off command')).toHaveAttribute('aria-current', 'page')
     expect(breadcrumbs().getByRole('link', { name: 'Headlamp system' })).toBeInTheDocument()
   })
 

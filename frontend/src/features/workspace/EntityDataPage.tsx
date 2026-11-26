@@ -1,8 +1,9 @@
+import { useTranslation } from 'react-i18next'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { isNotFound } from '../../api/errors'
 import type { EntityType } from '../../api/models/tree'
-import { ENTITY_TYPES } from './entities'
+import { formatEntityId } from './entities'
 import { EntityPage } from './EntityPage'
 
 interface EntityDataPageProps {
@@ -15,25 +16,24 @@ interface EntityDataPageProps {
 
 /** Page of an element loaded from its API, with the not-found, loading and error states around `EntityPage`. */
 export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDataPageProps) {
-  const { label } = ENTITY_TYPES[type]
-  const noun = label.toLowerCase()
+  const { t } = useTranslation()
 
   if (isNotFound(entity.error)) {
     return (
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">{label} not found</h1>
-        <p className="text-sm text-muted-foreground">The {noun} does not exist or was deleted.</p>
+        <h1 className="text-xl font-semibold">{t(`ui:entityStates.${type}.notFound`)}</h1>
+        <p className="text-sm text-muted-foreground">{t(`ui:entityStates.${type}.missing`)}</p>
         <Link to={`/projects/${projectId}`} className="text-sm hover:underline">
-          Back to project
+          {t('navigation.backToProject')}
         </Link>
       </div>
     )
   }
   if (!entity.data) {
     return entity.isError ? (
-      <p role="alert" className="text-sm text-destructive">The {noun} could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t(`ui:entityStates.${type}.loadError`)}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading {noun}…</output>
+      <output className="text-sm text-muted-foreground">{t(`ui:entityStates.${type}.loading`)}</output>
     )
   }
 
@@ -41,13 +41,13 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
     <EntityPage
       type={type}
       name={'title' in entity.data ? entity.data.title : entity.data.name}
-      code={entity.data.code}
+      code={formatEntityId(entity.data.code)}
       tabCounts={tabCounts}
       actions={
         // A failed refetch keeps the loaded element, so unsaved edits in the tabs survive.
         entity.isError && (
           <p role="alert" className="self-center text-sm text-destructive">
-            The {noun} could not be refreshed.
+            {t(`ui:entityStates.${type}.refreshError`)}
           </p>
         )
       }

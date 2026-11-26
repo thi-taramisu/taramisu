@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -13,12 +14,7 @@ import { entityPath } from '../workspace/entities'
 import { AssetPropertiesField, type PropertyValues } from './AssetPropertiesField'
 import { CIA_PROPERTIES } from './ciaProperties'
 
-const IDENTIFICATION_SOURCES: { value: IdentificationSource; label: string }[] = [
-  { value: 'ITEM_DEF', label: 'Item Definition' },
-  { value: 'IMPACT_RATING', label: 'Impact Rating' },
-  { value: 'THREAT_DERIVED', label: 'Derived From Threat Scenario' },
-  { value: 'CATALOGUE', label: 'Catalogue' },
-]
+const IDENTIFICATION_SOURCES: IdentificationSource[] = ['ITEM_DEF', 'IMPACT_RATING', 'THREAT_DERIVED', 'CATALOGUE']
 
 interface FormValues {
   name: string
@@ -55,15 +51,16 @@ function isSame(a: FormValues, b: FormValues) {
 
 /** Definition tab of an asset ("Asset Definition" wireframe): the fields of the data model and the C / I / A properties, saved together. */
 export function AssetDefinitionTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: asset } = useAsset(projectId, entityId)
   const relations = useAssetRelations(projectId, entityId)
   if (!asset) return null
   if (!relations.data) {
     return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The properties could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:assetPage.propertiesLoadError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading properties…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:assetPage.loadingProperties')}</output>
     )
   }
   // Remount on asset change so the form starts from the saved values.
@@ -71,6 +68,7 @@ export function AssetDefinitionTab() {
 }
 
 function DefinitionForm({ projectId, asset, relations }: { projectId: string; asset: Asset; relations: AssetRelations }) {
+  const { t } = useTranslation()
   const id = useId()
   const [values, setValues] = useState(() => toValues(asset))
   // Last saved state; kept here so a failed refetch cannot make the form dirty again.
@@ -89,7 +87,7 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
     event.preventDefault()
     const name = values.name.trim()
     if (!name) {
-      setNameError('Name is required.')
+      setNameError(t('ui:nameRequired'))
       return
     }
     update.mutate(
@@ -113,14 +111,14 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
 
   return (
     <form onSubmit={handleSubmit} noValidate className="grid max-w-3xl gap-4">
-      <p className="text-xs text-muted-foreground">Fields marked * are required.</p>
+      <p className="text-xs text-muted-foreground">{t('ui:requiredFields')}</p>
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-name`}>Name *</Label>
+        <Label htmlFor={`${id}-name`}>{t('ui:name')} *</Label>
         <Input
           id={`${id}-name`}
           value={values.name}
           required
-          placeholder="Object that has value, e.g. firmware, a message or stored data"
+          placeholder={t('ui:assetPage.namePlaceholder')}
           onChange={(event) => change({ name: event.target.value })}
           aria-invalid={Boolean(nameError)}
           aria-describedby={nameError ? `${id}-name-error` : undefined}
@@ -132,7 +130,7 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
         )}
       </div>
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-source`}>Identification Source</Label>
+        <Label htmlFor={`${id}-source`}>{t('ui:assetPage.identificationSource')}</Label>
         <NativeSelect
           id={`${id}-source`}
           value={values.identification_source}
@@ -142,22 +140,22 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
           {/* Only a placeholder: once a source is chosen, it cannot be cleared again. */}
           {!values.identification_source && (
             <NativeSelectOption value="" disabled>
-              Select…
+              {t('ui:select')}
             </NativeSelectOption>
           )}
           {IDENTIFICATION_SOURCES.map((source) => (
-            <NativeSelectOption key={source.value} value={source.value}>
-              {source.label}
+            <NativeSelectOption key={source} value={source}>
+              {t(`ui:assetPage.identificationSources.${source}`)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-description`}>Description</Label>
+        <Label htmlFor={`${id}-description`}>{t('ui:description')}</Label>
         <Textarea
           id={`${id}-description`}
           value={values.description}
-          placeholder="What the asset is and why it is valuable"
+          placeholder={t('ui:assetPage.descriptionPlaceholder')}
           onChange={(event) => change({ description: event.target.value })}
         />
       </div>
@@ -170,16 +168,16 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
       />
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={!dirty || update.isPending}>
-          Save
+          {t('ui:save')}
         </Button>
         <output aria-live="polite" className="text-sm text-muted-foreground">
-          {update.isSuccess && !dirty && 'Saved.'}
+          {update.isSuccess && !dirty && t('ui:saved')}
         </output>
         {update.isError && (
           <p role="alert" className="text-sm text-destructive">
             {update.error instanceof ApiError && update.error.status === 409
-              ? 'A removed property still leads to a damage scenario. Remove the link on the Relations tab first.'
-              : 'The asset could not be saved. Please try again.'}
+              ? t('ui:assetPage.propertyInUseError')
+              : t('ui:assetPage.saveError')}
           </p>
         )}
       </div>

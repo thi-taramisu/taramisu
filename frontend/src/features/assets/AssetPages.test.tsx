@@ -13,7 +13,7 @@ const section = (name: string) => within(screen.getByRole('region', { name }))
 const findSection = async (name: string) => within(await screen.findByRole('region', { name }))
 const fail = () => Promise.reject(new ApiError(500, 'Server error'))
 
-/** A second damage scenario of the item, linked to A-03 only, so A-01 can link it. */
+/** A second damage scenario of the item, linked to AS-3 only, so AS-1 can link it. */
 async function apiWithSecondScenario() {
   const api = createMockItemApi()
   const second = await api.damageScenarios.create('headlamp', {
@@ -28,11 +28,11 @@ describe('asset page', () => {
   it('shows the tabs of the wireframe with Definition as default and the number of relations', async () => {
     renderApp(page)
 
-    expect(await screen.findByRole('heading', { name: 'Headlamp on/off command, Asset #01' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Headlamp on/off command, Asset AS-1' })).toBeInTheDocument()
     const tabs = within(screen.getByRole('navigation', { name: 'Asset tabs' }))
     expect(tabs.getByRole('link', { name: 'Definition' })).toHaveAttribute('aria-current', 'page')
     expect(tabs.getByRole('link', { name: 'Risks' })).toHaveAttribute('href', `${page}/risks`)
-    // DS-01 and TS-01, which reaches the asset through DS-01.
+    // DS-1 and TS-1, which reaches the asset through DS-1.
     expect(await tabs.findByRole('link', { name: 'Relations 2' })).toHaveAttribute('href', `${page}/relations`)
   })
 
@@ -59,11 +59,11 @@ describe('asset definition', () => {
     expect(screen.getByLabelText('Identification Source')).toHaveDisplayValue('Item Definition')
     expect(screen.getByLabelText('Description')).toHaveDisplayValue('CAN message from the body control ECU that switches the low beam on and off.')
 
-    const properties = within(screen.getByRole('group', { name: 'Cybersecurity Properties' }))
+    const properties = within(screen.getByRole('group', { name: 'Cybersecurity properties' }))
     expect(properties.getByRole('checkbox', { name: /Confidentiality/ })).not.toBeChecked()
     expect(properties.getByRole('checkbox', { name: /Integrity/ })).toBeChecked()
-    expect(properties.getByRole('checkbox', { name: /Integrity/ })).toHaveAccessibleDescription(/Leads to DS-01 · targeted by TS-01/)
-    expect(properties.getByRole('checkbox', { name: /Availability/ })).toHaveAccessibleDescription(/Leads to DS-01\./)
+    expect(properties.getByRole('checkbox', { name: /Integrity/ })).toHaveAccessibleDescription(/Leads to DS-1 · targeted by TS-1/)
+    expect(properties.getByRole('checkbox', { name: /Availability/ })).toHaveAccessibleDescription(/Leads to DS-1\./)
     expect(properties.getByLabelText('Integrity description')).toHaveDisplayValue('A forged command switches the headlamp off.')
     expect(properties.queryByLabelText('Confidentiality description')).not.toBeInTheDocument()
   })
@@ -82,7 +82,7 @@ describe('asset definition', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(await within(tree()).findByRole('link', { name: /A-01 Low beam command/ })).toBeInTheDocument()
+    expect(await within(tree()).findByRole('link', { name: /AS-1 Low beam command/ })).toBeInTheDocument()
     expect(await api.assets.get('headlamp', 'a-01')).toMatchObject({
       name: 'Low beam command',
       identification_source: 'CATALOGUE',
@@ -146,7 +146,7 @@ describe('asset definition', () => {
     expect(integrity).toBeChecked()
     expect(integrity).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(screen.getAllByRole('link', { name: 'Remove the links on the Relations tab' })[0]).toHaveAttribute('href', `${page}/relations`)
+    expect(screen.getAllByRole('link', { name: 'Remove its links on the Relations tab to remove the property.' })[0]).toHaveAttribute('href', `${page}/relations`)
   })
 
   it('shows an error when saving fails', async () => {
@@ -168,12 +168,12 @@ describe('asset risks', () => {
     const table = await screen.findByRole('table')
     const [, row] = within(table).getAllByRole('row')
     expect(within(row).getByLabelText('Properties I, A')).toBeInTheDocument()
-    expect(within(row).getByRole('link', { name: /DS-01 Headlamp turns off/ })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
-    expect(within(row).getByRole('link', { name: /TS-01 Spoofed headlamp command/ })).toHaveAttribute('href', `${project}/threat-scenarios/ts-01/risks`)
+    expect(within(row).getByRole('link', { name: /DS-1 Headlamp turns off/ })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01/impact`)
+    expect(within(row).getByRole('link', { name: /TS-1 Spoofed headlamp command/ })).toHaveAttribute('href', `${project}/threat-scenarios/ts-01/risks`)
     expect(within(row).getByText('targeted')).toBeInTheDocument()
-    // AP-02 (Medium) is the most feasible path; Severe safety impact × Medium → 4, as on the threat scenario's Risks tab.
+    // AP-2 (Medium) is the most feasible path; Severe safety impact × Medium → 4, as on the threat scenario's Risks tab.
     expect(await within(row).findByText('Medium')).toBeInTheDocument()
-    expect(within(row).getByText('via AP-02')).toBeInTheDocument()
+    expect(within(row).getByText('via AP-2')).toBeInTheDocument()
     expect(within(row).getByText('Risk 4')).toBeInTheDocument()
     expect(screen.getByText('max Risk 4')).toBeInTheDocument()
   })
@@ -207,7 +207,7 @@ describe('asset risks', () => {
     renderApp(`${project}/assets/a-02/risks`)
 
     expect(await screen.findByText(/No risks yet/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Link a damage scenario on the Relations tab' })).toHaveAttribute('href', `${project}/assets/a-02/relations`)
+    expect(screen.getByRole('link', { name: 'Link a damage scenario on the Relations tab.' })).toHaveAttribute('href', `${project}/assets/a-02/relations`)
   })
 
   it('shows an error when the risks cannot be loaded', async () => {
@@ -225,7 +225,7 @@ describe('asset relations', () => {
 
     const damage = await findSection('Damage Scenarios')
     expect(damage.getByRole('link', { name: 'Headlamp turns off while driving at night' })).toHaveAttribute('href', `${project}/damage-scenarios/ds-01`)
-    const properties = damage.getByRole('group', { name: 'DS-01 properties' })
+    const properties = damage.getByRole('group', { name: 'DS-1 properties' })
     expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['I', 'A'])
     const targeting = section('Threat Scenarios Targeting It')
     expect(targeting.getByRole('link', { name: 'Spoofed headlamp command on the CAN bus' })).toHaveAttribute('href', `${project}/threat-scenarios/ts-01`)
@@ -242,7 +242,7 @@ describe('asset relations', () => {
 
     const viaDamage = await findSection('Threat Scenarios Affecting It via Damage')
     expect(viaDamage.getByRole('link', { name: 'Replayed headlamp command on the CAN bus' })).toBeInTheDocument()
-    expect(viaDamage.getByText('via DS-01')).toBeInTheDocument()
+    expect(viaDamage.getByText('via DS-1')).toBeInTheDocument()
   })
 
   it('links a damage scenario with all properties of the asset and refines them', async () => {
@@ -263,7 +263,7 @@ describe('asset relations', () => {
   it('removes a damage scenario link and the threat scenarios that reached the asset through it', async () => {
     const { user, api } = renderApp(`${page}/relations`)
 
-    await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: 'Remove link to DS-01 Headlamp turns off while driving at night' }))
+    await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: 'Remove link to DS-1 Headlamp turns off while driving at night' }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove link' }))
 
     expect(await section('Damage Scenarios').findByText('No damage scenarios linked yet.')).toBeInTheDocument()
@@ -286,7 +286,7 @@ describe('asset relations', () => {
     api.damageScenarios.unlinkAsset = fail
     const { user } = renderApp(`${page}/relations`, api)
 
-    await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: 'Remove link to DS-01 Headlamp turns off while driving at night' }))
+    await user.click((await findSection('Damage Scenarios')).getByRole('button', { name: 'Remove link to DS-1 Headlamp turns off while driving at night' }))
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove link' }))
 
     expect(await section('Damage Scenarios').findByRole('alert')).toHaveTextContent('The link could not be changed. Please try again.')

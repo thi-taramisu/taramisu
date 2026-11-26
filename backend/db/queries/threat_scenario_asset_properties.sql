@@ -68,3 +68,21 @@ DELETE FROM threat_scenario_asset_property l USING threat_scenario t, asset_cybe
 WHERE l.id = sqlc.arg(id) AND t.id = l.threat_scenario_id AND p.id = l.asset_cybersecurity_property_id AND a.id = p.asset_id
     AND t.item_definition_id = sqlc.arg(item_definition_id) AND a.item_definition_id = sqlc.arg(item_definition_id)
 RETURNING l.id;
+
+-- name: GetThreatScenarioAssetPropertyForUpdate :one
+SELECT l.* FROM threat_scenario_asset_property l
+JOIN threat_scenario t ON t.id = l.threat_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = sqlc.arg(id) AND t.item_definition_id = sqlc.arg(item_definition_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR NO KEY UPDATE OF l;
+
+-- name: GetThreatScenarioAssetPropertyForDelete :one
+SELECT l.* FROM threat_scenario_asset_property l
+JOIN threat_scenario t ON t.id = l.threat_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = sqlc.arg(id) AND t.item_definition_id = sqlc.arg(item_definition_id)
+    AND a.item_definition_id = sqlc.arg(item_definition_id)
+FOR UPDATE OF l;

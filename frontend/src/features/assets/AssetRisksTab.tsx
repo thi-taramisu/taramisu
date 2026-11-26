@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -6,11 +7,12 @@ import { useAssetRelations, useThreatScenariosRisks } from '../../api/queries/it
 import { FeasibilityBadge } from '../attack-paths/FeasibilityBadge'
 import { CiaProperties, RiskBadge } from '../items/RiskBadge'
 import { EntityLink } from '../workspace/EntityLink'
-import { entityPath } from '../workspace/entities'
+import { entityPath, formatEntityId } from '../workspace/entities'
 import { assetRiskRows } from './assetRisks'
 
 /** Risks tab of an asset ("Asset Summary" wireframe): read-only, every damage and threat scenario of the asset with the resulting risk. */
 export function AssetRisksTab() {
+  const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const relations = useAssetRelations(projectId, entityId)
   const threatIds = relations.data?.threatScenarios.map((ts) => ts.id) ?? []
@@ -18,19 +20,18 @@ export function AssetRisksTab() {
 
   if (!relations.data) {
     return relations.isError ? (
-      <p role="alert" className="text-sm text-destructive">The risks could not be loaded.</p>
+      <p role="alert" className="text-sm text-destructive">{t('ui:assetPage.risksLoadError')}</p>
     ) : (
-      <output className="text-sm text-muted-foreground">Loading risks…</output>
+      <output className="text-sm text-muted-foreground">{t('ui:loadingRisks')}</output>
     )
   }
   if (relations.data.damageScenarios.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-        No risks yet. Assets carry no rating of their own; risks appear once a damage scenario of this asset is linked to a rated threat scenario.{' '}
+        {t('ui:assetPage.noRisks')}{' '}
         <Link to={`${entityPath(projectId, 'assets', entityId)}/relations`} className="underline">
-          Link a damage scenario on the Relations tab
+          {t('ui:assetPage.linkDamageScenario')}
         </Link>
-        .
       </p>
     )
   }
@@ -51,24 +52,23 @@ export function AssetRisksTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <p className="flex-1 text-sm text-muted-foreground">
-          Assets carry no rating of their own. One row per damage scenario × threat scenario; Risk = highest value over the impact categories of
-          that damage scenario, as on the threat scenario's Risks tab.
+          {t('ui:assetPage.risksDescription')}
         </p>
-        {maxRisk && <RiskBadge value={maxRisk} prefix="max Risk" size="lg" />}
+        {maxRisk && <RiskBadge value={maxRisk} prefix={t('ui:maxRisk')} size="lg" />}
       </div>
       {failed && (
         <p role="alert" className="text-sm text-destructive">
-          Some risk values could not be loaded.
+          {t('ui:assetPage.someRisksLoadError')}
         </p>
       )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Property</TableHead>
-            <TableHead>Damage scenario</TableHead>
-            <TableHead>Threat scenario</TableHead>
-            <TableHead>Feasibility</TableHead>
-            <TableHead>Risk</TableHead>
+            <TableHead>{t('ui:property')}</TableHead>
+            <TableHead>{t('entities.damage-scenarios')}</TableHead>
+            <TableHead>{t('entities.threat-scenarios')}</TableHead>
+            <TableHead>{t('ui:feasibility')}</TableHead>
+            <TableHead>{t('ui:risk')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -86,23 +86,23 @@ export function AssetRisksTab() {
                   {row.threatScenario ? (
                     <>
                       <EntityLink projectId={projectId} type="threat-scenarios" entity={row.threatScenario} tab="risks" />{' '}
-                      <Badge variant={row.relation === 'targeted' ? 'default' : 'outline'}>{row.relation}</Badge>
+                      <Badge variant={row.relation === 'targeted' ? 'default' : 'outline'}>{t(row.relation === 'targeted' ? 'ui:targetedRelation' : 'ui:viaDamageRelation')}</Badge>
                     </>
                   ) : (
-                    <span className="text-muted-foreground">No threat scenario linked</span>
+                    <span className="text-muted-foreground">{t('ui:assetPage.noThreatLinked')}</span>
                   )}
                 </TableCell>
                 <TableCell>
                   {row.feasibility?.feasibility ? (
                     <span className="flex items-center gap-2">
                       <FeasibilityBadge value={row.feasibility.feasibility} withWord={false} size="sm" />
-                      {row.feasibility.decisive && <span className="text-xs text-muted-foreground">via {row.feasibility.decisive.code}</span>}
+                      {row.feasibility.decisive && <span className="text-xs text-muted-foreground">{t('ui:assetPage.viaCodes', { codes: formatEntityId(row.feasibility.decisive.code) })}</span>}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">{loading ? 'Loading…' : row.threatScenario ? 'Not rated' : '—'}</span>
+                    <span className="text-muted-foreground">{loading ? t('ui:loading') : row.threatScenario ? t('ui:notRated') : '—'}</span>
                   )}
                 </TableCell>
-                <TableCell>{loading ? <span className="text-muted-foreground">Loading…</span> : <RiskBadge value={row.risk} />}</TableCell>
+                <TableCell>{loading ? <span className="text-muted-foreground">{t('ui:loading')}</span> : <RiskBadge value={row.risk} />}</TableCell>
               </TableRow>
             )
           })}

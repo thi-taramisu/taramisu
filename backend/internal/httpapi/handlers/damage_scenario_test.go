@@ -320,3 +320,25 @@ func TestDamageRoutesRequireAuthentication(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeDamage) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
+
+func (f *fakeDamage) GetDamageScenarioForUpdate(ctx context.Context, p db.GetDamageScenarioForUpdateParams) (db.DamageScenario, error) {
+	return f.GetDamageScenario(ctx, db.GetDamageScenarioParams(p))
+}
+
+func (f *fakeDamage) GetDamageScenarioForDelete(ctx context.Context, p db.GetDamageScenarioForDeleteParams) (db.DamageScenario, error) {
+	return f.GetDamageScenario(ctx, db.GetDamageScenarioParams(p))
+}
+
+func (f *fakeDamage) GetImpactRatingForUpdate(ctx context.Context, p db.GetImpactRatingForUpdateParams) (db.ImpactRating, error) {
+	return f.GetImpactRating(ctx, db.GetImpactRatingParams(p))
+}
+
+func (f *fakeDamage) GetImpactRatingForDelete(ctx context.Context, p db.GetImpactRatingForDeleteParams) (db.ImpactRating, error) {
+	return f.GetImpactRating(ctx, db.GetImpactRatingParams(p))
+}
+
+func (f *fakeDamage) GetThreatDamageLinkForDelete(ctx context.Context, p db.GetThreatDamageLinkForDeleteParams) (db.ThreatDamageLink, error) {
+	return db.ThreatDamageLink{ID: dmgUUID(dmgRatingID), ThreatScenarioID: dmgUUID(dmgThreatID), DamageScenarioID: dmgUUID(dmgScenarioID)}, f.lookup()
+}

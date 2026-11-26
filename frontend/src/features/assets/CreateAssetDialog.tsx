@@ -1,12 +1,13 @@
+import { useTranslation } from 'react-i18next'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { CiaProperty } from '../../api/models/asset'
 import { useCreateAsset, useItemAssets, useProjectTree } from '../../api/queries/items'
 import { CreateElementDialog } from '../workspace/CreateElementDialog'
-import { entityPath } from '../workspace/entities'
+import { entityPath, formatEntityId } from '../workspace/entities'
+import { ItemSelectField } from '../workspace/ItemSelectField'
 import { usePageContext } from '../workspace/usePageContext'
 import { CIA_PROPERTIES } from './ciaProperties'
 import { findSimilarAsset } from './similarAsset'
@@ -26,6 +27,7 @@ interface CreateAssetDialogProps {
  * item of the current page and points out a similar existing asset to avoid duplicates.
  */
 export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, returnFocusTo, lockedItemId }: CreateAssetDialogProps) {
+  const { t } = useTranslation()
   const id = useId()
   const items = (useProjectTree(projectId).data ?? []).filter((node) => node.type === 'items')
   const context = usePageContext(items)
@@ -44,19 +46,19 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
       // Kept in C / I / A order, whatever order they were ticked in.
       asset: { name: trimmedName, properties: CIA_PROPERTIES.map((p) => p.value).filter((p) => properties.includes(p)) },
     })
-    return { name: `${asset.code} ${asset.name}`, path: entityPath(projectId, 'assets', asset.id) }
+    return { name: `${formatEntityId(asset.code)} ${asset.name}`, path: entityPath(projectId, 'assets', asset.id) }
   }
 
   return (
     <CreateElementDialog
-      title="New Asset"
-      description={`in project ${projectName} · only the name is required, details follow on the asset page`}
+      title={t('ui:assetPage.newAsset')}
+      description={t('ui:assetPage.context', { name: projectName })}
       open={open}
       onOpenChange={onOpenChange}
       returnFocusTo={returnFocusTo}
-      namePlaceholder="e.g. Contactor control signal"
-      hint="Will appear in the tree below the item."
-      errorMessage="The asset could not be created. Please try again."
+      namePlaceholder={t('ui:assetPage.createNamePlaceholder')}
+      hint={t('ui:assetPage.treeHint')}
+      errorMessage={t('ui:assetPage.createError')}
       onCreate={create}
       onNameChange={setName}
       onReset={() => {
@@ -66,30 +68,15 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
     >
       {similar && (
         <p className="-mt-2 text-sm text-muted-foreground">
-          Similar existing:{' '}
+          {t('ui:assetPage.similarExisting')}{' '}
           <Link to={entityPath(projectId, 'assets', similar.id)} onClick={() => onOpenChange(false)} className="underline">
-            {similar.code} {similar.name}
+            {formatEntityId(similar.code)} {similar.name}
           </Link>
         </p>
       )}
-      <div className="grid gap-2">
-        <Label htmlFor={`${id}-item`}>Item</Label>
-        <NativeSelect
-          id={`${id}-item`}
-          value={itemId}
-          disabled={Boolean(lockedItemId)}
-          onChange={(event) => setChosenItemId(event.target.value)}
-          className="w-full"
-        >
-          {items.map((item) => (
-            <NativeSelectOption key={item.id} value={item.id}>
-              {item.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
+      <ItemSelectField items={items} value={itemId} locked={Boolean(lockedItemId)} onChange={setChosenItemId} />
       <fieldset className="grid gap-2">
-        <legend className="mb-2 text-sm font-medium">Cybersecurity Properties</legend>
+        <legend className="mb-2 text-sm font-medium">{t('ui:cybersecurityProperties')}</legend>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {CIA_PROPERTIES.map(({ value, label }) => (
             <div key={value} className="flex items-center gap-2">
@@ -99,12 +86,12 @@ export function CreateAssetDialog({ projectId, projectName, open, onOpenChange, 
                 onCheckedChange={(checked) => setProperties((prev) => (checked === true ? [...prev, value] : prev.filter((p) => p !== value)))}
               />
               <Label htmlFor={`${id}-${value}`} className="font-normal">
-                {label}
+                {t(label)}
               </Label>
             </div>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">A damage scenario can only be linked through a declared property.</p>
+        <p className="text-xs text-muted-foreground">{t('ui:assetPage.propertiesLinkHint')}</p>
       </fieldset>
     </CreateElementDialog>
   )

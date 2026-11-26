@@ -25,16 +25,16 @@ describe('create damage scenario', () => {
     const dialog = await openNewDamageScenarioDialog(user)
 
     expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
-    expect(within(dialog).getByRole('button', { name: 'A-04 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(within(dialog).getByRole('button', { name: 'A-04 Integrity' }))
+    expect(within(dialog).getByRole('button', { name: 'AS-4 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: 'AS-4 Integrity' }))
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     const created = (await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-04')!.children![0]
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${created.id}`)
-    expect(within(tree()).getByRole('link', { name: 'DS-02 Diagnostic key leaked' })).toHaveAttribute('aria-current', 'page')
+    expect(within(tree()).getByRole('link', { name: 'DS-2 Diagnostic key leaked' })).toHaveAttribute('aria-current', 'page')
     expect((await api.content.assets('headlamp', 'i-01')).find((asset) => asset.id === 'a-04')).toMatchObject({ damageScenarios: 1 })
   })
 
@@ -54,11 +54,11 @@ describe('create damage scenario', () => {
 
     act(() => loadTree())
 
-    expect(await within(dialog).findByRole('button', { name: 'A-04 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await within(dialog).findByRole('button', { name: 'AS-4 Confidentiality' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(dialog).getByLabelText('Item')).toHaveDisplayValue('Headlamp system')
     await user.type(within(dialog).getByLabelText(/Name/), 'Diagnostic key leaked')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })).toBeInTheDocument()
   })
 
   it('links further assets with the properties they have', async () => {
@@ -66,14 +66,14 @@ describe('create damage scenario', () => {
     const dialog = await openNewDamageScenarioDialog(user)
 
     await user.click(within(dialog).getByRole('button', { name: 'Add Asset' }))
-    await user.click(screen.getByRole('menuitem', { name: /A-03 Camera image data/ }))
+    await user.click(screen.getByRole('menuitem', { name: /AS-3 Camera image data/ }))
 
-    const properties = within(dialog).getByRole('group', { name: 'A-03 properties' })
+    const properties = within(dialog).getByRole('group', { name: 'AS-3 properties' })
     expect(within(properties).getAllByRole('button', { pressed: true }).map((button) => button.textContent)).toEqual(['I', 'A'])
-    expect(within(properties).queryByRole('button', { name: 'A-03 Confidentiality' })).not.toBeInTheDocument()
+    expect(within(properties).queryByRole('button', { name: 'AS-3 Confidentiality' })).not.toBeInTheDocument()
 
-    await user.click(within(dialog).getByRole('button', { name: 'Remove A-03 Camera image data' }))
-    expect(within(dialog).queryByRole('group', { name: 'A-03 properties' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Remove AS-3 Camera image data' }))
+    expect(within(dialog).queryByRole('group', { name: 'AS-3 properties' })).not.toBeInTheDocument()
   })
 
   it('drops the linked assets when another item is chosen', async () => {
@@ -81,15 +81,15 @@ describe('create damage scenario', () => {
     await api.items.create('headlamp', { name: 'Rear lights', scope_type: 'ITEM' })
     const { user } = renderApp(`${project}/assets/a-04`, api)
     const dialog = await openNewDamageScenarioDialog(user)
-    expect(within(dialog).getByRole('group', { name: 'A-04 properties' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'AS-4 properties' })).toBeInTheDocument()
 
     await user.selectOptions(within(dialog).getByLabelText('Item'), 'Rear lights')
-    expect(within(dialog).queryByRole('group', { name: 'A-04 properties' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('group', { name: 'AS-4 properties' })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Add Asset' })).toBeDisabled()
 
     // Assets belong to one item, so going back does not bring the link back either.
     await user.selectOptions(within(dialog).getByLabelText('Item'), 'Headlamp system')
-    expect(within(dialog).queryByRole('group', { name: 'A-04 properties' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('group', { name: 'AS-4 properties' })).not.toBeInTheDocument()
   })
 
   it('requires a name, a linked asset and a property per asset', async () => {
@@ -100,12 +100,12 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByLabelText(/Name/)).toHaveAccessibleDescription('Name is required.')
 
     await user.type(within(dialog).getByLabelText(/Name/), 'Manipulated firmware')
-    await user.click(within(dialog).getByRole('button', { name: 'A-02 Integrity' }))
-    expect(within(dialog).getByRole('button', { name: 'A-02 Integrity' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(within(dialog).getByRole('button', { name: 'AS-2 Integrity' }))
+    expect(within(dialog).getByRole('button', { name: 'AS-2 Integrity' })).toHaveAttribute('aria-pressed', 'false')
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Select at least one property of A-02.')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Select at least one property of AS-2.')
 
-    await user.click(within(dialog).getByRole('button', { name: 'Remove A-02 Body control ECU firmware' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Remove AS-2 Body control ECU firmware' }))
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Link at least one asset.')
     expect((await api.content.children('headlamp', 'i-01')).find((node) => node.id === 'a-02')!.children).toBeUndefined()
@@ -131,9 +131,9 @@ describe('create damage scenario', () => {
     expect(within(dialog).getByRole('alert')).toHaveTextContent('The assets are still loading.')
 
     act(() => loadAssets())
-    await within(dialog).findByRole('button', { name: 'A-02 Integrity' })
+    await within(dialog).findByRole('button', { name: 'AS-2 Integrity' })
     await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
-    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage scenario #02' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Manipulated firmware, Damage Scenario DS-2' })).toBeInTheDocument()
   })
 
   it('keeps the dialog open with "Create & add another"', async () => {
@@ -145,7 +145,7 @@ describe('create damage scenario', () => {
 
     expect(await within(dialog).findByRole('status')).toHaveTextContent('Manipulated firmware created.')
     expect(within(dialog).getByLabelText(/Name/)).toHaveValue('')
-    expect(within(dialog).getByRole('button', { name: 'A-02 Integrity' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: 'AS-2 Integrity' })).toHaveAttribute('aria-pressed', 'true')
     expect(location()).toHaveTextContent(`${project}/assets/a-02`)
   })
 
@@ -174,12 +174,12 @@ describe('create damage scenario', () => {
 })
 
 describe('damage scenario page', () => {
-  it('shows the type label with the ID as #number above the title', async () => {
+  it('shows the type label with the prefixed ID above the title', async () => {
     renderApp(page)
 
-    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
-    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
-    expect(heading.parentElement).not.toHaveTextContent('DS-01')
+    const heading = await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
+    expect(heading.parentElement).toHaveTextContent('DS-1')
   })
 
   it('shows the ID of the newly opened damage scenario right after switching', async () => {
@@ -191,14 +191,14 @@ describe('damage scenario page', () => {
     })
     const { user } = renderApp(page, api)
 
-    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
-    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
-    await user.click(await within(tree()).findByRole('link', { name: 'DS-02 Diagnostic key leaked' }))
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
+    await user.click(await within(tree()).findByRole('link', { name: 'DS-2 Diagnostic key leaked' }))
 
     expect(location()).toHaveTextContent(`${project}/damage-scenarios/${second.id}`)
-    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage scenario #02' })
-    expect(screen.getByText('Damage scenario #02')).toBeInTheDocument()
-    expect(screen.queryByText('Damage scenario #01')).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Diagnostic key leaked, Damage Scenario DS-2' })
+    expect(screen.getByText('Damage Scenario DS-2')).toBeInTheDocument()
+    expect(screen.queryByText('Damage Scenario DS-1')).not.toBeInTheDocument()
   })
 
   it('falls back to the tree code when the API returns an empty code', async () => {
@@ -207,8 +207,8 @@ describe('damage scenario page', () => {
     api.damageScenarios.get = async (...args) => ({ ...(await get(...args)), code: '' })
     renderApp(page, api)
 
-    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })
-    expect(screen.getByText('Damage scenario #01')).toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })
+    expect(screen.getByText('Damage Scenario DS-1')).toBeInTheDocument()
   })
 
   it('shows a not-found state for unknown damage scenarios', async () => {
@@ -216,7 +216,7 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByRole('heading', { name: 'Damage scenario not found' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to project' })).toHaveAttribute('href', project)
-    expect(screen.queryByRole('navigation', { name: 'Damage scenario tabs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Damage Scenario tabs' })).not.toBeInTheDocument()
   })
 
   it('keeps the damage scenario page when a refetch of the loaded damage scenario fails', async () => {
@@ -231,7 +231,7 @@ describe('damage scenario page', () => {
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be refreshed')
-    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage scenario #01' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Headlamp turns off while driving at night, Damage Scenario DS-1' })).toBeInTheDocument()
     expect(screen.getByLabelText('Harm To Road User')).toHaveDisplayValue(/ Glare\.$/)
   })
 
@@ -258,8 +258,8 @@ describe('damage scenario definition', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage scenario #01' })).toBeInTheDocument()
-    expect(within(tree()).getByRole('link', { name: 'DS-01 Low beam fails at night' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Low beam fails at night, Damage Scenario DS-1' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'DS-1 Low beam fails at night' })).toBeInTheDocument()
     expect(await api.damageScenarios.get('headlamp', 'ds-01')).toMatchObject({
       title: 'Low beam fails at night',
       road_user_harm_description: null,

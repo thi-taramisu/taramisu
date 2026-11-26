@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import type { AssetRelations, CiaProperty } from '../../api/models/asset'
 import type { EntityRef } from '../../api/models/tree'
+import { formatEntityId } from '../workspace/entities'
 import { CIA_PROPERTIES } from './ciaProperties'
 
 /** One C / I / A property in the form; `description` is kept while the property is not declared. */
@@ -22,17 +24,18 @@ interface AssetPropertiesFieldProps {
 }
 
 function codes(entities: EntityRef[]) {
-  return entities.map((entity) => entity.code).join(', ')
+  return entities.map((entity) => formatEntityId(entity.code)).join(', ')
 }
 
 /** Part of the Definition form ("Asset Definition" wireframe): the declared cybersecurity properties [RQ-15-02, WP-15-02]. */
 export function AssetPropertiesField({ idPrefix, value, onChange, relations, relationsPath }: AssetPropertiesFieldProps) {
+  const { t } = useTranslation()
   return (
     <fieldset className="overflow-hidden rounded-lg border">
-      <legend className="sr-only">Cybersecurity Properties</legend>
+      <legend className="sr-only">{t('ui:cybersecurityProperties')}</legend>
       <div aria-hidden="true" className="flex flex-wrap items-baseline gap-x-2 border-b bg-muted/50 px-4 py-2">
-        <span className="text-sm font-medium">Cybersecurity Properties</span>
-        <span className="text-xs text-muted-foreground">whose loss can lead to a damage scenario (RQ-15-02)</span>
+        <span className="text-sm font-medium">{t('ui:cybersecurityProperties')}</span>
+        <span className="text-xs text-muted-foreground">{t('ui:assetPage.propertiesHint')}</span>
       </div>
       <ul className="divide-y">
         {CIA_PROPERTIES.map(({ value: property, label }) => {
@@ -60,31 +63,31 @@ export function AssetPropertiesField({ idPrefix, value, onChange, relations, rel
                   <span aria-hidden="true" className="mr-1.5 font-mono text-muted-foreground">
                     {property}
                   </span>
-                  {label}
+                  {t(label)}
                 </label>
               </div>
               <div className="grid gap-1">
                 {current.declared && (
                   <Input
-                    aria-label={`${label} description`}
+                    aria-label={t('ui:assetPage.propertyDescription', { property: t(label) })}
                     value={current.description}
-                    placeholder="Why this property matters for the asset"
+                    placeholder={t('ui:assetPage.propertyDescriptionPlaceholder')}
                     onChange={(event) => onChange(property, { ...current, description: event.target.value })}
                   />
                 )}
                 <p id={usageId} className="text-xs text-muted-foreground">
                   {!current.declared ? (
-                    'Not declared.'
+                    t('ui:assetPage.notDeclared')
                   ) : damageScenarios.length === 0 ? (
-                    'Leads to no damage scenario yet.'
+                    t('ui:assetPage.leadsToNothing')
                   ) : (
                     <>
-                      Leads to {codes(damageScenarios)}
-                      {threats.length > 0 && <> · targeted by {codes(threats)}</>}.{' '}
+                      {threats.length > 0
+                        ? t('ui:assetPage.leadsToTargeted', { codes: codes(damageScenarios), threats: codes(threats) })
+                        : t('ui:assetPage.leadsTo', { codes: codes(damageScenarios) })}{' '}
                       <Link to={relationsPath} className="underline">
-                        Remove the links on the Relations tab
-                      </Link>{' '}
-                      to remove the property.
+                        {t('ui:assetPage.removeLinksFirst')}
+                      </Link>
                     </>
                   )}
                 </p>

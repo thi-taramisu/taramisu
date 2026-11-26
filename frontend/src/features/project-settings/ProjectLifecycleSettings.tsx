@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
@@ -27,6 +28,7 @@ function SettingRow({ title, children, action }: { title: string; children: Reac
 
 /** "Danger Zone" of the project settings: archive, restore and delete. Only Owners see it. */
 export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const project = useProject(projectId)
   const archiveProject = useArchiveProject()
@@ -49,12 +51,8 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   if (project.isError && !isNotFound(project.error)) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <p role="alert" className="text-sm text-destructive">
-          The archive and delete options could not be loaded.
-        </p>
-        <Button variant="outline" size="sm" onClick={() => void project.refetch()}>
-          Retry
-        </Button>
+        <p role="alert" className="text-sm text-destructive">{t('ui:theArchiveAndDeleteOptionsCouldNotBeLoaded')}</p>
+        <Button variant="outline" size="sm" onClick={() => void project.refetch()}>{t('ui:retry')}</Button>
       </div>
     )
   }
@@ -68,56 +66,42 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
 
   return (
     <section aria-labelledby="danger-zone" className="grid gap-3">
-      <h2 id="danger-zone" className="text-base font-semibold">Danger Zone</h2>
+      <h2 id="danger-zone" className="text-base font-semibold">{t('ui:dangerZone')}</h2>
       <div className="divide-y rounded-lg border border-destructive/30">
         {archived ? (
           <SettingRow
-            title="Restore project"
+            title={t('ui:restoreProjectText')}
             action={(
               <Button variant="outline" disabled={pending} onClick={() => {
                 resetFailed(...mutations)
                 restoreProject.mutate(projectId)
               }}>
-                <ArchiveRestore aria-hidden="true" />
-                Restore Project
-              </Button>
+                <ArchiveRestore aria-hidden="true" />{t('ui:restoreProject')}</Button>
             )}
-          >
-            This project is archived and read-only for all members. Restore it to allow changes again.
-          </SettingRow>
+          >{t('ui:thisProjectIsArchivedAndReadonlyForAllMembersRestoreItToAllowChangesAgain')}</SettingRow>
         ) : (
           <SettingRow
-            title="Archive project"
+            title={t('ui:archiveProjectText')}
             action={(
               <Button variant="outline" disabled={pending} onClick={(event) => open('archive', event.currentTarget)}>
-                <Archive aria-hidden="true" />
-                Archive Project
-              </Button>
+                <Archive aria-hidden="true" />{t('ui:archiveProject')}</Button>
             )}
-          >
-            Archive this project to make it read-only for all members. Owners can restore it at any time.
-          </SettingRow>
+          >{t('ui:archiveThisProjectToMakeItReadonlyForAllMembersOwnersCanRestoreItAtAnyTime')}</SettingRow>
         )}
         <SettingRow
-          title="Delete project"
+          title={t('ui:deleteProjectText')}
           action={(
             <Button
               variant="destructive"
               disabled={pending}
               onClick={(event) => open('delete', event.currentTarget)}
             >
-              <Trash2 aria-hidden="true" />
-              Delete Project
-            </Button>
+              <Trash2 aria-hidden="true" />{t('ui:deleteProject')}</Button>
           )}
-        >
-          Permanently delete the project with everything in it. This cannot be undone.
-        </SettingRow>
+        >{t('ui:permanentlyDeleteTheProjectWithEverythingInItThisCannotBeUndone')}</SettingRow>
       </div>
       {failed && (
-        <p role="alert" className="text-sm text-destructive">
-          The change could not be saved. Please try again.
-        </p>
+        <p role="alert" className="text-sm text-destructive">{t('ui:theChangeCouldNotBeSavedPleaseTryAgain')}</p>
       )}
 
       <ArchiveProjectDialog
