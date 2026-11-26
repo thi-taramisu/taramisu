@@ -137,12 +137,8 @@ function DefinitionForm({ projectId, asset, relations }: { projectId: string; as
           onChange={(event) => change({ identification_source: event.target.value as FormValues['identification_source'] })}
           className={cn('w-full', !values.identification_source && 'text-muted-foreground')}
         >
-          {/* Only a placeholder: once a source is chosen, it cannot be cleared again. */}
-          {!values.identification_source && (
-            <NativeSelectOption value="" disabled>
-              {t('ui:select')}
-            </NativeSelectOption>
-          )}
+          {/* The source is optional (nullable in the data model), so it can be emptied again. */}
+          <NativeSelectOption value="">{t('ui:select')}</NativeSelectOption>
           {IDENTIFICATION_SOURCES.map((source) => (
             <NativeSelectOption key={source} value={source}>
               {t(`ui:assetPage.identificationSources.${source}`)}

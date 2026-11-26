@@ -96,25 +96,18 @@ describe('asset definition', () => {
     expect((await api.content.assets('headlamp', 'i-01'))[0].properties).toEqual(['C', 'I', 'A'])
   })
 
-  it('offers no empty identification source once a source is chosen', async () => {
-    renderApp(page)
-
+  it('empties the identification source again with the empty choice', async () => {
+    const { user, api } = renderApp(page)
     const source = await screen.findByLabelText('Identification Source')
-    expect(within(source).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument()
-  })
+    expect(source).toHaveDisplayValue('Item Definition')
 
-  it('shows the identification source placeholder while no source is chosen and drops it after choosing one', async () => {
-    const api = createMockItemApi()
-    await api.assets.update('headlamp', 'a-03', { identification_source: null })
-    const { user } = renderApp(`${project}/assets/a-03`, api)
+    // The source is optional in the data model, so a wrong pick can be undone.
+    await user.selectOptions(source, 'Select…')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    const source = await screen.findByLabelText('Identification Source')
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(source).toHaveDisplayValue('Select…')
-    expect(within(source).getByRole('option', { name: 'Select…' })).toBeDisabled()
-
-    await user.selectOptions(source, 'Catalogue')
-
-    expect(within(source).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument()
+    expect(await api.assets.get('headlamp', 'a-01')).toMatchObject({ identification_source: null })
   })
 
   it('requires a name', async () => {
