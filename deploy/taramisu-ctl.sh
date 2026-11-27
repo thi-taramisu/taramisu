@@ -8,7 +8,7 @@
 #   sudo -u taramisu deploy/taramisu-ctl.sh --prune           # also remove taramisu images no container uses
 #
 # One release tag selects both the Git checkout (compose files, nginx config, blueprints, migrations)
-# and the api, frontend and docs images, so they always fit together.
+# and the release images, so they always fit together.
 set -eu
 cd "$(dirname "$0")"
 
@@ -206,11 +206,7 @@ log "Release $target"
 export TARAMISU_VERSION="${TARAMISU_IMAGE_TAG:-$target}"
 ensure_env
 log 'Pulling images'
-compose pull --quiet --ignore-buildable
-# These services also have local build definitions, but servers use their release images.
-compose pull --quiet api frontend docs
-log 'Building storage provisioning jobs from the selected release'
-compose build storage-config storage-init
+compose pull --quiet
 start_stack
 if $prune; then
     prune_images

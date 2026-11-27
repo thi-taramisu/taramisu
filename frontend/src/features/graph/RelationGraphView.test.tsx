@@ -1,0 +1,45 @@
+import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { renderApp } from '../../test/renderApp'
+import { createMockItemApi } from '../../api/mocks/mockItemApi'
+
+const route = '/projects/headlamp/threat-scenarios/ts-01?view=graph'
+describe('graph view', () => {
+  it('switches between full and minimal views and retains graph navigation in tree links', async () => {
+    const { user } = renderApp(route)
+    const toggle = await screen.findByRole('switch', { name: 'Minimal view' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('link', { name: /AP-2 Malicious/ })).toHaveAttribute('href', expect.stringContaining('graphMode=minimal'))
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+  it('fits the graph from a single control without remounting the canvas', async () => {
+    const { user } = renderApp(route)
+    const fit = await screen.findByRole('button', { name: /fit view/i })
+    expect(screen.getAllByRole('button', { name: /fit (view|graph)/i })).toHaveLength(1)
+
+    await user.click(fit)
+
+    expect(screen.getByRole('button', { name: /fit view/i })).toBe(fit)
+  })
+  it('shows loading errors rather than presenting incomplete relations as an empty graph and allows retry', async () => {
+    const api = createMockItemApi()
+    const risks = api.content.risks
+    api.content.risks = () => Promise.reject(new Error('offline'))
+    const { user } = renderApp(route, api)
+    expect(await screen.findByRole('alert')).toHaveTextContent('graph could not be loaded')
+    api.content.risks = risks
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
+  })
+  it('does not invent nodes for an element missing from the graph data', async () => {
+    // The asset page loads the asset itself, so serve one that the graph does not contain.
+    const api = createMockItemApi()
+    const get = api.assets.get
+    api.assets.get = async (projectId) => ({ ...(await get(projectId, 'a-01')), id: 'unknown', code: 'A-99' })
+    renderApp('/projects/headlamp/assets/unknown?view=graph', api)
+    expect(await screen.findByText('No graph data for this element.')).toBeInTheDocument()
+  })
+})

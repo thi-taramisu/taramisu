@@ -101,6 +101,7 @@ func registerAttachments(api huma.API, h *Attachments, access handlers.ProjectAc
 		permission := handlers.PermRead
 		if route.method == http.MethodPost || route.method == http.MethodDelete {
 			permission = handlers.PermEdit
+			op.Responses["409"] = &huma.Response{Description: "Project is archived"}
 		}
 		op.Responses["403"] = &huma.Response{Description: "Insufficient project role"}
 		handlers.RegisterRaw(api, op, handlers.InProject(access, handlers.ScopeProject("project_id"), permission), func(ctx huma.Context) {

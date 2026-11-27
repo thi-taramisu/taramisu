@@ -87,10 +87,10 @@ func TestAttachmentsIntegration(t *testing.T) {
 			exec("INSERT INTO iam_user(id,external_iam_sub) VALUES($1,$1::uuid::text),($2,$2::uuid::text)", user, other)
 			exec("INSERT INTO project_role_assignment(tara_project_id,user_id,project_role) VALUES($1,$2,'OWNER')", project, user)
 			tracked := &trackedObjects{ObjectStore: objects}
-			database := &deleteFailureDB{DBTX: tx}
+			database := &deleteFailureDB{TxStarter: tx}
 			h := NewAttachments(db.New(database), tracked)
 			fixture := authtest.NewFixture(t, db.New(database))
-			mux := New(db.New(database), fixture.Manager, WithAttachments(h))
+			mux := New(db.NewStore(database), fixture.Manager, WithAttachments(h))
 			var groups []string
 			if scenario == "cleanup-batch" {
 				exec(`INSERT INTO attachment(id,project_id,file_name,content_type,size_bytes,sha256,s3_object_key,uploaded_by,delete_pending)
@@ -219,7 +219,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 						if e = tx.Commit(ctx); e != nil {
 							t.Fatal(e)
 						}
-						database.DBTX = pool
+						database.TxStarter = pool
 						t.Cleanup(func() {
 							_, _ = pool.Exec(ctx, "DELETE FROM attachment WHERE project_id=$1", project)
 							_, _ = pool.Exec(ctx, "DELETE FROM tara_project WHERE id=$1", project)
@@ -269,7 +269,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				if _, e = database.Exec(ctx, "UPDATE attachment SET created_at=now()-interval '11 minutes' WHERE project_id=$1", project); e != nil {
 					t.Fatal(e)
 				}
-				cleanupDB := database.DBTX
+				cleanupDB := database.TxStarter
 				if scenario == "upload-restart" {
 					if e = tx.Commit(ctx); e != nil {
 						t.Fatal(e)
@@ -373,7 +373,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				if e = tx.Commit(ctx); e != nil {
 					t.Fatal(e)
 				}
-				database.DBTX = pool
+				database.TxStarter = pool
 				t.Cleanup(func() {
 					if _, e := pool.Exec(ctx, "DELETE FROM attachment WHERE id=$1", meta.ID); e != nil {
 						t.Error(e)
@@ -456,7 +456,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 				// the successful metadata delete, exercising startup retry and shutdown.
 				workerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
-				recoveredDB := &deleteFailureDB{DBTX: pool, afterDelete: cancel}
+				recoveredDB := &deleteFailureDB{TxStarter: pool, afterDelete: cancel}
 				restarted := NewAttachments(db.New(recoveredDB), storage.New(cfg))
 				if scenario == "delete-replicas" {
 					results := make(chan error, 2)
@@ -650,7 +650,7 @@ func TestRejectUnsupportedDeclaredAttachmentType(t *testing.T) {
 // Inject deletion failures while all other SQL still uses PostgreSQL.
 type deleteFailureDB struct {
 	beforeCreate func()
-	db.DBTX
+	db.TxStarter
 	fail, failMark                              bool
 	failInsert, failComplete, ambiguousComplete bool
 	afterDelete                                 func()
@@ -663,7 +663,7 @@ func (d *deleteFailureDB) Exec(ctx context.Context, sql string, args ...any) (pg
 	if d.failMark && strings.Contains(sql, "UPDATE attachment SET delete_pending") {
 		return pgconn.CommandTag{}, errors.New("injected marker failure")
 	}
-	tag, err := d.DBTX.Exec(ctx, sql, args...)
+	tag, err := d.TxStarter.Exec(ctx, sql, args...)
 	if err == nil && d.afterDelete != nil && strings.Contains(sql, "DELETE FROM attachment") {
 		d.afterDelete()
 	}
@@ -693,8 +693,8 @@ func (d *deleteFailureDB) QueryRow(ctx context.Context, sql string, args ...any)
 			return attachmentErrorRow{}
 		}
 		if d.ambiguousComplete {
-			return attachmentErrorRow{row: d.DBTX.QueryRow(ctx, sql, args...)}
+			return attachmentErrorRow{row: d.TxStarter.QueryRow(ctx, sql, args...)}
 		}
 	}
-	return d.DBTX.QueryRow(ctx, sql, args...)
+	return d.TxStarter.QueryRow(ctx, sql, args...)
 }

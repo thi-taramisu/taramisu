@@ -50,10 +50,18 @@ services:
     <<: *authentik
     command: worker
     networks: [iam-db]
+    # Both containers fill the new authentik_data volume with the image's /data/media symlink when they are created.
+    # Created at the same time, the second one can fail with "file exists".
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-server:
+        condition: service_started
     environment:
       <<: *authentik-environment
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-taramisu}
       OIDC_REDIRECT_URI: ${APP_URL:-http://localhost}/auth/callback
+      OIDC_POST_LOGOUT_REDIRECT_URI: ${APP_URL:-http://localhost}/projects
       DEV_PASSWORD: ${DEV_PASSWORD:?Set DEV_PASSWORD in iam/.env; see iam/.env.example}
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?Set AUTHENTIK_BOOTSTRAP_PASSWORD in iam/.env; see iam/.env.example}
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:?Set AUTHENTIK_API_TOKEN in iam/.env; see iam/.env.example}

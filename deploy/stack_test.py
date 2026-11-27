@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 import functools
 import hashlib
 from http.cookiejar import CookieJar
+import http.client
 import json
 import os
 from pathlib import Path
@@ -39,6 +40,26 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+
+
+class LocalhostHTTPHandler(urllib.request.HTTPHandler):
+    """Connect to IPv4 localhost without changing HTTP origins, cookies, or Host.
+
+    Compose publishes the proxy on 127.0.0.1. On Windows a failed ::1 attempt
+    otherwise delays each sequential request long enough to miss an outage.
+    Non-local HTTP hosts and HTTPS retain urllib's normal connection behavior.
+    """
+
+    def http_open(self, req: urllib.request.Request) -> Any:
+        def connection(host: str, **kwargs: Any) -> http.client.HTTPConnection:
+            if host == "localhost" or host.startswith("localhost:"):
+                host = "127.0.0.1" + host[len("localhost"):]
+            return http.client.HTTPConnection(host, **kwargs)
+
+        return self.do_open(connection, req)
+
+
+HTTP_OPENER = urllib.request.build_opener(LocalhostHTTPHandler())
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -59,11 +80,11 @@ COMPOSE_TIMEOUT = 180
 # Matches proxy/nginx.conf 'log_format upstream_logging':
 #   $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent
 #   "$http_referer" "$http_user_agent" "$http_x_forwarded_for"
-#   upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time
+#   upstream: $upstream_addr status: $upstream_status response_time: $upstream_response_time request_id: $request_id
 LOG_PATTERN = re.compile(
     r'"(?P<method>[A-Z]+)\s+(?P<uri>\S+)[^"]*"\s+(?P<http_status>\d+)\s+\d+\s+'
     r'"[^"]*"\s+"(?P<user_agent>[^"]*)"\s+"[^"]*"\s+'
-    r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>[^\r\n]+)'
+    r'upstream:\s+(?P<upstream_addr>.+?)\s+status:\s+(?P<upstream_status>.+?)\s+response_time:\s+(?P<upstream_response_time>.+?)\s+request_id:\s+\S+'
 )
 
 
@@ -208,7 +229,7 @@ def oidc_pkce_login(
 ) -> str:
     """Performs an OIDC Authorization Code + PKCE login flow against Authentik via NGINX."""
     jar = CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener = urllib.request.build_opener(LocalhostHTTPHandler(), urllib.request.HTTPCookieProcessor(jar))
     base = base_url.rstrip("/")
 
     # 1. Initialize flow to establish session
@@ -272,6 +293,7 @@ def oidc_pkce_login(
     auth_url = f"{base}/auth/application/o/authorize/?{auth_params}"
 
     no_redir_opener = urllib.request.build_opener(
+        LocalhostHTTPHandler(),
         urllib.request.HTTPCookieProcessor(jar),
         NoRedirect(),
     )
@@ -305,7 +327,7 @@ def oidc_pkce_login(
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
-    with urllib.request.urlopen(req_token, timeout=20) as resp:
+    with HTTP_OPENER.open(req_token, timeout=20) as resp:
         token_res = json.loads(resp.read().decode("utf-8"))
 
     if "access_token" not in token_res:
@@ -421,7 +443,7 @@ def query_proxy(
     if token is not None:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with HTTP_OPENER.open(req, timeout=5) as resp:
             return resp.status, decode_body(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         return e.code, decode_body(e.read().decode("utf-8", errors="replace"))
@@ -539,7 +561,7 @@ def proxy_ready(base_url: str, attempts: int, delay: float) -> bool:
     """Polls /health/ready through NGINX until it returns 200."""
     for _ in range(attempts):
         try:
-            with urllib.request.urlopen(f"{base_url}/health/ready", timeout=3) as resp:
+            with HTTP_OPENER.open(f"{base_url}/health/ready", timeout=3) as resp:
                 if resp.status == 200:
                     return True
         except Exception:
@@ -552,7 +574,13 @@ def cleanup_stack(initial_count: int) -> bool:
     """Restores the api service to its initial replica count and waits until NGINX serves it again."""
     try:
         scale_api(initial_count, new_session=True)
-        # Until the resolver TTL expires, NGINX may still route to a replica that was just removed.
+        for replica in wait_for_api_replicas(initial_count):
+            wait_for_replica_ready(replica["ip"])
+        # The scale-down can remove all addresses used by the final test and
+        # restart a stopped replica. Refresh DNS and passive failure state only
+        # after the tests; runtime failover assertions never reload the proxy.
+        run_compose("exec", "-T", "proxy", "nginx", "-t", new_session=True)
+        run_compose("exec", "-T", "proxy", "nginx", "-s", "reload", new_session=True)
         if not proxy_ready(STACK.base_url, attempts=10, delay=1):
             print("Warning: api is not ready through NGINX after restoring the replica count", file=sys.stderr)
             return False
@@ -578,6 +606,7 @@ def self_check() -> int:
         "upstream_addr": "10.0.0.2:8080, 10.0.0.3:8080",
         "upstream_status": "502, 200",
         "upstream_response_time": "0.001, 0.002",
+        "request_id": "0123456789abcdef0123456789abcdef",
     }
     try:
         line = re.sub(r"\$(\w+)", lambda m: values[m.group(1)], read_log_format())

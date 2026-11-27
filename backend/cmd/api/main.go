@@ -12,34 +12,65 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 	"github.com/thi-taramisu/taramisu/backend/internal/storage"
 )
 
-// After SIGTERM, shutdownTimeout bounds how long in-flight requests may finish and poolCloseTimeout how long
-// the database pool may then take to close. Together they stay below stop_grace_period (10s) of the api
-// service in deploy/compose.backend.yaml, after which Docker sends SIGKILL; keep the three in sync.
+// HTTP draining, pool closure, and Sentry flushing together stay below the API's
+// stop_grace_period (15s) in deploy/compose.backend.yaml. Keep these budgets in sync.
 const (
-	shutdownTimeout  = 8 * time.Second
-	poolCloseTimeout = time.Second
+	shutdownTimeout    = 8 * time.Second
+	poolCloseTimeout   = time.Second
+	sentryFlushTimeout = 5 * time.Second
 )
 
-func main() {
-	if err := run(); err != nil {
-		slog.Error("server stopped", "error", err)
-		os.Exit(1)
+func main() { os.Exit(exitCode()) }
+
+func exitCode() int {
+	options := sentry.ClientOptions{
+		Dsn:         os.Getenv("SENTRY_DSN"),
+		Environment: os.Getenv("SENTRY_ENVIRONMENT"),
+		Release:     os.Getenv("SENTRY_RELEASE"),
 	}
+	if tunnel := os.Getenv("SENTRY_TUNNEL_URL"); options.Dsn != "" && tunnel != "" {
+		transport, err := logging.NewTunnelTransport(tunnel)
+		if err != nil {
+			slog.Error("configure Sentry ingest tunnel", "error", err)
+			return 1
+		}
+		options.HTTPTransport = transport
+	}
+	logLevel := new(slog.LevelVar)
+	logger, flush, err := logging.New(options, os.Stderr, logLevel)
+	if err != nil {
+		slog.Error("initialize logging", "error", err)
+		return 1
+	}
+	slog.SetDefault(logger)
+	defer func() {
+		if !flush(sentryFlushTimeout) {
+			slog.New(slog.NewJSONHandler(os.Stderr, nil)).Warn("Sentry flush timed out")
+		}
+	}()
+	if err := run(logLevel); err != nil {
+		slog.Error("server stopped", "error", err)
+		return 1
+	}
+	return 0
 }
 
-func run() error {
+func run(logLevel *slog.LevelVar) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
+	logLevel.Set(cfg.LogLevel)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Once shutdown starts, restore default signal handling so a second signal terminates immediately.
@@ -50,6 +81,10 @@ func run() error {
 	}
 	defer closePool(pool, poolCloseTimeout)
 	queries := db.NewStore(pool)
+	// Deferred after closePool, so the cleanup is cancelled before the pool closes, also when run returns early.
+	purgeCtx, stopPurge := context.WithCancel(ctx)
+	defer stopPurge()
+	go purgeAuditEvents(purgeCtx, queries, cfg.AuditRetentionAfterDelete, auditCleanupInterval, auditCleanupRetry)
 	iam, err := auth.New(ctx, auth.Config{
 		Issuer:   cfg.OIDCIssuer,
 		ClientID: cfg.OIDCClientID,
@@ -77,7 +112,11 @@ func run() error {
 	} else {
 		slog.Warn("AUTHENTIK_API_URL or AUTHENTIK_API_TOKEN not set: member names are hidden and adding members is disabled")
 	}
-	server := &http.Server{Handler: httpapi.New(queries, iam, opts...), ReadHeaderTimeout: 5 * time.Second}
+	handler := httpapi.New(queries, iam, opts...)
+	if os.Getenv("SENTRY_DSN") != "" {
+		handler = logging.WithSentryHub(handler)
+	}
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
 		return err

@@ -57,6 +57,26 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 > **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, Authentik, and storage data volumes.
 > It keeps `iam/.env` and `storage/.env`; `make up` provisions a fresh stack afterward.
 
+## Sentry
+
+Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Sentry receives application logs
+at Info, Warn, and Error, subject to the configured log level. HTTP panics produce an event with a stack trace and the matched route.
+Panic values and raw request data stay local, as do request, access-denial, and audit logs.
+Application logs sent to Sentry omit raw error attributes.
+Request bodies, headers, cookies, query parameters, and automatically collected user
+information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
+the Compose API stop timeout is 15 seconds to cover all three phases.
+
+For **host execution** (`make run`), set `SENTRY_DSN`, `SENTRY_ENVIRONMENT=development`, and optionally
+`SENTRY_RELEASE` in `backend/.env`. The host sends directly unless `SENTRY_TUNNEL_URL` is configured.
+
+For **Compose/server execution**, set the backend project's `SENTRY_DSN` in **`iam/.env`**. `backend/.env` is not
+read by Compose. Backend and frontend Compose builds share `SENTRY_ENVIRONMENT` (default `production`).
+The API remains on internal networks and sends through `http://sentry-ingest:8081`; the dedicated ingest proxy forwards only POSTs to
+that DSN's Sentry SaaS project envelope endpoint, with TLS verification. Port 8081 is not published and the
+public listener has no ingest route. The original DSN stays in SDK envelopes and authentication headers.
+See [deployment configuration](../deploy/README.md#sentry-reporting) for frontend build settings and verification.
+
 ## Authentication
 
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)
@@ -72,12 +92,51 @@ Project roles (Viewer, Editor, Owner) and how to protect an endpoint are specifi
 [project roles](../docs/internal/architecture/iam/project-roles.md); the helpers are in
 `internal/httpapi/handlers/project_access.go`. Access is denied by default: every `/api/` operation is registered with
 `handlers.Register` and an access declaration, and the API panics at startup if one is missing. Members are managed under
-`/api/v1/projects/{id}/members`; member and project changes are written as `audit` log entries.
+`/api/v1/projects/{id}/members`; changes to projects, members, and item definitions are stored in the audit history (`audit_event`).
 
 Adding members and showing member names needs the Authentik Core API through `AUTHENTIK_API_URL` and `AUTHENTIK_API_TOKEN`.
 The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
 host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
 omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
+
+## Archived projects
+
+Owners can `POST /api/v1/projects/{id}/archive` and `POST /api/v1/projects/{id}/unarchive`.
+Both return the project and are idempotent: repeated archive preserves its original timestamp.
+State changes record project.archived or project.unarchived in the audit history.
+Project responses include `archived_at` (null for active projects). The project list accepts
+`?archived=true` (archived only), `?archived=false` (active only), or neither (both, the existing default).
+
+The shared project authorization blocks project settings and all analysis-content writes while archived
+with HTTP 409. Reads, project deletion, and membership maintenance (including leaving) remain available;
+normal role and last-Owner rules still apply. Unarchive is Owner-only. Role failures retain 403/404 and
+are checked before archive state. Archive state is checked against the database for every write,
+without caching. Requests already authorized before archiving may still complete.
+
+New project operations inherit archive protection through `InProject`. Only explicit maintenance
+exceptions use `.AllowArchived()`; a read permission on a write operation does not bypass protection.
+Run the backend integration tests with a migrated `TEST_DATABASE_URL` to verify the archive lifecycle,
+filters, maintenance exceptions, and rejection of every registered project-content write.
+
+## Logging
+
+The API writes JSON log lines to stderr; `LOG_LEVEL` sets the minimum level (`debug`, `info`, `warn`, `error`; default `info`).
+
+- Every request gets an ID: NGINX sets `X-Request-ID` to its `$request_id`, which also appears in its access log, and the API
+  returns it in the response. Log lines written with the request context carry it as `request_id`. Without NGINX (for
+  example `make run`), the API keeps an ID the client sends, so such IDs are only trustworthy behind the proxy.
+- One `request` line per request with method, path, route, status, duration, and the caller's internal user ID (`actor`).
+  Health checks are logged at `debug`.
+- Security entries: `authentication failed` (with `reason`) and `access denied` (with `operation`, `status`, and `actor`;
+  `warn` for 403, `info` for 404, which also covers records that no longer exist).
+- Errors that a handler does not map to an HTTP status are logged as `unexpected error` (or `request cancelled` at `info` if
+  the client went away); the client gets a plain 500 without the error text. That text can contain input values, for
+  example from PostgreSQL errors. Panics are logged with their stack trace.
+- In the Compose stack, set `LOG_LEVEL` in `iam/.env`.
+
+What is logged and what is stored as audit history is described in [Audit and logging](../docs/internal/architecture/audit.md).
+At start and once a day, the API deletes the audit history of a deleted project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`,
+one year); in the Compose stack, set it in `iam/.env`.
 
 ## Checks
 
@@ -182,6 +241,7 @@ db/                            schema, Atlas migrations, sqlc queries
 internal/db/                   sqlc-generated query code
 internal/httpapi/              router, OpenAPI
 internal/httpapi/handlers/     HTTP handlers
+internal/logging/              JSON logger, request IDs, request log
 ```
 
 Health checks: `GET /health/live` and `GET /health/ready` (readiness checks Postgres).
@@ -227,8 +287,9 @@ assignable Authentik groups from the signed `taramisu_groups` token claim are su
 Invalid inputs return 422. Missing or inaccessible projects and items return 404; members whose role
 is too low receive 403. Deleting an item also deletes its assets, damage scenarios, threat scenarios,
 attack paths, and their dependent properties, links, ratings, risk values, and treatment decisions.
-The frontend must ask for confirmation before deletion. Responses use the existing problem JSON
-error format without database details.
+The audit history records this as one `item_definition.deleted` event; the rows deleted with the
+item get none. The frontend must ask for confirmation before deletion. Responses use the existing
+problem JSON error format without database details.
 
 Regenerate queries with `make sqlc` and the contract with `make openapi`. Run `make test`
 for authenticated route/validation tests and set `TEST_DATABASE_URL` to a migrated database

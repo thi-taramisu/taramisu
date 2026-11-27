@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import { CircleX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ function isLastOwner(member: Member, members: Member[]) {
 }
 
 export function MembersSettings() {
+  const { t } = useTranslation()
   const [members, setMembers] = useState<Member[]>(headlampMembers)
   const [memberToRemove, setMemberToRemove] = useState<Member | null>(null)
 
@@ -29,7 +31,7 @@ export function MembersSettings() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold">Members</h1>
+        <h1 className="text-lg font-semibold">{t('navigation.members')}</h1>
         <AddMemberDialog
           onAdd={(member) =>
             setMembers((prev) => [...prev, { ...member, id: crypto.randomUUID(), added: new Date().toISOString().slice(0, 10) }])
@@ -39,11 +41,11 @@ export function MembersSettings() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Member</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Added</TableHead>
+            <TableHead>{t('ui:member')}</TableHead>
+            <TableHead>{t('ui:role')}</TableHead>
+            <TableHead>{t('ui:added')}</TableHead>
             <TableHead>
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t('ui:actions')}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -53,14 +55,14 @@ export function MembersSettings() {
               <TableCell className="font-medium">{member.email}</TableCell>
               <TableCell>
                 <NativeSelect
-                  aria-label={`Role for ${member.email}`}
+                  aria-label={t('ui:memberRole', { email: member.email })}
                   value={member.role}
                   disabled={isLastOwner(member, members)}
                   onChange={(event) => changeRole(member.id, event.target.value as ProjectRole)}
                 >
                   {PROJECT_ROLES.map(({ value, label }) => (
                     <NativeSelectOption key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
@@ -72,7 +74,7 @@ export function MembersSettings() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Remove ${member.email}`}
+                  aria-label={t('ui:removeNamed', { name: member.email })}
                   disabled={isLastOwner(member, members)}
                   onClick={() => setMemberToRemove(member)}
                 >
@@ -83,7 +85,7 @@ export function MembersSettings() {
           ))}
         </TableBody>
       </Table>
-      <p className="text-sm text-muted-foreground">Every project needs at least one owner.</p>
+      <p className="text-sm text-muted-foreground">{t('ui:ownerRequired')}</p>
       <RemoveMemberDialog member={memberToRemove} onCancel={() => setMemberToRemove(null)} onConfirm={remove} />
     </div>
   )

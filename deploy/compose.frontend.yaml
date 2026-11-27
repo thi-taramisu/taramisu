@@ -2,7 +2,12 @@ services:
   frontend:
     # Server: pulled from GHCR (taramisu-ctl.sh). Local: built from source (dev.sh uses --build).
     image: ghcr.io/thi-taramisu/taramisu-frontend:${TARAMISU_VERSION:-latest}
-    build: ../frontend
+    build:
+      context: ../frontend
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+        VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
     # Only documents the port; the proxy reaches the frontend through the proxy network.
     expose:
       - 80

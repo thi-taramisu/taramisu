@@ -31,15 +31,19 @@ src/
   pages/                       # route-level components
   features/api-status/         # example: typed GET /health/live on the real backend
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
+  features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
-  features/assets/             # item assets tab: table and dialog built with shadcn/ui
+  features/assets/             # item assets tab, "New Asset" dialog and asset pages: Definition with C / I / A, Risks and Relations tabs
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
+  features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
+  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog, read-only section
+  features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
   test/setup.ts                # jest-dom matchers, browser API mocks for jsdom
-  test/renderApp.tsx           # renders the app with a fresh mock item API and query cache
+  test/renderApp.tsx           # renders the app with fresh mock item and project APIs and query cache
 ```
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
@@ -54,6 +58,10 @@ Branches start expanded; navigating to a hidden descendant reveals its ancestors
 follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End move between visible links; Arrow Right expands a branch or
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
+
+Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
+parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 
 ## API client
 
@@ -79,8 +87,8 @@ src/api/
   queries/backend.ts       # REAL: hooks on the client (health, current user)
   errors.ts                # ApiError, which every service rejects with
   models/                  # domain types of the views; hand-written until their routes are in the spec
-  services/                # service interfaces the views use (e.g. ItemService)
-  queries/items.ts         # TanStack Query hooks on the services
+  services/                # service interfaces the views use (e.g. ItemService, ProjectService)
+  queries/items.ts, queries/projects.ts # TanStack Query hooks on the services
   ApiProvider.tsx          # provides the client and the service implementations
   mocks/                   # MOCK: in-memory services and their seed data (mocks/data/)
 ```
@@ -88,7 +96,65 @@ src/api/
 `src/main.tsx` is the only place that decides between real and mock: it passes the real client and the mock item services to
 `ApiProvider`. Once a route is in the spec, implement its service on the client (rejecting with `ApiError` and the HTTP status), derive the
 model from `components['schemas']` in `schema.d.ts`, and swap it in `main.tsx`. Components never import from `mocks/` except for data
-that has no service yet (project list, project settings, example project).
+that has no service yet (project settings, example project).
+
+Whether the current user can change a project comes from `useProjectAccess(projectId).canEdit` in `queries/projects.ts`. Components use it
+instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
+can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
+
+## Global search
+
+Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
+focuses its input, searches names, internal IDs and display IDs (for example `TS-1`), and opens the selected result with Enter.
+Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
+The dialog stays anchored near the top with a fixed-height, scrollable results area. Input is debounced by 250 ms; filters apply
+immediately. While typing, previous results stay visible but cannot be opened until the current search finishes.
+
+Project and element-type filters can be combined. Toggle a selected type button to remove that type; project chips have a remove button.
+Several types or projects are ORed within that filter; project and type filters
+are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
+projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
+Results include the project, type and ID. Further matches are available through **Load more results**.
+
+Start with `item:` or type `item` and press Tab to activate the Item filter and keep typing a name or ID.
+The same works with `project`, `asset`, `damage`, `threat` and `attack`, or the full English/German type names.
+Commands add to the selected type filters without changing project filters; toggle the type button to remove one.
+Tab keeps its normal focus behavior for other text, and Shift+Tab always moves backwards.
+Search labels and counts follow the header's English/German language choice; entity names and route IDs stay unchanged.
+
+The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50
+matches initially and offers **Show more projects** for browsing. Arrow keys and Enter work across these batches. Escape closes the
+picker first and returns focus to its trigger; the global query and selected filters stay intact.
+
+The frontend currently uses `SearchService` (`src/api/services/search.ts`) and the live in-memory mock stores. Project list changes
+survive route navigation and are shared with search; a reload still resets all mock data. The project service reuses the structure
+introduced in PR #286. Search reads all stored elements, including unlinked scenarios, rather than indexing only visible Filetree nodes.
+TanStack Query isolates requests by search session, query, filters and user identity and cancels outdated requests.
+Results from another query are never used as placeholder data. Mutations invalidate search results alongside their entity queries.
+
+The real search endpoint, generated API types, pagination contract and membership authorization are pending **#240** and **#239**.
+The mock scopes results to the projects returned by its project service, including when a caller supplies other project IDs. This models
+access restrictions for development; production authorization must be enforced by the backend. Replace the service in `ApiProvider`
+when that contract is available; do not fetch unauthorized project data and filter it in the component.
+
+## Sentry
+
+For the Vite dev server, copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the frontend Sentry project.
+An empty DSN disables reporting. `VITE_SENTRY_ENVIRONMENT` defaults to the Vite mode when unset or empty;
+`VITE_SENTRY_RELEASE` is optional. The SDK captures browser exceptions, unhandled rejections, and React render errors.
+Never put a Sentry auth token in a `VITE_` variable.
+
+For the full **Compose stack**, put `VITE_SENTRY_DSN` and the shared `SENTRY_ENVIRONMENT` in **`iam/.env`**,
+then rebuild with `make -C deploy up`. Compose does not read `frontend/.env.local` automatically. Backend and frontend
+Compose settings default to `production`; set `SENTRY_ENVIRONMENT=development` for a development stack.
+Vite embeds these values during the build; changing container runtime variables cannot update a built image.
+
+The **GHCR publishing workflow** passes the repository Actions variable `VITE_SENTRY_DSN` into the frontend build,
+uses `SENTRY_ENVIRONMENT` (default `production`), and records the Git commit as the frontend release.
+Configure those repository variables before publishing. A deployment using a prebuilt GHCR image must use the
+same environment name for its runtime backend; changing frontend settings requires publishing a new image.
+
+Source-map uploads are not configured; production stack traces may reference bundled code.
 
 ## UI components
 
@@ -114,3 +180,24 @@ React Flow out of the initial bundle.
 Build with Node 24 and `npm run build`, then serve the static `dist/` directory. Configure the web server to serve `index.html` for
 application routes so direct links and browser refreshes work. Unknown application routes show the React not-found page; the static SPA
 fallback can still return HTTP 200. `npm run preview` is for local verification of this build.
+
+## Element display IDs
+
+Display IDs use a type prefix and an unpadded number, for example AS-1, DS-12, TS-3, AP-100 and IT-1.
+Mock data and newly created mock elements use this format directly.
+Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
+Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
+by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Localization checks
+
+Run `npm run check:localization` from `frontend/`. Frontend PR lint runs the same command.
+The English and German resources in the registered common and UI namespaces must have matching keys,
+nonempty string translations and matching interpolation expressions. The check reports unknown literal
+keys in `t(...)` and `i18n.t(...)`, including conditional branches and plural keys. Reviewers should
+verify computed keys, variable-based lookups and translation quality.
+
+Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
+Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
+The exception applies only to hardcoded text on that line.

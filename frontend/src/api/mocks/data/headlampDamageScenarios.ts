@@ -1,5 +1,4 @@
 import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../../models/damageScenario'
-import type { ThreatDamageLink, ThreatScenario } from '../../models/threatScenario'
 
 // Example damage scenario of the headlamp system, seed data of the mock item API until the backend
 // has damage scenario endpoints.
@@ -8,7 +7,7 @@ export const headlampDamageScenarios: DamageScenario[] = [
   {
     id: 'ds-01',
     item_definition_id: 'i-01',
-    code: 'DS-01',
+    code: 'DS-1',
     title: 'Headlamp turns off while driving at night',
     functionality_adverse_relation: 'Loss of the low beam function while the vehicle is driven in the dark.',
     road_user_harm_description: 'The driver no longer sees the road; collision with other road users or obstacles.',
@@ -19,15 +18,6 @@ export const headlampDamageScenarioLinks: (DamageScenarioAssetProperty & { damag
   { damage_scenario_id: 'ds-01', asset_id: 'a-01', property: 'I' },
   { damage_scenario_id: 'ds-01', asset_id: 'a-01', property: 'A' },
 ]
-
-// TS-02 and TS-03 have no links yet, so they can be added on the Relations tab.
-export const headlampThreatScenarios: ThreatScenario[] = [
-  { id: 'ts-01', item_definition_id: 'i-01', code: 'TS-01', title: 'Spoofed headlamp command on the CAN bus' },
-  { id: 'ts-02', item_definition_id: 'i-01', code: 'TS-02', title: 'Replayed headlamp command on the CAN bus' },
-  { id: 'ts-03', item_definition_id: 'i-01', code: 'TS-03', title: 'Denial of service on the body control ECU' },
-]
-
-export const headlampThreatDamageLinks: ThreatDamageLink[] = [{ threat_scenario_id: 'ts-01', damage_scenario_id: 'ds-01' }]
 
 export const headlampImpactRatings: ImpactRating[] = [
   {

@@ -73,6 +73,7 @@ func Allows(role db.ProjectRole, permission Permission) bool {
 // ProjectAccessStore reads the caller's role and finds the project of a record. It is
 // implemented by the sqlc-generated queries.
 type ProjectAccessStore interface {
+	ProjectIsArchived(context.Context, pgtype.UUID) (bool, error)
 	GetProjectRole(context.Context, db.GetProjectRoleParams) (db.ProjectRole, error)
 	ProjectIDForItemDefinition(context.Context, pgtype.UUID) (pgtype.UUID, error)
 	ProjectIDForThreatScenario(context.Context, pgtype.UUID) (pgtype.UUID, error)
@@ -100,10 +101,18 @@ var (
 
 // Access is an operation's access declaration, created with InProject or WithoutProject.
 type Access struct {
-	store      ProjectAccessStore
-	scope      Scope
-	permission Permission
-	inProject  bool
+	store         ProjectAccessStore
+	scope         Scope
+	permission    Permission
+	inProject     bool
+	allowArchived bool
+}
+
+// AllowArchived explicitly permits a maintenance operation on archived projects.
+// Role checks still apply. Analysis writes must use the default InProject policy.
+func (a Access) AllowArchived() Access {
+	a.allowArchived = true
+	return a
 }
 
 // InProject declares that the operation needs permission in the project that scope leads to.
@@ -138,7 +147,11 @@ const accessMetadataKey = "taramisu.access"
 // Register registers op with its access declaration. For InProject, the caller's role is checked
 // before the handler runs; the handler can read it with RoleFromContext.
 func Register[I, O any](api huma.API, op huma.Operation, access Access, handler func(context.Context, *I) (*O, error)) {
-	huma.Register(api, declareAccess(api, op, access), handler)
+	op = declareAccess(api, op, access)
+	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
+		out, err := handler(ctx, in)
+		return out, hideUnexpected(ctx, op.OperationID, err)
+	})
 }
 
 // RegisterRaw registers a streaming handler with the same project access checks as typed handlers.
@@ -164,10 +177,30 @@ func declareAccess(api huma.API, op huma.Operation, access Access) huma.Operatio
 			op.Extensions = map[string]any{}
 		}
 		op.Extensions["x-taramisu-permission"] = access.permission.String()
+		op.Extensions["x-taramisu-allow-archived"] = access.allowArchived
 		op.Errors = appendMissing(op.Errors, http.StatusForbidden, http.StatusNotFound)
+		if !access.allowArchived && isWrite(op.Method) {
+			op.Errors = appendMissing(op.Errors, http.StatusConflict)
+		}
 		op.Middlewares = append(op.Middlewares, access.middleware(api))
 	}
 	return op
+}
+
+// hideUnexpected logs an error that the handler did not map to an HTTP status and replaces it with a
+// plain 500. Huma would otherwise send the error text, such as a database message, to the client.
+func hideUnexpected(ctx context.Context, operationID string, err error) error {
+	var statusErr huma.StatusError
+	if err == nil || errors.As(err, &statusErr) {
+		return err
+	}
+	if ctx.Err() != nil {
+		// The client went away or the server is shutting down; nobody reads the response.
+		slog.InfoContext(ctx, "request cancelled", "operation", operationID, "error", err)
+		return huma.Error500InternalServerError("internal server error")
+	}
+	slog.ErrorContext(ctx, "unexpected error", "operation", operationID, "error", err)
+	return huma.Error500InternalServerError("internal server error")
 }
 
 func appendMissing(codes []int, add ...int) []int {
@@ -195,11 +228,29 @@ func (a Access) middleware(api huma.API) func(huma.Context, func(huma.Context)) 
 	return func(ctx huma.Context, next func(huma.Context)) {
 		access, err := a.check(ctx.Context(), ctx.Param(a.scope.param))
 		if err != nil {
+			logDenied(ctx.Context(), ctx.Operation().OperationID, err)
 			writeAccessError(api, ctx, err)
 			return
 		}
+		if !a.allowArchived && isWrite(ctx.Method()) {
+			archived, err := a.store.ProjectIsArchived(ctx.Context(), access.projectID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				err = huma.Error404NotFound("project not found")
+			}
+			if err == nil && archived {
+				err = huma.Error409Conflict("project is archived; unarchive it before making changes")
+			}
+			if err != nil {
+				writeAccessError(api, ctx, err)
+				return
+			}
+		}
 		next(huma.WithValue(ctx, projectAccessKey{}, access))
 	}
+}
+
+func isWrite(method string) bool {
+	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
 }
 
 func (a Access) check(ctx context.Context, rawID string) (projectAccess, error) {
@@ -226,8 +277,31 @@ func writeAccessError(api huma.API, ctx huma.Context, err error) {
 		_ = huma.WriteErr(api, ctx, statusErr.GetStatus(), statusErr.Error())
 		return
 	}
-	slog.Error("check project access", "error", err)
+	if ctx.Context().Err() != nil {
+		slog.InfoContext(ctx.Context(), "request cancelled", "operation", ctx.Operation().OperationID, "error", err)
+	} else {
+		slog.ErrorContext(ctx.Context(), "check project access", "error", err)
+	}
 	_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "internal server error")
+}
+
+// logDenied writes a security log entry when the access check refuses a request: 403 at warn level,
+// 404 at info level, because a 404 also covers records that no longer exist (for example a reload after
+// a deletion), which the API does not tell apart from a missing role.
+func logDenied(ctx context.Context, operationID string, err error) {
+	var statusErr huma.StatusError
+	if !errors.As(err, &statusErr) {
+		return
+	}
+	level := slog.LevelWarn
+	switch statusErr.GetStatus() {
+	case http.StatusForbidden:
+	case http.StatusNotFound:
+		level = slog.LevelInfo
+	default:
+		return
+	}
+	slog.Log(ctx, level, "access denied", "operation", operationID, "status", statusErr.GetStatus(), "actor", auth.UserFromContext(ctx).ID)
 }
 
 // RoleFromContext returns the caller's role in the operation's project, set by the access check.
