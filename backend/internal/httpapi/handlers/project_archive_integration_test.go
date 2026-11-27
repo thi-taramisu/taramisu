@@ -68,10 +68,10 @@ func TestProjectArchivePostgres(t *testing.T) {
 		}
 		return id
 	}
-	item := insert("INSERT INTO item_definition(tara_project_id,name,scope_type) VALUES($1,'Item','ITEM')", project.ID)
-	damage := insert("INSERT INTO damage_scenario(item_definition_id,title) VALUES($1,'Damage')", item)
-	threat := insert("INSERT INTO threat_scenario(item_definition_id,title) VALUES($1,'Threat')", item)
-	attack := insert("INSERT INTO attack_path(item_definition_id,title) VALUES($1,'Attack')", item)
+	item := seedItem(t, ctx, tx, project.ID, "Item")
+	damage := seedDamageScenario(t, ctx, tx, item, "Damage")
+	threat := seedThreatScenario(t, ctx, tx, item, "Threat")
+	attack := seedAttackPath(t, ctx, tx, item, "Attack")
 	impact := insert("INSERT INTO impact_rating(damage_scenario_id,impact_category) VALUES($1,'SAFETY')", damage)
 	risk := insert("INSERT INTO risk_value(threat_scenario_id,impact_rating_id,risk_score,determination_method) VALUES($1,$2,3,'RISK_MATRIX')", threat, impact)
 	memberBody := call(owner, "POST", base+"/members", `{"email":"new@example.com","role":"VIEWER"}`, 201)
