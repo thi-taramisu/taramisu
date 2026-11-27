@@ -69,8 +69,8 @@ project.
 
 | Area | Event | Before and after | Status |
 | --- | --- | --- | --- |
-| Project | `project.created` | After: name, first Owner | Stored |
-| Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
+| Project | `project.created` | After: name, first Owner, and default rating method | Stored |
+| Project | `project.updated` | Name and default rating method before and after, plus whether the description changed | Stored |
 | Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
 | Project | `project.archived`, `project.unarchived` | Archived state before and after | Stored |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |

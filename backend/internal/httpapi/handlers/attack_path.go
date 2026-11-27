@@ -59,6 +59,7 @@ func (h *AttackPath) Register(api huma.API) {
 const itemPath = "/api/v1/item-definitions/{item_definition_id}"
 
 type AttackPathBody struct {
+	InitialRatingMethod      string               `json:"initial_rating_method" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR" doc:"Creation-time method used when rating PUT omits rating_method; unaffected by later project default changes"`
 	ID                       string               `json:"id" format:"uuid"`
 	ItemDefinitionID         string               `json:"item_definition_id" format:"uuid"`
 	Title                    string               `json:"title"`
@@ -104,7 +105,10 @@ type AttackPathInputBody struct {
 
 type CreateAttackPathInput struct {
 	AttackPathParentPath
-	Body AttackPathInputBody
+	Body struct {
+		AttackPathInputBody
+		InitialRatingMethod *string `json:"initial_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR" doc:"Overrides the project default for this new path"`
+	}
 }
 
 type ReplaceAttackPathInput struct {
@@ -134,10 +138,12 @@ func (h *AttackPath) Create(ctx context.Context, in *CreateAttackPathInput) (*Cr
 	if err != nil {
 		return nil, err
 	}
+	params := attackPathParams(itemID, in.Body.AttackPathInputBody)
+	params.InitialRatingMethod = in.Body.InitialRatingMethod
 	var p db.AttackPath
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		var err error
-		p, err = h.store.CreateAttackPath(ctx, attackPathParams(itemID, in.Body))
+		p, err = h.store.CreateAttackPath(ctx, params)
 		if err != nil {
 			return db.Change{}, err
 		}
@@ -298,6 +304,7 @@ func mapAttackPathError(err error) error {
 
 func toAttackPathBody(p db.AttackPath) AttackPathBody {
 	out := AttackPathBody{
+		InitialRatingMethod: p.InitialRatingMethod,
 		ID:                  p.ID.String(),
 		ItemDefinitionID:    p.ItemDefinitionID.String(),
 		Title:               p.Title,

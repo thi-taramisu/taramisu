@@ -206,6 +206,7 @@ func TestAttackPathRoutes(t *testing.T) {
 		code   int
 	}{
 		{"create", true, http.MethodPost, attackPaths, `{"title":"AP"}`, http.StatusCreated},
+		{"create invalid initial method", true, http.MethodPost, attackPaths, `{"title":"AP","initial_rating_method":"OTHER"}`, http.StatusUnprocessableEntity},
 		{"create empty title", true, http.MethodPost, attackPaths, `{"title":""}`, http.StatusUnprocessableEntity},
 		{"create bad approach", true, http.MethodPost, attackPaths, `{"title":"AP","analysis_approach":"SIDEWAYS"}`, http.StatusUnprocessableEntity},
 		{"create with steps", true, http.MethodPost, attackPaths, `{"title":"AP","attack_steps_and_weaknesses":{"a":[1,2]}}`, http.StatusCreated},
@@ -252,6 +253,7 @@ func TestAttackFeasibilityRatingRoutes(t *testing.T) {
 		{"get missing", true, false, http.MethodGet, "", http.StatusNotFound},
 		{"get path not in item", false, true, http.MethodGet, "", http.StatusNotFound},
 		{"replace", true, true, http.MethodPut, `{"ap_total_score":7,"feasibility_rating":"HIGH","rationale":"why"}`, http.StatusOK},
+		{"replace null method", true, true, http.MethodPut, `{"rating_method":null}`, http.StatusUnprocessableEntity},
 		{"replace bad rating", true, true, http.MethodPut, `{"feasibility_rating":"EXTREME"}`, http.StatusUnprocessableEntity},
 		{"replace negative score", true, true, http.MethodPut, `{"ap_equipment":-1}`, http.StatusUnprocessableEntity},
 		{"replace path not in item", false, true, http.MethodPut, `{}`, http.StatusNotFound},

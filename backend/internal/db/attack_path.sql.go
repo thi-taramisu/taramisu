@@ -12,25 +12,34 @@ import (
 )
 
 const createAttackPath = `-- name: CreateAttackPath :one
-INSERT INTO attack_path (item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+INSERT INTO attack_path (item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method)
+SELECT i.id, $1, $2::analysis_approach,
+    $3, $4::jsonb,
+    COALESCE($5::text, p.default_rating_method, 'ATTACK_POTENTIAL')
+FROM item_definition i JOIN tara_project p ON p.id = i.tara_project_id
+WHERE i.id = $6
+RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method
 `
 
 type CreateAttackPathParams struct {
-	ItemDefinitionID         pgtype.UUID
 	Title                    string
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
+	InitialRatingMethod      *string
+	ItemDefinitionID         pgtype.UUID
 }
 
+// Snapshot the project default in the same statement that creates the path.
+// Rating inputs are supplied separately, so CVSS/vector constraints remain strict.
 func (q *Queries) CreateAttackPath(ctx context.Context, arg CreateAttackPathParams) (AttackPath, error) {
 	row := q.db.QueryRow(ctx, createAttackPath,
-		arg.ItemDefinitionID,
 		arg.Title,
 		arg.AnalysisApproach,
 		arg.IsPartialEarlyStage,
 		arg.AttackStepsAndWeaknesses,
+		arg.InitialRatingMethod,
+		arg.ItemDefinitionID,
 	)
 	var i AttackPath
 	err := row.Scan(
@@ -40,6 +49,7 @@ func (q *Queries) CreateAttackPath(ctx context.Context, arg CreateAttackPathPara
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }
@@ -62,7 +72,7 @@ func (q *Queries) DeleteAttackPath(ctx context.Context, arg DeleteAttackPathPara
 }
 
 const getAttackPath = `-- name: GetAttackPath :one
-SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path WHERE id = $1 AND item_definition_id = $2
 `
 
 type GetAttackPathParams struct {
@@ -80,12 +90,13 @@ func (q *Queries) GetAttackPath(ctx context.Context, arg GetAttackPathParams) (A
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }
 
 const getAttackPathForDelete = `-- name: GetAttackPathForDelete :one
-SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path WHERE id = $1 AND item_definition_id = $2
 FOR UPDATE
 `
 
@@ -104,12 +115,13 @@ func (q *Queries) GetAttackPathForDelete(ctx context.Context, arg GetAttackPathF
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }
 
 const getAttackPathForUpdate = `-- name: GetAttackPathForUpdate :one
-SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path WHERE id = $1 AND item_definition_id = $2
 FOR NO KEY UPDATE
 `
 
@@ -128,12 +140,13 @@ func (q *Queries) GetAttackPathForUpdate(ctx context.Context, arg GetAttackPathF
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }
 
 const listAttackPaths = `-- name: ListAttackPaths :many
-SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses FROM attack_path
+SELECT id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method FROM attack_path
 WHERE item_definition_id = $1
 ORDER BY title, id
 LIMIT $3 OFFSET $2
@@ -161,6 +174,7 @@ func (q *Queries) ListAttackPaths(ctx context.Context, arg ListAttackPathsParams
 			&i.AnalysisApproach,
 			&i.IsPartialEarlyStage,
 			&i.AttackStepsAndWeaknesses,
+			&i.InitialRatingMethod,
 		); err != nil {
 			return nil, err
 		}
@@ -176,7 +190,7 @@ const replaceAttackPath = `-- name: ReplaceAttackPath :one
 UPDATE attack_path
 SET title = $3, analysis_approach = $4, is_partial_early_stage = $5, attack_steps_and_weaknesses = $6
 WHERE id = $1 AND item_definition_id = $2
-RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method
 `
 
 type ReplaceAttackPathParams struct {
@@ -205,6 +219,7 @@ func (q *Queries) ReplaceAttackPath(ctx context.Context, arg ReplaceAttackPathPa
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }
@@ -216,7 +231,7 @@ SET title = COALESCE($1, title),
     is_partial_early_stage = COALESCE($4, is_partial_early_stage),
     attack_steps_and_weaknesses = CASE WHEN $5::boolean THEN $6::jsonb ELSE attack_steps_and_weaknesses END
 WHERE id = $7 AND item_definition_id = $8
-RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses
+RETURNING id, item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses, initial_rating_method
 `
 
 type UpdateAttackPathParams struct {
@@ -249,6 +264,7 @@ func (q *Queries) UpdateAttackPath(ctx context.Context, arg UpdateAttackPathPara
 		&i.AnalysisApproach,
 		&i.IsPartialEarlyStage,
 		&i.AttackStepsAndWeaknesses,
+		&i.InitialRatingMethod,
 	)
 	return i, err
 }

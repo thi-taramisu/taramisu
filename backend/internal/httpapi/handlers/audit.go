@@ -36,7 +36,8 @@ func auditActor(ctx context.Context) (db.Actor, error) {
 // projectSettings is what project.created and project.updated record. The description is free text,
 // so only whether it changed is recorded.
 type projectSettings struct {
-	Name               string      `json:"name"`
-	DescriptionChanged bool        `json:"description_changed,omitempty"`
-	FirstOwner         pgtype.UUID `json:"first_owner,omitzero"` // iam_user.id; project.created only
+	DefaultRatingMethod *string     `json:"default_rating_method,omitempty"`
+	Name                string      `json:"name"`
+	DescriptionChanged  bool        `json:"description_changed,omitempty"`
+	FirstOwner          pgtype.UUID `json:"first_owner,omitzero"` // iam_user.id; project.created only
 }

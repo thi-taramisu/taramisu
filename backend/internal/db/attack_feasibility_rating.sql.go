@@ -28,7 +28,7 @@ func (q *Queries) AttackPathBelongsToItem(ctx context.Context, arg AttackPathBel
 }
 
 const deleteAttackFeasibilityRating = `-- name: DeleteAttackFeasibilityRating :execrows
-DELETE FROM attack_feasibility_rating WHERE attack_path_id = $1
+DELETE FROM attack_feasibility_rating AS current WHERE current.attack_path_id = $1
 `
 
 func (q *Queries) DeleteAttackFeasibilityRating(ctx context.Context, attackPathID pgtype.UUID) (int64, error) {
@@ -40,7 +40,7 @@ func (q *Queries) DeleteAttackFeasibilityRating(ctx context.Context, attackPathI
 }
 
 const getAttackFeasibilityRating = `-- name: GetAttackFeasibilityRating :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
 `
 
 func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID pgtype.UUID) (AttackFeasibilityRating, error) {
@@ -49,6 +49,13 @@ func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID p
 	err := row.Scan(
 		&i.ID,
 		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
 		&i.ApElapsedTime,
 		&i.ApSpecialistExpertise,
 		&i.ApKnowledgeOfItem,
@@ -62,7 +69,7 @@ func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID p
 }
 
 const getAttackFeasibilityRatingForDelete = `-- name: GetAttackFeasibilityRatingForDelete :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
 FOR UPDATE
 `
 
@@ -72,6 +79,13 @@ func (q *Queries) GetAttackFeasibilityRatingForDelete(ctx context.Context, attac
 	err := row.Scan(
 		&i.ID,
 		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
 		&i.ApElapsedTime,
 		&i.ApSpecialistExpertise,
 		&i.ApKnowledgeOfItem,
@@ -85,7 +99,7 @@ func (q *Queries) GetAttackFeasibilityRatingForDelete(ctx context.Context, attac
 }
 
 const getAttackFeasibilityRatingForUpdate = `-- name: GetAttackFeasibilityRatingForUpdate :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
 FOR NO KEY UPDATE
 `
 
@@ -95,6 +109,13 @@ func (q *Queries) GetAttackFeasibilityRatingForUpdate(ctx context.Context, attac
 	err := row.Scan(
 		&i.ID,
 		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
 		&i.ApElapsedTime,
 		&i.ApSpecialistExpertise,
 		&i.ApKnowledgeOfItem,
@@ -125,39 +146,102 @@ func (q *Queries) LockAttackPathForRating(ctx context.Context, arg LockAttackPat
 }
 
 const updateAttackFeasibilityRating = `-- name: UpdateAttackFeasibilityRating :one
-UPDATE attack_feasibility_rating
-SET ap_elapsed_time = CASE WHEN $1::boolean THEN $2::integer ELSE ap_elapsed_time END,
-    ap_specialist_expertise = CASE WHEN $3::boolean THEN $4::integer ELSE ap_specialist_expertise END,
-    ap_knowledge_of_item = CASE WHEN $5::boolean THEN $6::integer ELSE ap_knowledge_of_item END,
-    ap_window_of_opportunity = CASE WHEN $7::boolean THEN $8::integer ELSE ap_window_of_opportunity END,
-    ap_equipment = CASE WHEN $9::boolean THEN $10::integer ELSE ap_equipment END,
-    ap_total_score = CASE WHEN $11::boolean THEN $12::integer ELSE ap_total_score END,
-    feasibility_rating = CASE WHEN $13::boolean THEN $14::attack_feasibility ELSE feasibility_rating END,
-    rationale = CASE WHEN $15::boolean THEN $16::text ELSE rationale END
-WHERE attack_path_id = $17
-RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
+WITH proposed AS (
+    SELECT current.attack_path_id,
+        CASE WHEN $1::boolean THEN $2::integer ELSE current.ap_elapsed_time END AS ap_elapsed_time,
+        CASE WHEN $3::boolean THEN $4::integer ELSE current.ap_specialist_expertise END AS ap_specialist_expertise,
+        CASE WHEN $5::boolean THEN $6::integer ELSE current.ap_knowledge_of_item END AS ap_knowledge_of_item,
+        CASE WHEN $7::boolean THEN $8::integer ELSE current.ap_window_of_opportunity END AS ap_window_of_opportunity,
+        CASE WHEN $9::boolean THEN $10::integer ELSE current.ap_equipment END AS ap_equipment,
+        CASE WHEN $11::boolean THEN $12::integer ELSE current.ap_total_score END AS ap_total_score,
+        CASE WHEN $13::boolean THEN $14::attack_feasibility ELSE current.feasibility_rating END AS feasibility_rating,
+        CASE WHEN $15::boolean THEN $16::text ELSE current.rationale END AS rationale,
+        CASE WHEN $17::boolean THEN $18::text ELSE current.rating_method END AS rating_method,
+        CASE WHEN $19::boolean THEN $20::text ELSE current.cvss_attack_vector END AS cvss_attack_vector,
+        CASE WHEN $21::boolean THEN $22::text ELSE current.cvss_attack_complexity END AS cvss_attack_complexity,
+        CASE WHEN $23::boolean THEN $24::text ELSE current.cvss_privileges_required END AS cvss_privileges_required,
+        CASE WHEN $25::boolean THEN $26::text ELSE current.cvss_user_interaction END AS cvss_user_interaction,
+        CASE WHEN $27::boolean THEN $28::text ELSE current.cvss_scope END AS cvss_scope,
+        CASE WHEN $29::boolean THEN $30::text ELSE current.attack_vector END AS attack_vector
+    FROM attack_feasibility_rating AS current WHERE current.attack_path_id = $31
+    -- Serialize concurrent patches so each merges against the locked current row.
+    FOR UPDATE
+), scored AS (
+    -- Use the same scoring rules as PUT, now applied to the merged inputs.
+    SELECT proposed.attack_path_id, proposed.ap_elapsed_time, proposed.ap_specialist_expertise, proposed.ap_knowledge_of_item, proposed.ap_window_of_opportunity, proposed.ap_equipment, proposed.ap_total_score, proposed.feasibility_rating, proposed.rationale, proposed.rating_method, proposed.cvss_attack_vector, proposed.cvss_attack_complexity, proposed.cvss_privileges_required, proposed.cvss_user_interaction, proposed.cvss_scope, proposed.attack_vector, ap_elapsed_time::bigint + ap_specialist_expertise + ap_knowledge_of_item + ap_window_of_opportunity + ap_equipment AS ap_score,
+    8.22
+        * CASE cvss_attack_vector WHEN 'NETWORK' THEN 0.85 WHEN 'ADJACENT' THEN 0.62 WHEN 'LOCAL' THEN 0.55 ELSE 0.20 END
+        * CASE cvss_attack_complexity WHEN 'LOW' THEN 0.77 ELSE 0.44 END
+        * CASE cvss_privileges_required WHEN 'NONE' THEN 0.85
+            WHEN 'LOW' THEN CASE WHEN cvss_scope = 'CHANGED' THEN 0.68 ELSE 0.62 END
+            ELSE CASE WHEN cvss_scope = 'CHANGED' THEN 0.50 ELSE 0.27 END END
+        * CASE cvss_user_interaction WHEN 'NONE' THEN 0.85 ELSE 0.62 END AS cvss_score FROM proposed
+)
+UPDATE attack_feasibility_rating AS target
+SET ap_elapsed_time = scored.ap_elapsed_time,
+    ap_specialist_expertise = scored.ap_specialist_expertise,
+    ap_knowledge_of_item = scored.ap_knowledge_of_item,
+    ap_window_of_opportunity = scored.ap_window_of_opportunity,
+    ap_equipment = scored.ap_equipment,
+    ap_total_score = scored.ap_total_score,
+    feasibility_rating = CASE scored.rating_method
+    WHEN 'ATTACK_POTENTIAL' THEN CASE WHEN ap_score IS NULL THEN NULL
+        WHEN ap_score <= 13 THEN 'HIGH' WHEN ap_score <= 19 THEN 'MEDIUM'
+        WHEN ap_score <= 24 THEN 'LOW' ELSE 'VERY_LOW' END
+    WHEN 'CVSS' THEN CASE WHEN cvss_score >= 2.96 THEN 'HIGH'
+        WHEN cvss_score >= 2.00 THEN 'MEDIUM' WHEN cvss_score >= 1.06 THEN 'LOW' ELSE 'VERY_LOW' END
+    WHEN 'ATTACK_VECTOR' THEN CASE scored.attack_vector WHEN 'NETWORK' THEN 'HIGH'
+        WHEN 'ADJACENT' THEN 'MEDIUM' WHEN 'LOCAL' THEN 'LOW' ELSE 'VERY_LOW' END
+    END::attack_feasibility,
+    rationale = scored.rationale,
+    rating_method = scored.rating_method,
+    cvss_attack_vector = scored.cvss_attack_vector,
+    cvss_attack_complexity = scored.cvss_attack_complexity,
+    cvss_privileges_required = scored.cvss_privileges_required,
+    cvss_user_interaction = scored.cvss_user_interaction,
+    cvss_scope = scored.cvss_scope,
+    attack_vector = scored.attack_vector
+FROM scored
+WHERE target.attack_path_id = scored.attack_path_id
+RETURNING target.id, target.attack_path_id, target.rating_method, target.cvss_attack_vector, target.cvss_attack_complexity, target.cvss_privileges_required, target.cvss_user_interaction, target.cvss_scope, target.attack_vector, target.ap_elapsed_time, target.ap_specialist_expertise, target.ap_knowledge_of_item, target.ap_window_of_opportunity, target.ap_equipment, target.ap_total_score, target.feasibility_rating, target.rationale
 `
 
 type UpdateAttackFeasibilityRatingParams struct {
-	SetApElapsedTime         bool
-	ApElapsedTime            *int32
-	SetApSpecialistExpertise bool
-	ApSpecialistExpertise    *int32
-	SetApKnowledgeOfItem     bool
-	ApKnowledgeOfItem        *int32
-	SetApWindowOfOpportunity bool
-	ApWindowOfOpportunity    *int32
-	SetApEquipment           bool
-	ApEquipment              *int32
-	SetApTotalScore          bool
-	ApTotalScore             *int32
-	SetFeasibilityRating     bool
-	FeasibilityRating        *AttackFeasibility
-	SetRationale             bool
-	Rationale                *string
-	AttackPathID             pgtype.UUID
+	SetApElapsedTime          bool
+	ApElapsedTime             *int32
+	SetApSpecialistExpertise  bool
+	ApSpecialistExpertise     *int32
+	SetApKnowledgeOfItem      bool
+	ApKnowledgeOfItem         *int32
+	SetApWindowOfOpportunity  bool
+	ApWindowOfOpportunity     *int32
+	SetApEquipment            bool
+	ApEquipment               *int32
+	SetApTotalScore           bool
+	ApTotalScore              *int32
+	SetFeasibilityRating      bool
+	FeasibilityRating         *AttackFeasibility
+	SetRationale              bool
+	Rationale                 *string
+	SetRatingMethod           bool
+	RatingMethod              *string
+	SetCvssAttackVector       bool
+	CvssAttackVector          *string
+	SetCvssAttackComplexity   bool
+	CvssAttackComplexity      *string
+	SetCvssPrivilegesRequired bool
+	CvssPrivilegesRequired    *string
+	SetCvssUserInteraction    bool
+	CvssUserInteraction       *string
+	SetCvssScope              bool
+	CvssScope                 *string
+	SetAttackVector           bool
+	AttackVector              *string
+	AttackPathID              pgtype.UUID
 }
 
+// Merge PATCH fields before scoring: set=false retains the column; set=true
+// accepts the supplied value, including NULL. Table checks validate the merged row.
 func (q *Queries) UpdateAttackFeasibilityRating(ctx context.Context, arg UpdateAttackFeasibilityRatingParams) (AttackFeasibilityRating, error) {
 	row := q.db.QueryRow(ctx, updateAttackFeasibilityRating,
 		arg.SetApElapsedTime,
@@ -176,12 +260,33 @@ func (q *Queries) UpdateAttackFeasibilityRating(ctx context.Context, arg UpdateA
 		arg.FeasibilityRating,
 		arg.SetRationale,
 		arg.Rationale,
+		arg.SetRatingMethod,
+		arg.RatingMethod,
+		arg.SetCvssAttackVector,
+		arg.CvssAttackVector,
+		arg.SetCvssAttackComplexity,
+		arg.CvssAttackComplexity,
+		arg.SetCvssPrivilegesRequired,
+		arg.CvssPrivilegesRequired,
+		arg.SetCvssUserInteraction,
+		arg.CvssUserInteraction,
+		arg.SetCvssScope,
+		arg.CvssScope,
+		arg.SetAttackVector,
+		arg.AttackVector,
 		arg.AttackPathID,
 	)
 	var i AttackFeasibilityRating
 	err := row.Scan(
 		&i.ID,
 		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
 		&i.ApElapsedTime,
 		&i.ApSpecialistExpertise,
 		&i.ApKnowledgeOfItem,
@@ -195,11 +300,47 @@ func (q *Queries) UpdateAttackFeasibilityRating(ctx context.Context, arg UpdateA
 }
 
 const upsertAttackFeasibilityRating = `-- name: UpsertAttackFeasibilityRating :one
-INSERT INTO attack_feasibility_rating (
-    attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item,
-    ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
+WITH proposed AS (
+    SELECT $1::uuid AS attack_path_id,
+        $2::integer AS ap_elapsed_time,
+        $3::integer AS ap_specialist_expertise,
+        $4::integer AS ap_knowledge_of_item,
+        $5::integer AS ap_window_of_opportunity,
+        $6::integer AS ap_equipment,
+        $7::integer AS ap_total_score,
+        $8::attack_feasibility AS feasibility_rating,
+        $9::text AS rationale,
+        COALESCE($10::text,
+            (SELECT initial_rating_method FROM attack_path WHERE id = $1)) AS rating_method,
+        $11::text AS cvss_attack_vector,
+        $12::text AS cvss_attack_complexity,
+        $13::text AS cvss_privileges_required,
+        $14::text AS cvss_user_interaction,
+        $15::text AS cvss_scope,
+        $16::text AS attack_vector
+), scored AS (
+    -- Missing AP factors propagate NULL, leaving incomplete drafts unrated.
+    -- bigint prevents overflow during summation; the existing AP checks still apply.
+    -- CVSS Scope selects the privileges weight; inputs are checked by the table.
+    SELECT proposed.attack_path_id, proposed.ap_elapsed_time, proposed.ap_specialist_expertise, proposed.ap_knowledge_of_item, proposed.ap_window_of_opportunity, proposed.ap_equipment, proposed.ap_total_score, proposed.feasibility_rating, proposed.rationale, proposed.rating_method, proposed.cvss_attack_vector, proposed.cvss_attack_complexity, proposed.cvss_privileges_required, proposed.cvss_user_interaction, proposed.cvss_scope, proposed.attack_vector, ap_elapsed_time::bigint + ap_specialist_expertise + ap_knowledge_of_item + ap_window_of_opportunity + ap_equipment AS ap_score,
+    8.22
+        * CASE cvss_attack_vector WHEN 'NETWORK' THEN 0.85 WHEN 'ADJACENT' THEN 0.62 WHEN 'LOCAL' THEN 0.55 ELSE 0.20 END
+        * CASE cvss_attack_complexity WHEN 'LOW' THEN 0.77 ELSE 0.44 END
+        * CASE cvss_privileges_required WHEN 'NONE' THEN 0.85
+            WHEN 'LOW' THEN CASE WHEN cvss_scope = 'CHANGED' THEN 0.68 ELSE 0.62 END
+            ELSE CASE WHEN cvss_scope = 'CHANGED' THEN 0.50 ELSE 0.27 END END
+        * CASE cvss_user_interaction WHEN 'NONE' THEN 0.85 ELSE 0.62 END AS cvss_score FROM proposed
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO attack_feasibility_rating (attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector)
+SELECT attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, CASE rating_method
+    WHEN 'ATTACK_POTENTIAL' THEN CASE WHEN ap_score IS NULL THEN NULL
+        WHEN ap_score <= 13 THEN 'HIGH' WHEN ap_score <= 19 THEN 'MEDIUM'
+        WHEN ap_score <= 24 THEN 'LOW' ELSE 'VERY_LOW' END
+    WHEN 'CVSS' THEN CASE WHEN cvss_score >= 2.96 THEN 'HIGH'
+        WHEN cvss_score >= 2.00 THEN 'MEDIUM' WHEN cvss_score >= 1.06 THEN 'LOW' ELSE 'VERY_LOW' END
+    WHEN 'ATTACK_VECTOR' THEN CASE attack_vector WHEN 'NETWORK' THEN 'HIGH'
+        WHEN 'ADJACENT' THEN 'MEDIUM' WHEN 'LOCAL' THEN 'LOW' ELSE 'VERY_LOW' END
+    END::attack_feasibility, rationale, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector FROM scored
 ON CONFLICT (attack_path_id) DO UPDATE SET
     ap_elapsed_time = EXCLUDED.ap_elapsed_time,
     ap_specialist_expertise = EXCLUDED.ap_specialist_expertise,
@@ -208,22 +349,44 @@ ON CONFLICT (attack_path_id) DO UPDATE SET
     ap_equipment = EXCLUDED.ap_equipment,
     ap_total_score = EXCLUDED.ap_total_score,
     feasibility_rating = EXCLUDED.feasibility_rating,
-    rationale = EXCLUDED.rationale
-RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
+    rationale = EXCLUDED.rationale,
+    rating_method = EXCLUDED.rating_method,
+    cvss_attack_vector = EXCLUDED.cvss_attack_vector,
+    cvss_attack_complexity = EXCLUDED.cvss_attack_complexity,
+    cvss_privileges_required = EXCLUDED.cvss_privileges_required,
+    cvss_user_interaction = EXCLUDED.cvss_user_interaction,
+    cvss_scope = EXCLUDED.cvss_scope,
+    attack_vector = EXCLUDED.attack_vector
+RETURNING id, attack_path_id, rating_method, cvss_attack_vector, cvss_attack_complexity, cvss_privileges_required, cvss_user_interaction, cvss_scope, attack_vector, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
 `
 
 type UpsertAttackFeasibilityRatingParams struct {
-	AttackPathID          pgtype.UUID
-	ApElapsedTime         *int32
-	ApSpecialistExpertise *int32
-	ApKnowledgeOfItem     *int32
-	ApWindowOfOpportunity *int32
-	ApEquipment           *int32
-	ApTotalScore          *int32
-	FeasibilityRating     *AttackFeasibility
-	Rationale             *string
+	AttackPathID           pgtype.UUID
+	ApElapsedTime          *int32
+	ApSpecialistExpertise  *int32
+	ApKnowledgeOfItem      *int32
+	ApWindowOfOpportunity  *int32
+	ApEquipment            *int32
+	ApTotalScore           *int32
+	FeasibilityRating      *AttackFeasibility
+	Rationale              *string
+	RatingMethod           *string
+	CvssAttackVector       *string
+	CvssAttackComplexity   *string
+	CvssPrivilegesRequired *string
+	CvssUserInteraction    *string
+	CvssScope              *string
+	AttackVector           *string
 }
 
+// CVSS v3.1 exploitability = 8.22 * AV * AC * PR * UI (FIRST specification).
+// Feasibility adopts ISO/SAE 21434:2021 Annex G, Table G.8 example cutoffs:
+// HIGH >=2.96, MEDIUM >=2.00, LOW >=1.06, otherwise VERY_LOW.
+// Compare full-precision scores; these are not CVSS base-score severity bands.
+// AP policy thresholds: 13/19/24. Complete inputs determine feasibility_rating;
+// the legacy feasibility_rating parameter is accepted but never overrides it.
+// Build the complete replacement row from PUT parameters. sqlc.narg allows NULL.
+// Each attack path has at most one rating. Replace all fields on an existing row.
 func (q *Queries) UpsertAttackFeasibilityRating(ctx context.Context, arg UpsertAttackFeasibilityRatingParams) (AttackFeasibilityRating, error) {
 	row := q.db.QueryRow(ctx, upsertAttackFeasibilityRating,
 		arg.AttackPathID,
@@ -235,11 +398,25 @@ func (q *Queries) UpsertAttackFeasibilityRating(ctx context.Context, arg UpsertA
 		arg.ApTotalScore,
 		arg.FeasibilityRating,
 		arg.Rationale,
+		arg.RatingMethod,
+		arg.CvssAttackVector,
+		arg.CvssAttackComplexity,
+		arg.CvssPrivilegesRequired,
+		arg.CvssUserInteraction,
+		arg.CvssScope,
+		arg.AttackVector,
 	)
 	var i AttackFeasibilityRating
 	err := row.Scan(
 		&i.ID,
 		&i.AttackPathID,
+		&i.RatingMethod,
+		&i.CvssAttackVector,
+		&i.CvssAttackComplexity,
+		&i.CvssPrivilegesRequired,
+		&i.CvssUserInteraction,
+		&i.CvssScope,
+		&i.AttackVector,
 		&i.ApElapsedTime,
 		&i.ApSpecialistExpertise,
 		&i.ApKnowledgeOfItem,

@@ -64,11 +64,12 @@ func (h *TaraProject) Register(api huma.API) {
 }
 
 type TaraProjectBody struct {
-	ArchivedAt  *time.Time `json:"archived_at" doc:"Archive timestamp; null for an active project"`
-	ID          string     `json:"id" format:"uuid"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ArchivedAt          *time.Time `json:"archived_at" doc:"Archive timestamp; null for an active project"`
+	DefaultRatingMethod *string    `json:"default_rating_method" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR" doc:"Default for new attack paths; null falls back to ATTACK_POTENTIAL"`
+	ID                  string     `json:"id" format:"uuid"`
+	Name                string     `json:"name"`
+	Description         *string    `json:"description,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
 	// Role is the caller's highest role in the project.
 	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 }
@@ -103,24 +104,27 @@ type TaraProjectIDInput struct {
 
 type CreateTaraProjectInput struct {
 	Body struct {
-		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
-		Description *string `json:"description,omitempty"`
+		DefaultRatingMethod *string `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                string  `json:"name" minLength:"1" pattern:"\\S"`
+		Description         *string `json:"description,omitempty"`
 	}
 }
 
 type ReplaceTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
-		Description *string `json:"description,omitempty"`
+		DefaultRatingMethod *string `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                string  `json:"name" minLength:"1" pattern:"\\S"`
+		Description         *string `json:"description,omitempty"`
 	}
 }
 
 type UpdateTaraProjectInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Name        *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
-		Description Optional[string] `json:"description,omitempty"`
+		DefaultRatingMethod Optional[string] `json:"default_rating_method,omitempty" enum:"ATTACK_POTENTIAL,CVSS,ATTACK_VECTOR"`
+		Name                *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
+		Description         Optional[string] `json:"description,omitempty"`
 	}
 }
 
@@ -136,14 +140,15 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 	err = h.store.Audit(ctx, actor, func(ctx context.Context) (db.Change, error) {
 		var err error
 		p, err = h.store.CreateTaraProject(ctx, db.CreateTaraProjectParams{
-			Name:        in.Body.Name,
-			Description: in.Body.Description,
-			OwnerID:     ownerID,
+			DefaultRatingMethod: in.Body.DefaultRatingMethod,
+			Name:                in.Body.Name,
+			Description:         in.Body.Description,
+			OwnerID:             ownerID,
 		})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Created(db.TargetProject, p.ID, p.ID, projectSettings{Name: p.Name, FirstOwner: ownerID}), nil
+		return db.Created(db.TargetProject, p.ID, p.ID, projectSettings{Name: p.Name, DefaultRatingMethod: p.DefaultRatingMethod, FirstOwner: ownerID}), nil
 	})
 	if err != nil {
 		return nil, err
@@ -168,7 +173,7 @@ func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*Tar
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, ArchivedAt: p.ArchivedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, DefaultRatingMethod: p.DefaultRatingMethod, ArchivedAt: p.ArchivedAt,
 		}, p.Role))
 	}
 	return out, nil
@@ -184,17 +189,19 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
 	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
-		return h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{ID: id, Name: in.Body.Name, Description: in.Body.Description})
+		return h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{ID: id, DefaultRatingMethod: in.Body.DefaultRatingMethod, Name: in.Body.Name, Description: in.Body.Description})
 	})
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
 	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
 		return h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
-			ID:             id,
-			Name:           in.Body.Name,
-			SetDescription: in.Body.Description.Set,
-			Description:    in.Body.Description.Value,
+			ID:                     id,
+			Name:                   in.Body.Name,
+			SetDefaultRatingMethod: in.Body.DefaultRatingMethod.Set,
+			DefaultRatingMethod:    in.Body.DefaultRatingMethod.Value,
+			SetDescription:         in.Body.Description.Set,
+			Description:            in.Body.Description.Value,
 		})
 	})
 }
@@ -211,8 +218,8 @@ func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Co
 		if p, err = update(ctx, id); err != nil {
 			return db.Change{}, err
 		}
-		after := projectSettings{Name: p.Name, DescriptionChanged: !sameText(before.Description, p.Description)}
-		return db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name}, after), nil
+		after := projectSettings{Name: p.Name, DefaultRatingMethod: p.DefaultRatingMethod, DescriptionChanged: !sameText(before.Description, p.Description)}
+		return db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name, DefaultRatingMethod: before.DefaultRatingMethod}, after), nil
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -257,12 +264,13 @@ func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
 		archivedAt = &p.ArchivedAt.Time
 	}
 	return TaraProjectBody{
-		ArchivedAt:  archivedAt,
-		ID:          p.ID.String(),
-		Name:        p.Name,
-		Description: p.Description,
-		CreatedAt:   p.CreatedAt.Time,
-		Role:        role,
+		ArchivedAt:          archivedAt,
+		DefaultRatingMethod: p.DefaultRatingMethod,
+		ID:                  p.ID.String(),
+		Name:                p.Name,
+		Description:         p.Description,
+		CreatedAt:           p.CreatedAt.Time,
+		Role:                role,
 	}
 }
 
