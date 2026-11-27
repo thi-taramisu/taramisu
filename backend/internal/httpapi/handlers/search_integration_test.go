@@ -83,6 +83,14 @@ func TestSearchPostgres(t *testing.T) {
 	seedAsset(t, ctx, tx, headlamp, "Port abc")
 	replay := seedAttackPath(t, ctx, tx, headlamp, "Replay via OBD")
 
+	// alice's project for the ranking of names: the scores tie or favour the wrong match.
+	ranking := createProject(alice, "Ranking checks")
+	sensors := seedItem(t, ctx, tx, ranking, "Sensor cluster")
+	absBrake := seedAsset(t, ctx, tx, sensors, "ABS brake")
+	brake := seedAsset(t, ctx, tx, sensors, "Brake")
+	lamInterface := seedAsset(t, ctx, tx, sensors, "Lam interface")
+	headlamps := seedAsset(t, ctx, tx, sensors, "Headlamps")
+
 	// bob's project, shared with the team group as Viewer.
 	brakes := createProject(bob, "Brake System")
 	brakeItem := seedItem(t, ctx, tx, brakes, "Brake controller")
@@ -216,6 +224,23 @@ func TestSearchPostgres(t *testing.T) {
 		for _, query := range []string{"ts12", "TS 12", "ts-012"} {
 			if page := search(t, alice, q(query)); len(page.Results) == 0 || page.Results[0].ID != threats["TS-12"] {
 				t.Errorf("%q = %v", query, ids(page))
+			}
+		}
+	})
+
+	t.Run("exact names, then substrings, then similar names", func(t *testing.T) {
+		for _, tc := range []struct {
+			query string
+			want  []string
+		}{
+			// Both have word similarity 1; the exact name comes first although "ABS brake" sorts before it.
+			{"brake", []string{brake, absBrake}},
+			// "Lam interface" is more similar (0.6) than "Headlamps" (0.4), but only "Headlamps" contains the query.
+			{"lamp", []string{headlamps, lamInterface}},
+		} {
+			page := search(t, alice, q(tc.query, "project_id", ranking, "type", "assets"))
+			if got := ids(page); strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("%q = %v, want %v", tc.query, got, tc.want)
 			}
 		}
 	})

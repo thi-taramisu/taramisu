@@ -53,6 +53,8 @@ WITH projects AS (
         (c.type = $7::text AND c.display_number::text = $8::text) AS exact_id,
         (c.type = $7::text AND c.display_number::text LIKE $8::text || '%') AS id_prefix,
         (btrim(unaccent($1::text)) <> ''
+            AND lower(unaccent(c.name)) = lower(unaccent($1::text))) AS exact_name,
+        (btrim(unaccent($1::text)) <> ''
             AND strpos(lower(unaccent(c.name)), lower(unaccent($1::text))) > 0) AS contains_query,
         unaccent($1::text) <% unaccent(c.name) AS similar_name
     FROM candidates c
@@ -63,6 +65,7 @@ SELECT type, id, display_number, name, project_id, project_name, item_id, item_n
 FROM matches
 WHERE id_prefix OR contains_query OR similar_name
 ORDER BY exact_id DESC, id_prefix DESC, CASE WHEN id_prefix THEN display_number END,
+    exact_name DESC, contains_query DESC,
     word_similarity(unaccent($1::text), unaccent(name)) DESC,
     name, type, id
 LIMIT $3 OFFSET $2
@@ -107,8 +110,9 @@ type SearchElementsRow struct {
 // Names are compared without accents (unaccent), so "schaden" finds "Schäden".
 // Display IDs are not matched by similarity: "TS-7" would be similar to every TS ID.
 //
-// Order: exact display ID, display ID prefix by number (TS-1, TS-10, TS-11, ...), similarity; then name,
-// type and id, which make the order total, so that pages are stable.
+// Order: exact display ID, display ID prefix by number (TS-1, TS-10, TS-11, ...), exact name, names that
+// contain the query, names that are only similar; within each, by similarity. Name, type, and id make the
+// order total, so that pages are stable.
 // total counts all matches; a page past the last match has no rows and therefore no total.
 func (q *Queries) SearchElements(ctx context.Context, arg SearchElementsParams) ([]SearchElementsRow, error) {
 	rows, err := q.db.Query(ctx, searchElements,
