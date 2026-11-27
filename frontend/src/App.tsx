@@ -21,6 +21,7 @@ import { ThreatScenarioPage } from './features/threat-scenarios/ThreatScenarioPa
 import { ThreatScenarioRelationsTab } from './features/threat-scenarios/ThreatScenarioRelationsTab'
 import { ThreatScenarioRisksTab } from './features/threat-scenarios/ThreatScenarioRisksTab'
 import type { EntityType } from './api/models/tree'
+import { useResetQueriesOnSignOut } from './api/queries/session'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
 import { Placeholder } from './features/workspace/Placeholder'
@@ -58,6 +59,7 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
 // Route concept: docs/internal/frontend-routes.md
 export default function App() {
   const { t } = useTranslation()
+  useResetQueriesOnSignOut()
   return (
     <SearchProvider>
       <Routes>
