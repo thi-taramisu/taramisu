@@ -70,6 +70,9 @@ optimistic concurrency control with HTTP preconditions instead of edit locks is 
 - **Requests.** `PUT`, `PATCH`, and `DELETE` send the version they are based on as `If-Match: "3"`. If the record has changed
   in the meantime, the API answers `412 Precondition Failed` with the current `ETag`, changes nothing, and records no audit
   event. `*` matches any version. A missing record is still `404`.
+- **Proxies.** `If-Match` uses the strong comparison (RFC 9110), so a weak tag such as `W/"3"` never matches. nginx turns
+  the `ETag` into a weak one when it compresses a response, so the proxy must not enable gzip for `/api/`. Clients that build
+  `If-Match` from the `version` field are not affected.
 - **Saving without a change** keeps the version: `Store.Audit` rolls back a change that records no event, so others who read
   the record before can still save. The handler then returns the record as it was before the change, because the record that
   the update returned carries a version that was never committed.

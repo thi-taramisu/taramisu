@@ -1,6 +1,6 @@
 # ADR 0006: Protection against conflicting edits
 
-- Status: Proposed
+- Status: Accepted, agreed with the backend team
 - Issue: #241
 - Related: #89 (who is editing), [conflicting edits](../architecture/backend/backend-architecture.md#conflicting-edits) (API
   contract and implementation)
