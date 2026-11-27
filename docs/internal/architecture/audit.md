@@ -46,7 +46,8 @@ project.
    such as setting a role to the role a member already has, records no event.
 3. **Every change, through one entry point.** Every mutating API operation records its change through one generic entry
    point in the backend, which all record types use. A test fails for a mutating operation that is declared neither as
-   audited nor as not audited yet, so a new operation cannot bypass the history by accident.
+   audited nor as not audited yet, so a new operation cannot bypass the history by accident. Personal preferences, such as
+   favourite projects, are intentionally never audited; they are declared in `neverAudited` and are not project data.
 4. **Append-only.** The application never updates or deletes audit rows, except for the retention cleanup. A separate database
    role with only `INSERT` and `SELECT` can enforce this later; the cleanup then needs its own role with `DELETE`. Database
    triggers are not used because Atlas manages triggers only in its paid edition.

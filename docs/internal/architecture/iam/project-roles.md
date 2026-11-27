@@ -164,6 +164,18 @@ permission instead of a place in the order (see [Open questions](#open-questions
   assignment of their own to remove.
 - The same applies when an Owner removes someone's direct assignment: access through a group stays.
 
+### Favourites
+
+- Every role can mark a project as a favourite (`PUT` and `DELETE /api/v1/projects/{id}/favorite`, permission `read`, `204`;
+  repeating either request changes nothing). Favourites are personal: `is_favorite` in the project list and project
+  responses and the filter `GET /api/v1/projects?favorite=true` only reflect the caller's own favourites.
+- Removing a user's direct assignment, by an Owner or by leaving, also removes that user's favourite of the project, even
+  if the user keeps access through a group.
+- Losing access through a group cannot remove the favourite, because group membership is not stored in the database. The
+  favourite stays hidden, since the project list and project requests only return projects the caller has a role in, and
+  shows up again if access is granted again.
+- Deleting the project or the user deletes the favourite (`ON DELETE CASCADE`); deleting a favourite never changes the project.
+
 ## When changes take effect
 
 | Change | Takes effect |
@@ -223,6 +235,7 @@ described in [Audit and logging](../audit.md).
 | `project_role` enum | Values ordered by rank: `VIEWER`, `EDITOR`, `OWNER`; `REVIEWER` pending, see [Open questions](#open-questions) |
 | `iam_group` | Unchanged: maps an Authentik group UUID (`external_iam_group_id`) to an internal ID |
 | `iam_user_group_member` | Removed; membership comes from the token |
+| `project_favorite` | Personal favourites (#232): one row per user and project, deleted with the user or the project |
 
 The database still stores no names or email addresses. Member lists get them from the Authentik API at runtime
 ([request flows, section 3](../request-flows.md)).

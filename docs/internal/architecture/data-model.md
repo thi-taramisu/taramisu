@@ -15,6 +15,8 @@ erDiagram
     TARA_PROJECT ||--o{ PROJECT_ROLE_ASSIGNMENT : "grants access via"
     IAM_USER ||--o{ PROJECT_ROLE_ASSIGNMENT : "assigned directly (0..N)"
     IAM_GROUP ||--o{ PROJECT_ROLE_ASSIGNMENT : "assigned as group (0..N)"
+    IAM_USER ||--o{ PROJECT_FAVORITE : "marks as favourite (0..N)"
+    TARA_PROJECT ||--o{ PROJECT_FAVORITE : "favourite of (0..N)"
 
     %% ==========================================
     %% 2. PROJECT & PREREQUISITES (15.1, 15.3.1)
@@ -81,6 +83,12 @@ erDiagram
         uuid group_id FK "Nullable: set if entire group is authorized"
         enum project_role "VIEWER | EDITOR | OWNER"
         timestamp assigned_at
+    }
+
+    PROJECT_FAVORITE {
+        uuid user_id PK, FK "Cascades when the user is deleted"
+        uuid tara_project_id PK, FK "Cascades when the project is deleted"
+        timestamp created_at
     }
 
     %% ==========================================
@@ -243,6 +251,9 @@ erDiagram
 * **Project role rules (#211 / #212):** The [project roles specification](iam/project-roles.md) defines
   one role per user or group and project, with the enum ordered by rank (`VIEWER`, `EDITOR`, `OWNER`).
   Group membership comes from the signed Authentik access token; no local membership table is stored.
+* **Personal favourites (`PROJECT_FAVORITE`, #232):** One row per user and project. Deleting the user or the project
+  deletes the favourite; deleting a favourite never touches the project. See
+  [project roles, favourites](iam/project-roles.md#favourites).
 
 ### 2.2 Separation of Assets and Cybersecurity Properties (`[RQ-15-02]`, `[WP-15-02]`)
 

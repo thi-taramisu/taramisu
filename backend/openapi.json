@@ -1244,6 +1244,9 @@
             "format": "uuid",
             "type": "string"
           },
+          "is_favorite": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
@@ -1261,7 +1264,8 @@
           "id",
           "name",
           "created_at",
-          "role"
+          "role",
+          "is_favorite"
         ],
         "type": "object"
       },
@@ -7638,6 +7642,16 @@
               "description": "true: archived only; false: active only; omitted: both",
               "type": "boolean"
             }
+          },
+          {
+            "description": "Return only the caller's favourite projects.",
+            "explode": false,
+            "in": "query",
+            "name": "favorite",
+            "schema": {
+              "description": "Return only the caller's favourite projects.",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -8143,6 +8157,168 @@
         ],
         "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/favorite": {
+      "delete": {
+        "operationId": "remove-tara-project-favorite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a TARA project from the caller's favourites",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "read"
+      },
+      "put": {
+        "operationId": "add-tara-project-favorite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a TARA project as a favourite of the caller",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "read"
       }
     },
     "/api/v1/projects/{id}/members": {

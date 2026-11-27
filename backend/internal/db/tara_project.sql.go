@@ -123,20 +123,24 @@ func (q *Queries) GetTaraProjectForUpdate(ctx context.Context, id pgtype.UUID) (
 }
 
 const listTaraProjects = `-- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role,
+    bool_or(f.user_id IS NOT NULL)::boolean AS is_favorite
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
+LEFT JOIN project_favorite f ON f.tara_project_id = p.id AND f.user_id = $1
 WHERE (a.user_id = $1 OR g.external_iam_group_id = ANY($2::text[]))
 AND ($3::boolean IS NULL OR (p.archived_at IS NOT NULL) = $3::boolean)
 GROUP BY p.id
+HAVING NOT $4::boolean OR bool_or(f.user_id IS NOT NULL)
 ORDER BY p.created_at DESC, p.id
 `
 
 type ListTaraProjectsParams struct {
-	UserID   pgtype.UUID
-	GroupIds []string
-	Archived *bool
+	UserID        pgtype.UUID
+	GroupIds      []string
+	Archived      *bool
+	OnlyFavorites bool
 }
 
 type ListTaraProjectsRow struct {
@@ -146,11 +150,18 @@ type ListTaraProjectsRow struct {
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	Role        ProjectRole
+	IsFavorite  bool
 }
 
-// List only projects the caller has a role in, with the caller's highest role.
+// List only projects the caller has a role in, with the caller's highest role and favourite flag.
+// only_favorites restricts the list to the caller's favourites.
 func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsParams) ([]ListTaraProjectsRow, error) {
-	rows, err := q.db.Query(ctx, listTaraProjects, arg.UserID, arg.GroupIds, arg.Archived)
+	rows, err := q.db.Query(ctx, listTaraProjects,
+		arg.UserID,
+		arg.GroupIds,
+		arg.Archived,
+		arg.OnlyFavorites,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +176,7 @@ func (q *Queries) ListTaraProjects(ctx context.Context, arg ListTaraProjectsPara
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.Role,
+			&i.IsFavorite,
 		); err != nil {
 			return nil, err
 		}

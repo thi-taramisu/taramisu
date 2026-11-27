@@ -59,6 +59,16 @@ CREATE TABLE project_role_assignment (
 CREATE INDEX project_role_assignment_user_id_idx ON project_role_assignment (user_id);
 CREATE INDEX project_role_assignment_group_id_idx ON project_role_assignment (group_id);
 
+-- Personal favourites (#232). Deleting the user or the project deletes the favourite, never the other way round.
+CREATE TABLE project_favorite (
+    user_id uuid NOT NULL REFERENCES iam_user (id) ON DELETE CASCADE,
+    tara_project_id uuid NOT NULL REFERENCES tara_project (id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, tara_project_id)
+);
+
+CREATE INDEX project_favorite_tara_project_id_idx ON project_favorite (tara_project_id);
+
 -- Audit history: one row per successful change, written in the transaction of the change
 -- (docs/internal/architecture/audit.md). No foreign keys, so events outlive the project, assignment,
 -- and user they describe. IDs only, never names or email addresses.

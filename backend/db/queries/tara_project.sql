@@ -18,15 +18,19 @@ SELECT * FROM tara_project WHERE id = $1;
 -- name: GetTaraProjectForUpdate :one
 SELECT * FROM tara_project WHERE id = $1 FOR NO KEY UPDATE;
 
--- List only projects the caller has a role in, with the caller's highest role.
+-- List only projects the caller has a role in, with the caller's highest role and favourite flag.
+-- only_favorites restricts the list to the caller's favourites.
 -- name: ListTaraProjects :many
-SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role
+SELECT p.id, p.name, p.description, p.archived_at, p.created_at, max(a.project_role)::project_role AS role,
+    bool_or(f.user_id IS NOT NULL)::boolean AS is_favorite
 FROM tara_project p
 JOIN project_role_assignment a ON a.tara_project_id = p.id
 LEFT JOIN iam_group g ON g.id = a.group_id
+LEFT JOIN project_favorite f ON f.tara_project_id = p.id AND f.user_id = sqlc.arg(user_id)
 WHERE (a.user_id = sqlc.arg(user_id) OR g.external_iam_group_id = ANY(sqlc.arg(group_ids)::text[]))
 AND (sqlc.narg('archived')::boolean IS NULL OR (p.archived_at IS NOT NULL) = sqlc.narg('archived')::boolean)
 GROUP BY p.id
+HAVING NOT sqlc.arg(only_favorites)::boolean OR bool_or(f.user_id IS NOT NULL)
 ORDER BY p.created_at DESC, p.id;
 
 -- name: ReplaceTaraProject :one

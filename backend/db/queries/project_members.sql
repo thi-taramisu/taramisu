@@ -48,14 +48,23 @@ WHERE previous.id = a.id AND a.tara_project_id = sqlc.arg(project_id) AND a.id =
 RETURNING a.id, previous.project_role AS previous_role, a.user_id, a.group_id;
 
 -- Remove an assignment unless it is the last user Owner (same rule as UpdateProjectMemberRole).
+-- Removing a user assignment also removes that user's favourite of the project (#232).
+-- Group assignments leave favourites alone: group membership is not stored in the database.
 -- name: DeleteProjectMember :one
-DELETE FROM project_role_assignment a
-WHERE a.tara_project_id = sqlc.arg(project_id) AND a.id = sqlc.arg(id)
-  AND (a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
-      SELECT 1 FROM project_role_assignment o
-      WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
-        AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id, a.project_role, a.user_id, a.group_id;
+WITH removed AS (
+    DELETE FROM project_role_assignment a
+    WHERE a.tara_project_id = sqlc.arg(project_id) AND a.id = sqlc.arg(id)
+      AND (a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
+          SELECT 1 FROM project_role_assignment o
+          WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
+            AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
+    RETURNING a.id, a.project_role, a.user_id, a.group_id, a.tara_project_id
+), favorite AS (
+    DELETE FROM project_favorite f
+    USING removed r
+    WHERE f.user_id = r.user_id AND f.tara_project_id = r.tara_project_id
+)
+SELECT id, project_role, user_id, group_id FROM removed;
 
 -- Serializes membership changes per project. The Store's membership methods take this lock before
 -- the guarded statement, so two Owners cannot downgrade or remove each other at the same moment.

@@ -591,6 +591,12 @@ type ItemDefinition struct {
 	CreatedAt                pgtype.Timestamptz
 }
 
+type ProjectFavorite struct {
+	UserID        pgtype.UUID
+	TaraProjectID pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+}
+
 type ProjectRoleAssignment struct {
 	ID            pgtype.UUID
 	TaraProjectID pgtype.UUID

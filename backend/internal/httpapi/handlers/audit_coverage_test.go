@@ -34,6 +34,10 @@ var auditedOperations = []string{
 // auditedOperations when its changes are recorded; new operations must go into one of the lists.
 var notAuditedYet = []string{}
 
+// neverAudited are mutating operations that are intentionally not recorded: personal preferences,
+// not project data. Unlike notAuditedYet, they stay here.
+var neverAudited = []string{"add-tara-project-favorite", "remove-tara-project-favorite"}
+
 // TestEveryChangeIsDeclaredForAudit makes adding a mutating operation a conscious decision about its
 // audit events, like the access declaration in handlers.Register.
 func TestEveryChangeIsDeclaredForAudit(t *testing.T) {
@@ -41,7 +45,7 @@ func TestEveryChangeIsDeclaredForAudit(t *testing.T) {
 	for _, list := range []struct {
 		name string
 		ids  []string
-	}{{"auditedOperations", auditedOperations}, {"notAuditedYet", notAuditedYet}} {
+	}{{"auditedOperations", auditedOperations}, {"notAuditedYet", notAuditedYet}, {"neverAudited", neverAudited}} {
 		for _, id := range list.ids {
 			if other, ok := declared[id]; ok {
 				t.Errorf("%s is listed in %s and %s", id, other, list.name)
@@ -68,7 +72,7 @@ func TestEveryChangeIsDeclaredForAudit(t *testing.T) {
 	}
 	sort.Strings(undeclared)
 	for _, op := range undeclared {
-		t.Errorf("%s is neither in auditedOperations nor in notAuditedYet", op)
+		t.Errorf("%s is in none of auditedOperations, notAuditedYet and neverAudited", op)
 	}
 	for id := range declared {
 		t.Errorf("%s is listed but no such mutating operation exists", id)
