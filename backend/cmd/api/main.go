@@ -19,6 +19,7 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
+	"github.com/thi-taramisu/taramisu/backend/internal/storage"
 )
 
 // HTTP draining, pool closure, and Sentry flushing together stay below the API's
@@ -92,7 +93,12 @@ func run(logLevel *slog.LevelVar) error {
 	if err != nil {
 		return fmt.Errorf("configure authentication: %w", err)
 	}
-	var opts []httpapi.Option
+	files := httpapi.NewAttachments(queries.Queries, storage.New(cfg.S3))
+	cleanupCtx, stopCleanup := context.WithCancel(ctx)
+	cleanupDone := make(chan struct{})
+	go func() { defer close(cleanupDone); files.RunCleanup(cleanupCtx) }()
+	defer func() { stopCleanup(); <-cleanupDone }()
+	opts := []httpapi.Option{httpapi.WithAttachments(files)}
 	if cfg.AuthentikURL != "" && cfg.AuthentikToken != "" {
 		directory, err := auth.NewDirectoryResolver(auth.DirectoryConfig{
 			BaseURL: cfg.AuthentikURL,

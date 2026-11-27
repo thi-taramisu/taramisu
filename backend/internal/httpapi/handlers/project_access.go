@@ -147,6 +147,21 @@ const accessMetadataKey = "taramisu.access"
 // Register registers op with its access declaration. For InProject, the caller's role is checked
 // before the handler runs; the handler can read it with RoleFromContext.
 func Register[I, O any](api huma.API, op huma.Operation, access Access, handler func(context.Context, *I) (*O, error)) {
+	op = declareAccess(api, op, access)
+	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
+		out, err := handler(ctx, in)
+		return out, hideUnexpected(ctx, op.OperationID, err)
+	})
+}
+
+// RegisterRaw registers a streaming handler with the same project access checks as typed handlers.
+func RegisterRaw(api huma.API, op huma.Operation, access Access, handler func(huma.Context)) {
+	op = declareAccess(api, op, access)
+	api.OpenAPI().AddOperation(&op)
+	api.Adapter().Handle(&op, api.Middlewares().Handler(op.Middlewares.Handler(handler)))
+}
+
+func declareAccess(api huma.API, op huma.Operation, access Access) huma.Operation {
 	if op.Metadata == nil {
 		op.Metadata = map[string]any{}
 	}
@@ -169,10 +184,7 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 		}
 		op.Middlewares = append(op.Middlewares, access.middleware(api))
 	}
-	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
-		out, err := handler(ctx, in)
-		return out, hideUnexpected(ctx, op.OperationID, err)
-	})
+	return op
 }
 
 // hideUnexpected logs an error that the handler did not map to an HTTP status and replaces it with a
