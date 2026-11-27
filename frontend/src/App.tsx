@@ -1,6 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AssetDefinitionTab } from './features/assets/AssetDefinitionTab'
+import { AssetPage } from './features/assets/AssetPage'
+import { AssetRelationsTab } from './features/assets/AssetRelationsTab'
+import { AssetRisksTab } from './features/assets/AssetRisksTab'
 import { ItemAssetsTab } from './features/assets/ItemAssetsTab'
 import { AttackPathDefinitionTab } from './features/attack-paths/AttackPathDefinitionTab'
 import { AttackPathPage } from './features/attack-paths/AttackPathPage'
@@ -35,6 +39,7 @@ import { ProjectSettingsPage } from './pages/ProjectSettingsPage'
 // Element types with their own page (data from the API), everything else uses the generic page.
 const PAGES: Partial<Record<EntityType, ReactNode>> = {
   items: <ItemPage />,
+  assets: <AssetPage />,
   'damage-scenarios': <DamageScenarioPage />,
   'threat-scenarios': <ThreatScenarioPage />,
   'attack-paths': <AttackPathPage />,
@@ -45,6 +50,9 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/': <ItemDefinitionTab />,
   'items/assets': <ItemAssetsTab />,
   'items/risks': <ItemRisksTab />,
+  'assets/': <AssetDefinitionTab />,
+  'assets/risks': <AssetRisksTab />,
+  'assets/relations': <AssetRelationsTab />,
   'damage-scenarios/': <DamageScenarioDefinitionTab />,
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
   'damage-scenarios/relations': <DamageScenarioRelationsTab />,

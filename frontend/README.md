@@ -33,11 +33,11 @@ src/
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
   features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
-  features/assets/             # item assets tab: table and dialog built with shadcn/ui
+  features/assets/             # item assets tab, "New Asset" dialog and asset pages: Definition with C / I / A, Risks and Relations tabs
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
   features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
   features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
-  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog, read-only section
   features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
@@ -145,6 +145,25 @@ The real search endpoint, generated API types, pagination contract and membershi
 The mock scopes results to the projects returned by its project service, including when a caller supplies other project IDs. This models
 access restrictions for development; production authorization must be enforced by the backend. Replace the service in `ApiProvider`
 when that contract is available; do not fetch unauthorized project data and filter it in the component.
+
+## Sentry
+
+For the Vite dev server, copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` from the frontend Sentry project.
+An empty DSN disables reporting. `VITE_SENTRY_ENVIRONMENT` defaults to the Vite mode when unset or empty;
+`VITE_SENTRY_RELEASE` is optional. The SDK captures browser exceptions, unhandled rejections, and React render errors.
+Never put a Sentry auth token in a `VITE_` variable.
+
+For the full **Compose stack**, put `VITE_SENTRY_DSN` and the shared `SENTRY_ENVIRONMENT` in **`iam/.env`**,
+then rebuild with `make -C deploy up`. Compose does not read `frontend/.env.local` automatically. Backend and frontend
+Compose settings default to `production`; set `SENTRY_ENVIRONMENT=development` for a development stack.
+Vite embeds these values during the build; changing container runtime variables cannot update a built image.
+
+The **GHCR publishing workflow** passes the repository Actions variable `VITE_SENTRY_DSN` into the frontend build,
+uses `SENTRY_ENVIRONMENT` (default `production`), and records the Git commit as the frontend release.
+Configure those repository variables before publishing. A deployment using a prebuilt GHCR image must use the
+same environment name for its runtime backend; changing frontend settings requires publishing a new image.
+
+Source-map uploads are not configured; production stack traces may reference bundled code.
 
 ## UI components
 

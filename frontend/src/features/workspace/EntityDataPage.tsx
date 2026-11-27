@@ -9,7 +9,8 @@ import { EntityPage } from './EntityPage'
 interface EntityDataPageProps {
   type: EntityType
   projectId: string
-  entity: UseQueryResult<{ code: string; title: string }>
+  /** Scenarios and attack paths have a title, assets a name. */
+  entity: UseQueryResult<{ code: string } & ({ title: string } | { name: string })>
   tabCounts?: Record<string, number>
 }
 
@@ -39,7 +40,7 @@ export function EntityDataPage({ type, projectId, entity, tabCounts }: EntityDat
   return (
     <EntityPage
       type={type}
-      name={entity.data.title}
+      name={'title' in entity.data ? entity.data.title : entity.data.name}
       code={formatEntityId(entity.data.code)}
       tabCounts={tabCounts}
       actions={

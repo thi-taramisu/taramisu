@@ -2,14 +2,12 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { CreateAssetDialog } from '../assets/CreateAssetDialog'
 import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
 import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
-
-// Assets cannot be created here yet; they follow with their own ticket.
-const OTHER_TYPES = ['assets']
 
 interface NewElementMenuProps {
   projectId: string
@@ -22,6 +20,7 @@ interface NewElementMenuProps {
 export function NewElementMenu({ projectId, projectName, disabled = false }: NewElementMenuProps) {
   const { t } = useTranslation()
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
+  const [assetDialog, setAssetDialog] = useState({ open: false, key: 0 })
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
   const [threatScenarioDialog, setThreatScenarioDialog] = useState({ open: false, key: 0 })
   const [attackPathDialog, setAttackPathDialog] = useState({ open: false, key: 0 })
@@ -40,6 +39,7 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
           {/* A new key per opening, so the dialogs start from the item and element of the current page. */}
+          <DropdownMenuItem onSelect={() => setAssetDialog(({ key }) => ({ open: true, key: key + 1 }))}>{t('entities.assets')}</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.damage-scenarios')}
           </DropdownMenuItem>
@@ -49,11 +49,6 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.attack-paths')}
           </DropdownMenuItem>
-          {OTHER_TYPES.map((label) => (
-            <DropdownMenuItem key={label} disabled>
-              {t(`entities.${label}`)}
-            </DropdownMenuItem>
-          ))}
         </DropdownMenuContent>
       </DropdownMenu>
       <CreateItemDialog
@@ -64,6 +59,16 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         returnFocusTo={newButton}
       />
       {/* Mounted from the first opening on, so closed dialogs load nothing on every page. */}
+      {assetDialog.key > 0 && (
+        <CreateAssetDialog
+          key={`asset-${assetDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={assetDialog.open}
+          onOpenChange={(open) => setAssetDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
       {damageScenarioDialog.key > 0 && (
         <CreateDamageScenarioDialog
           key={`damage-scenario-${damageScenarioDialog.key}`}
