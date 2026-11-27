@@ -8,6 +8,7 @@ import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
 import type { ProjectService } from './services/projects'
+import type { SearchService } from './services/search'
 import type { ThreatScenarioService } from './services/threatScenarios'
 import { useAuth } from '@/auth/useAuth'
 
@@ -18,6 +19,7 @@ import { useAuth } from '@/auth/useAuth'
 export interface Api {
   client: ApiClient
   projects: ProjectService
+  search: SearchService
   items: ItemService
   content: ItemContentService
   damageScenarios: DamageScenarioService
@@ -27,6 +29,7 @@ export interface Api {
 
 const ApiContext = createContext<Api | null>(null)
 
+
 export function ApiProvider({
   api,
   children,
@@ -35,12 +38,13 @@ export function ApiProvider({
   children: ReactNode
 }) {
   const { accessToken, signOut } = useAuth()
-  const defaultMocks = useMemo(() => createMockItemApi(), [])
   // Created once, so the mocked parts of the projects survive a new token (and with it a new client).
   const projectMocks = useMemo(
     () => ({ extras: createMockProjectExtras(), example: createExampleProjectApi() }),
     [],
   )
+  // Created once, so edits in the item mocks survive a new token (and with it a new project service).
+  const defaultMocks = useMemo(() => createMockItemApi(), [])
 
   const client = useMemo(
     () =>
@@ -55,27 +59,22 @@ export function ApiProvider({
   )
   const defaultProjects = useMemo(() => createProjectApi(client, projectMocks), [client, projectMocks])
 
+  const projects = api?.projects ?? defaultProjects
+  // The mock search reads the user's projects, so it uses the current project service.
+  const search = useMemo(() => api?.search ?? defaultMocks.searchWith(projects), [api?.search, defaultMocks, projects])
+
   const value = useMemo<Api>(
     () => ({
       client,
-      projects: api?.projects ?? defaultProjects,
+      projects,
+      search,
       items: api?.items ?? defaultMocks.items,
       content: api?.content ?? defaultMocks.content,
       damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
       threatScenarios: api?.threatScenarios ?? defaultMocks.threatScenarios,
       attackPaths: api?.attackPaths ?? defaultMocks.attackPaths,
     }),
-    [
-      api?.attackPaths,
-      api?.content,
-      api?.damageScenarios,
-      api?.items,
-      api?.projects,
-      api?.threatScenarios,
-      client,
-      defaultMocks,
-      defaultProjects,
-    ],
+    [api?.attackPaths, api?.content, api?.damageScenarios, api?.items, api?.threatScenarios, client, defaultMocks, projects, search],
   )
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>

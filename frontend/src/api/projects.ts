@@ -57,7 +57,7 @@ export function createProjectApi(
   const fetchProject = (projectId: string) =>
     unwrap(client.GET('/api/v1/projects/{id}', { params: { path: { id: projectId } } }))
 
-  /** Checks the backend's role, as the archive endpoints (#233) will. */
+  /** Checks the backend's role, as the archive endpoints (#233) do; they are connected with #361. */
   async function setOwnedExtras(projectId: string, archived: boolean) {
     const body = await fetchProject(projectId)
     if (body.role !== 'OWNER') throw new ApiError(403, 'Only owners can do this.')

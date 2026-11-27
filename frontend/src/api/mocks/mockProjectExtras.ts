@@ -3,10 +3,10 @@ import type { Project } from '../models/project'
 // MOCK: project fields that `/api/v1/projects` does not have yet. The real project service
 // (`../projects.ts`) merges them into the backend's projects; they are kept in memory and reset on reload.
 // Each field moves to the backend with its issue:
-// - `archived`: archive endpoints (#233)
+// - `archived`: archive endpoints exist (#233), connected with #361
 // - `image`: project image upload (#231, #284)
 // - `owner`: project members (#249)
-// - `favorite`: no issue yet
+// - `favorite`: favorite endpoints (#232), connected with #375
 
 export type ProjectExtras = Pick<Project, 'favorite' | 'archived' | 'owner' | 'image'>
 

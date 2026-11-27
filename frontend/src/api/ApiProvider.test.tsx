@@ -3,8 +3,22 @@ import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { AuthContext, type AuthContextValue } from '@/auth/useAuth'
 import { ApiProvider, useApi } from './ApiProvider'
+import { createMockProjectApi } from './mocks/mockProjectApi'
+import { mockProjects } from './mocks/data/projects'
 
 describe('ApiProvider', () => {
+  it('scopes the default search to an injected project directory', async () => {
+    const projects = createMockProjectApi(mockProjects.filter((project) => project.id === 'battery-security'))
+    const { result } = renderHook(() => useApi(), {
+      wrapper: ({ children }: { children: ReactNode }) => <ApiProvider api={{ projects }}>{children}</ApiProvider>,
+    })
+    const page = await result.current.search.search(
+      { query: '', projectIds: [], types: [], offset: 0 },
+      { signal: new AbortController().signal },
+    )
+    expect(page.results.map((match) => match.project.id)).toEqual(['battery-security'])
+  })
+
   it('preserves mock service instances and created data across access-token changes', async () => {
     let currentToken = 'initial-token'
 

@@ -3,7 +3,7 @@ import type { Project } from '../models/project'
 import type { ProjectService } from '../services/projects'
 import { exampleProject } from './data/headlamp'
 import { mockProjects } from './data/projects'
-import { run } from './mockStore'
+import { run } from './request'
 
 // MOCK: in-memory project API. Tests use it instead of the backend, and the real project service
 // (`../projects.ts`) serves the example project from it until the example lives in the backend (#250).

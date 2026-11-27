@@ -317,6 +317,8 @@ func TestItemDefinitionPermissions(t *testing.T) {
 	}
 }
 
+func (s *itemStore) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
+
 // TestItemDefinitionChangesAreAudited checks which change each operation hands to the store; the
 // stored events are covered against PostgreSQL in TestAuditContentPostgres.
 func TestItemDefinitionChangesAreAudited(t *testing.T) {

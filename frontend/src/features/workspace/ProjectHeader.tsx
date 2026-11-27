@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { ThemeToggle } from '../theme/ThemeToggle'
-import { useProject } from '../../api/queries/projects'
-import { LanguageSelector } from '@/components/layout/LanguageSelector'
 import { useTranslation } from 'react-i18next'
+import { Link, NavLink } from 'react-router-dom'
+import { LanguageSelector } from '@/components/layout/LanguageSelector'
+import { useProject } from '../../api/queries/projects'
+import { SearchTrigger } from '../search/SearchTrigger'
+import { ThemeToggle } from '../theme/ThemeToggle'
 
 /** Top bar of a project (workspace and settings); page-specific controls go into `children` on the right. */
-export function ProjectHeader({ projectId, children }: { projectId: string; children?: ReactNode }) {
+export function ProjectHeader({ projectId, projectName, children }: { projectId: string; projectName?: string; children?: ReactNode }) {
   const { t } = useTranslation()
   const { data: project } = useProject(projectId)
   return (
@@ -14,7 +15,7 @@ export function ProjectHeader({ projectId, children }: { projectId: string; chil
       <Link to="/projects" className="text-sm text-muted-foreground hover:underline">
         {t('navigation.projects')}
       </Link>
-      <span className="font-medium">{project?.name}</span>
+      <span className="font-medium">{projectName ?? project?.name}</span>
       <NavLink
         to={`/projects/${projectId}/settings`}
         className={({ isActive }) => `text-sm hover:underline ${isActive ? 'font-medium' : 'text-muted-foreground'}`}
@@ -23,6 +24,7 @@ export function ProjectHeader({ projectId, children }: { projectId: string; chil
       </NavLink>
       <Link to="/design-system/colors" className="text-sm text-muted-foreground hover:underline">{t('navigation.colourSchemes')}</Link>
       <div className="ml-auto flex items-center gap-2">
+        <SearchTrigger compact />
         <LanguageSelector />
         <ThemeToggle />
         {children}

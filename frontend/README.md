@@ -35,9 +35,10 @@ src/
   features/items/              # item pages: create/delete dialogs, tabs
   features/assets/             # item assets tab: table and dialog built with shadcn/ui
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
-  features/threat-scenarios/   # threat scenario pages: Definition with targets, Risks and Relations tabs
-  features/attack-paths/       # attack path pages: Definition with steps, Rating and Relations tabs
+  features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
+  features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
   features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews
   features/item-definition/    # Item definition diagram (React Flow example, headlamp system)
@@ -47,8 +48,8 @@ src/
 
 All routes from the concept exist, most of them as placeholders. Start at `/projects` and open the hard-coded example project, e.g.
 `/projects/headlamp/items/i-01` for the item pages. Items, assets and risks come from the mock item API, so changes last until reload.
-The project list comes from the backend (`/api/v1/projects`) plus the example project; projects from the backend open their settings,
-since their workspace needs the item routes (#250).
+The project list comes from the backend (`/api/v1/projects`) plus the example project; the workspace of a backend project stays empty
+until its items come from the backend (#250).
 The route concept is in [`docs/internal/frontend-routes.md`](../docs/internal/frontend-routes.md).
 
 The workspace `Filetree` takes a project ID and `TreeNode` entries. It uses shadcn/ui disclosure controls, keeps each occurrence of a shared
@@ -110,6 +111,41 @@ Whether the current user can change a project comes from `useProjectAccess(proje
 instead of checking `archived` or the role themselves: they disable New, hide delete and link actions and show forms disabled. Read-only roles
 can later be added there in one place. The backend rejects writes to archived projects itself (#233), so this only shapes the UI.
 
+## Global search
+
+Open Search from the project-list sidebar or the project header, or press **Ctrl/Cmd + K** on any route. The centered dialog
+focuses its input, searches names, internal IDs and display IDs (for example `TS-1`), and opens the selected result with Enter.
+Arrow Up/Down moves through results; Escape, the close button or an outside click closes the dialog and returns focus.
+The dialog stays anchored near the top with a fixed-height, scrollable results area. Input is debounced by 250 ms; filters apply
+immediately. While typing, previous results stay visible but cannot be opened until the current search finishes.
+
+Project and element-type filters can be combined. Toggle a selected type button to remove that type; project chips have a remove button.
+Several types or projects are ORed within that filter; project and type filters
+are ANDed. Opening in a project workspace or its settings starts with that project's filter. Remove its chip to search all accessible
+projects; opening on the project list starts without a project filter. A new search session resets the query and filters.
+Results include the project, type and ID. Further matches are available through **Load more results**.
+
+Start with `item:` or type `item` and press Tab to activate the Item filter and keep typing a name or ID.
+The same works with `project`, `asset`, `damage`, `threat` and `attack`, or the full English/German type names.
+Commands add to the selected type filters without changing project filters; toggle the type button to remove one.
+Tab keeps its normal focus behavior for other text, and Shift+Tab always moves backwards.
+Search labels and counts follow the header's English/German language choice; entity names and route IDs stay unchanged.
+
+The project picker is a non-modal popover with its own local name/ID lookup. It keeps multiple selections checked, shows up to 50
+matches initially and offers **Show more projects** for browsing. Arrow keys and Enter work across these batches. Escape closes the
+picker first and returns focus to its trigger; the global query and selected filters stay intact.
+
+The frontend currently uses `SearchService` (`src/api/services/search.ts`) and the live in-memory mock stores. Project list changes
+survive route navigation and are shared with search; a reload still resets all mock data. The project service reuses the structure
+introduced in PR #286. Search reads all stored elements, including unlinked scenarios, rather than indexing only visible Filetree nodes.
+TanStack Query isolates requests by search session, query, filters and user identity and cancels outdated requests.
+Results from another query are never used as placeholder data. Mutations invalidate search results alongside their entity queries.
+
+The real search endpoint, generated API types, pagination contract and membership authorization are pending **#240** and **#239**.
+The mock scopes results to the projects returned by its project service, including when a caller supplies other project IDs. This models
+access restrictions for development; production authorization must be enforced by the backend. Replace the service in `ApiProvider`
+when that contract is available; do not fetch unauthorized project data and filter it in the component.
+
 ## UI components
 
 We use [shadcn/ui](https://ui.shadcn.com) (see [ADR 0002](../docs/internal/adr/0002-frontend-ui-library.md)). Add new components with the
@@ -142,3 +178,16 @@ Mock data and newly created mock elements use this format directly.
 Headers, breadcrumbs, graph labels, tables and relation pickers use this presentation.
 Internal IDs and route parameters keep their original values. Item codes are displayed when supplied
 by the tree, using the IT prefix; no code is invented from an item's internal UUID.
+
+## Localization checks
+
+Run `npm run check:localization` from `frontend/`. Frontend PR lint runs the same command.
+The English and German resources in the registered common and UI namespaces must have matching keys,
+nonempty string translations and matching interpolation expressions. The check reports unknown literal
+keys in `t(...)` and `i18n.t(...)`, including conditional branches and plural keys. Reviewers should
+verify computed keys, variable-based lookups and translation quality.
+
+Literal JSX text and user-facing attributes such as labels, titles and placeholders produce advisory warnings.
+Tests, mocks, fixtures, stories and palette demos are excluded. For intentional text, put a comment
+such as `{/* i18n-allow-next-line */}` immediately above the line reported in the warning.
+The exception applies only to hardcoded text on that line.

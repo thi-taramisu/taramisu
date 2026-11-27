@@ -39,3 +39,15 @@ RETURNING *;
 DELETE FROM impact_rating
 WHERE impact_rating.id = $1 AND impact_rating.damage_scenario_id = $2
   AND EXISTS(SELECT 1 FROM damage_scenario WHERE damage_scenario.id = $2 AND damage_scenario.item_definition_id = $3);
+
+-- name: GetImpactRatingForUpdate :one
+SELECT r.* FROM impact_rating r
+JOIN damage_scenario d ON d.id = r.damage_scenario_id
+WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
+FOR NO KEY UPDATE OF r;
+
+-- name: GetImpactRatingForDelete :one
+SELECT r.* FROM impact_rating r
+JOIN damage_scenario d ON d.id = r.damage_scenario_id
+WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
+FOR UPDATE OF r;

@@ -5,9 +5,9 @@ import type { NewProject, Project, ProjectUpdate } from '../models/project'
 
 /**
  * Projects of the current user. `list`, `get`, `create`, `update` and `delete` follow `/api/v1/projects`;
- * `archive` and `restore` follow the planned archive endpoints (#233); `setFavorite` has no backend
- * route yet. Calls reject with an `ApiError`, e.g. 404 for unknown projects, 403 for missing rights
- * and 422 for invalid bodies.
+ * `archive` and `restore` are still mocked (archive endpoints #233, connected with #361); so is `setFavorite`
+ * (favorite endpoints #232, connected with #375). Calls reject with an `ApiError`, e.g. 404 for unknown
+ * projects, 403 for missing rights and 422 for invalid bodies.
  */
 export interface ProjectService {
   list(): Promise<Project[]>

@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n'
+
 export interface OidcConfig {
   authority: string
   clientId: string
@@ -158,6 +160,7 @@ export async function buildAuthorizationUrl(
   url.searchParams.set('redirect_uri', config.redirectUri)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', config.scopes)
+  url.searchParams.set('ui_locales', i18n.resolvedLanguage === 'de' ? 'de' : 'en')
   url.searchParams.set('state', state)
   url.searchParams.set('code_challenge', codeChallenge)
   url.searchParams.set('code_challenge_method', 'S256')

@@ -18,3 +18,10 @@ DELETE FROM threat_attack_path_link l
 WHERE l.id = $1
   AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
   AND EXISTS(SELECT 1 FROM attack_path a WHERE a.id = l.attack_path_id AND a.item_definition_id = $2);
+
+-- name: GetThreatAttackPathLinkForDelete :one
+SELECT l.* FROM threat_attack_path_link l
+WHERE l.id = $1
+  AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
+  AND EXISTS(SELECT 1 FROM attack_path a WHERE a.id = l.attack_path_id AND a.item_definition_id = $2)
+FOR UPDATE OF l;
