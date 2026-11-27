@@ -42,6 +42,7 @@ type fakeAttackAccess struct {
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.DamageScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
@@ -69,8 +70,9 @@ type fakeAttackPaths struct {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	statusReaderFunc
-	found  bool
-	update db.UpdateAttackPathParams
+	found     bool
+	createErr error
+	update    db.UpdateAttackPathParams
 }
 
 func (f *fakeAttackPaths) path() db.AttackPath {
@@ -81,6 +83,9 @@ func (f *fakeAttackPaths) path() db.AttackPath {
 }
 
 func (f *fakeAttackPaths) CreateAttackPath(context.Context, db.CreateAttackPathParams) (db.AttackPath, error) {
+	if f.createErr != nil {
+		return db.AttackPath{}, f.createErr
+	}
 	return f.path(), nil
 }
 func (f *fakeAttackPaths) GetAttackPath(context.Context, db.GetAttackPathParams) (db.AttackPath, error) {
@@ -235,6 +240,23 @@ func TestAttackPathRoutes(t *testing.T) {
 				t.Fatalf("status = %d, want %d: %s", rr.Code, tc.code, rr.Body.String())
 			}
 		})
+	}
+}
+
+// TestAttackPathCreateInDeletedItem checks the answer when the item is deleted after the access check:
+// the create query then returns no row, or a foreign key violation if the deletion happens during it.
+func TestAttackPathCreateInDeletedItem(t *testing.T) {
+	manager, bearer := authtest.NewManagerAndToken(t)
+	for _, err := range []error{pgx.ErrNoRows, &pgconn.PgError{Code: "23503"}} {
+		h := httpapi.New(&fakeAttackPaths{fakeAttackAccess: editor(), found: true, createErr: err}, manager)
+		req := httptest.NewRequest(http.MethodPost, attackPaths, strings.NewReader(`{"title":"AP"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", bearer)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNotFound || !strings.Contains(rr.Body.String(), "item definition not found") {
+			t.Fatalf("%v: %d %s, want 404 item definition not found", err, rr.Code, rr.Body)
+		}
 	}
 }
 

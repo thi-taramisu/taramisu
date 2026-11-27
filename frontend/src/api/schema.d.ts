@@ -618,6 +618,26 @@ export interface paths {
         patch: operations["update-item-definition"];
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search projects and elements
+         * @description Finds projects and elements by name or title, tolerating small typos, and elements by display ID (`TS-12`, `ts12`, `TS-012`; `TS-1` also finds IDs whose number starts with 1, such as `TS-10`). Only projects the caller has a role in are searched.
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions": {
         parameters: {
             query?: never;
@@ -734,6 +754,11 @@ export interface components {
     schemas: {
         Asset: {
             description: string | null;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example AS-1
+             */
+            readonly display_id: string;
             /** Format: uuid */
             id: string;
             /** @enum {string|null} */
@@ -806,6 +831,11 @@ export interface components {
             /** @enum {string} */
             analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
             attack_steps_and_weaknesses?: unknown;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example AP-1
+             */
+            readonly display_id: string;
             /** Format: uuid */
             id: string;
             is_partial_early_stage: boolean;
@@ -867,6 +897,11 @@ export interface components {
             damage_scenario_id: string;
         };
         DamageScenarioBody: {
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example DS-1
+             */
+            readonly display_id: string;
             functionality_adverse_relation?: string;
             /** Format: uuid */
             id: string;
@@ -985,6 +1020,11 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             cybersecurity_specs_wp_10_01?: string | null;
+            /**
+             * @description Readable ID, unique within the project and never reused; assigned on creation
+             * @example IT-1
+             */
+            readonly display_id: string;
             functions?: string | null;
             /** Format: uuid */
             id: string;
@@ -1099,6 +1139,40 @@ export interface components {
             impact_rating_id: string;
             /** Format: int32 */
             risk_score: number;
+        };
+        SearchPage: {
+            /**
+             * Format: int64
+             * @description Offset of the next page, or null on the last page
+             */
+            next_offset: number | null;
+            results: components["schemas"]["SearchResult"][];
+            /**
+             * Format: int64
+             * @description Number of all matches; 0 for a page past the last match
+             */
+            total: number;
+        };
+        SearchRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        SearchResult: {
+            /**
+             * @description Display ID of the element; null for projects
+             * @example TS-12
+             */
+            display_id: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Item of the element; omitted for projects and items */
+            item?: components["schemas"]["SearchRef"];
+            /** @description Name or title */
+            name: string;
+            project: components["schemas"]["SearchRef"];
+            /** @enum {string} */
+            type: "projects" | "items" | "assets" | "damage-scenarios" | "threat-scenarios" | "attack-paths";
         };
         StatusOutputBody: {
             status: string;
@@ -6804,6 +6878,62 @@ export interface operations {
             };
             /** @description Service Unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                /** @description Name, title, or display ID to search for */
+                q: string;
+                /** @description Only search these projects; projects without a role return nothing */
+                project_id?: string[];
+                /** @description Only return these result types */
+                type?: ("projects" | "items" | "assets" | "damage-scenarios" | "threat-scenarios" | "attack-paths")[];
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchPage"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

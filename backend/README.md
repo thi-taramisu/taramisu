@@ -159,6 +159,11 @@ make migrate-diff name=my_change
 make sqlc
 ```
 
+PostgreSQL extensions are the exception: Atlas without login rejects `CREATE EXTENSION` in `db/schema.sql` and ignores
+extensions when it compares, so they are created only in a hand-written migration (`pg_trgm` and `unaccent` for the search,
+in `20261123212752_search_extensions.sql`). `db/schema.sql` must not use objects that need them, such as trigram indexes,
+because the drift check builds it in a database without extensions. Queries in `db/queries/` may use their functions.
+
 CI verifies that migrations and generated Go models are in sync with `db/schema.sql` and `db/queries/`:
 
 1. **Migration directory integrity (`atlas.sum`):**
