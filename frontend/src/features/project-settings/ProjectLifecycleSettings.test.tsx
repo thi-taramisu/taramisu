@@ -54,7 +54,8 @@ describe('ProjectLifecycleSettings', () => {
     await act(async () => {
       await loaded
     })
-    expect(screen.getByRole('heading', { name: 'General' })).toBeInTheDocument()
+    // React Query renders the result on a timer, so the page is waited for, not assumed.
+    expect(await screen.findByRole('heading', { name: 'General' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Danger Zone' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive Project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument()
