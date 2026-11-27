@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -89,7 +90,7 @@ func TestAttachmentsIntegration(t *testing.T) {
 			database := &deleteFailureDB{DBTX: tx}
 			h := NewAttachments(db.New(database), tracked)
 			fixture := authtest.NewFixture(t, db.New(database))
-			mux := New(db.New(database), fixture.Manager, WithAttachments(h))
+			mux := New(db.NewStore(database), fixture.Manager, WithAttachments(h))
 			if scenario == "title-images" {
 				testProjectTitleImages(t, mux, fixture, h, tracked, project, user, other, exec)
 				return
@@ -638,6 +639,11 @@ type deleteFailureDB struct {
 	db.DBTX
 	fail, failMark bool
 	afterDelete    func()
+}
+
+// Begin lets db.Store run its audited transactions on the wrapped connection.
+func (d *deleteFailureDB) Begin(ctx context.Context) (pgx.Tx, error) {
+	return d.DBTX.(db.TxStarter).Begin(ctx)
 }
 
 func (d *deleteFailureDB) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {

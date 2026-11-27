@@ -80,6 +80,50 @@ func (q *Queries) GetThreatScenarioAssetProperty(ctx context.Context, arg GetThr
 	return i, err
 }
 
+const getThreatScenarioAssetPropertyForDelete = `-- name: GetThreatScenarioAssetPropertyForDelete :one
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+JOIN threat_scenario t ON t.id = l.threat_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = $1 AND t.item_definition_id = $2
+    AND a.item_definition_id = $2
+FOR UPDATE OF l
+`
+
+type GetThreatScenarioAssetPropertyForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetThreatScenarioAssetPropertyForDelete(ctx context.Context, arg GetThreatScenarioAssetPropertyForDeleteParams) (ThreatScenarioAssetProperty, error) {
+	row := q.db.QueryRow(ctx, getThreatScenarioAssetPropertyForDelete, arg.ID, arg.ItemDefinitionID)
+	var i ThreatScenarioAssetProperty
+	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	return i, err
+}
+
+const getThreatScenarioAssetPropertyForUpdate = `-- name: GetThreatScenarioAssetPropertyForUpdate :one
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+JOIN threat_scenario t ON t.id = l.threat_scenario_id
+JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
+JOIN asset a ON a.id = p.asset_id
+WHERE l.id = $1 AND t.item_definition_id = $2
+    AND a.item_definition_id = $2
+FOR NO KEY UPDATE OF l
+`
+
+type GetThreatScenarioAssetPropertyForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetThreatScenarioAssetPropertyForUpdate(ctx context.Context, arg GetThreatScenarioAssetPropertyForUpdateParams) (ThreatScenarioAssetProperty, error) {
+	row := q.db.QueryRow(ctx, getThreatScenarioAssetPropertyForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i ThreatScenarioAssetProperty
+	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	return i, err
+}
+
 const listThreatScenarioAssetProperties = `-- name: ListThreatScenarioAssetProperties :many
 SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id

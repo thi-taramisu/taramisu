@@ -1,6 +1,6 @@
 x-storage-bootstrap: &storage-bootstrap
-  build: ../storage
-  networks: [taramisu-storage]
+  image: ghcr.io/thi-taramisu/taramisu-storage-bootstrap:${TARAMISU_VERSION:-latest}
+  networks: [storage]
   # Validate at startup so down works with older .env files.
   environment:
     S3_ROOT_ACCESS_KEY: ${S3_ROOT_ACCESS_KEY:-}
@@ -12,13 +12,14 @@ x-storage-bootstrap: &storage-bootstrap
 services:
   storage-config:
     <<: *storage-bootstrap
+    build: ../storage
     command: [config]
     volumes:
       - storage_config:/config
 
   storage:
     image: chrislusf/seaweedfs:4.51
-    networks: [taramisu-storage]
+    networks: [storage]
     restart: unless-stopped
     command:
       - server
@@ -52,14 +53,11 @@ services:
 
   storage-init:
     <<: *storage-bootstrap
+    pull_policy: never
     command: [bucket]
     depends_on:
       storage:
         condition: service_healthy
-
-networks:
-  taramisu-storage:
-    internal: true
 
 volumes:
   storage_data:

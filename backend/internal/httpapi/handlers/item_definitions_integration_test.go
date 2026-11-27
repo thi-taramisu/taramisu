@@ -45,7 +45,7 @@ func TestItemDefinitionPostgresCRUD(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	handler, token := authenticatedAPI(t, queries, newItemStore())
 	call := func(method, path, body string, want int) *handlers.ItemDefinition {
 		t.Helper()
@@ -146,56 +146,8 @@ func TestItemDefinitionPostgresCRUD(t *testing.T) {
 	token = &groupToken
 	call("PATCH", path, `{"name":"Group editor"}`, 200)
 
-	// Populate all four direct children and every dependent table, including the risk
-	// treatment -> risk value constraint, before deleting the whole item through the API.
-	children := map[string]string{}
-	insertChild := func(table, values string, args ...any) string {
-		t.Helper()
-		var id string
-		if err := tx.QueryRow(ctx, "INSERT INTO "+table+" "+values+" RETURNING id::text", args...).Scan(&id); err != nil {
-			t.Fatal(err)
-		}
-		children[table] = id
-		return id
-	}
-	asset := insertChild("asset", `(item_definition_id,name) VALUES ($1,'Headlamp ECU')`, item.ID)
-	property := insertChild("asset_cybersecurity_property", `(asset_id,property_type) VALUES ($1,'INTEGRITY')`, asset)
-	damage := insertChild("damage_scenario", `(item_definition_id,title) VALUES ($1,'Lost lighting')`, item.ID)
-	insertChild("damage_scenario_asset_property", `(damage_scenario_id,asset_cybersecurity_property_id) VALUES ($1,$2)`, damage, property)
-	impact := insertChild("impact_rating", `(damage_scenario_id,impact_category,rating_value) VALUES ($1,'SAFETY','MAJOR')`, damage)
-	threat := insertChild("threat_scenario", `(item_definition_id,title) VALUES ($1,'Spoofed control')`, item.ID)
-	insertChild("threat_scenario_asset_property", `(threat_scenario_id,asset_cybersecurity_property_id) VALUES ($1,$2)`, threat, property)
-	insertChild("threat_damage_link", `(threat_scenario_id,damage_scenario_id) VALUES ($1,$2)`, threat, damage)
-	attack := insertChild("attack_path", `(item_definition_id,title) VALUES ($1,'CAN access')`, item.ID)
-	insertChild("threat_attack_path_link", `(threat_scenario_id,attack_path_id) VALUES ($1,$2)`, threat, attack)
-	insertChild("attack_feasibility_rating", `(attack_path_id,feasibility_rating) VALUES ($1,'HIGH')`, attack)
-	risk := insertChild("risk_value", `(threat_scenario_id,impact_rating_id,risk_score,determination_method) VALUES ($1,$2,3,'RISK_MATRIX')`, threat, impact)
-	insertChild("risk_treatment_decision", `(threat_scenario_id,risk_value_id,treatment_option) VALUES ($1,$2,'REDUCING')`, threat, risk)
-	// A separate project's item and asset must survive this deletion.
-	var unrelatedItem, unrelatedAsset string
-	if err := tx.QueryRow(ctx, `INSERT INTO item_definition (tara_project_id,name,scope_type) VALUES ($1,'Unrelated','ITEM') RETURNING id::text`, otherProject).Scan(&unrelatedItem); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.QueryRow(ctx, `INSERT INTO asset (item_definition_id,name) VALUES ($1,'Unrelated asset') RETURNING id::text`, unrelatedItem).Scan(&unrelatedAsset); err != nil {
-		t.Fatal(err)
-	}
+	// Deleting an item with its full content is covered by TestItemDefinitionDeleteCascadePostgres.
 	call("DELETE", path, "", 204)
 	call("GET", path, "", 404)
 	call("DELETE", path, "", 404)
-	for table, id := range children {
-		var exists bool
-		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id=$1)", id).Scan(&exists); err != nil {
-			t.Fatal(err)
-		}
-		if exists {
-			t.Errorf("%s child %s still exists after item deletion", table, id)
-		}
-	}
-	var unrelatedExists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM item_definition i JOIN asset a ON a.item_definition_id=i.id WHERE i.id=$1 AND a.id=$2)`, unrelatedItem, unrelatedAsset).Scan(&unrelatedExists); err != nil {
-		t.Fatal(err)
-	}
-	if !unrelatedExists {
-		t.Fatal("deletion removed another item's data")
-	}
 }

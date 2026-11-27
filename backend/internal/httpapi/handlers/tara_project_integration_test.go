@@ -42,7 +42,7 @@ func TestTaraProjectPostgresCRUD(t *testing.T) {
 	// which needs a real iam_user row.
 	fixture := authtest.NewFixture(t, db.New(tx))
 	bearer := "Bearer " + fixture.Token(t, nil)
-	handler := httpapi.New(db.New(tx), fixture.Manager)
+	handler := httpapi.New(db.NewStore(tx), fixture.Manager)
 	call := func(method, path, body string, want int) handlers.TaraProjectBody {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body))

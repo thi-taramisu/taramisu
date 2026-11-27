@@ -15,23 +15,27 @@ describe('ItemAssetsTab', () => {
     )
   })
 
-  it('adds an asset through the dialog', async () => {
+  it('adds assets to this item with "Create & add another" and keeps the table up to date', async () => {
     const { user, api } = renderAssets()
 
     await user.click(await screen.findByRole('button', { name: 'Add Asset' }))
-    const dialog = screen.getByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name'), 'LED driver config')
-    await user.type(within(dialog).getByLabelText('Component'), 'Power switch actuator')
-    await user.click(within(dialog).getByLabelText('Integrity'))
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    const dialog = screen.getByRole('dialog', { name: 'New Asset' })
+    // The tab belongs to one item, so the item cannot be changed here.
+    expect(within(dialog).getByLabelText('Item')).toBeDisabled()
+    await user.type(within(dialog).getByLabelText(/Name/), 'LED driver config')
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Integrity' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Create & add another' }))
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await within(dialog).findByText('AS-5 LED driver config created.')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/Name/)).toHaveDisplayValue('')
+    expect(within(dialog).getByRole('checkbox', { name: 'Integrity' })).not.toBeChecked()
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('button', { name: 'Add Asset' })).toHaveFocus()
     const row = (await screen.findByRole('cell', { name: 'LED driver config' })).closest('tr')!
-    expect(within(row).getByText('A-05')).toBeInTheDocument()
-    expect(within(row).getByText('Power switch actuator')).toBeInTheDocument()
+    expect(within(row).getByText('AS-5')).toBeInTheDocument()
     expect(within(row).getByLabelText('Properties I')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Assets (5)' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'A-05 LED driver config' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Project elements' })).getByRole('link', { name: 'AS-5 LED driver config' })).toBeInTheDocument()
     expect(await api.content.assets('headlamp', 'i-01')).toHaveLength(5)
   })
 })

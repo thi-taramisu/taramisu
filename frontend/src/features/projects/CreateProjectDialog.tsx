@@ -1,4 +1,5 @@
-﻿
+import { useTranslation } from 'react-i18next'
+
 import { useState, type FormEvent } from 'react'
 import {
   Dialog,
@@ -26,6 +27,7 @@ export function CreateProjectDialog({
   onCreateProject,
   returnFocusTo,
 }: CreateProjectDialogProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -58,27 +60,25 @@ export function CreateProjectDialog({
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>Create Project</DialogTitle>
+            <DialogTitle>{t('navigation.createProject')}</DialogTitle>
             <DialogDescription>
-              Enter a name for your new TARA project.
+              {t('ui:createProjectDescription')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="project-name">Project name</Label>
+            <Label htmlFor="project-name">{t('ui:projectName')}</Label>
             <Input
               id="project-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Enter project name"
+              placeholder={t('ui:projectNamePlaceholder')}
               autoComplete="off"
             />
           </div>
 
           <ProjectImageInput defaultValue={null} />
-          <p className="text-xs text-muted-foreground">
-            Optional. PNG, JPEG or WebP, up to 5 MB.
-          </p>
+          <p className="text-xs text-muted-foreground">{t('ui:optionalUploadAPNGJPEGOrWebPUpTo5MBOrUseAnAutomaticallyGeneratedImage')}</p>
 
           <DialogFooter>
             <Button
@@ -86,11 +86,11 @@ export function CreateProjectDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t('ui:cancel')}
             </Button>
 
             <Button type="submit" disabled={!name.trim()}>
-              Create
+              {t('ui:create')}
             </Button>
           </DialogFooter>
         </form>

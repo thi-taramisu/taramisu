@@ -2,7 +2,10 @@ import type { ItemAsset, NewAsset } from '../models/asset'
 import type { ItemDefinition, ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { RiskGroup } from '../models/risk'
 import type { EntityRef, TreeNode } from '../models/tree'
+import type { AssetService } from './assets'
 import type { DamageScenarioService } from './damageScenarios'
+import type { AttackPathService } from './attackPaths'
+import type { ThreatScenarioService } from './threatScenarios'
 
 // Services of the item views. Only the mock in `../mocks/mockItemApi.ts` implements them so far; the
 // real implementation wraps the openapi-fetch client once the routes are in `backend/openapi.json`.
@@ -28,10 +31,15 @@ export interface ItemContentService {
   risks(projectId: string, itemId: string): Promise<RiskGroup[]>
   /** All threat scenarios of the item, also those without links, which the tree does not show yet. */
   threatScenarios(projectId: string, itemId: string): Promise<EntityRef[]>
+  damageScenarios(projectId: string, itemId: string): Promise<EntityRef[]>
+  attackPaths(projectId: string, itemId: string): Promise<EntityRef[]>
 }
 
 export interface ItemApi {
   items: ItemService
   content: ItemContentService
+  assets: AssetService
   damageScenarios: DamageScenarioService
+  threatScenarios: ThreatScenarioService
+  attackPaths: AttackPathService
 }

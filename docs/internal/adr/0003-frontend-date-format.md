@@ -1,6 +1,6 @@
 # ADR 0003: Date format in the frontend
 
-- Status: Proposed
+- Status: Accepted, implemented in the frontend
 - Issue: #96
 - Related: [ADR 0002](0002-frontend-ui-library.md) (UI library), [route concept](../frontend-routes.md) (open question on language)
 

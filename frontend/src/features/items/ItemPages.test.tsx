@@ -22,20 +22,18 @@ describe('sidebar tree', () => {
 
     expect(await within(tree()).findByRole('link', { name: /Extra item/ })).toHaveAttribute('href', `${project}/items/${extra.id}`)
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toHaveAttribute('href', `${project}/items/i-01`)
-    expect(within(tree()).getByRole('link', { name: 'AP-02 Malicious device on the OBD-II connector' })).toBeInTheDocument()
+    expect(within(tree()).getByRole('link', { name: 'AP-2 Malicious device on the OBD-II connector' })).toBeInTheDocument()
   })
 })
 
 describe('create item', () => {
-  it('offers only Item and Damage Scenario in the "+ New" menu for now', async () => {
+  it('offers every element type in the "+ New" menu', async () => {
     const { user } = renderApp(project)
 
     await user.click(await within(tree()).findByRole('button', { name: 'New' }))
 
-    expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
-    expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
-      expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
+    for (const name of ['Item', 'Asset', 'Damage Scenario', 'Threat Scenario', 'Attack Path']) {
+      expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('aria-disabled')
     }
   })
 
@@ -104,7 +102,7 @@ describe('delete item', () => {
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete item' }))
 
     expect(await screen.findByText('No project elements yet.')).toBeInTheDocument()
-    expect(location()).toHaveTextContent(new RegExp(`^${project}$`))
+    await waitFor(() => expect(location()).toHaveTextContent(new RegExp(`^${project}$`)))
     expect(await api.items.list('headlamp')).toEqual([])
   })
 
@@ -197,7 +195,7 @@ describe('item page', () => {
     expect(await within(tabs).findByRole('link', { name: 'Assets (4)' })).toHaveAttribute('aria-current', 'page')
     const table = await screen.findByRole('table')
     const row = (await within(table).findByRole('link', { name: 'Headlamp on/off command' })).closest('tr')!
-    expect(within(row).getByText('A-01')).toBeInTheDocument()
+    expect(within(row).getByText('AS-1')).toBeInTheDocument()
     expect(within(row).getByText('4')).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Definition' }))
@@ -208,8 +206,8 @@ describe('item page', () => {
     renderApp(`${project}/items/i-01/risks`)
 
     const table = await screen.findByRole('table')
-    expect(within(table).getByRole('rowheader', { name: /A-01 Headlamp on\/off command/ })).toBeInTheDocument()
-    expect(within(table).getAllByRole('link', { name: /TS-01 Spoofed headlamp command/ })[0]).toHaveAttribute(
+    expect(within(table).getByRole('rowheader', { name: /AS-1 Headlamp on\/off command/ })).toBeInTheDocument()
+    expect(within(table).getAllByRole('link', { name: /TS-1 Spoofed headlamp command/ })[0]).toHaveAttribute(
       'href',
       `${project}/threat-scenarios/ts-01`,
     )
@@ -325,11 +323,11 @@ describe('review findings', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Add Asset' }))
     const dialog = screen.getByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name'), 'LED driver')
-    await user.type(within(dialog).getByLabelText('Component'), 'Lamp ECU')
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await user.type(within(dialog).getByLabelText(/Name/), 'LED driver')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be added')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be created')
+    expect(within(dialog).getByLabelText(/Name/)).toHaveDisplayValue('LED driver')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 

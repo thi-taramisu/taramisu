@@ -1,50 +1,41 @@
 # Discord notifications
 
-GitHub Actions notifies Discord when matching labels are added to issues,
-including during creation. Issues use only `labeled` events, not `opened`, to
-avoid duplicate creation notifications. PRs targeting `main` notify on both
-opening with matching labels, adding labels, and being merged. Adding a label notifies only
-its destination. Labels are case-sensitive; unknown labels are ignored.
-Multiple added labels can each send a message, even to the same channel.
+New issues are summarized at **09:00 and 19:00 Europe/Berlin** (CET/CEST, adjusting for daylight saving) using their current labels.
+Empty channels stay silent; digests include titles and links without pings.
+The first message in each active channel also lists up to eight open, approved PRs with matching labels,
+with a link to the full list when more qualify.
+The initial lookback is 24 hours; later runs catch up from the last delivery.
+Labels added after an issue has been processed do not send another entry.
 
-Merged PRs send a celebratory **🎉 PR merged** message to the destinations of
-their matching labels, once per webhook, without role pings. The message links
-to the PR, credits the merge actor, and displays the merge time. Closing a PR
-without merging it sends no message. PRs without matching labels remain silent.
+PRs targeting `main` notify on opening or labeling, once per destination.
+A label for a new channel sends there; repeated labels stay silent.
+Merges send a separate **Pull request merged** message. Unmerged closes stay silent.
+All PR messages are mention-free.
 
 ## Setup
 
-1. Create a webhook in each Discord channel under **Edit Channel → Integrations → Webhooks**.
-2. Save the URLs as GitHub repository secrets under **Settings → Secrets and variables → Actions**:
+Create channel webhooks and save their URLs as repository Actions secrets:
 
-   | Labels | Channel | Secret |
-   | --- | --- | --- |
-   | `backend` | `#backend` | `DISCORD_BACKEND_WEBHOOK` |
-   | `frontend` | `#frontend` | `DISCORD_FRONTEND_WEBHOOK` |
-   | `IAM`, `infrastructure`, `CI/CD`, `devops` | `#devops` | `DISCORD_DEVOPS_WEBHOOK` |
+| Labels | Channel | Secret |
+| --- | --- | --- |
+| `backend` | `#backend` | `DISCORD_BACKEND_WEBHOOK` |
+| `frontend` | `#frontend` | `DISCORD_FRONTEND_WEBHOOK` |
+| `IAM`, `infrastructure`, `CI/CD`, `devops` | `#devops` | `DISCORD_DEVOPS_WEBHOOK` |
 
-3. Enable **Allow anyone to @mention this role** for the configured roles under
-   **Server Settings → Roles**. Role IDs live in `LABEL_ROLES` in the script.
-4. Merge the workflow and script into `main`. No application deployment is needed.
-5. Apply labels to a test issue and PR, then check **Actions → Discord notifications**
-   and the destination channels.
+Merge into `main`; no application deployment is needed. Missing secrets skip delivery.
+Routing is configured in `.github/scripts/discord_notifications.py` and secrets in
+`.github/workflows/discord-notifications.yml`.
 
-## Issue role mentions
+Actions needs permission to create/update `automation/discord-issue-digest-state`.
+Keep this branch: it records delivery checkpoints for serialized PR and digest runs.
+Initial setup publishes the branch with its tracking file already in place, so interrupted setup can retry.
+Delivery history follows the secret names in the table above; replacing a webhook URL preserves that history.
+Deleting it resets duplicate suppression. A lost Discord response or failed checkpoint
+write after delivery can still cause a duplicate on retry.
+Labels applied using `GITHUB_TOKEN` do not trigger a notification run; automation must
+invoke delivery explicitly after labeling with the same serialization.
 
-Issues ping Backend, Frontend, CI/CD, Containerisierung, or IAM / Security for
-`backend`, `frontend`, `CI/CD`, `infrastructure`, or `IAM`, respectively. Adding a
-label pings only its role; each role is mentioned once per message. PRs and the
-`devops` label never ping roles. User mentions and `@everyone` / `@here` are blocked.
-
-Missing webhook secrets skip delivery, even if the workflow succeeds.
-Each webhook receives at most one message per run. Failed deliveries fail the job;
-reruns or removing and re-adding labels can repeat notifications and pings.
-
-Routing and role IDs live in `.github/scripts/discord_notifications.py`
-(`LABEL_WEBHOOKS` and `LABEL_ROLES`). Role IDs are not secrets.
-New webhook secrets must also be exposed in `.github/workflows/discord-notifications.yml`.
-Keep webhook URLs in secrets, never in committed files.
-Offline tests:
+Test locally without sending messages:
 
 ```sh
 python3 -m unittest discover -s .github/scripts -p 'test_*.py'

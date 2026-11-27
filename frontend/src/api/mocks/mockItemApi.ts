@@ -1,50 +1,57 @@
 import { ApiError } from '../errors'
 import type { CiaProperty, ItemAsset } from '../models/asset'
-import type { DamageScenario, DamageScenarioAssetProperty, DamageScenarioRelations, ImpactRating, ImpactRatingBody } from '../models/damageScenario'
+import type { DamageScenario, DamageScenarioRelations, ImpactRatingBody } from '../models/damageScenario'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
-import type { RiskGroup } from '../models/risk'
-import type { ThreatDamageLink, ThreatScenario } from '../models/threatScenario'
-import type { EntityRef, TreeNode } from '../models/tree'
 import type { ItemApi } from '../services/items'
-import { exampleProject, headlampAssets, headlampItem, headlampRisks, headlampThreatAttackPaths } from './data/headlamp'
+import type { ProjectService } from '../services/projects'
+import type { SearchService } from '../services/search'
+import { createMockProjectApi } from './mockProjectApi'
+import { createMockSearchService } from './mockSearch'
+import { exampleProject, headlampAssetDetails, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
+import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
-  headlampDamageScenarioLinks,
-  headlampDamageScenarios,
-  headlampImpactRatings,
+  headlampAttackFeasibilityRatings,
+  headlampAttackPaths,
+  headlampThreatAttackPathLinks,
   headlampThreatDamageLinks,
   headlampThreatScenarios,
-} from './data/headlampDamageScenarios'
+  headlampThreatTargets,
+} from './data/headlampThreatScenarios'
+import {
+  addThreatDamageLink,
+  linkedThreatScenarios,
+  removeThreatDamageLink,
+  renameNodes,
+  run,
+  syncLinks,
+  titleRef,
+  validateTitle,
+  type StoredItem,
+} from './mockStore'
+import { createMockAssetService } from './mockAssets'
+import { createMockAttackPathService } from './mockAttackPaths'
+import { createMockThreatScenarioService } from './mockThreatScenarios'
 
 // MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
 // once the item routes (#83) are in `backend/openapi.json`.
-
-interface StoredItem {
-  item: ItemDefinition
-  children: TreeNode[]
-  assets: ItemAsset[]
-  risks: RiskGroup[]
-  damageScenarios: DamageScenario[]
-  damageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[]
-  impactRatings: ImpactRating[]
-  threatScenarios: ThreatScenario[]
-  threatDamageLinks: ThreatDamageLink[]
-  /** Attack paths below a threat scenario in the tree, kept while it has no link. */
-  threatAttackPaths: Record<string, TreeNode[]>
-}
 
 function seed(): Map<string, StoredItem> {
   const [headlamp] = exampleProject.tree
   const entry = structuredClone({
     item: headlampItem,
     children: headlamp.children ?? [],
-    assets: headlampAssets,
+    assets: headlampAssets.map((asset) => ({ ...asset, ...headlampAssetDetails[asset.id] })),
     risks: headlampRisks,
     damageScenarios: headlampDamageScenarios,
     damageScenarioLinks: headlampDamageScenarioLinks,
     impactRatings: headlampImpactRatings,
     threatScenarios: headlampThreatScenarios,
     threatDamageLinks: headlampThreatDamageLinks,
-    threatAttackPaths: headlampThreatAttackPaths,
+    threatAttackPathLinks: headlampThreatAttackPathLinks,
+    attackPaths: headlampAttackPaths,
+    attackFeasibilityRatings: headlampAttackFeasibilityRatings,
+    threatTargets: headlampThreatTargets,
+    riskValues: [],
   })
   return new Map([[headlampItem.id, entry]])
 }
@@ -55,13 +62,6 @@ function validateName(name: string | undefined) {
   if (!trimmed || trimmed.length > ITEM_NAME_MAX_LENGTH) {
     throw new ApiError(422, `Name must be 1 to ${ITEM_NAME_MAX_LENGTH} characters.`)
   }
-  return trimmed
-}
-
-function validateTitle(title: string | undefined) {
-  if (title === undefined) return undefined
-  const trimmed = title.trim()
-  if (!trimmed) throw new ApiError(422, 'Title is required.')
   return trimmed
 }
 
@@ -87,52 +87,6 @@ function validateAssetProperties(asset: ItemAsset, properties: CiaProperty[]) {
   if (missing) throw new ApiError(422, `Asset ${asset.id} has no property ${missing}.`)
 }
 
-function threatScenarioRef({ id, code, title }: ThreatScenario): EntityRef {
-  return { id, code, name: title }
-}
-
-/** Renames every occurrence of an element in the tree; shared elements appear below several parents. */
-function renameNodes(nodes: TreeNode[], node: Pick<TreeNode, 'type' | 'id' | 'name'>) {
-  for (const child of nodes) {
-    if (child.type === node.type && child.id === node.id) child.name = node.name
-    if (child.children) renameNodes(child.children, node)
-  }
-}
-
-function linkedThreatScenarios(entry: StoredItem, damageScenarioId: string) {
-  return entry.threatScenarios.filter((threat) =>
-    entry.threatDamageLinks.some((link) => link.threat_scenario_id === threat.id && link.damage_scenario_id === damageScenarioId),
-  )
-}
-
-function damageScenarioNode(entry: StoredItem, scenario: DamageScenario): TreeNode {
-  const threats: TreeNode[] = linkedThreatScenarios(entry, scenario.id).map((threat) => ({
-    type: 'threat-scenarios',
-    id: threat.id,
-    code: threat.code,
-    name: threat.title,
-    children: entry.threatAttackPaths[threat.id],
-  }))
-  return { type: 'damage-scenarios', id: scenario.id, code: scenario.code, name: scenario.title, children: threats.length ? threats : undefined }
-}
-
-/** Derives the tree below the assets and their counters from the links, after a link changed. */
-function syncLinks(entry: StoredItem) {
-  for (const asset of entry.assets) {
-    const scenarioIds = new Set(entry.damageScenarioLinks.filter((link) => link.asset_id === asset.id).map((link) => link.damage_scenario_id))
-    const threatIds = new Set(entry.threatDamageLinks.filter((link) => scenarioIds.has(link.damage_scenario_id)).map((link) => link.threat_scenario_id))
-    asset.damageScenarios = scenarioIds.size
-    asset.threatScenarios = threatIds.size
-    // Without threat scenarios nothing is rated; the mock cannot recalculate the value when one is linked again.
-    if (threatIds.size === 0) asset.maxRisk = null
-    const node = entry.children.find((child) => child.type === 'assets' && child.id === asset.id)
-    if (!node) continue
-    const others = node.children?.filter((child) => child.type !== 'damage-scenarios') ?? []
-    const children = [...others, ...entry.damageScenarios.filter((ds) => scenarioIds.has(ds.id)).map((ds) => damageScenarioNode(entry, ds))]
-    node.children = children.length ? children : undefined
-  }
-}
-
 function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenarioRelations {
   const links = entry.damageScenarioLinks.filter((link) => link.damage_scenario_id === damageScenarioId)
   return {
@@ -140,16 +94,7 @@ function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenari
       const linkedProperties = links.filter((link) => link.asset_id === id).map((link) => link.property)
       return linkedProperties.length ? [{ id, code, name, properties, linkedProperties }] : []
     }),
-    threatScenarios: linkedThreatScenarios(entry, damageScenarioId).map(threatScenarioRef),
-  }
-}
-
-/** Runs `fn` like a request: async, with a copy of the result, errors as rejections. */
-function run<T>(fn: () => T): Promise<T> {
-  try {
-    return Promise.resolve(structuredClone(fn()))
-  } catch (error) {
-    return Promise.reject(error)
+    threatScenarios: linkedThreatScenarios(entry, damageScenarioId).map(titleRef),
   }
 }
 
@@ -157,7 +102,7 @@ function run<T>(fn: () => T): Promise<T> {
  * In-memory implementation of the item API, seeded with the headlamp example. Each call returns
  * copies, so callers cannot change the stored state by accident.
  */
-export function createMockItemApi(): ItemApi {
+export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
   const db = seed()
 
   function find(projectId: string, itemId: string) {
@@ -175,6 +120,18 @@ export function createMockItemApi(): ItemApi {
   }
 
   return {
+    projects,
+    search: createMockSearchService(projects, () => [...db.values()].flatMap((entry) => {
+      const { item, assets, damageScenarios, threatScenarios, attackPaths } = entry
+      const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
+      return [
+        { ...common, type: 'items' as const, id: item.id, name: item.name },
+        ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
+        ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
+        ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
+        ...attackPaths.map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.title })),
+      ]
+    })),
     items: {
       list: (projectId) =>
         run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),
@@ -205,7 +162,11 @@ export function createMockItemApi(): ItemApi {
             impactRatings: [],
             threatScenarios: [],
             threatDamageLinks: [],
-            threatAttackPaths: {},
+            threatAttackPathLinks: [],
+            attackPaths: [],
+            attackFeasibilityRatings: [],
+            threatTargets: [],
+            riskValues: [],
           })
           return item
         }),
@@ -225,19 +186,41 @@ export function createMockItemApi(): ItemApi {
     },
     content: {
       children: (projectId, itemId) => run(() => find(projectId, itemId).children),
-      assets: (projectId, itemId) => run(() => find(projectId, itemId).assets),
+      assets: (projectId, itemId) =>
+        run(() =>
+          find(projectId, itemId).assets.map(({ id, code, name, component, properties, damageScenarios, threatScenarios, maxRisk }): ItemAsset => ({
+            id,
+            code,
+            name,
+            component,
+            properties,
+            damageScenarios,
+            threatScenarios,
+            maxRisk,
+          })),
+        ),
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
           const entry = find(projectId, itemId)
-          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(2))))
-          const code = `A-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`
-          const asset: ItemAsset = { ...newAsset, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
-          entry.assets.push(asset)
+          const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(3))))
+          const code = `AS-${Math.max(0, ...codes) + 1}`
+          // Same rule as the non-blank name of `asset` in backend/db/schema.sql.
+          const name = newAsset.name.trim()
+          if (!name) throw new ApiError(422, 'Name is required.')
+          const asset: ItemAsset = { ...newAsset, name, component: '', id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
+          entry.assets.push({
+            ...asset,
+            description: null,
+            identification_source: null,
+            propertyDescriptions: Object.fromEntries(newAsset.properties.map((property) => [property, null])),
+          })
           entry.children.push({ type: 'assets', id: asset.id, code, name: asset.name })
           return asset
         }),
       risks: (projectId, itemId) => run(() => find(projectId, itemId).risks),
-      threatScenarios: (projectId, itemId) => run(() => find(projectId, itemId).threatScenarios.map(threatScenarioRef)),
+      threatScenarios: (projectId, itemId) => run(() => find(projectId, itemId).threatScenarios.map(titleRef)),
+      damageScenarios: (projectId, itemId) => run(() => find(projectId, itemId).damageScenarios.map(titleRef)),
+      attackPaths: (projectId, itemId) => run(() => find(projectId, itemId).attackPaths.map(titleRef)),
     },
     damageScenarios: {
       create: (projectId, body) =>
@@ -255,7 +238,7 @@ export function createMockItemApi(): ItemApi {
           const scenario: DamageScenario = {
             id: crypto.randomUUID(),
             item_definition_id: entry.item.id,
-            code: `DS-${String(Math.max(0, ...codes) + 1).padStart(2, '0')}`,
+            code: `DS-${Math.max(0, ...codes) + 1}`,
             title: validateTitle(body.title)!,
             functionality_adverse_relation: null,
             road_user_harm_description: null,
@@ -328,23 +311,18 @@ export function createMockItemApi(): ItemApi {
         run(() => {
           const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
           if (!entry.threatScenarios.some((threat) => threat.id === threatScenarioId)) throw new ApiError(404, 'Threat scenario not found.')
-          // Same rule as the UNIQUE constraint of `threat_damage_link`.
-          if (entry.threatDamageLinks.some((link) => link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === scenario.id)) {
-            throw new ApiError(409, 'The threat scenario is already linked.')
-          }
-          entry.threatDamageLinks.push({ threat_scenario_id: threatScenarioId, damage_scenario_id: scenario.id })
-          syncLinks(entry)
+          addThreatDamageLink(entry, threatScenarioId, scenario.id)
           return relationsOf(entry, scenario.id)
         }),
       unlinkThreatScenario: (projectId, damageScenarioId, threatScenarioId) =>
         run(() => {
           const { entry, scenario } = findDamageScenario(projectId, damageScenarioId)
-          const isLink = (link: ThreatDamageLink) => link.threat_scenario_id === threatScenarioId && link.damage_scenario_id === scenario.id
-          if (!entry.threatDamageLinks.some(isLink)) throw new ApiError(404, 'Link not found.')
-          entry.threatDamageLinks = entry.threatDamageLinks.filter((link) => !isLink(link))
-          syncLinks(entry)
+          removeThreatDamageLink(entry, threatScenarioId, scenario.id)
           return relationsOf(entry, scenario.id)
         }),
     },
+    assets: createMockAssetService(db),
+    threatScenarios: createMockThreatScenarioService(db),
+    attackPaths: createMockAttackPathService(db),
   }
 }

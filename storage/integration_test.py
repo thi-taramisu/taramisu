@@ -14,6 +14,7 @@ PROJECT = 'storage-test-' + uuid.uuid4().hex[:10]
 ENV = {k: v for k, v in os.environ.items() if not k.startswith(('S3_', 'COMPOSE_'))}
 ENV['COMPOSE_PROJECT_NAME'] = PROJECT
 ENV['S3_DEV_PORT'] = '0'
+ENV['TARAMISU_VERSION'] = PROJECT
 CLIENT = '''
 import boto3, os, socket
 from botocore.config import Config
@@ -64,10 +65,10 @@ with tempfile.TemporaryDirectory(prefix=PROJECT) as directory:
     def inspect_storage():
         return json.loads(run('docker', 'inspect', compose('ps', '-q', 'storage').strip()))[0]
 
+    image = 'ghcr.io/thi-taramisu/taramisu-storage-bootstrap:' + PROJECT
     try:
         run('sh', str(work / 'deploy/dev.sh'), '--init')
-        compose('build', 'storage-config', 'storage-init')
-        image = PROJECT + '-storage-init'
+        compose('build', 'storage-config')
         start()
         compose('run', '--rm', '--no-deps', 'storage-init')
         assert not any(inspect_storage()['NetworkSettings']['Ports'].values())
@@ -180,5 +181,4 @@ assert c.get_object(Bucket=bucket, Key='host-upload')['Body'].read() == body
             run('docker', 'network', 'rm', network, check=False)
         for volume in (PROJECT + '-storage_data', PROJECT + '-storage_config', restore_volume):
             run('docker', 'volume', 'rm', volume, check=False)
-        for image_name in (PROJECT + '-storage-init', PROJECT + '-storage-config'):
-            run('docker', 'image', 'rm', image_name, check=False)
+        run('docker', 'image', 'rm', image, check=False)

@@ -19,3 +19,5 @@ networks:
     internal: true
   iam-db:
     internal: true
+  storage:
+    internal: true

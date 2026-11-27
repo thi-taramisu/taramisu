@@ -1,16 +1,13 @@
-"""Route GitHub events to Discord; local invocations default to a dry run."""
+"""Shared routing, webhook transport, and GitHub delivery checkpoints."""
 
-import argparse
+import base64
 import json
 import os
 import re
-import sys
 import urllib.error
 import urllib.request
-from datetime import datetime
-from pathlib import Path
-from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
+from urllib.parse import urlencode, urlsplit
 
 # Configuration: add labels here and expose their secrets in the workflow's env.
 # Webhook URLs belong in environment variables / GitHub secrets
@@ -22,41 +19,12 @@ LABEL_WEBHOOKS = {
     "infrastructure": "DISCORD_DEVOPS_WEBHOOK",
     "CI/CD": "DISCORD_DEVOPS_WEBHOOK",
 }
-LABEL_ROLES = {
-    "backend": "1563190105974513765",
-    "frontend": "1563190563342258296",
-    "CI/CD": "1563190406554984498",
-    "infrastructure": "1563190449810833448",
-    "IAM": "1563190604408553522",
-}
 WEBHOOK_TIMEOUT_SECONDS = 20
-ISSUE_COLOR = 0x238636
-PR_COLOR = 0x8957E5
-
-
-def event_item(event_name, event):
-    if event_name not in ("issues", "pull_request_target"):
-        return None
-    if event.get("action") not in ("opened", "labeled", "closed"):
-        return None
-    key = "issue" if event_name == "issues" else "pull_request"
-    item = event.get(key)
-    if not isinstance(item, dict) or (key == "issue" and "pull_request" in item):
-        return None
-    if event["action"] == "closed" and (key != "pull_request" or item.get("merged") is not True):
-        return None
-    return item
-
-
-def matching_labels(event_name, event):
-    item = event_item(event_name, event)
-    if item is None:
-        return []
-    labels = ([event.get("label", {})] if event["action"] == "labeled"
-              else item.get("labels", []))
-    return list(dict.fromkeys(
-        label.get("name") for label in labels if label.get("name") in LABEL_WEBHOOKS
-    ))
+ISSUE_COLOR = 0x5865F2
+PR_COLOR = 0x5865F2
+MERGED_COLOR = 0x3BA55C
+LABEL_COLOR = 0xC99A45
+NO_MENTIONS = {"parse": [], "users": [], "roles": [], "replied_user": False}
 
 
 def destinations(labels, environ):
@@ -72,56 +40,9 @@ def destinations(labels, environ):
     return grouped
 
 
-def embed_payload(event_name, event, labels):
-    item = event_item(event_name, event)
-    is_issue = event_name == "issues"
-    is_merged = event["action"] == "closed"
-    kind = "🐛 Issue" if is_issue else "🔀 PR"
-    if is_merged:
-        kind = "🎉 PR merged"
-    actor = event.get("sender", {}).get("login") or item["user"]["login"]
-    if event["action"] == "opened":
-        description = f"`{actor}` opened {'an issue' if is_issue else 'a pull request'}"
-    elif is_merged:
-        description = f"`{actor}` merged this pull request. Great work, team! 🥳"
-    else:
-        label = event["label"]["name"].replace("`", "'")
-        description = f"`{actor}` added `{label}`"
-    fields = []
-    footer_parts = ["GitHub", *[f"[{label}]" for label in labels]]
-    if not is_issue:
-        head = item.get("head", {}).get("ref")
-        base = item.get("base", {}).get("ref")
-        if head and base:
-            branches = f"{head} → {base}".replace("`", "'")[:1022]
-            fields.append({"name": "Branches", "value": f"`{branches}`"})
-    embed = {
-        "title": f"{kind} #{item['number']} · {item['title']}"[:256],
-        "url": item["html_url"],
-        "description": description,
-        "color": ISSUE_COLOR if is_issue else PR_COLOR,
-        "fields": fields,
-        "footer": {
-            "text": " · ".join(footer_parts),
-            "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
-        },
-    }
-    timestamp_key = "merged_at" if is_merged else "created_at" if event["action"] == "opened" else "updated_at"
-    timestamp = item.get(timestamp_key)
-    if timestamp:
-        local_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Berlin"))
-        footer_parts.append(local_time.strftime("%d.%m.%Y · %H:%M"))
-        embed["footer"]["text"] = " · ".join(footer_parts)
-    roles = list(dict.fromkeys(
-        LABEL_ROLES[label] for label in labels if LABEL_ROLES.get(label)
-    )) if is_issue else []
-    payload = {
-        "allowed_mentions": {"parse": [], "users": [], "roles": roles, "replied_user": False},
-        "embeds": [embed],
-    }
-    if roles:
-        payload["content"] = " ".join(f"<@&{role}>" for role in roles)
-    return payload
+def display_text(value):
+    """Keep GitHub text on one line and escape Discord Markdown."""
+    return re.sub(r"([\\`*_{}\[\]()<>~|])", r"\\\1", " ".join(value.split()))
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -131,6 +52,11 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class DeliveryError(Exception):
     pass
+
+
+def warn_delivery(labels, error):
+    # Route labels come from LABEL_WEBHOOKS and transport errors omit secrets.
+    print(f"::warning title=Discord notification undelivered::{', '.join(labels)}: {error}")
 
 
 def send_webhook(webhook, payload):
@@ -158,33 +84,97 @@ def send_webhook(webhook, payload):
         raise DeliveryError("Discord delivery failed due to a network, TLS, or timeout error.") from None
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--event-name", default=os.environ.get("GITHUB_EVENT_NAME"))
-    parser.add_argument("--event-path", default=os.environ.get("GITHUB_EVENT_PATH"), type=Path)
-    parser.add_argument("--deliver", action="store_true", help="Send real messages using environment webhook URLs")
-    args = parser.parse_args(argv)
-    if not args.event_name or not args.event_path:
-        parser.error("Supply --event-name and --event-path, or GitHub's event environment variables.")
-    try:
-        event = json.loads(args.event_path.read_text(encoding="utf-8"))
-        labels = matching_labels(args.event_name, event)
-        if not args.deliver:
-            print("Dry run; matching destinations: " + (", ".join(LABEL_WEBHOOKS[label] for label in labels) or "none"))
-            return 0
-        failed = False
-        for webhook, routed_labels in destinations(labels, os.environ).items():
+STATE_BRANCH = "automation/discord-issue-digest-state"
+STATE_PATH = "discord-issue-digest.json"
+
+
+def timestamp(value):
+    return value.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+class GitHub:
+    def __init__(self):
+        self.root = f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}"
+        self.token = os.environ["GH_TOKEN"]
+        self.sha = None
+
+    def request(self, path, data=None, method=None, *, root=None):
+        request = urllib.request.Request(
+            (root or self.root) + path,
+            data=json.dumps(data).encode() if data is not None else None,
+            headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
+                     "Content-Type": "application/json", "User-Agent": "Taramisu-Issue-Digest"},
+            method=method,
+        )
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=30) as response:
+            return json.load(response)
+
+    def load(self, initial_since):
+        try:
+            result = self.request(f"/contents/{STATE_PATH}?{urlencode({'ref': STATE_BRANCH})}")
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+            # Only initialize a missing branch. A missing file on an existing branch
+            # is an error, not permission to replay old notifications.
             try:
-                send_webhook(webhook, embed_payload(args.event_name, event, routed_labels))
-                print("Delivered notification for: " + ", ".join(routed_labels))
-            except DeliveryError as error:
-                print(f"Delivery failed for {', '.join(routed_labels)}: {error}", file=sys.stderr)
-                failed = True
-        return 1 if failed else 0
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        print("Cannot process event: check the event file and required GitHub payload fields.", file=sys.stderr)
-        return 1
+                self.request(f"/git/ref/heads/{STATE_BRANCH}")
+            except urllib.error.HTTPError as ref_error:
+                if ref_error.code != 404:
+                    raise
+            else:
+                raise ValueError("Digest state file is missing from the existing state branch")
+            state = {"version": 1, "initial_since": initial_since, "channels": {}}
+            # Publish the branch only when its checkpoint file already exists.
+            # Interrupted setup leaves no half-initialized branch and can retry.
+            parent = os.environ["GITHUB_SHA"]
+            base = self.request(f"/git/commits/{parent}")
+            tree = self.request("/git/trees", {
+                "base_tree": base["tree"]["sha"],
+                "tree": [{"path": STATE_PATH, "mode": "100644", "type": "blob",
+                          "content": json.dumps(state, sort_keys=True)}],
+            })
+            commit = self.request("/git/commits", {
+                "message": "Initialize Discord notification checkpoints",
+                "tree": tree["sha"], "parents": [parent],
+            })
+            self.request("/git/refs", {"ref": f"refs/heads/{STATE_BRANCH}", "sha": commit["sha"]})
+            self.sha = next(entry["sha"] for entry in tree["tree"] if entry["path"] == STATE_PATH)
+            return state
+        self.sha = result["sha"]
+        state = json.loads(base64.b64decode(result["content"]))
+        if state["version"] != 1:
+            raise ValueError("Unsupported digest state version")
+        return state
 
+    def save(self, state):
+        data = {"message": "Update Discord issue digest checkpoint", "branch": STATE_BRANCH,
+                "content": base64.b64encode(json.dumps(state, sort_keys=True).encode()).decode()}
+        if self.sha:
+            data["sha"] = self.sha
+        self.sha = self.request(f"/contents/{STATE_PATH}", data, "PUT")["content"]["sha"]
 
-if __name__ == "__main__":
-    sys.exit(main())
+    def approved_pulls(self, labels):
+        repo = os.environ["GITHUB_REPOSITORY"]
+        query = f'repo:{repo} is:pr is:open review:approved label:{",".join(labels)}'
+        result = self.request("/search/issues?" + urlencode({"q": query, "per_page": 8}),
+                              root="https://api.github.com")
+        search_url = f"https://github.com/{repo}/pulls?" + urlencode({"q": query})
+        return result["items"], result["total_count"], search_url
+
+    def issues(self, since, until):
+        # GitHub filters updated_at strictly after since; overlap one second
+        # so an issue created exactly at our inclusive boundary is not lost.
+        api_since = timestamp(datetime.fromisoformat(since.replace("Z", "+00:00")) - timedelta(seconds=1))
+        page = 1
+        while True:
+            items = self.request("/issues?" + urlencode({
+                "state": "all", "sort": "created", "direction": "desc", "since": api_since,
+                "per_page": 100, "page": page,
+            }))
+            for item in items:
+                if "pull_request" not in item and since <= item["created_at"] < until:
+                    yield item
+            if len(items) < 100 or items[-1]["created_at"] < since:
+                return
+            page += 1

@@ -4,7 +4,7 @@
 # in /opt/taramisu. The clone has all release tags plus three test releases made from the current working tree:
 # v99.0.0, v99.0.1 (no changes) and v99.0.2 (same commit as v99.0.1), followed by one commit that is not a release,
 # as on a fresh clone of main.
-# The test releases have no published images, so the api, frontend and docs images use the tag "latest".
+# The test releases have no published images, so the images use the tag "latest".
 #
 #   deploy/test-bootstrap.sh                 # run taramisu-ctl.sh (installs the newest release, v99.0.2)
 #   deploy/test-bootstrap.sh sh              # open a shell as taramisu in /opt/taramisu instead

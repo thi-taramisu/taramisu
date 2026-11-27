@@ -1286,6 +1286,14 @@
       "TaraProjectBody": {
         "additionalProperties": false,
         "properties": {
+          "archived_at": {
+            "description": "Archive timestamp; null for an active project",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -1314,6 +1322,7 @@
           }
         },
         "required": [
+          "archived_at",
           "id",
           "name",
           "created_at",
@@ -1820,6 +1829,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -1894,6 +1904,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -1924,6 +1944,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2073,6 +2094,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -2207,6 +2229,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2330,6 +2353,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -2457,6 +2481,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -2595,6 +2620,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -2732,6 +2758,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2795,6 +2822,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -2825,6 +2862,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -2922,6 +2960,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -3000,6 +3039,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -3030,6 +3079,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -3107,6 +3157,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -3137,6 +3197,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3255,6 +3316,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -3358,6 +3420,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3448,6 +3511,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -3543,6 +3607,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -3649,6 +3714,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -3754,6 +3820,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3844,6 +3911,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -3939,6 +4007,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -4045,6 +4114,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -4150,6 +4220,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -4289,6 +4360,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -4413,6 +4485,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -4525,6 +4598,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -4642,6 +4716,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -4770,6 +4845,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -4897,6 +4973,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5015,6 +5092,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -5118,6 +5196,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5245,6 +5324,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -5357,6 +5437,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5456,6 +5537,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -5560,6 +5642,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -5675,6 +5758,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -5789,6 +5873,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5879,6 +5964,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -5974,6 +6060,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -6079,6 +6166,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -6184,6 +6272,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6302,6 +6391,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -6405,6 +6495,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6495,6 +6586,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6613,6 +6705,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -6716,6 +6809,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6806,6 +6900,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6945,6 +7040,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -7069,6 +7165,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -7181,6 +7278,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -7298,6 +7396,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -7426,6 +7525,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -7553,6 +7653,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -7592,6 +7693,18 @@
     "/api/v1/projects": {
       "get": {
         "operationId": "list-tara-projects",
+        "parameters": [
+          {
+            "description": "true: archived only; false: active only; omitted: both",
+            "explode": false,
+            "in": "query",
+            "name": "archived",
+            "schema": {
+              "description": "true: archived only; false: active only; omitted: both",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7743,6 +7856,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       },
       "get": {
@@ -7819,6 +7933,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -7875,6 +7990,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -7905,6 +8030,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "manage"
       },
       "put": {
@@ -7930,6 +8056,95 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a TARA project",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/archive": {
+      "post": {
+        "operationId": "archive-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7987,10 +8202,11 @@
             "bearer": []
           }
         ],
-        "summary": "Replace a TARA project",
+        "summary": "Archive a TARA project (idempotent)",
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8076,6 +8292,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -8170,6 +8387,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8251,6 +8469,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -8347,6 +8566,86 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/unarchive": {
+      "post": {
+        "operationId": "unarchive-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unarchive an archived TARA project (idempotent)",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8419,6 +8718,7 @@
           }
         ],
         "summary": "List project attachments",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -8496,6 +8796,7 @@
           }
         ],
         "summary": "Upload one multipart file (field file), up to 10 MiB; PDF, PNG, JPEG, GIF, WebP or plain text",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -8554,6 +8855,7 @@
           }
         ],
         "summary": "Delete an attachment",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -8626,6 +8928,7 @@
           }
         ],
         "summary": "Download an attachment",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       }
     },
@@ -8763,6 +9066,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -8886,6 +9190,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -8996,6 +9301,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -9111,6 +9417,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -9236,6 +9543,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -9361,6 +9669,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -9442,6 +9751,7 @@
           }
         ],
         "summary": "List item attachments",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -9528,6 +9838,7 @@
           }
         ],
         "summary": "Upload one multipart file (field file), up to 10 MiB; PDF, PNG, JPEG, GIF, WebP or plain text",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -9595,6 +9906,7 @@
           }
         ],
         "summary": "Delete an attachment",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -9676,6 +9988,7 @@
           }
         ],
         "summary": "Download an attachment",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       }
     },
@@ -9725,6 +10038,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "manage"
       },
       "get": {
@@ -9788,6 +10102,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "put": {
@@ -9868,6 +10183,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "manage"
       }
     },
@@ -9995,6 +10311,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -10108,6 +10425,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10208,6 +10526,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -10313,6 +10632,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -10428,6 +10748,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -10543,6 +10864,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10670,6 +10992,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -10783,6 +11106,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10883,6 +11207,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -10988,6 +11313,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -11103,6 +11429,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -11218,6 +11545,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },

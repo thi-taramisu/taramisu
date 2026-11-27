@@ -12,6 +12,8 @@ import (
 )
 
 type ThreatAttackPathLinkStore interface {
+	Auditor
+	GetThreatAttackPathLinkForDelete(context.Context, db.GetThreatAttackPathLinkForDeleteParams) (db.ThreatAttackPathLink, error)
 	CreateThreatAttackPathLink(context.Context, db.CreateThreatAttackPathLinkParams) (db.ThreatAttackPathLink, error)
 	ListThreatAttackPathLinks(context.Context, db.ListThreatAttackPathLinksParams) ([]db.ThreatAttackPathLink, error)
 	DeleteThreatAttackPathLink(context.Context, db.DeleteThreatAttackPathLinkParams) (int64, error)
@@ -88,8 +90,16 @@ func (h *ThreatAttackPathLink) Create(ctx context.Context, in *CreateThreatAttac
 	if err != nil {
 		return nil, err
 	}
-	l, err := h.store.CreateThreatAttackPathLink(ctx, db.CreateThreatAttackPathLinkParams{
-		ThreatScenarioID: threatID, AttackPathID: pathID, ItemDefinitionID: itemID,
+	var l db.ThreatAttackPathLink
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		l, err = h.store.CreateThreatAttackPathLink(ctx, db.CreateThreatAttackPathLinkParams{
+			ThreatScenarioID: threatID, AttackPathID: pathID, ItemDefinitionID: itemID,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetThreatAttackPathLink, projectIDFromContext(ctx), l.ID, toThreatAttackPathLinkBody(l)), nil
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -132,12 +142,25 @@ func (h *ThreatAttackPathLink) Delete(ctx context.Context, in *ThreatAttackPathL
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteThreatAttackPathLink(ctx, db.DeleteThreatAttackPathLinkParams{ID: id, ItemDefinitionID: itemID})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetThreatAttackPathLinkForDelete(ctx, db.GetThreatAttackPathLinkForDeleteParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteThreatAttackPathLink(ctx, db.DeleteThreatAttackPathLinkParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetThreatAttackPathLink, projectIDFromContext(ctx), before.ID, toThreatAttackPathLinkBody(before)), nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, huma.Error404NotFound("link not found")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("link not found")
 	}
 	return nil, nil
 }
