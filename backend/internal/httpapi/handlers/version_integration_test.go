@@ -156,6 +156,15 @@ func TestConflictingEditsPostgres(t *testing.T) {
 	if v := version(call(http.MethodPatch, projectPath, tag(4), `{"name":"Versions"}`, http.StatusOK)); v != 4 {
 		t.Fatalf("version after saving without a change = %d, want 4", v)
 	}
+	// Archiving changes the project too; archiving it again changes nothing and keeps the version.
+	for _, step := range []struct {
+		action string
+		want   int
+	}{{"archive", 5}, {"archive", 5}, {"unarchive", 6}} {
+		if v := version(call(http.MethodPost, projectPath+"/"+step.action, "", "", http.StatusOK)); v != step.want {
+			t.Fatalf("version after %s = %d, want %d", step.action, v, step.want)
+		}
+	}
 
 	// Item definitions.
 	items := projectPath + "/item-definitions"
@@ -254,6 +263,6 @@ func TestConflictingEditsPostgres(t *testing.T) {
 	call(http.MethodDelete, member, tag(2), "", http.StatusNoContent)
 
 	// Deleting the project.
-	rejected(http.MethodDelete, projectPath, "", 4, getProject)
-	call(http.MethodDelete, projectPath, tag(4), "", http.StatusNoContent)
+	rejected(http.MethodDelete, projectPath, "", 6, getProject)
+	call(http.MethodDelete, projectPath, tag(6), "", http.StatusNoContent)
 }
