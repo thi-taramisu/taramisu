@@ -9,7 +9,9 @@ test('creates, renames and deletes a project', async ({ page }) => {
   await dialog.getByLabel('Project name').fill('Brake system')
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 
-  await page.getByRole('link', { name: 'Brake system settings' }).click()
+  // Every project opens its workspace; the settings are linked in its header.
+  await page.getByRole('link', { name: 'Brake system', exact: true }).click()
+  await page.getByRole('banner').getByRole('link', { name: 'Settings' }).click()
   await expect(page.getByRole('banner')).toContainText('Brake system')
   await page.getByLabel('Name').fill('Brake controller')
   await page.getByLabel('Description').fill('TARA of the brake controller')
@@ -17,8 +19,8 @@ test('creates, renames and deletes a project', async ({ page }) => {
   await expect(page.getByText('Saved.')).toBeVisible()
   await expect(page.getByRole('banner')).toContainText('Brake controller')
 
-  await page.getByRole('link', { name: '← Back' }).click()
-  const row = page.getByRole('link', { name: 'Brake controller settings' })
+  await page.getByRole('banner').getByRole('link', { name: 'Projects' }).click()
+  const row = page.getByRole('link', { name: 'Brake controller', exact: true })
   await expect(row).toContainText('TARA of the brake controller')
 
   await page.getByRole('button', { name: 'Actions for Brake controller' }).click()
