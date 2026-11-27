@@ -33,11 +33,11 @@ src/
   features/workspace/          # project workspace: layout with element tree, "+ New" menu, element pages with tabs, example data
   features/graph/              # local relation graph prototype, normal/minimal modes (#184)
   features/items/              # item pages: create/delete dialogs, tabs
-  features/assets/             # item assets tab: table and dialog built with shadcn/ui
+  features/assets/             # item assets tab, "New Asset" dialog and asset pages: Definition with C / I / A, Risks and Relations tabs
   features/damage-scenarios/   # damage scenario pages: create dialog, Definition, Impact and Relations tabs
   features/threat-scenarios/   # threat scenario pages: create dialog, Definition with targets, Risks and Relations tabs
   features/attack-paths/       # attack path pages: create dialog, Definition with steps, Rating and Relations tabs
-  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog
+  features/relations/          # shared Relations tab parts: section with linked elements, "+ Add …" dialog, read-only section
   features/search/             # global Spotlight overlay, project/type filters and keyboard navigation
   features/project-settings/   # project settings sections
   features/design-system/      # colour scheme data and reusable palette previews

@@ -1,5 +1,5 @@
 import { ApiError } from '../errors'
-import type { CiaProperty, ItemAsset } from '../models/asset'
+import type { CiaProperty, IdentificationSource, ItemAsset } from '../models/asset'
 import type { AttackFeasibilityRating, AttackPath } from '../models/attackPath'
 import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../models/damageScenario'
 import type { ItemDefinition } from '../models/item'
@@ -9,10 +9,18 @@ import type { EntityRef, TreeNode } from '../models/tree'
 
 // MOCK: stored data of the in-memory item API and the helpers its services share.
 
+/** Asset row of the item views with the fields only the asset page shows. */
+export interface StoredAsset extends ItemAsset {
+  description: string | null
+  identification_source: IdentificationSource | null
+  /** Context per declared property [WP-15-02]; `properties` says which ones are declared. */
+  propertyDescriptions: Partial<Record<CiaProperty, string | null>>
+}
+
 export interface StoredItem {
   item: ItemDefinition
   children: TreeNode[]
-  assets: ItemAsset[]
+  assets: StoredAsset[]
   risks: RiskGroup[]
   damageScenarios: DamageScenario[]
   damageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[]
