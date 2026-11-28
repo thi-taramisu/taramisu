@@ -21,7 +21,7 @@ RETURNING *;
 
 -- name: ReplaceRiskValue :one
 UPDATE risk_value
-SET impact_rating_id = sqlc.arg(impact_rating_id),
+SET version = risk_value.version + 1, impact_rating_id = sqlc.arg(impact_rating_id),
     risk_score = sqlc.arg(risk_score),
     determination_method = sqlc.arg(determination_method)
 WHERE risk_value.threat_scenario_id = sqlc.arg(threat_scenario_id)
@@ -35,7 +35,7 @@ RETURNING *;
 
 -- name: PatchRiskValue :one
 UPDATE risk_value
-SET impact_rating_id = COALESCE(sqlc.narg(impact_rating_id)::uuid, risk_value.impact_rating_id),
+SET version = risk_value.version + 1, impact_rating_id = COALESCE(sqlc.narg(impact_rating_id)::uuid, risk_value.impact_rating_id),
     risk_score = COALESCE(sqlc.narg(risk_score)::integer, risk_score),
     determination_method = COALESCE(sqlc.narg(determination_method)::risk_determination_method, determination_method)
 WHERE risk_value.threat_scenario_id = sqlc.arg(threat_scenario_id)

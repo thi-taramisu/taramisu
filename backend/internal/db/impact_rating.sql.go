@@ -15,7 +15,7 @@ const createImpactRating = `-- name: CreateImpactRating :one
 INSERT INTO impact_rating (damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety)
 SELECT $1, $3, $4, $5, $6, $7
 WHERE EXISTS(SELECT 1 FROM damage_scenario WHERE damage_scenario.id = $1 AND damage_scenario.item_definition_id = $2)
-RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety
+RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety, version
 `
 
 type CreateImpactRatingParams struct {
@@ -47,6 +47,7 @@ func (q *Queries) CreateImpactRating(ctx context.Context, arg CreateImpactRating
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }
@@ -72,7 +73,7 @@ func (q *Queries) DeleteImpactRating(ctx context.Context, arg DeleteImpactRating
 }
 
 const getImpactRating = `-- name: GetImpactRating :one
-SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety, r.version FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
 `
@@ -94,12 +95,13 @@ func (q *Queries) GetImpactRating(ctx context.Context, arg GetImpactRatingParams
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getImpactRatingForDelete = `-- name: GetImpactRatingForDelete :one
-SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety, r.version FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
 FOR UPDATE OF r
@@ -122,12 +124,13 @@ func (q *Queries) GetImpactRatingForDelete(ctx context.Context, arg GetImpactRat
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getImpactRatingForUpdate = `-- name: GetImpactRatingForUpdate :one
-SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety, r.version FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.id = $1 AND r.damage_scenario_id = $2 AND d.item_definition_id = $3
 FOR NO KEY UPDATE OF r
@@ -150,12 +153,13 @@ func (q *Queries) GetImpactRatingForUpdate(ctx context.Context, arg GetImpactRat
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listImpactRatings = `-- name: ListImpactRatings :many
-SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety FROM impact_rating r
+SELECT r.id, r.damage_scenario_id, r.impact_category, r.rating_value, r.is_omitted_by_pm_15_07, r.omission_or_rating_rationale, r.reused_from_functional_safety, r.version FROM impact_rating r
 JOIN damage_scenario d ON d.id = r.damage_scenario_id
 WHERE r.damage_scenario_id = $1 AND d.item_definition_id = $2
 ORDER BY r.impact_category, r.id
@@ -191,6 +195,7 @@ func (q *Queries) ListImpactRatings(ctx context.Context, arg ListImpactRatingsPa
 			&i.IsOmittedByPm1507,
 			&i.OmissionOrRatingRationale,
 			&i.ReusedFromFunctionalSafety,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -204,11 +209,11 @@ func (q *Queries) ListImpactRatings(ctx context.Context, arg ListImpactRatingsPa
 
 const replaceImpactRating = `-- name: ReplaceImpactRating :one
 UPDATE impact_rating
-SET impact_category = $4, rating_value = $5, is_omitted_by_pm_15_07 = $6,
+SET version = impact_rating.version + 1, impact_category = $4, rating_value = $5, is_omitted_by_pm_15_07 = $6,
     omission_or_rating_rationale = $7, reused_from_functional_safety = $8
 WHERE impact_rating.id = $1 AND impact_rating.damage_scenario_id = $2
   AND EXISTS(SELECT 1 FROM damage_scenario WHERE damage_scenario.id = $2 AND damage_scenario.item_definition_id = $3)
-RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety
+RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety, version
 `
 
 type ReplaceImpactRatingParams struct {
@@ -242,20 +247,21 @@ func (q *Queries) ReplaceImpactRating(ctx context.Context, arg ReplaceImpactRati
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateImpactRating = `-- name: UpdateImpactRating :one
 UPDATE impact_rating
-SET impact_category = COALESCE($1, impact_category),
+SET version = impact_rating.version + 1, impact_category = COALESCE($1, impact_category),
     rating_value = COALESCE($2, rating_value),
     is_omitted_by_pm_15_07 = COALESCE($3, is_omitted_by_pm_15_07),
     omission_or_rating_rationale = CASE WHEN $4::boolean THEN $5::text ELSE omission_or_rating_rationale END,
     reused_from_functional_safety = COALESCE($6, reused_from_functional_safety)
 WHERE impact_rating.id = $7 AND impact_rating.damage_scenario_id = $8
   AND EXISTS(SELECT 1 FROM damage_scenario WHERE damage_scenario.id = $8 AND damage_scenario.item_definition_id = $9)
-RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety
+RETURNING id, damage_scenario_id, impact_category, rating_value, is_omitted_by_pm_15_07, omission_or_rating_rationale, reused_from_functional_safety, version
 `
 
 type UpdateImpactRatingParams struct {
@@ -291,6 +297,7 @@ func (q *Queries) UpdateImpactRating(ctx context.Context, arg UpdateImpactRating
 		&i.IsOmittedByPm1507,
 		&i.OmissionOrRatingRationale,
 		&i.ReusedFromFunctionalSafety,
+		&i.Version,
 	)
 	return i, err
 }

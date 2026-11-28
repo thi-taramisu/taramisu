@@ -51,7 +51,7 @@ describe('mock global search', () => {
   it('reads live creations, renames and deletions, including elements outside the tree', async () => {
     const api = createMockItemApi()
     const item = await api.items.create('headlamp', { name: 'Powertrain', scope_type: 'ITEM' })
-    const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', component: '', properties: [] })
+    const asset = await api.content.addAsset('headlamp', item.id, { name: 'Firmware', properties: [] })
     const damage = await api.damageScenarios.create('headlamp', { item_definition_id: item.id, title: 'Unlinked damage', asset_properties: [] })
     expect((await api.search.search({ ...request, query: 'unlinked' }, options())).results.map((result) => result.id)).toEqual([damage.id])
     await api.items.update('headlamp', item.id, { name: 'Power unit' })

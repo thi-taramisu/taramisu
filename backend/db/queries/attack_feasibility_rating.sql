@@ -8,6 +8,7 @@ INSERT INTO attack_feasibility_rating (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (attack_path_id) DO UPDATE SET
+    version = attack_feasibility_rating.version + 1,
     ap_elapsed_time = EXCLUDED.ap_elapsed_time,
     ap_specialist_expertise = EXCLUDED.ap_specialist_expertise,
     ap_knowledge_of_item = EXCLUDED.ap_knowledge_of_item,
@@ -20,7 +21,7 @@ RETURNING *;
 
 -- name: UpdateAttackFeasibilityRating :one
 UPDATE attack_feasibility_rating
-SET ap_elapsed_time = CASE WHEN sqlc.arg('set_ap_elapsed_time')::boolean THEN sqlc.narg('ap_elapsed_time')::integer ELSE ap_elapsed_time END,
+SET version = attack_feasibility_rating.version + 1, ap_elapsed_time = CASE WHEN sqlc.arg('set_ap_elapsed_time')::boolean THEN sqlc.narg('ap_elapsed_time')::integer ELSE ap_elapsed_time END,
     ap_specialist_expertise = CASE WHEN sqlc.arg('set_ap_specialist_expertise')::boolean THEN sqlc.narg('ap_specialist_expertise')::integer ELSE ap_specialist_expertise END,
     ap_knowledge_of_item = CASE WHEN sqlc.arg('set_ap_knowledge_of_item')::boolean THEN sqlc.narg('ap_knowledge_of_item')::integer ELSE ap_knowledge_of_item END,
     ap_window_of_opportunity = CASE WHEN sqlc.arg('set_ap_window_of_opportunity')::boolean THEN sqlc.narg('ap_window_of_opportunity')::integer ELSE ap_window_of_opportunity END,

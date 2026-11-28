@@ -140,6 +140,51 @@ func (ns NullCybersecurityPropertyType) Value() (driver.Value, error) {
 	return string(ns.CybersecurityPropertyType), nil
 }
 
+type DisplayIDType string
+
+const (
+	DisplayIDTypeITEM           DisplayIDType = "ITEM"
+	DisplayIDTypeASSET          DisplayIDType = "ASSET"
+	DisplayIDTypeDAMAGESCENARIO DisplayIDType = "DAMAGE_SCENARIO"
+	DisplayIDTypeTHREATSCENARIO DisplayIDType = "THREAT_SCENARIO"
+	DisplayIDTypeATTACKPATH     DisplayIDType = "ATTACK_PATH"
+)
+
+func (e *DisplayIDType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DisplayIDType(s)
+	case string:
+		*e = DisplayIDType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DisplayIDType: %T", src)
+	}
+	return nil
+}
+
+type NullDisplayIDType struct {
+	DisplayIDType DisplayIDType
+	Valid         bool // Valid is true if DisplayIDType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDisplayIDType) Scan(value interface{}) error {
+	if value == nil {
+		ns.DisplayIDType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DisplayIDType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDisplayIDType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DisplayIDType), nil
+}
+
 type ElicitationMethod string
 
 const (
@@ -494,9 +539,12 @@ func (ns NullScopeType) Value() (driver.Value, error) {
 type Asset struct {
 	ID                   pgtype.UUID
 	ItemDefinitionID     pgtype.UUID
+	TaraProjectID        pgtype.UUID
+	DisplayNumber        int32
 	Name                 string
 	Description          *string
 	IdentificationSource *IdentificationSource
+	Version              int32
 }
 
 type AssetCybersecurityProperty struct {
@@ -504,6 +552,20 @@ type AssetCybersecurityProperty struct {
 	AssetID      pgtype.UUID
 	PropertyType CybersecurityPropertyType
 	Description  *string
+	Version      int32
+}
+
+type Attachment struct {
+	ID            pgtype.UUID
+	ProjectID     pgtype.UUID
+	FileName      string
+	ContentType   string
+	SizeBytes     int64
+	Sha256        string
+	S3ObjectKey   pgtype.UUID
+	UploadedBy    pgtype.UUID
+	DeletePending bool
+	CreatedAt     pgtype.Timestamptz
 }
 
 type AttackFeasibilityRating struct {
@@ -517,15 +579,19 @@ type AttackFeasibilityRating struct {
 	ApTotalScore          *int32
 	FeasibilityRating     *AttackFeasibility
 	Rationale             *string
+	Version               int32
 }
 
 type AttackPath struct {
 	ID                       pgtype.UUID
 	ItemDefinitionID         pgtype.UUID
+	TaraProjectID            pgtype.UUID
+	DisplayNumber            int32
 	Title                    string
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
+	Version                  int32
 }
 
 type AuditEvent struct {
@@ -544,9 +610,12 @@ type AuditEvent struct {
 type DamageScenario struct {
 	ID                           pgtype.UUID
 	ItemDefinitionID             pgtype.UUID
+	TaraProjectID                pgtype.UUID
+	DisplayNumber                int32
 	Title                        string
 	FunctionalityAdverseRelation *string
 	RoadUserHarmDescription      *string
+	Version                      int32
 }
 
 type DamageScenarioAssetProperty struct {
@@ -554,6 +623,13 @@ type DamageScenarioAssetProperty struct {
 	DamageScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
 	CompromiseMechanismNote      *string
+	Version                      int32
+}
+
+type DisplayIDCounter struct {
+	TaraProjectID pgtype.UUID
+	ElementType   DisplayIDType
+	LastNumber    int32
 }
 
 type IamGroup struct {
@@ -574,11 +650,13 @@ type ImpactRating struct {
 	IsOmittedByPm1507          bool
 	OmissionOrRatingRationale  *string
 	ReusedFromFunctionalSafety bool
+	Version                    int32
 }
 
 type ItemDefinition struct {
 	ID                       pgtype.UUID
 	TaraProjectID            pgtype.UUID
+	DisplayNumber            int32
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
@@ -589,6 +667,7 @@ type ItemDefinition struct {
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string
 	CreatedAt                pgtype.Timestamptz
+	Version                  int32
 }
 
 type ProjectRoleAssignment struct {
@@ -598,6 +677,7 @@ type ProjectRoleAssignment struct {
 	GroupID       pgtype.UUID
 	ProjectRole   ProjectRole
 	AssignedAt    pgtype.Timestamptz
+	Version       int32
 }
 
 type RiskTreatmentDecision struct {
@@ -607,6 +687,7 @@ type RiskTreatmentDecision struct {
 	TreatmentOption      RiskTreatmentOption
 	DecisionRationale    *string
 	IsCybersecurityClaim bool
+	Version              int32
 }
 
 type RiskValue struct {
@@ -615,6 +696,7 @@ type RiskValue struct {
 	ImpactRatingID      pgtype.UUID
 	RiskScore           int32
 	DeterminationMethod RiskDeterminationMethod
+	Version             int32
 }
 
 type ServiceStatus struct {
@@ -628,6 +710,8 @@ type TaraProject struct {
 	Description *string
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+	Version     int32
 }
 
 type ThreatAttackPathLink struct {
@@ -645,16 +729,20 @@ type ThreatDamageLink struct {
 type ThreatScenario struct {
 	ID                          pgtype.UUID
 	ItemDefinitionID            pgtype.UUID
+	TaraProjectID               pgtype.UUID
+	DisplayNumber               int32
 	Title                       string
 	CauseOfCompromise           *string
 	ElicitationMethod           *ElicitationMethod
 	TechnicalNotes              *string
 	AggregatedAttackFeasibility *AttackFeasibility
 	MaxRiskScore                *int32
+	Version                     int32
 }
 
 type ThreatScenarioAssetProperty struct {
 	ID                           pgtype.UUID
 	ThreatScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
+	Version                      int32
 }

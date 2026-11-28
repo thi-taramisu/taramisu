@@ -15,11 +15,16 @@ const deleteExpiredAuditEvents = `-- name: DeleteExpiredAuditEvents :execrows
 DELETE FROM audit_event
 WHERE tara_project_id IN (
     SELECT deleted.tara_project_id FROM audit_event deleted
-    WHERE deleted.event = 'project.deleted' AND deleted.occurred_at < $1::timestamptz
+    WHERE deleted.event = 'project.deleted'
+      AND NOT EXISTS (SELECT 1 FROM tara_project p WHERE p.id = deleted.tara_project_id)
+    GROUP BY deleted.tara_project_id
+    HAVING max(deleted.occurred_at) < $1::timestamptz
 )
 `
 
-// Deletes all events of projects that were deleted before the cutoff.
+// Deletes all events of projects whose deletion was requested before the cutoff and that are gone
+// for good. The latest project.deleted event counts, and a project that still exists keeps its
+// events: it was restored, or it is still within its grace period.
 func (q *Queries) DeleteExpiredAuditEvents(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredAuditEvents, cutoff)
 	if err != nil {

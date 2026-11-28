@@ -8,18 +8,33 @@ LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 SELECT * FROM item_definition
 WHERE tara_project_id = sqlc.arg(project_id) AND id = sqlc.arg(id);
 
+-- Assigns the next display number of the project's items in the same statement; the counter row
+-- stays locked until the transaction ends, so concurrent creations get consecutive numbers. The
+-- project is locked first, in the order a project deletion takes the locks, so the two cannot deadlock
+-- (docs/internal/architecture/data-model.md#27-display-ids). Returns no row if the project does not exist.
 -- name: CreateItemDefinition :one
+WITH project AS (
+    SELECT p.id FROM tara_project AS p WHERE p.id = sqlc.arg(project_id) FOR KEY SHARE
+), display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT project.id, 'ITEM', 1 FROM project
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
 INSERT INTO item_definition (
-    tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment,
+    tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment,
     item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design
-) VALUES (
-    sqlc.arg(project_id), sqlc.arg(name), sqlc.arg(scope_type), sqlc.narg(lifecycle_phase),
+)
+SELECT
+    display.tara_project_id, display.last_number, sqlc.arg(name), sqlc.arg(scope_type), sqlc.narg(lifecycle_phase),
     sqlc.narg(boundary), sqlc.narg(functions), sqlc.narg(operational_environment),
     sqlc.narg(item_definition_wp_09_01), sqlc.narg(cybersecurity_specs_wp_10_01), sqlc.narg(architectural_design)
-) RETURNING *;
+FROM display
+RETURNING *;
 
 -- name: ReplaceItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = sqlc.arg(name), scope_type = sqlc.arg(scope_type),
     lifecycle_phase = sqlc.narg(lifecycle_phase),
     boundary = sqlc.narg(boundary),
@@ -33,6 +48,7 @@ RETURNING *;
 
 -- name: PatchItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = COALESCE(sqlc.narg(name)::text, name),
     scope_type = COALESCE(sqlc.narg(scope_type)::scope_type, scope_type),
     boundary = CASE WHEN sqlc.arg(set_boundary)::boolean THEN sqlc.narg(boundary)::text ELSE boundary END,

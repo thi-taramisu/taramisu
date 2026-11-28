@@ -29,6 +29,9 @@ type Config struct {
 	AuthentikMetadataCacheTTL time.Duration
 	LogLevel                  slog.Level
 	AuditRetentionAfterDelete time.Duration
+	ProjectDeleteGracePeriod  time.Duration
+	// RequireIfMatch rejects a PUT, PATCH, or DELETE on a versioned record without If-Match with 428.
+	RequireIfMatch bool
 }
 
 // S3Config holds S3 settings.
@@ -108,14 +111,25 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	// Audit events of a deleted project are kept this long after its deletion (one year).
-	auditRetentionAfterDelete := 8760 * time.Hour
-	if raw := os.Getenv("AUDIT_RETENTION_AFTER_DELETE"); raw != "" {
-		parsed, err := time.ParseDuration(raw)
-		if err != nil || parsed <= 0 {
-			return Config{}, fmt.Errorf("invalid AUDIT_RETENTION_AFTER_DELETE: must be a positive duration: %q", raw)
+	// Audit events of a deleted project are kept this long after its deletion was requested (one year).
+	auditRetentionAfterDelete, err := positiveDuration("AUDIT_RETENTION_AFTER_DELETE", 8760*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	// A deleted project can be restored this long, then it is deleted for good (30 days).
+	projectDeleteGracePeriod, err := positiveDuration("PROJECT_DELETE_GRACE_PERIOD", 720*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// Off until every client sends If-Match, so that the current frontend can still save (#241).
+	requireIfMatch := false
+	if raw := os.Getenv("REQUIRE_IF_MATCH"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid REQUIRE_IF_MATCH: must be a boolean such as true or false: %q", raw)
 		}
-		auditRetentionAfterDelete = parsed
+		requireIfMatch = parsed
 	}
 
 	logLevel := slog.LevelInfo
@@ -138,6 +152,8 @@ func Load() (Config, error) {
 		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
 		LogLevel:                  logLevel,
 		AuditRetentionAfterDelete: auditRetentionAfterDelete,
+		ProjectDeleteGracePeriod:  projectDeleteGracePeriod,
+		RequireIfMatch:            requireIfMatch,
 	}, nil
 }
 
@@ -212,4 +228,18 @@ func loadS3() (S3Config, error) {
 		cfg.Region = "us-east-1"
 	}
 	return cfg, nil
+}
+
+// positiveDuration reads a duration such as "720h" from the environment variable name, or returns
+// fallback if it is not set.
+func positiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback, nil
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid %s: must be a positive duration: %q", name, raw)
+	}
+	return parsed, nil
 }

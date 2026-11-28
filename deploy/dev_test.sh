@@ -10,10 +10,10 @@ mkdir "$scratch/bin" "$scratch/iam" "$scratch/backend" "$scratch/deploy" "$scrat
 cp ../iam/.env.example "$scratch/iam/"
 cp -R ../iam/branding ../iam/blueprints "$scratch/iam/"
 cp ../backend/Makefile "$scratch/backend/"
-cp ../proxy/nginx.conf "$scratch/proxy/"
+cp ../proxy/nginx.conf ../proxy/25-sentry-ingest.sh "$scratch/proxy/"
 mkdir "$scratch/storage"
 cp ../storage/*.py ../storage/*.toml ../storage/Dockerfile ../storage/.env.example "$scratch/storage/"
-cp dev.sh compose*.yaml Makefile authentik-blueprints.txt "$scratch/deploy/"
+cp dev.sh compose*.yaml Makefile authentik-blueprints.txt authentik-blueprints-wait.py "$scratch/deploy/"
 
 cat > "$scratch/bin/docker" <<'STUB'
 #!/bin/sh
@@ -38,6 +38,11 @@ esac
 echo "$*" >> "$COMMAND_LOG"
 case " $* " in
     *" config --quiet "*) exec "$REAL_DOCKER" "$@" ;;
+    *" ak shell "*)
+        # The only script dev.sh feeds to the Authentik shell is the wait for Authentik's own blueprints.
+        grep -q 'blueprints_find' || exit 1
+        echo 'blueprint wait diagnosis: sentinel-secret'
+        exit "${BLUEPRINT_WAIT_FAIL:-0}" ;;
     *" ak apply_blueprint "*)
         echo 'blueprint diagnosis: sentinel-secret'
         exit "${BLUEPRINT_FAIL:-0}" ;;
@@ -68,7 +73,7 @@ unset S3_DEV_PORT S3_ENDPOINT S3_REGION S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY S3
 unset APP_URL OIDC_ISSUER OIDC_JWKS_URL OIDC_CLIENT_ID PG_PASS
 unset AUTHENTIK_SECRET_KEY DEV_PASSWORD AUTHENTIK_BOOTSTRAP_PASSWORD AUTHENTIK_API_TOKEN
 unset COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES
-unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
+unset IAM_FAIL API_FAIL WEB_FAIL BLUEPRINT_WAIT_FAIL BLUEPRINT_FAIL READY_FAIL DB_FAIL
 unset PROXY_CONFIG_FAIL PROXY_RELOAD_FAIL
 unset EXISTING_IAM_VOLUME EXISTING_STORAGE_VOLUME DOCKER_UNAVAILABLE
 
@@ -103,13 +108,14 @@ run
 awk '
     /up .* authentik-db$/ { db = NR }
     /up .*authentik-server authentik-worker/ { iam = NR }
+    /ak shell$/ { settled = NR }
     /ak apply_blueprint/ { provision = NR }
     /up .* api$/ { api = NR }
     /up .*frontend proxy/ { web = NR }
     /proxy nginx -t$/ { validate = NR }
     /proxy nginx -s reload$/ { reload = NR }
     /^readiness$/ { ready = NR }
-    END { exit !(db > 0 && db < iam && iam < provision && provision < api && api < web && web < validate && validate < reload && reload < ready) }
+    END { exit !(db > 0 && db < iam && iam < settled && settled < provision && provision < api && api < web && web < validate && validate < reload && reload < ready) }
 ' "$COMMAND_LOG"
 grep -q '/blueprints/custom/enrollment.yaml' "$COMMAND_LOG"
 grep -q '/blueprints/default/flow-default-user-settings-flow.yaml' "$COMMAND_LOG"
@@ -212,8 +218,21 @@ export IAM_FAIL=1
 : > "$COMMAND_LOG"
 expect_failure
 unset IAM_FAIL
+! grep -q 'ak shell$' "$COMMAND_LOG"
 ! grep -q 'ak apply_blueprint' "$COMMAND_LOG"
 ! grep -q ' up .* api$' "$COMMAND_LOG"
+
+# Our blueprints are not applied while Authentik's own are still pending: applied later, those would reset ours.
+export BLUEPRINT_WAIT_FAIL=1
+: > "$COMMAND_LOG"
+expect_failure
+unset BLUEPRINT_WAIT_FAIL
+! grep -q 'ak apply_blueprint' "$COMMAND_LOG"
+! grep -q ' up .* api$' "$COMMAND_LOG"
+grep -q 'did not finish applying its own blueprints' "$scratch/output"
+grep -q 'sentinel-secret' "$scratch/iam/.blueprint.log"
+test -n "$(find "$scratch/iam/.blueprint.log" -perm 600)"
+! grep -q 'sentinel-secret' "$scratch/output"
 
 export BLUEPRINT_FAIL=1
 : > "$COMMAND_LOG"
@@ -257,12 +276,13 @@ root = Path(sys.argv[1]).resolve()
 model = json.loads((root / 'model.json').read_text())
 services = model['services']
 assert model['name'] == 'taramisu'
-assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'docs',
+assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'sentry-ingest', 'docs',
                          'authentik-server', 'authentik-worker', 'authentik-db', 'storage', 'storage-config', 'storage-init'}
 expected_networks = {
     'api': {'proxy', 'app-db', 'storage'},
     'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
     'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
+    'sentry-ingest': {'edge', 'proxy'},
     'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
     'docs': {'proxy'},
     'storage': {'storage'}, 'storage-config': {'storage'}, 'storage-init': {'storage'},
@@ -319,6 +339,12 @@ assert 'OIDC_CLIENT_SECRET' not in worker['environment']
 assert api['environment']['OIDC_ISSUER'] == 'http://127.0.0.1:8080/auth/application/o/taramisu/'
 assert api['environment']['OIDC_JWKS_URL'] == 'http://authentik-server:9000/auth/application/o/taramisu/jwks/'
 assert api['depends_on']['migrate']['condition'] == 'service_completed_successfully'
+assert api['environment']['SENTRY_ENVIRONMENT'] == services['frontend']['build']['args']['VITE_SENTRY_ENVIRONMENT'] == 'production'
+assert api['environment']['SENTRY_TUNNEL_URL'] == 'http://sentry-ingest:8081'
+assert api['stop_grace_period'] == '15s'
+assert services['sentry-ingest']['environment']['SENTRY_DSN'] == ''
+assert api['depends_on']['sentry-ingest']['condition'] == 'service_healthy'
+assert not services['sentry-ingest'].get('ports')
 assert 'authentik-server' not in api['depends_on']
 assert services['pgadmin']['profiles'] == ['tools']
 probe = services['authentik-db']['healthcheck']['test']
@@ -340,6 +366,7 @@ for service, target, source in [
     ('authentik-worker', '/blueprints/custom', root / 'iam/blueprints'),
     ('authentik-server', '/web/dist/assets/icons/blank.svg', root / 'iam/branding/blank.svg'),
     ('proxy', '/etc/nginx/conf.d/default.conf', root / 'proxy/nginx.conf'),
+    ('sentry-ingest', '/docker-entrypoint.d/25-sentry-ingest.sh', root / 'proxy/25-sentry-ingest.sh'),
 ]:
     mount = next(v for v in services[service]['volumes'] if v['target'] == target)
     assert Path(mount['source']).resolve() == source, (service, mount)

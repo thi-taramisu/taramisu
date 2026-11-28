@@ -23,6 +23,9 @@ CREATE TYPE attack_feasibility AS ENUM ('HIGH', 'MEDIUM', 'LOW', 'VERY_LOW');
 CREATE TYPE analysis_approach AS ENUM ('TOP_DOWN', 'BOTTOM_UP');
 CREATE TYPE risk_determination_method AS ENUM ('RISK_MATRIX', 'RISK_FORMULA');
 CREATE TYPE risk_treatment_option AS ENUM ('AVOIDING', 'REDUCING', 'SHARING', 'RETAINING');
+CREATE TYPE display_id_type AS ENUM (
+    'ITEM', 'ASSET', 'DAMAGE_SCENARIO', 'THREAT_SCENARIO', 'ATTACK_PATH'
+);
 
 CREATE TABLE iam_user (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,8 +42,16 @@ CREATE TABLE tara_project (
     name text NOT NULL,
     description text,
     archived_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    -- Set when an Owner deletes the project. The project is then hidden from everyone and deleted for
+    -- good after the grace period, unless an operator restores it (docs/internal/architecture/audit.md).
+    deleted_at timestamptz,
+    -- Every editable table has a version, which every update raises. Writes send the version they
+    -- are based on (If-Match), see docs/internal/architecture/backend/backend-architecture.md.
+    version integer NOT NULL DEFAULT 1
 );
+
+CREATE INDEX tara_project_deleted_at_idx ON tara_project (deleted_at) WHERE deleted_at IS NOT NULL;
 
 CREATE TABLE project_role_assignment (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,6 +60,7 @@ CREATE TABLE project_role_assignment (
     group_id uuid REFERENCES iam_group (id) ON DELETE CASCADE,
     project_role project_role NOT NULL,
     assigned_at timestamptz NOT NULL DEFAULT now(),
+    version integer NOT NULL DEFAULT 1,
     CONSTRAINT project_role_assignment_one_principal CHECK (
         (user_id IS NOT NULL) <> (group_id IS NOT NULL)
     ),
@@ -78,12 +90,23 @@ CREATE TABLE audit_event (
 );
 
 CREATE INDEX audit_event_project_time_idx ON audit_event (tara_project_id, occurred_at DESC);
--- Finds the projects whose deletion is older than the retention period.
+-- Finds the project.deleted events for the retention cleanup.
 CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE event = 'project.deleted';
+
+-- Display IDs (docs/internal/architecture/data-model.md#27-display-ids): the last number assigned per
+-- project and element type. Create queries raise it in the same statement as the insert; it never
+-- goes down, so numbers of deleted elements are not reused.
+CREATE TABLE display_id_counter (
+    tara_project_id uuid NOT NULL REFERENCES tara_project (id) ON DELETE CASCADE,
+    element_type display_id_type NOT NULL,
+    last_number integer NOT NULL CHECK (last_number > 0),
+    PRIMARY KEY (tara_project_id, element_type)
+);
 
 CREATE TABLE item_definition (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tara_project_id uuid NOT NULL REFERENCES tara_project (id),
+    tara_project_id uuid NOT NULL REFERENCES tara_project (id) ON DELETE CASCADE,
+    display_number integer NOT NULL CHECK (display_number > 0),
     name text NOT NULL,
     scope_type scope_type NOT NULL,
     lifecycle_phase text,
@@ -93,17 +116,28 @@ CREATE TABLE item_definition (
     item_definition_wp_09_01 text,
     cybersecurity_specs_wp_10_01 text,
     architectural_design text,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    version integer NOT NULL DEFAULT 1,
+    -- Its index also serves lookups of a project's items.
+    CONSTRAINT item_definition_display_number_key UNIQUE (tara_project_id, display_number),
+    -- Target of the elements' (item_definition_id, tara_project_id) foreign keys.
+    CONSTRAINT item_definition_id_project_key UNIQUE (id, tara_project_id)
 );
 
-CREATE INDEX item_definition_tara_project_id_idx ON item_definition (tara_project_id);
-
+-- Elements of an item (asset, damage_scenario, threat_scenario, attack_path) repeat the item's
+-- project, so that their display numbers are unique per project; the foreign key keeps it consistent.
 CREATE TABLE asset (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
+    item_definition_id uuid NOT NULL,
+    tara_project_id uuid NOT NULL,
+    display_number integer NOT NULL CHECK (display_number > 0),
     name text NOT NULL,
     description text,
-    identification_source identification_source
+    identification_source identification_source,
+    version integer NOT NULL DEFAULT 1,
+    CONSTRAINT asset_item_definition_fk FOREIGN KEY (item_definition_id, tara_project_id)
+        REFERENCES item_definition (id, tara_project_id) ON DELETE CASCADE,
+    CONSTRAINT asset_display_number_key UNIQUE (tara_project_id, display_number)
 );
 
 CREATE INDEX asset_item_definition_id_idx ON asset (item_definition_id);
@@ -113,15 +147,22 @@ CREATE TABLE asset_cybersecurity_property (
     asset_id uuid NOT NULL REFERENCES asset (id) ON DELETE CASCADE,
     property_type cybersecurity_property_type NOT NULL,
     description text,
+    version integer NOT NULL DEFAULT 1,
     UNIQUE (asset_id, property_type)
 );
 
 CREATE TABLE damage_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
+    item_definition_id uuid NOT NULL,
+    tara_project_id uuid NOT NULL,
+    display_number integer NOT NULL CHECK (display_number > 0),
     title text NOT NULL,
     functionality_adverse_relation text,
-    road_user_harm_description text
+    road_user_harm_description text,
+    version integer NOT NULL DEFAULT 1,
+    CONSTRAINT damage_scenario_item_definition_fk FOREIGN KEY (item_definition_id, tara_project_id)
+        REFERENCES item_definition (id, tara_project_id) ON DELETE CASCADE,
+    CONSTRAINT damage_scenario_display_number_key UNIQUE (tara_project_id, display_number)
 );
 
 CREATE INDEX damage_scenario_item_definition_id_idx ON damage_scenario (item_definition_id);
@@ -131,6 +172,7 @@ CREATE TABLE damage_scenario_asset_property (
     damage_scenario_id uuid NOT NULL REFERENCES damage_scenario (id) ON DELETE CASCADE,
     asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id) ON DELETE CASCADE,
     compromise_mechanism_note text,
+    version integer NOT NULL DEFAULT 1,
     UNIQUE (damage_scenario_id, asset_cybersecurity_property_id)
 );
 
@@ -145,6 +187,7 @@ CREATE TABLE impact_rating (
     is_omitted_by_pm_15_07 boolean NOT NULL DEFAULT false,
     omission_or_rating_rationale text,
     reused_from_functional_safety boolean NOT NULL DEFAULT false,
+    version integer NOT NULL DEFAULT 1,
     UNIQUE (damage_scenario_id, impact_category),
     CONSTRAINT impact_rating_omission_consistent CHECK (
         is_omitted_by_pm_15_07 = (rating_value IS NOT NULL AND rating_value = 'OMITTED')
@@ -156,13 +199,19 @@ CREATE TABLE impact_rating (
 
 CREATE TABLE threat_scenario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
+    item_definition_id uuid NOT NULL,
+    tara_project_id uuid NOT NULL,
+    display_number integer NOT NULL CHECK (display_number > 0),
     title text NOT NULL,
     cause_of_compromise text,
     elicitation_method elicitation_method,
     technical_notes text,
     aggregated_attack_feasibility attack_feasibility,
-    max_risk_score integer CHECK (max_risk_score BETWEEN 1 AND 5)
+    max_risk_score integer CHECK (max_risk_score BETWEEN 1 AND 5),
+    version integer NOT NULL DEFAULT 1,
+    CONSTRAINT threat_scenario_item_definition_fk FOREIGN KEY (item_definition_id, tara_project_id)
+        REFERENCES item_definition (id, tara_project_id) ON DELETE CASCADE,
+    CONSTRAINT threat_scenario_display_number_key UNIQUE (tara_project_id, display_number)
 );
 
 CREATE INDEX threat_scenario_item_definition_id_idx ON threat_scenario (item_definition_id);
@@ -171,6 +220,7 @@ CREATE TABLE threat_scenario_asset_property (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     threat_scenario_id uuid NOT NULL REFERENCES threat_scenario (id) ON DELETE CASCADE,
     asset_cybersecurity_property_id uuid NOT NULL REFERENCES asset_cybersecurity_property (id) ON DELETE CASCADE,
+    version integer NOT NULL DEFAULT 1,
     UNIQUE (threat_scenario_id, asset_cybersecurity_property_id)
 );
 
@@ -188,11 +238,17 @@ CREATE INDEX threat_damage_link_damage_scenario_id_idx ON threat_damage_link (da
 
 CREATE TABLE attack_path (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_definition_id uuid NOT NULL REFERENCES item_definition (id) ON DELETE CASCADE,
+    item_definition_id uuid NOT NULL,
+    tara_project_id uuid NOT NULL,
+    display_number integer NOT NULL CHECK (display_number > 0),
     title text NOT NULL,
     analysis_approach analysis_approach,
     is_partial_early_stage boolean NOT NULL DEFAULT true,
-    attack_steps_and_weaknesses jsonb
+    attack_steps_and_weaknesses jsonb,
+    version integer NOT NULL DEFAULT 1,
+    CONSTRAINT attack_path_item_definition_fk FOREIGN KEY (item_definition_id, tara_project_id)
+        REFERENCES item_definition (id, tara_project_id) ON DELETE CASCADE,
+    CONSTRAINT attack_path_display_number_key UNIQUE (tara_project_id, display_number)
 );
 
 CREATE INDEX attack_path_item_definition_id_idx ON attack_path (item_definition_id);
@@ -217,6 +273,7 @@ CREATE TABLE attack_feasibility_rating (
     ap_total_score integer CHECK (ap_total_score >= 0),
     feasibility_rating attack_feasibility,
     rationale text,
+    version integer NOT NULL DEFAULT 1,
     CONSTRAINT attack_feasibility_rating_total_consistent CHECK (
         ap_total_score IS NULL OR (
             ap_elapsed_time IS NOT NULL
@@ -236,6 +293,7 @@ CREATE TABLE risk_value (
     impact_rating_id uuid NOT NULL REFERENCES impact_rating (id) ON DELETE CASCADE,
     risk_score integer NOT NULL CHECK (risk_score BETWEEN 1 AND 5),
     determination_method risk_determination_method NOT NULL,
+    version integer NOT NULL DEFAULT 1,
     UNIQUE (threat_scenario_id, impact_rating_id),
     UNIQUE (id, threat_scenario_id)
 );
@@ -249,6 +307,7 @@ CREATE TABLE risk_treatment_decision (
     treatment_option risk_treatment_option NOT NULL,
     decision_rationale text,
     is_cybersecurity_claim boolean NOT NULL DEFAULT false,
+    version integer NOT NULL DEFAULT 1,
     CONSTRAINT risk_treatment_decision_risk_threat_fk
         FOREIGN KEY (risk_value_id, threat_scenario_id)
         REFERENCES risk_value (id, threat_scenario_id) ON DELETE NO ACTION,
@@ -261,3 +320,18 @@ CREATE INDEX risk_treatment_decision_threat_scenario_id_idx
     ON risk_treatment_decision (threat_scenario_id);
 CREATE INDEX risk_treatment_decision_risk_value_id_idx
     ON risk_treatment_decision (risk_value_id, threat_scenario_id);
+
+CREATE TABLE attachment (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id uuid REFERENCES tara_project (id) ON DELETE SET NULL,
+    file_name text NOT NULL CHECK (length(file_name) BETWEEN 1 AND 255),
+    content_type text NOT NULL,
+    size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
+    sha256 text NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+    s3_object_key uuid NOT NULL UNIQUE,
+    uploaded_by uuid NOT NULL REFERENCES iam_user (id),
+    delete_pending boolean NOT NULL DEFAULT false,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX attachment_project_id_created_at_id_idx ON attachment (project_id, created_at, id);
+CREATE INDEX attachment_pending_deletion_idx ON attachment (id) WHERE delete_pending OR project_id IS NULL;

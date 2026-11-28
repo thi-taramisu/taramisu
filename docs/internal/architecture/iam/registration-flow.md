@@ -45,9 +45,11 @@ an existing deployment. The login guard does not cover separate recovery flows.
 
 ## Startup and local verification
 
-[`deploy/dev.sh`](../../../../deploy/dev.sh) starts Authentik and applies the built-in
-flows followed by the application, enrollment, and branding blueprints before
-starting the API. Enrollment configuration does not manage individual user records,
+[`deploy/dev.sh`](../../../../deploy/dev.sh) starts Authentik, waits until it has applied
+its own blueprints, and then applies the built-in flows followed by the application,
+enrollment, and branding blueprints before starting the API. Applied the other way round,
+Authentik's blueprints would reset values such as the login title.
+Enrollment configuration does not manage individual user records,
 so reapplication preserves approvals. The seeded `dev` account is a separate
 exception: the application blueprint sets it active on startup.
 

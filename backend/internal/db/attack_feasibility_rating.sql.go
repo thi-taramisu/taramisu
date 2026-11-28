@@ -40,7 +40,7 @@ func (q *Queries) DeleteAttackFeasibilityRating(ctx context.Context, attackPathI
 }
 
 const getAttackFeasibilityRating = `-- name: GetAttackFeasibilityRating :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, version FROM attack_feasibility_rating WHERE attack_path_id = $1
 `
 
 func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID pgtype.UUID) (AttackFeasibilityRating, error) {
@@ -57,12 +57,13 @@ func (q *Queries) GetAttackFeasibilityRating(ctx context.Context, attackPathID p
 		&i.ApTotalScore,
 		&i.FeasibilityRating,
 		&i.Rationale,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAttackFeasibilityRatingForDelete = `-- name: GetAttackFeasibilityRatingForDelete :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, version FROM attack_feasibility_rating WHERE attack_path_id = $1
 FOR UPDATE
 `
 
@@ -80,12 +81,13 @@ func (q *Queries) GetAttackFeasibilityRatingForDelete(ctx context.Context, attac
 		&i.ApTotalScore,
 		&i.FeasibilityRating,
 		&i.Rationale,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAttackFeasibilityRatingForUpdate = `-- name: GetAttackFeasibilityRatingForUpdate :one
-SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale FROM attack_feasibility_rating WHERE attack_path_id = $1
+SELECT id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, version FROM attack_feasibility_rating WHERE attack_path_id = $1
 FOR NO KEY UPDATE
 `
 
@@ -103,6 +105,7 @@ func (q *Queries) GetAttackFeasibilityRatingForUpdate(ctx context.Context, attac
 		&i.ApTotalScore,
 		&i.FeasibilityRating,
 		&i.Rationale,
+		&i.Version,
 	)
 	return i, err
 }
@@ -126,7 +129,7 @@ func (q *Queries) LockAttackPathForRating(ctx context.Context, arg LockAttackPat
 
 const updateAttackFeasibilityRating = `-- name: UpdateAttackFeasibilityRating :one
 UPDATE attack_feasibility_rating
-SET ap_elapsed_time = CASE WHEN $1::boolean THEN $2::integer ELSE ap_elapsed_time END,
+SET version = attack_feasibility_rating.version + 1, ap_elapsed_time = CASE WHEN $1::boolean THEN $2::integer ELSE ap_elapsed_time END,
     ap_specialist_expertise = CASE WHEN $3::boolean THEN $4::integer ELSE ap_specialist_expertise END,
     ap_knowledge_of_item = CASE WHEN $5::boolean THEN $6::integer ELSE ap_knowledge_of_item END,
     ap_window_of_opportunity = CASE WHEN $7::boolean THEN $8::integer ELSE ap_window_of_opportunity END,
@@ -135,7 +138,7 @@ SET ap_elapsed_time = CASE WHEN $1::boolean THEN $2::integer ELSE ap_elapsed_tim
     feasibility_rating = CASE WHEN $13::boolean THEN $14::attack_feasibility ELSE feasibility_rating END,
     rationale = CASE WHEN $15::boolean THEN $16::text ELSE rationale END
 WHERE attack_path_id = $17
-RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
+RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, version
 `
 
 type UpdateAttackFeasibilityRatingParams struct {
@@ -190,6 +193,7 @@ func (q *Queries) UpdateAttackFeasibilityRating(ctx context.Context, arg UpdateA
 		&i.ApTotalScore,
 		&i.FeasibilityRating,
 		&i.Rationale,
+		&i.Version,
 	)
 	return i, err
 }
@@ -201,6 +205,7 @@ INSERT INTO attack_feasibility_rating (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (attack_path_id) DO UPDATE SET
+    version = attack_feasibility_rating.version + 1,
     ap_elapsed_time = EXCLUDED.ap_elapsed_time,
     ap_specialist_expertise = EXCLUDED.ap_specialist_expertise,
     ap_knowledge_of_item = EXCLUDED.ap_knowledge_of_item,
@@ -209,7 +214,7 @@ ON CONFLICT (attack_path_id) DO UPDATE SET
     ap_total_score = EXCLUDED.ap_total_score,
     feasibility_rating = EXCLUDED.feasibility_rating,
     rationale = EXCLUDED.rationale
-RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale
+RETURNING id, attack_path_id, ap_elapsed_time, ap_specialist_expertise, ap_knowledge_of_item, ap_window_of_opportunity, ap_equipment, ap_total_score, feasibility_rating, rationale, version
 `
 
 type UpsertAttackFeasibilityRatingParams struct {
@@ -248,6 +253,7 @@ func (q *Queries) UpsertAttackFeasibilityRating(ctx context.Context, arg UpsertA
 		&i.ApTotalScore,
 		&i.FeasibilityRating,
 		&i.Rationale,
+		&i.Version,
 	)
 	return i, err
 }

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -192,8 +193,9 @@ func TestAuditHistoryPostgres(t *testing.T) {
 	}
 }
 
-// TestAuditRetentionPostgres checks that a project deletion that fails leaves no
-// event, and that the retention cleanup removes the history of deleted projects only.
+// TestAuditRetentionPostgres checks that the retention cleanup removes the history of a project only
+// once the project is deleted for good and its latest deletion was requested before the cutoff, so a
+// restored project and a project within its grace period keep their history.
 func TestAuditRetentionPostgres(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
@@ -227,26 +229,45 @@ func TestAuditRetentionPostgres(t *testing.T) {
 		}
 		return p.ID
 	}
-	kept, deleted := newProject("kept"), newProject("deleted")
+	kept, restored, marked, deleted := newProject("kept"), newProject("restored"), newProject("marked"), newProject("deleted")
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	history := func(id pgtype.UUID, want ...string) {
+		t.Helper()
+		stored := auditEvents(t, ctx, tx, id.String())
+		got := make([]string, 0, len(stored))
+		for _, e := range stored {
+			got = append(got, e.Event)
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("history of project %s = %v, want %v", id, got, want)
+		}
+	}
+	const added = db.EventMemberAdded
+	const del, res = db.EventProjectDeleted, db.EventProjectRestored
 
-	// A project with item definitions cannot be deleted; the failed deletion stores no event.
-	if _, err := tx.Exec(ctx, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'Item', 'ITEM')`, kept); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.DeleteTaraProject(ctx, actor, kept); err == nil {
-		t.Fatal("deleting a project with item definitions succeeded")
-	}
-	if err := store.DeleteTaraProject(ctx, actor, deleted); err != nil {
-		t.Fatal(err)
-	}
-	if got := auditEvents(t, ctx, tx, kept.String()); len(got) != 1 || got[0].Event != db.EventMemberAdded {
-		t.Fatalf("history of the kept project = %+v, want only member.added", got)
-	}
+	must(store.DeleteTaraProject(ctx, actor, restored, nil))
+	must(store.RestoreTaraProject(ctx, actor, restored, "operator"))
+	// Deleted, restored, and deleted again: the retention period runs from the second deletion.
+	must(store.DeleteTaraProject(ctx, actor, deleted, nil))
+	must(store.RestoreTaraProject(ctx, actor, deleted, "operator"))
+	must(store.DeleteTaraProject(ctx, actor, deleted, nil))
+	var secondDeletion time.Time
+	must(tx.QueryRow(ctx, `SELECT max(occurred_at) FROM audit_event WHERE tara_project_id = $1 AND event = $2`, deleted, del).Scan(&secondDeletion))
 
-	// A change to a project that does not exist stores nothing and says so.
+	// A change to a project that does not exist, or is marked as deleted, stores nothing and says so.
 	missing := pgtype.UUID{Bytes: [16]byte{0x21, 0x80, 0x01}, Valid: true}
-	if _, err := store.AddProjectMember(ctx, actor, db.AddProjectMemberParams{ProjectID: missing, GroupExternalID: teamGroupID, Role: db.ProjectRoleVIEWER}); !errors.Is(err, db.ErrProjectNotFound) {
-		t.Fatalf("add member to a missing project: %v, want ErrProjectNotFound", err)
+	for _, id := range []pgtype.UUID{missing, deleted} {
+		if _, err := store.AddProjectMember(ctx, actor, db.AddProjectMemberParams{ProjectID: id, GroupExternalID: teamGroupID, Role: db.ProjectRoleEDITOR}); !errors.Is(err, db.ErrProjectNotFound) {
+			t.Fatalf("add member to project %s: %v, want ErrProjectNotFound", id, err)
+		}
+		if err := store.DeleteTaraProject(ctx, actor, id, nil); !errors.Is(err, db.ErrProjectNotFound) {
+			t.Fatalf("delete project %s: %v, want ErrProjectNotFound", id, err)
+		}
 	}
 
 	purge := func(cutoff time.Time) {
@@ -255,6 +276,21 @@ func TestAuditRetentionPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	unchanged := func() {
+		t.Helper()
+		history(kept, added)
+		history(restored, added, del, res)
+		history(marked, added, del)
+		history(deleted, added, del, res, del)
+	}
+	future := time.Now().Add(time.Hour)
+
+	// One project is deleted for good; another is marked after that and stays within its grace period.
+	purged, err := store.PurgeDeletedProjects(ctx, pgtype.Timestamptz{Time: future, Valid: true})
+	if err != nil || !slices.Contains(purged, deleted) || slices.Contains(purged, restored) || slices.Contains(purged, kept) {
+		t.Fatalf("purged projects = %v, %v, want %s but not the restored or the kept project", purged, err, deleted)
+	}
+	must(store.DeleteTaraProject(ctx, actor, marked, nil))
 
 	// While another replica holds the cleanup lock, this one skips the cleanup. (Once this
 	// transaction has taken the lock itself, it keeps it until the test ends, so this comes first.)
@@ -265,28 +301,25 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	if _, err := other.Exec(ctx, `SELECT pg_advisory_xact_lock(218001)`); err != nil {
 		t.Fatal(err)
 	}
-	purge(time.Now().Add(time.Hour))
+	purge(future)
 	if err := other.Rollback(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := auditEvents(t, ctx, tx, deleted.String()); len(got) != 2 {
-		t.Fatalf("history after a cleanup that another replica blocked = %+v, want 2 events", got)
-	}
+	unchanged()
 
-	// Within the retention period nothing is removed.
-	purge(time.Now().Add(-time.Hour))
-	if got := auditEvents(t, ctx, tx, deleted.String()); len(got) != 2 {
-		t.Fatalf("history of the deleted project before expiry = %+v, want 2 events", got)
-	}
+	// Within the retention period nothing is removed. The first deletion is older than this cutoff,
+	// the second is not.
+	purge(secondDeletion)
+	unchanged()
 
-	// After the retention period, the deleted project's history is gone.
-	purge(time.Now().Add(time.Hour))
-	if got := auditEvents(t, ctx, tx, deleted.String()); len(got) != 0 {
-		t.Fatalf("history of the deleted project after expiry = %+v, want none", got)
-	}
-	if got := auditEvents(t, ctx, tx, kept.String()); len(got) != 1 {
-		t.Fatalf("history of the kept project after cleanup = %+v, want it unchanged", got)
-	}
+	// After the retention period, the history of the project that is gone is removed. The restored
+	// project and the project that is only marked keep theirs, although their project.deleted events
+	// are as old: they still exist.
+	purge(future)
+	history(deleted)
+	history(kept, added)
+	history(restored, added, del, res)
+	history(marked, added, del)
 }
 
 // failAfterChange runs each audited change and then fails, as a later step of a request could. The

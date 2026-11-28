@@ -57,6 +57,26 @@ The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to
 > **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, Authentik, and storage data volumes.
 > It keeps `iam/.env` and `storage/.env`; `make up` provisions a fresh stack afterward.
 
+## Sentry
+
+Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Sentry receives application logs
+at Info, Warn, and Error, subject to the configured log level. HTTP panics produce an event with a stack trace and the matched route.
+Panic values and raw request data stay local, as do request, access-denial, and audit logs.
+Application logs sent to Sentry omit raw error attributes.
+Request bodies, headers, cookies, query parameters, and automatically collected user
+information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
+the Compose API stop timeout is 15 seconds to cover all three phases.
+
+For **host execution** (`make run`), set `SENTRY_DSN`, `SENTRY_ENVIRONMENT=development`, and optionally
+`SENTRY_RELEASE` in `backend/.env`. The host sends directly unless `SENTRY_TUNNEL_URL` is configured.
+
+For **Compose/server execution**, set the backend project's `SENTRY_DSN` in **`iam/.env`**. `backend/.env` is not
+read by Compose. Backend and frontend Compose builds share `SENTRY_ENVIRONMENT` (default `production`).
+The API remains on internal networks and sends through `http://sentry-ingest:8081`; the dedicated ingest proxy forwards only POSTs to
+that DSN's Sentry SaaS project envelope endpoint, with TLS verification. Port 8081 is not published and the
+public listener has no ingest route. The original DSN stays in SDK envelopes and authentication headers.
+See [deployment configuration](../deploy/README.md#sentry-reporting) for frontend build settings and verification.
+
 ## Authentication
 
 The React SPA authenticates directly with Authentik under `/auth/` (hosted Authentik login UI using OIDC Authorization Code Flow with PKCE)
@@ -115,8 +135,15 @@ The API writes JSON log lines to stderr; `LOG_LEVEL` sets the minimum level (`de
 - In the Compose stack, set `LOG_LEVEL` in `iam/.env`.
 
 What is logged and what is stored as audit history is described in [Audit and logging](../docs/internal/architecture/audit.md).
-At start and once a day, the API deletes the audit history of a deleted project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`,
-one year); in the Compose stack, set it in `iam/.env`.
+Deleting a project only marks it and hides it from all members. At start and once a day, the API deletes projects for good
+that were marked more than `PROJECT_DELETE_GRACE_PERIOD` ago (default `720h`, 30 days), and the audit history of a deleted
+project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`, one year). In the Compose stack, set both in `iam/.env`.
+Until the grace period ends, operators can restore a project with `cmd/restore-project`
+([deployment guide](../deploy/README.md#restoring-a-deleted-project)).
+
+Changes of a record can send its version as `If-Match`; an outdated one is rejected with `412`. With `REQUIRE_IF_MATCH=true`
+(default `false`; in the Compose stack in `iam/.env`), a change without it is rejected with `428`
+([conflicting edits](../docs/internal/architecture/backend/backend-architecture.md#conflicting-edits)).
 
 ## Checks
 
@@ -138,6 +165,11 @@ After editing `db/schema.sql` or `db/queries/`, generate the corresponding Atlas
 make migrate-diff name=my_change
 make sqlc
 ```
+
+PostgreSQL extensions are the exception: Atlas without login rejects `CREATE EXTENSION` in `db/schema.sql` and ignores
+extensions when it compares, so they are created only in a hand-written migration (`pg_trgm` and `unaccent` for the search,
+in `20261123212752_search_extensions.sql`). `db/schema.sql` must not use objects that need them, such as trigram indexes,
+because the drift check builds it in a database without extensions. Queries in `db/queries/` may use their functions.
 
 CI verifies that migrations and generated Go models are in sync with `db/schema.sql` and `db/queries/`:
 
@@ -217,6 +249,7 @@ fails. Missing or empty domain coverage fails the check. The raw profile still c
 ```text
 cmd/api/                       entrypoint
 cmd/openapi/                   offline OpenAPI JSON export (stdout)
+cmd/restore-project/           operator command: restore a deleted project
 db/                            schema, Atlas migrations, sqlc queries
 internal/db/                   sqlc-generated query code
 internal/httpapi/              router, OpenAPI

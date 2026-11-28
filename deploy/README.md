@@ -34,7 +34,8 @@ It validates the complete Compose configuration before starting any containers. 
 are used by `make run` and `make test`; they are not loaded for container commands.
 
 Startup first verifies a password-authenticated query to the Authentik database, then waits for server and worker health.
-It applies the built-in and custom blueprints before starting the API.
+It waits until Authentik has applied its own blueprints, which would otherwise reset values that ours set,
+then applies the built-in and custom blueprints before starting the API.
 The API waits for backend migrations, Authentik health, and storage bucket initialization. The script additionally checks `/health/ready`
 before starting frontend and proxy.
 It validates and reloads nginx so configuration changes and rebuilt API containers take effect on repeat starts.
@@ -207,6 +208,7 @@ make -C deploy test-stack
 Requires a running stack (`make -C deploy up`); the runner does not start one.
 It obtains an access token through the OIDC PKCE flow against Authentik via NGINX (`/auth/`), checks its claims,
 and temporarily scales `api` to 2 replicas.
+It checks that the login page shows the title from `iam/blueprints/branding.yaml`.
 It verifies direct token acceptance and rejection on each replica's container IP
 and that sequential requests through NGINX reach both replicas.
 Under continuous load, it verifies that no request fails while a replica is stopped (`docker stop`, SIGTERM)
@@ -238,6 +240,26 @@ Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings fro
 > so every checkout and worktree talks to the same running stack.
 > Bind mounts such as the proxy's `nginx.conf` point to the checkout that last recreated the container;
 > run `make -C deploy up` from your main checkout when you finish in a worktree.
+
+## Restoring a deleted project
+
+Deleting a project in the application only hides it; the API deletes it for good after `PROJECT_DELETE_GRACE_PERIOD`
+(default 30 days, set in `iam/.env`). Until the API has done that, which it does at start and once a day, an operator can
+restore the project with its content and members. The command is part of the API image since this feature. Run from the
+repository root; on the VM that is `/opt/taramisu`, as root with `sudo -u taramisu` in front, because only the `taramisu`
+user may use Docker there:
+
+```bash
+docker compose --env-file iam/.env -f deploy/compose.yaml run --rm --no-deps --entrypoint /restore-project api \
+  -project <project id> -actor <user id> -operator <your name>
+```
+
+- Deleted projects that can still be restored: `SELECT id, name, deleted_at FROM tara_project WHERE deleted_at IS NOT NULL;`
+- The actor is the `iam_user.id` recorded for the `project.restored` event, for example the Owner who asked for the
+  restore: `actor_user_id` of the project's latest `project.deleted` event in `audit_event`
+  ([Audit and logging](../docs/internal/architecture/audit.md#who-may-read-the-history)).
+- The operator is your own name or user name (letters, digits, `.`, `_`, `@`, `-`). The event records it, because the
+  actor alone does not show who ran the restore.
 
 ## Database password mismatch
 
@@ -311,3 +333,36 @@ Restore into an empty volume with storage stopped, start the same version, and v
 The `storage_config` volume is regenerated from `storage/.env`. `down` preserves volumes; `reset` deletes them.
 
 Run `make -C deploy test-storage` for isolated live S3, network, rotation, and restore checks (requires Linux Docker and Python 3).
+
+## Sentry reporting
+
+The Compose stack reads **`iam/.env`**. `backend/.env` only configures a backend started on the host, and
+`frontend/.env.local` only configures a frontend built/run directly with Vite. To enable the Compose stack:
+
+```dotenv
+SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/BACKEND_PROJECT_ID
+VITE_SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/FRONTEND_PROJECT_ID
+SENTRY_ENVIRONMENT=production
+```
+
+Use the actual DSNs from each Sentry project's client-key settings. Empty DSNs disable reporting. Optional
+`SENTRY_RELEASE` and `VITE_SENTRY_RELEASE` identify releases. Backend and frontend Compose settings share
+`SENTRY_ENVIRONMENT` and default to `production`. Rebuild the frontend after changes with `make -C deploy up`.
+
+For prebuilt GHCR images, set repository Actions variables `VITE_SENTRY_DSN` and optionally `SENTRY_ENVIRONMENT`
+before publishing. The latter defaults to `production`; configure the deployed backend with the same name.
+Frontend DSNs are public in browser JavaScript; Sentry auth tokens must never be used as build arguments.
+
+The API keeps its internal-only networks. Its Sentry HTTP transport routes envelopes to the dedicated ingest proxy's unpublished
+port 8081 while retaining the original DSN. The proxy accepts only POSTs for the configured backend project and
+forwards them to that DSN's Sentry SaaS HTTPS host with certificate verification. Other paths/projects/methods are
+rejected; incoming cookies and Authorization headers are removed. This is not a general outbound proxy, and the
+public port 80 listener exposes no ingest endpoint. With no backend DSN, the internal listener rejects all requests.
+The ingest configuration is generated on startup. The API depends on this service, so it starts first and remains
+available until the API has drained requests, closed its pool, and flushed reports during shutdown.
+
+`make -C deploy test` checks configuration and defaults. After starting the stack, run
+`python3 deploy/sentry_smoke_test.py` from the repository root (or pass `--api-image IMAGE`). It uses temporary
+isolated networks and a local TLS collector to verify actual SDK delivery, upstream verification, method/project
+restrictions, API network isolation, and the absence of a public ingest route. No test event reaches Sentry.
+The existing full-stack test continues to cover real OIDC logins, API replicas, and failover.

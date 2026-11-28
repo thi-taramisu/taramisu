@@ -21,6 +21,8 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("AUTHENTIK_METADATA_CACHE_TTL", "")
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("AUDIT_RETENTION_AFTER_DELETE", "")
+	t.Setenv("PROJECT_DELETE_GRACE_PERIOD", "")
+	t.Setenv("REQUIRE_IF_MATCH", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -341,37 +343,72 @@ func TestLoadLogLevel(t *testing.T) {
 	}
 }
 
-func TestLoadAuditRetention(t *testing.T) {
-	tests := []struct {
+func TestLoadRetentionPeriods(t *testing.T) {
+	for _, period := range []struct {
+		name     string
+		fallback time.Duration
+		get      func(Config) time.Duration
+	}{
+		{"AUDIT_RETENTION_AFTER_DELETE", 8760 * time.Hour, func(c Config) time.Duration { return c.AuditRetentionAfterDelete }},
+		{"PROJECT_DELETE_GRACE_PERIOD", 720 * time.Hour, func(c Config) time.Duration { return c.ProjectDeleteGracePeriod }},
+	} {
+		for _, tt := range []struct {
+			raw       string
+			want      time.Duration
+			wantError bool
+		}{
+			{raw: "", want: period.fallback},
+			{raw: "48h", want: 48 * time.Hour},
+			{raw: "0s", wantError: true},
+			{raw: "-1h", wantError: true},
+			{raw: "one year", wantError: true},
+		} {
+			t.Run(period.name+"="+tt.raw, func(t *testing.T) {
+				clearOIDCEnv(t)
+				t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
+				t.Setenv(period.name, tt.raw)
+
+				cfg, err := Load()
+				if tt.wantError {
+					if err == nil || !strings.Contains(err.Error(), "invalid "+period.name) {
+						t.Fatalf("Load() error = %v, want invalid %s", err, period.name)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("Load() error = %v", err)
+				}
+				if got := period.get(cfg); got != tt.want {
+					t.Errorf("%s = %v, want %v", period.name, got, tt.want)
+				}
+			})
+		}
+	}
+}
+
+func TestLoadRequireIfMatch(t *testing.T) {
+	for _, tt := range []struct {
 		raw       string
-		want      time.Duration
+		want      bool
 		wantError bool
 	}{
-		{raw: "", want: 8760 * time.Hour},
-		{raw: "720h", want: 720 * time.Hour},
-		{raw: "0s", wantError: true},
-		{raw: "-1h", wantError: true},
-		{raw: "one year", wantError: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.raw, func(t *testing.T) {
-			clearOIDCEnv(t)
-			t.Setenv("DATABASE_URL", "postgres://user@localhost/taramisu")
-			t.Setenv("AUDIT_RETENTION_AFTER_DELETE", tt.raw)
-
-			cfg, err := Load()
-			if tt.wantError {
-				if err == nil || !strings.Contains(err.Error(), "invalid AUDIT_RETENTION_AFTER_DELETE") {
-					t.Fatalf("Load() error = %v, want invalid AUDIT_RETENTION_AFTER_DELETE", err)
-				}
-				return
+		{raw: "", want: false},
+		{raw: "true", want: true},
+		{raw: "false", want: false},
+		{raw: "yes", wantError: true},
+	} {
+		clearOIDCEnv(t)
+		t.Setenv("DATABASE_URL", "postgres://user@localhost:5432/taramisu")
+		t.Setenv("REQUIRE_IF_MATCH", tt.raw)
+		cfg, err := Load()
+		if tt.wantError {
+			if err == nil || !strings.Contains(err.Error(), "REQUIRE_IF_MATCH") {
+				t.Errorf("REQUIRE_IF_MATCH=%q: error = %v, want one naming the variable", tt.raw, err)
 			}
-			if err != nil {
-				t.Fatalf("Load() error = %v", err)
-			}
-			if cfg.AuditRetentionAfterDelete != tt.want {
-				t.Errorf("AuditRetentionAfterDelete = %v, want %v", cfg.AuditRetentionAfterDelete, tt.want)
-			}
-		})
+			continue
+		}
+		if err != nil || cfg.RequireIfMatch != tt.want {
+			t.Errorf("REQUIRE_IF_MATCH=%q: RequireIfMatch = %v, %v; want %v", tt.raw, cfg.RequireIfMatch, err, tt.want)
+		}
 	}
 }

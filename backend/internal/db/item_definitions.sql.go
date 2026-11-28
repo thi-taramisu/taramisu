@@ -12,18 +12,27 @@ import (
 )
 
 const createItemDefinition = `-- name: CreateItemDefinition :one
+WITH project AS (
+    SELECT p.id FROM tara_project AS p WHERE p.id = $10 FOR KEY SHARE
+), display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT project.id, 'ITEM', 1 FROM project
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
 INSERT INTO item_definition (
-    tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment,
+    tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment,
     item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design
-) VALUES (
-    $1, $2, $3, $4,
-    $5, $6, $7,
-    $8, $9, $10
-) RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+)
+SELECT
+    display.tara_project_id, display.last_number, $1, $2, $3,
+    $4, $5, $6,
+    $7, $8, $9
+FROM display
+RETURNING id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version
 `
 
 type CreateItemDefinitionParams struct {
-	ProjectID                pgtype.UUID
 	Name                     string
 	ScopeType                ScopeType
 	LifecyclePhase           *string
@@ -33,11 +42,15 @@ type CreateItemDefinitionParams struct {
 	ItemDefinitionWp0901     *string
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string
+	ProjectID                pgtype.UUID
 }
 
+// Assigns the next display number of the project's items in the same statement; the counter row
+// stays locked until the transaction ends, so concurrent creations get consecutive numbers. The
+// project is locked first, in the order a project deletion takes the locks, so the two cannot deadlock
+// (docs/internal/architecture/data-model.md#27-display-ids). Returns no row if the project does not exist.
 func (q *Queries) CreateItemDefinition(ctx context.Context, arg CreateItemDefinitionParams) (ItemDefinition, error) {
 	row := q.db.QueryRow(ctx, createItemDefinition,
-		arg.ProjectID,
 		arg.Name,
 		arg.ScopeType,
 		arg.LifecyclePhase,
@@ -47,11 +60,13 @@ func (q *Queries) CreateItemDefinition(ctx context.Context, arg CreateItemDefini
 		arg.ItemDefinitionWp0901,
 		arg.CybersecuritySpecsWp1001,
 		arg.ArchitecturalDesign,
+		arg.ProjectID,
 	)
 	var i ItemDefinition
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -62,6 +77,7 @@ func (q *Queries) CreateItemDefinition(ctx context.Context, arg CreateItemDefini
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
@@ -85,7 +101,7 @@ func (q *Queries) DeleteItemDefinition(ctx context.Context, arg DeleteItemDefini
 }
 
 const getItemDefinition = `-- name: GetItemDefinition :one
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version FROM item_definition
 WHERE tara_project_id = $1 AND id = $2
 `
 
@@ -100,6 +116,7 @@ func (q *Queries) GetItemDefinition(ctx context.Context, arg GetItemDefinitionPa
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -110,12 +127,13 @@ func (q *Queries) GetItemDefinition(ctx context.Context, arg GetItemDefinitionPa
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getItemDefinitionForDelete = `-- name: GetItemDefinitionForDelete :one
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version FROM item_definition
 WHERE tara_project_id = $1 AND id = $2
 FOR UPDATE
 `
@@ -133,6 +151,7 @@ func (q *Queries) GetItemDefinitionForDelete(ctx context.Context, arg GetItemDef
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -143,12 +162,13 @@ func (q *Queries) GetItemDefinitionForDelete(ctx context.Context, arg GetItemDef
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getItemDefinitionForUpdate = `-- name: GetItemDefinitionForUpdate :one
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version FROM item_definition
 WHERE tara_project_id = $1 AND id = $2
 FOR NO KEY UPDATE
 `
@@ -166,6 +186,7 @@ func (q *Queries) GetItemDefinitionForUpdate(ctx context.Context, arg GetItemDef
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -176,12 +197,13 @@ func (q *Queries) GetItemDefinitionForUpdate(ctx context.Context, arg GetItemDef
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listItemDefinitions = `-- name: ListItemDefinitions :many
-SELECT id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at FROM item_definition
+SELECT id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version FROM item_definition
 WHERE tara_project_id = $1
 ORDER BY created_at, id
 LIMIT $3 OFFSET $2
@@ -205,6 +227,7 @@ func (q *Queries) ListItemDefinitions(ctx context.Context, arg ListItemDefinitio
 		if err := rows.Scan(
 			&i.ID,
 			&i.TaraProjectID,
+			&i.DisplayNumber,
 			&i.Name,
 			&i.ScopeType,
 			&i.LifecyclePhase,
@@ -215,6 +238,7 @@ func (q *Queries) ListItemDefinitions(ctx context.Context, arg ListItemDefinitio
 			&i.CybersecuritySpecsWp1001,
 			&i.ArchitecturalDesign,
 			&i.CreatedAt,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -228,6 +252,7 @@ func (q *Queries) ListItemDefinitions(ctx context.Context, arg ListItemDefinitio
 
 const patchItemDefinition = `-- name: PatchItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = COALESCE($1::text, name),
     scope_type = COALESCE($2::scope_type, scope_type),
     boundary = CASE WHEN $3::boolean THEN $4::text ELSE boundary END,
@@ -238,7 +263,7 @@ UPDATE item_definition SET
     cybersecurity_specs_wp_10_01 = CASE WHEN $13::boolean THEN $14::text ELSE cybersecurity_specs_wp_10_01 END,
     architectural_design = CASE WHEN $15::boolean THEN $16::text ELSE architectural_design END
 WHERE tara_project_id = $17 AND id = $18
-RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+RETURNING id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version
 `
 
 type PatchItemDefinitionParams struct {
@@ -287,6 +312,7 @@ func (q *Queries) PatchItemDefinition(ctx context.Context, arg PatchItemDefiniti
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -297,12 +323,14 @@ func (q *Queries) PatchItemDefinition(ctx context.Context, arg PatchItemDefiniti
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }
 
 const replaceItemDefinition = `-- name: ReplaceItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = $1, scope_type = $2,
     lifecycle_phase = $3,
     boundary = $4,
@@ -312,7 +340,7 @@ UPDATE item_definition SET
     cybersecurity_specs_wp_10_01 = $8,
     architectural_design = $9
 WHERE tara_project_id = $10 AND id = $11
-RETURNING id, tara_project_id, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at
+RETURNING id, tara_project_id, display_number, name, scope_type, lifecycle_phase, boundary, functions, operational_environment, item_definition_wp_09_01, cybersecurity_specs_wp_10_01, architectural_design, created_at, version
 `
 
 type ReplaceItemDefinitionParams struct {
@@ -347,6 +375,7 @@ func (q *Queries) ReplaceItemDefinition(ctx context.Context, arg ReplaceItemDefi
 	err := row.Scan(
 		&i.ID,
 		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.ScopeType,
 		&i.LifecyclePhase,
@@ -357,6 +386,7 @@ func (q *Queries) ReplaceItemDefinition(ctx context.Context, arg ReplaceItemDefi
 		&i.CybersecuritySpecsWp1001,
 		&i.ArchitecturalDesign,
 		&i.CreatedAt,
+		&i.Version,
 	)
 	return i, err
 }

@@ -69,6 +69,7 @@ type CreateItemDefinitionInput struct {
 }
 type ReplaceItemDefinitionInput struct {
 	ItemDefinitionPath
+	IfMatch
 	Body ItemDefinitionBody
 }
 
@@ -86,26 +87,39 @@ type PatchItemDefinitionBody struct {
 
 type PatchItemDefinitionInput struct {
 	ItemDefinitionPath
+	IfMatch
 	Body PatchItemDefinitionBody
+}
+
+type DeleteItemDefinitionInput struct {
+	ItemDefinitionPath
+	IfMatch
 }
 
 type ItemDefinition struct {
 	ID            string `json:"id" format:"uuid"`
+	DisplayID     string `json:"display_id" readOnly:"true" example:"IT-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	TaraProjectID string `json:"tara_project_id" format:"uuid"`
 	ItemDefinitionBody
 	CreatedAt time.Time `json:"created_at"`
+	Version   int32     `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the item definition."`
 }
 
-type ItemDefinitionOutput struct{ Body ItemDefinition }
+type ItemDefinitionOutput struct {
+	ETag string `header:"ETag"`
+	Body ItemDefinition
+}
 type CreateItemDefinitionOutput struct {
 	Location string `header:"Location"`
+	ETag     string `header:"ETag"`
 	Body     ItemDefinition
 }
 type ListItemDefinitionsOutput struct{ Body []ItemDefinition }
 
 func itemDefinition(row db.ItemDefinition) ItemDefinition {
 	return ItemDefinition{
-		ID: row.ID.String(), TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
+		ID: row.ID.String(), DisplayID: displayID(displayPrefixItem, row.DisplayNumber),
+		TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time, Version: row.Version,
 		ItemDefinitionBody: ItemDefinitionBody{
 			Name: row.Name, ScopeType: row.ScopeType, LifecyclePhase: row.LifecyclePhase,
 			Boundary: row.Boundary, Functions: row.Functions, OperationalEnvironment: row.OperationalEnvironment,
@@ -149,7 +163,7 @@ func (h *ItemDefinitions) Get(ctx context.Context, in *ItemDefinitionPath) (*Ite
 	if err != nil {
 		return nil, itemDefinitionError(err)
 	}
-	return &ItemDefinitionOutput{Body: itemDefinition(row)}, nil
+	return &ItemDefinitionOutput{ETag: etag(row.Version), Body: itemDefinition(row)}, nil
 }
 
 func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionInput) (*CreateItemDefinitionOutput, error) {
@@ -171,10 +185,13 @@ func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionIn
 		}
 		return db.Created(db.TargetItemDefinition, projectID, row.ID, itemDefinition(row)), nil
 	})
+	if errors.Is(err, pgx.ErrNoRows) { // the create query locks the project, which was deleted after the access check
+		return nil, huma.Error404NotFound("project not found")
+	}
 	if err != nil {
 		return nil, itemDefinitionError(err)
 	}
-	return &CreateItemDefinitionOutput{Location: "/api/v1/projects/" + projectID.String() + "/item-definitions/" + row.ID.String(), Body: itemDefinition(row)}, nil
+	return &CreateItemDefinitionOutput{Location: "/api/v1/projects/" + projectID.String() + "/item-definitions/" + row.ID.String(), ETag: etag(row.Version), Body: itemDefinition(row)}, nil
 }
 
 func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinitionInput) (*ItemDefinitionOutput, error) {
@@ -186,7 +203,7 @@ func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinition
 	if strings.TrimSpace(in.Body.Name) == "" {
 		return nil, huma.Error422UnprocessableEntity("name must not be blank")
 	}
-	return h.update(ctx, projectID, id, func(ctx context.Context) (db.ItemDefinition, error) {
+	return h.update(ctx, projectID, id, in.IfMatch, func(ctx context.Context) (db.ItemDefinition, error) {
 		return h.store.ReplaceItemDefinition(ctx, db.ReplaceItemDefinitionParams{
 			ProjectID: projectID, ID: id, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
 			Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
@@ -196,24 +213,31 @@ func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinition
 	})
 }
 
-// update runs change on the item definition and records item_definition.updated, unless nothing
-// changed.
-func (h *ItemDefinitions) update(ctx context.Context, projectID, id pgtype.UUID, change func(context.Context) (db.ItemDefinition, error)) (*ItemDefinitionOutput, error) {
+// update runs change on the item definition if its version matches the precondition, and records
+// item_definition.updated, unless nothing changed.
+func (h *ItemDefinitions) update(ctx context.Context, projectID, id pgtype.UUID, precondition IfMatch, change func(context.Context) (db.ItemDefinition, error)) (*ItemDefinitionOutput, error) {
 	var row db.ItemDefinition
 	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetItemDefinitionForUpdate(ctx, db.GetItemDefinitionForUpdateParams{ProjectID: projectID, ID: id})
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := precondition.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		if row, err = change(ctx); err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetItemDefinition, projectID, id, itemDefinition(before), itemDefinition(row)), nil
+		updated := db.Updated(db.TargetItemDefinition, projectID, id, itemDefinition(before), itemDefinition(row))
+		if updated.Event == "" {
+			row = before // Audit rolls the no-op back, so the version stays
+		}
+		return updated, nil
 	})
 	if err != nil {
 		return nil, itemDefinitionError(err)
 	}
-	return &ItemDefinitionOutput{Body: itemDefinition(row)}, nil
+	return &ItemDefinitionOutput{ETag: etag(row.Version), Body: itemDefinition(row)}, nil
 }
 
 func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInput) (*ItemDefinitionOutput, error) {
@@ -234,7 +258,7 @@ func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInpu
 		value := db.ScopeType(*body.ScopeType.Value)
 		scope = &value
 	}
-	return h.update(ctx, projectID, id, func(ctx context.Context) (db.ItemDefinition, error) {
+	return h.update(ctx, projectID, id, in.IfMatch, func(ctx context.Context) (db.ItemDefinition, error) {
 		return h.store.PatchItemDefinition(ctx, db.PatchItemDefinitionParams{
 			ProjectID: projectID, ID: id, Name: body.Name.Value, ScopeType: scope,
 			SetBoundary: body.Boundary.Set, Boundary: body.Boundary.Value,
@@ -248,7 +272,7 @@ func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInpu
 	})
 }
 
-func (h *ItemDefinitions) Delete(ctx context.Context, in *ItemDefinitionPath) (*struct{}, error) {
+func (h *ItemDefinitions) Delete(ctx context.Context, in *DeleteItemDefinitionInput) (*struct{}, error) {
 	projectID := projectIDFromContext(ctx)
 	id, err := parseUUID(in.ItemID)
 	if err != nil {
@@ -257,6 +281,9 @@ func (h *ItemDefinitions) Delete(ctx context.Context, in *ItemDefinitionPath) (*
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetItemDefinitionForDelete(ctx, db.GetItemDefinitionForDeleteParams{ProjectID: projectID, ID: id})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		count, err := h.store.DeleteItemDefinition(ctx, db.DeleteItemDefinitionParams{ProjectID: projectID, ID: id})

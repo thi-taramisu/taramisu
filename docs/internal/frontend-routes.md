@@ -82,6 +82,17 @@ risk matrix from the impact of the linked damage scenarios and the most feasible
 The attack path page (#195) has the Definition tab (name, analysis approach, partial flag, steps), the Rating tab (attack potential with
 the five factors, total and feasibility) and the Relations tab (threat scenarios), all on the mock API.
 
+The asset page (#196) has the Definition tab (name, identification source, description and the C / I / A properties with their
+description), the Risks tab (one row per damage scenario × threat scenario of the asset, with the risk calculated as on the threat
+scenario's Risks tab) and the Relations tab (damage scenarios with their properties; threat scenarios that target the asset or reach it
+only via damage, both read-only), all on the mock API. The fields follow the data model: the wireframe's "Group" is not in the data model,
+so it is left out. A property that leads to a damage scenario can only be removed after its links are removed. The Risks tab has no
+treatment column yet, as treatment decisions are still a placeholder.
+
+Assets are created in the "New Asset" dialog ("+ New → Asset", or "Add Asset" on the item's Assets tab with the item fixed): only the name
+is required; item and C / I / A properties are optional (the wireframe's "Component / Interface" is not in the data model either), and a
+similar existing asset of the item is pointed out. "Create & open" opens the new asset's Definition tab.
+
 Threat scenarios and attack paths are created in the "New Threat Scenario" and "New Attack Path" dialogs (#332), from "+ New" or from
 "Create new …" on a Relations tab (with the item fixed). Both ask for the name, the item and the elements one level up: damage scenarios for
 a threat scenario, threat scenarios for an attack path. On the page of such an element, the dialog starts linked to it. At least one link is

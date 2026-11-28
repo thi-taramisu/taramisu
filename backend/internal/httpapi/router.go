@@ -31,18 +31,32 @@ type Queries interface {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 }
 
 // Option configures optional dependencies of the API.
 type Option func(*options)
 
 type options struct {
-	directory handlers.Directory
+	directory      handlers.Directory
+	attachments    *Attachments
+	requireIfMatch bool
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
 func WithDirectory(directory handlers.Directory) Option {
 	return func(o *options) { o.directory = directory }
+}
+
+// WithAttachments enables attachment storage.
+func WithAttachments(files *Attachments) Option {
+	return func(o *options) { o.attachments = files }
+}
+
+// WithRequiredIfMatch rejects a PUT, PATCH, or DELETE on a versioned record without If-Match with
+// 428 Precondition Required (REQUIRE_IF_MATCH).
+func WithRequiredIfMatch() Option {
+	return func(o *options) { o.requireIfMatch = true }
 }
 
 func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
@@ -63,6 +77,9 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	h := handlers.NewHealth(queries)
 	mux := chi.NewRouter()
 	mux.Use(logging.Middleware)
+	if o.requireIfMatch {
+		mux.Use(handlers.RequireIfMatch)
+	}
 	mux.Use(func(next http.Handler) http.Handler {
 		protected := manager.Require(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +120,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewDamageScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
+	handlers.NewSearch(queries).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
@@ -112,6 +130,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	registerAttachments(api, o.attachments, queries)
 	// Fail closed: an /api/ operation without an access declaration must not be served.
 	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
 		panic(err)

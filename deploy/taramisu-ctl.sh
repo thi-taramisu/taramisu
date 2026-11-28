@@ -95,11 +95,17 @@ start_stack() {
     log 'Starting Authentik (several minutes on the first start, which migrates its database)'
     compose up -d --no-build authentik-db authentik-server authentik-worker
     wait_healthy 600 authentik-db authentik-server authentik-worker
-    log 'Applying Authentik blueprints'
     # Blueprint output may contain secrets.
     blueprint_log=../iam/.blueprint.log
     : > "$blueprint_log"
     chmod 600 "$blueprint_log"
+    # Ours must come last: applied later, Authentik's own blueprints would reset what ours change,
+    # such as the login title (#344).
+    log 'Waiting for Authentik to apply its own blueprints'
+    if ! compose exec -T authentik-worker ak shell < authentik-blueprints-wait.py > "$blueprint_log" 2>&1; then
+        die 'Authentik did not finish applying its own blueprints. Details: iam/.blueprint.log (private; may contain secrets)'
+    fi
+    log 'Applying Authentik blueprints'
     if ! compose exec -T authentik-worker ak apply_blueprint $(grep -v '^#' authentik-blueprints.txt) > "$blueprint_log" 2>&1; then
         die 'Authentik provisioning failed. Details: iam/.blueprint.log (private; may contain secrets)'
     fi

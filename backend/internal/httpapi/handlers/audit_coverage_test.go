@@ -32,7 +32,9 @@ var auditedOperations = []string{
 
 // notAuditedYet change analysis content without an audit event. Move an operation to
 // auditedOperations when its changes are recorded; new operations must go into one of the lists.
-var notAuditedYet = []string{}
+var notAuditedYet = []string{
+	"upload-attachment", "delete-attachment",
+}
 
 // TestEveryChangeIsDeclaredForAudit makes adding a mutating operation a conscious decision about its
 // audit events, like the access declaration in handlers.Register.

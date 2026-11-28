@@ -9,7 +9,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -25,8 +24,8 @@ type TaraProjectStore interface {
 	ListTaraProjects(context.Context, db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error)
 	ReplaceTaraProject(context.Context, db.ReplaceTaraProjectParams) (db.TaraProject, error)
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
-	// DeleteTaraProject also records the audit event (see db.Store).
-	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
+	// DeleteTaraProject marks the project as deleted and records the audit event (see db.Store).
+	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID, db.VersionCheck) error
 	ExportProject(context.Context, pgtype.UUID) (db.ProjectExport, error)
 }
 
@@ -61,6 +60,7 @@ func (h *TaraProject) Register(api huma.API) {
 	Register(api, op("unarchive-tara-project", http.MethodPost, member+"/unarchive", "Unarchive an archived TARA project (idempotent)"), project(PermManage).AllowArchived(), h.Unarchive)
 	del := op("delete-tara-project", http.MethodDelete, member, "Delete a TARA project")
 	del.DefaultStatus = http.StatusNoContent
+	del.Description = "Owner only. The project disappears for all members at once, with all its content, and is deleted permanently after a grace period (30 days by default). Until then, an operator can restore it."
 	Register(api, del, project(PermManage).AllowArchived(), h.Delete)
 }
 
@@ -71,10 +71,12 @@ type TaraProjectBody struct {
 	Description *string    `json:"description,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	// Role is the caller's highest role in the project.
-	Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
+	Role    db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
+	Version int32          `json:"version" doc:"Raised by every change of the settings; send it as If-Match to change or delete the project."`
 }
 
 type TaraProjectOutput struct {
+	ETag string `header:"ETag"`
 	Body TaraProjectBody
 }
 
@@ -110,7 +112,8 @@ type CreateTaraProjectInput struct {
 }
 
 type ReplaceTaraProjectInput struct {
-	ID   string `path:"id" format:"uuid"`
+	ID string `path:"id" format:"uuid"`
+	IfMatch
 	Body struct {
 		Name        string  `json:"name" minLength:"1" pattern:"\\S"`
 		Description *string `json:"description,omitempty"`
@@ -118,7 +121,8 @@ type ReplaceTaraProjectInput struct {
 }
 
 type UpdateTaraProjectInput struct {
-	ID   string `path:"id" format:"uuid"`
+	ID string `path:"id" format:"uuid"`
+	IfMatch
 	Body struct {
 		Name        *string          `json:"name,omitempty" minLength:"1" pattern:"\\S"`
 		Description Optional[string] `json:"description,omitempty"`
@@ -149,7 +153,7 @@ func (h *TaraProject) Create(ctx context.Context, in *CreateTaraProjectInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return toTaraProjectOutput(db.TaraProject(p), db.ProjectRoleOWNER), nil
+	return toTaraProjectOutput(db.TaraProject{ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, Version: p.Version}, db.ProjectRoleOWNER), nil
 }
 
 // List returns only projects the caller has a role in.
@@ -169,7 +173,7 @@ func (h *TaraProject) List(ctx context.Context, in *ListTaraProjectsInput) (*Tar
 	out := &TaraProjectListOutput{Body: make([]TaraProjectBody, 0, len(projects))}
 	for _, p := range projects {
 		out.Body = append(out.Body, toTaraProjectBody(db.TaraProject{
-			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, ArchivedAt: p.ArchivedAt,
+			ID: p.ID, Name: p.Name, Description: p.Description, CreatedAt: p.CreatedAt, ArchivedAt: p.ArchivedAt, Version: p.Version,
 		}, p.Role))
 	}
 	return out, nil
@@ -184,13 +188,13 @@ func (h *TaraProject) Get(ctx context.Context, _ *TaraProjectIDInput) (*TaraProj
 }
 
 func (h *TaraProject) Replace(ctx context.Context, in *ReplaceTaraProjectInput) (*TaraProjectOutput, error) {
-	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+	return h.changeSettings(ctx, in.IfMatch, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
 		return h.store.ReplaceTaraProject(ctx, db.ReplaceTaraProjectParams{ID: id, Name: in.Body.Name, Description: in.Body.Description})
 	})
 }
 
 func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*TaraProjectOutput, error) {
-	return h.changeSettings(ctx, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
+	return h.changeSettings(ctx, in.IfMatch, func(ctx context.Context, id pgtype.UUID) (db.TaraProject, error) {
 		return h.store.UpdateTaraProject(ctx, db.UpdateTaraProjectParams{
 			ID:             id,
 			Name:           in.Body.Name,
@@ -200,8 +204,9 @@ func (h *TaraProject) Update(ctx context.Context, in *UpdateTaraProjectInput) (*
 	})
 }
 
-// changeSettings runs update and records project.updated, unless nothing changed.
-func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Context, pgtype.UUID) (db.TaraProject, error)) (*TaraProjectOutput, error) {
+// changeSettings runs update if the project's version matches the precondition, and records
+// project.updated, unless nothing changed.
+func (h *TaraProject) changeSettings(ctx context.Context, precondition IfMatch, update func(context.Context, pgtype.UUID) (db.TaraProject, error)) (*TaraProjectOutput, error) {
 	id := projectIDFromContext(ctx)
 	var p db.TaraProject
 	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
@@ -209,11 +214,18 @@ func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Co
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := precondition.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		if p, err = update(ctx, id); err != nil {
 			return db.Change{}, err
 		}
 		after := projectSettings{Name: p.Name, DescriptionChanged: !sameText(before.Description, p.Description)}
-		return db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name}, after), nil
+		updated := db.Updated(db.TargetProject, id, id, projectSettings{Name: before.Name}, after)
+		if updated.Event == "" {
+			p = before // Audit rolls the no-op back, so the version stays
+		}
+		return updated, nil
 	})
 	if err != nil {
 		return nil, mapTaraProjectError(err)
@@ -221,13 +233,18 @@ func (h *TaraProject) changeSettings(ctx context.Context, update func(context.Co
 	return toTaraProjectOutput(p, RoleFromContext(ctx)), nil
 }
 
-func (h *TaraProject) Delete(ctx context.Context, _ *TaraProjectIDInput) (*struct{}, error) {
+type DeleteTaraProjectInput struct {
+	ID string `path:"id" format:"uuid"`
+	IfMatch
+}
+
+func (h *TaraProject) Delete(ctx context.Context, in *DeleteTaraProjectInput) (*struct{}, error) {
 	id := projectIDFromContext(ctx)
 	actor, err := auditActor(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.store.DeleteTaraProject(ctx, actor, id); err != nil {
+	if err := h.store.DeleteTaraProject(ctx, actor, id, in.check); err != nil {
 		return nil, mapTaraProjectError(err)
 	}
 	return nil, nil
@@ -245,10 +262,6 @@ func mapTaraProjectError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, db.ErrProjectNotFound) {
 		return huma.Error404NotFound("project not found")
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
-		return huma.Error409Conflict("project still contains item definitions")
-	}
 	return err
 }
 
@@ -264,6 +277,7 @@ func toTaraProjectBody(p db.TaraProject, role db.ProjectRole) TaraProjectBody {
 		Description: p.Description,
 		CreatedAt:   p.CreatedAt.Time,
 		Role:        role,
+		Version:     p.Version,
 	}
 }
 
@@ -283,8 +297,12 @@ func (h *TaraProject) changeArchiveState(ctx context.Context, event string, upda
 		if err != nil {
 			return db.Change{}, err
 		}
-		if p, err = update(ctx, id); err != nil || before.ArchivedAt.Valid == p.ArchivedAt.Valid {
+		if p, err = update(ctx, id); err != nil {
 			return db.Change{}, err
+		}
+		if before.ArchivedAt.Valid == p.ArchivedAt.Valid {
+			p = before // Audit rolls the no-op back, so the version stays
+			return db.Change{}, nil
 		}
 		return db.Change{
 			Event: event, ProjectID: id, TargetType: db.TargetProject, TargetID: id,
@@ -299,7 +317,7 @@ func (h *TaraProject) changeArchiveState(ctx context.Context, event string, upda
 }
 
 func toTaraProjectOutput(p db.TaraProject, role db.ProjectRole) *TaraProjectOutput {
-	return &TaraProjectOutput{Body: toTaraProjectBody(p, role)}
+	return &TaraProjectOutput{ETag: etag(p.Version), Body: toTaraProjectBody(p, role)}
 }
 
 // sameText reports whether two optional texts are equal; nil equals only nil.

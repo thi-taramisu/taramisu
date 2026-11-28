@@ -7,7 +7,21 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const iAMUserExists = `-- name: IAMUserExists :one
+SELECT EXISTS (SELECT 1 FROM iam_user WHERE id = $1)
+`
+
+// Whether an internal user ID exists; for changes whose actor is not taken from a token.
+func (q *Queries) IAMUserExists(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, iAMUserExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
 
 const upsertIAMUser = `-- name: UpsertIAMUser :one
 INSERT INTO iam_user (external_iam_sub)
