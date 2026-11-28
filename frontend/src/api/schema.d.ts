@@ -822,6 +822,13 @@ export interface components {
         AssistantOutputBody: {
             answer: string;
             tools_used: string[] | null;
+            usage: components["schemas"]["AssistantUsage"];
+        };
+        AssistantUsage: {
+            /** Format: int64 */
+            input_tokens: number;
+            /** Format: int64 */
+            output_tokens: number;
         };
         AttachmentMetadata: {
             content_type: string;

@@ -36,7 +36,7 @@ func (f *fakeModelAPI) start(t *testing.T) *url.URL {
 
 func TestForwardsChatCompletionsWithServiceKey(t *testing.T) {
 	var upstream fakeModelAPI
-	handler := newHandler(upstream.start(t), "service-key")
+	handler := newHandler(upstream.start(t), "service-key", nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"m"}`))
 	req.Header.Set("Authorization", "Bearer caller-token")
@@ -63,7 +63,7 @@ func TestForwardsChatCompletionsWithServiceKey(t *testing.T) {
 
 func TestForwardsModelList(t *testing.T) {
 	var upstream fakeModelAPI
-	handler := newHandler(upstream.start(t), "service-key")
+	handler := newHandler(upstream.start(t), "service-key", nil)
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/models", http.NoBody))
@@ -87,7 +87,7 @@ func TestRejectsOtherEndpointsWithoutCallingUpstream(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
 			var upstream fakeModelAPI
-			handler := newHandler(upstream.start(t), "service-key")
+			handler := newHandler(upstream.start(t), "service-key", nil)
 
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, http.NoBody))
@@ -104,7 +104,7 @@ func TestRejectsOtherEndpointsWithoutCallingUpstream(t *testing.T) {
 
 func TestWithoutKeyReturns503WithoutCallingUpstream(t *testing.T) {
 	var upstream fakeModelAPI
-	handler := newHandler(upstream.start(t), "")
+	handler := newHandler(upstream.start(t), "", nil)
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{}`)))
@@ -119,7 +119,7 @@ func TestWithoutKeyReturns503WithoutCallingUpstream(t *testing.T) {
 
 func TestRejectsOversizedRequest(t *testing.T) {
 	var upstream fakeModelAPI
-	handler := newHandler(upstream.start(t), "service-key")
+	handler := newHandler(upstream.start(t), "service-key", nil)
 
 	body := strings.NewReader(strings.Repeat("x", maxRequestBytes+1))
 	rec := httptest.NewRecorder()
@@ -139,7 +139,7 @@ func TestUnreachableModelAPIReturns502(t *testing.T) {
 	server.Close() // nothing listens there any more
 
 	rec := httptest.NewRecorder()
-	newHandler(u, "service-key").ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/models", http.NoBody))
+	newHandler(u, "service-key", nil).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/models", http.NoBody))
 
 	if rec.Code != http.StatusBadGateway {
 		t.Errorf("status = %d, want 502", rec.Code)

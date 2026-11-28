@@ -4,6 +4,7 @@
 //
 // It forwards only the endpoints the API needs and never logs request or response bodies. It has no
 // authentication of its own: only the API can reach it, through the internal llm network.
+// Optionally it reports chat completions to a self-hosted Langfuse (langfuse.go).
 package main
 
 import (
@@ -28,7 +29,9 @@ const (
 	defaultUpstreamURL = "https://chat-ai.academiccloud.de"
 	// maxRequestBytes bounds a chat request, including the conversation history and tool results.
 	maxRequestBytes = 1 << 20
-	shutdownTimeout = 8 * time.Second
+	// maxTracedResponseBytes bounds how much of a model response is kept for a Langfuse report.
+	maxTracedResponseBytes = 1 << 20
+	shutdownTimeout        = 8 * time.Second
 )
 
 func main() {
@@ -48,11 +51,19 @@ func run() error {
 	if apiKey == "" {
 		slog.Warn("LLM_API_KEY not set: the assistant is disabled and every model request returns 503")
 	}
+	tracing, err := newLangfuseFromEnv()
+	if err != nil {
+		return err
+	}
+	if tracing != nil {
+		slog.Info("reporting model requests to Langfuse", "host", os.Getenv("LANGFUSE_HOST"))
+		defer tracing.wait()
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	server := &http.Server{Handler: newHandler(upstream, apiKey), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Handler: newHandler(upstream, apiKey, tracing), ReadHeaderTimeout: 5 * time.Second}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -79,12 +90,14 @@ func run() error {
 
 // newHandler forwards the allowed endpoints to upstream and adds the API key. Paths are kept as they are,
 // so upstream is the base URL without /v1. Other paths get 404, other methods on an allowed path 405.
-func newHandler(upstream *url.URL, apiKey string) http.Handler {
+// With tracing, chat completions are also reported to Langfuse; tracing may be nil.
+func newHandler(upstream *url.URL, apiKey string, tracing *langfuse) http.Handler {
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(upstream)
 			// Only our key leaves the network; nothing the caller sent is passed on as credentials.
 			r.Out.Header.Del("Cookie")
+			r.Out.Header.Del(traceHeader)
 			r.Out.Header.Set("Authorization", "Bearer "+apiKey)
 		},
 		// Pass streamed (SSE) responses on immediately instead of buffering them.
@@ -95,46 +108,67 @@ func newHandler(upstream *url.URL, apiKey string) http.Handler {
 		},
 	}
 
-	forward := func(w http.ResponseWriter, r *http.Request) {
-		if apiKey == "" {
-			http.Error(w, "assistant is not configured", http.StatusServiceUnavailable)
-			return
-		}
-		// Read the whole body first, so an oversized request is rejected before anything reaches the model API.
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
-		if err != nil {
-			var tooLarge *http.MaxBytesError
-			if errors.As(err, &tooLarge) {
-				http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+	forward := func(trace bool) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if apiKey == "" {
+				http.Error(w, "assistant is not configured", http.StatusServiceUnavailable)
 				return
 			}
-			http.Error(w, "could not read request", http.StatusBadRequest)
-			return
+			// Read the whole body first, so an oversized request is rejected before anything reaches the model API.
+			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBytes))
+			if err != nil {
+				var tooLarge *http.MaxBytesError
+				if errors.As(err, &tooLarge) {
+					http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+					return
+				}
+				http.Error(w, "could not read request", http.StatusBadRequest)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			r.ContentLength = int64(len(body))
+			traced := trace && tracing != nil
+			traceID := traceIDFrom(r)
+			start := time.Now()
+			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK, keep: traced}
+			proxy.ServeHTTP(rec, r)
+			end := time.Now()
+			slog.Info("model request", "method", r.Method, "path", r.URL.Path, "status", rec.status,
+				"duration", end.Sub(start).Round(time.Millisecond))
+			if traced {
+				tracing.report(r.Context(), generation{traceID: traceID, start: start, end: end, status: rec.status,
+					request: body, response: rec.body.Bytes()})
+			}
 		}
-		r.Body = io.NopCloser(bytes.NewReader(body))
-		r.ContentLength = int64(len(body))
-		start := time.Now()
-		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-		proxy.ServeHTTP(rec, r)
-		slog.Info("model request", "method", r.Method, "path", r.URL.Path, "status", rec.status,
-			"duration", time.Since(start).Round(time.Millisecond))
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/chat/completions", forward)
-	mux.HandleFunc("GET /v1/models", forward)
+	mux.HandleFunc("POST /v1/chat/completions", forward(true))
+	mux.HandleFunc("GET /v1/models", forward(false))
 	return mux
 }
 
-// statusRecorder remembers the status code for the request log. Unwrap lets the proxy flush streamed responses.
+// statusRecorder remembers the status code for the request log and, with keep, the start of the body for tracing.
+// Unwrap lets the proxy flush streamed responses.
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
+	keep   bool
+	body   bytes.Buffer
 }
 
 func (r *statusRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(p []byte) (int, error) {
+	if r.keep {
+		if room := maxTracedResponseBytes - r.body.Len(); room > 0 {
+			r.body.Write(p[:min(len(p), room)])
+		}
+	}
+	return r.ResponseWriter.Write(p)
 }
 
 func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }

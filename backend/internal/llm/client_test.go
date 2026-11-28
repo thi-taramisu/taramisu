@@ -7,25 +7,29 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 func TestCompleteSendsRequestAndReturnsMessage(t *testing.T) {
 	var got Request
-	var path string
+	var path, traceID, rawBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path = r.URL.Path
+		path, traceID = r.URL.Path, r.Header.Get("X-Trace-Id")
 		body, _ := io.ReadAll(r.Body)
+		rawBody = string(body)
 		_ = json.Unmarshal(body, &got)
 		_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"",
-			"tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_project","arguments":"{}"}}]}}]}`)
+			"tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_project","arguments":"{}"}}]}}],
+			"usage":{"prompt_tokens":120,"completion_tokens":15,"total_tokens":135}}`)
 	}))
 	defer server.Close()
 
-	msg, err := NewHTTPClient(server.URL+"/").Complete(context.Background(), Request{
+	completion, err := NewHTTPClient(server.URL+"/").Complete(context.Background(), Request{
 		Model:    "m",
 		Messages: []Message{{Role: "user", Content: "hi"}},
 		Tools:    []Tool{{Type: "function", Function: Function{Name: "get_project", Parameters: map[string]any{"type": "object"}}}},
+		TraceID:  "0123456789abcdef",
 	})
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
@@ -33,11 +37,33 @@ func TestCompleteSendsRequestAndReturnsMessage(t *testing.T) {
 	if path != "/v1/chat/completions" {
 		t.Errorf("path = %q, want /v1/chat/completions", path)
 	}
+	if traceID != "0123456789abcdef" || strings.Contains(rawBody, "0123456789abcdef") {
+		t.Errorf("trace ID header = %q, body = %s; want the ID as header only", traceID, rawBody)
+	}
 	if got.Model != "m" || len(got.Messages) != 1 || len(got.Tools) != 1 || got.Tools[0].Function.Name != "get_project" {
 		t.Errorf("request = %+v, want model, message and tool passed on", got)
 	}
+	msg := completion.Message
 	if len(msg.ToolCalls) != 1 || msg.ToolCalls[0].ID != "call_1" || msg.ToolCalls[0].Function.Name != "get_project" {
 		t.Errorf("message = %+v, want the tool call", msg)
+	}
+	if want := (Usage{InputTokens: 120, OutputTokens: 15}); completion.Usage != want {
+		t.Errorf("usage = %+v, want %+v", completion.Usage, want)
+	}
+}
+
+func TestCompleteWithoutUsage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"Hi"}}]}`)
+	}))
+	defer server.Close()
+
+	completion, err := NewHTTPClient(server.URL).Complete(context.Background(), Request{Model: "m"})
+	if err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+	if completion.Message.Content != "Hi" || completion.Usage != (Usage{}) {
+		t.Errorf("completion = %+v, want the answer and zero usage", completion)
 	}
 }
 

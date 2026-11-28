@@ -107,6 +107,27 @@ Check `docker volume ls` and migrate or explicitly override the volume names bef
 `COMPOSE_PROJECT_NAME` (or Docker Compose `-p`) changes both container/network names and the volume prefixes.
 Use a separate checkout, secrets file, and free host ports as well when running multiple stacks.
 
+## Assistant tracing with Langfuse (optional)
+
+The LLM service can report every model call to a self-hosted [Langfuse](https://langfuse.com): messages, answer, tool calls,
+token usage, duration and errors. All calls of one assistant question form one trace. Langfuse is not part of this stack.
+It stores the full prompts, including project data, so only use an instance you run yourself, not Langfuse Cloud.
+
+1. Start Langfuse on your machine with its [Docker Compose setup](https://langfuse.com/self-hosting/deployment/docker-compose).
+   Publish `langfuse-web` on `127.0.0.1:3000` and on the Docker bridge (usually `172.17.0.1:3000`), not on all interfaces.
+   Its other ports clash with this stack (5432, 9000) and are not needed from the host.
+2. In Langfuse, create a project and an API key pair.
+3. Set in `iam/.env` and restart with `make -C deploy up`:
+
+   ```sh
+   LANGFUSE_HOST=http://host.docker.internal:3000
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   ```
+
+Without these variables nothing is sent. `compose.dev.yaml` maps `host.docker.internal` to the host for the LLM service.
+Reports are sent in the background; when Langfuse is unreachable, the LLM service logs a warning and the assistant keeps working.
+
 ## Checks
 
 ```sh
