@@ -3,6 +3,7 @@ import type { ItemDefinition, ItemDefinitionBody, PatchItemDefinitionBody } from
 import type { RiskGroup } from '../models/risk'
 import type { EntityRef, TreeNode } from '../models/tree'
 import type { PageRequest } from '../pagination'
+import type { AssetService } from './assets'
 import type { DamageScenarioService } from './damageScenarios'
 import type { AttackPathService } from './attackPaths'
 import type { ThreatScenarioService } from './threatScenarios'
@@ -39,6 +40,7 @@ export interface ItemContentService {
 export interface ItemApi {
   items: ItemService
   content: ItemContentService
+  assets: AssetService
   damageScenarios: DamageScenarioService
   threatScenarios: ThreatScenarioService
   attackPaths: AttackPathService

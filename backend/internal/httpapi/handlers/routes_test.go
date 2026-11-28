@@ -25,11 +25,13 @@ type propertyQueries struct {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 
 	resourceAccess
 	handlers.ProjectMemberStore
@@ -212,4 +214,8 @@ func TestResourceOpenAPIPermissions(t *testing.T) {
 			}
 		}
 	}
+}
+
+func (a resourceAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
 }

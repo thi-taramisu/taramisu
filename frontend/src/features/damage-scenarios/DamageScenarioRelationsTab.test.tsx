@@ -67,7 +67,7 @@ describe('damage scenario relations', () => {
     expect(dialog.queryByRole('button', { name: /TS-1/ })).not.toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-2/ })).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: /TS-3/ })).toBeInTheDocument()
-    expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeDisabled()
+    expect(dialog.getByRole('button', { name: 'Create new Threat Scenario…' })).toBeEnabled()
   })
 
   it('links one threat scenario to several damage scenarios', async () => {
@@ -104,7 +104,7 @@ describe('damage scenario relations', () => {
 
   it('adds an asset with all its properties and offers only assets with properties', async () => {
     const api = createMockItemApi()
-    await api.content.addAsset('headlamp', 'i-01', { name: 'Unrated asset', component: 'ECU', properties: [] })
+    await api.content.addAsset('headlamp', 'i-01', { name: 'Unrated asset', properties: [] })
     const { user } = renderApp(page, api)
 
     await user.click((await findSection('Assets')).getByRole('button', { name: 'Add Asset' }))

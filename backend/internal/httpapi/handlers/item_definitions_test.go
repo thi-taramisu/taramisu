@@ -36,10 +36,12 @@ type itemStore struct {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 	handlers.StatusReader
@@ -239,6 +241,9 @@ func TestItemDefinitionValidationAndErrors(t *testing.T) {
 			if w.Code != tc.code || strings.Contains(w.Body.String(), "private database details") {
 				t.Errorf("%s error: %d %s", method, w.Code, w.Body.String())
 			}
+			if method == "POST" && errors.Is(tc.err, pgx.ErrNoRows) && !strings.Contains(w.Body.String(), "project not found") {
+				t.Errorf("create in a deleted project: %s, want project not found", w.Body.String())
+			}
 		}
 	}
 	store.err = nil
@@ -316,6 +321,8 @@ func TestItemDefinitionPermissions(t *testing.T) {
 		}
 	}
 }
+
+func (s *itemStore) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
 
 // TestItemDefinitionChangesAreAudited checks which change each operation hands to the store; the
 // stored events are covered against PostgreSQL in TestAuditContentPostgres.

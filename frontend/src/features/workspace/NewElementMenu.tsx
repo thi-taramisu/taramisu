@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { CreateAssetDialog } from '../assets/CreateAssetDialog'
+import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
 import { isExampleProject } from '../../api/mocks/data/headlamp'
+import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
-
-// Only items and damage scenarios can be created so far; the other types follow with their own tickets. Real
-// projects only have items so far (#250); everything below them is still mocked in the example project.
-const OTHER_TYPES = ['assets', 'threat-scenarios', 'attack-paths']
 
 interface NewElementMenuProps {
   projectId: string
@@ -23,7 +22,10 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
   const { t } = useTranslation()
   const canCreateBelowItems = isExampleProject(projectId)
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
+  const [assetDialog, setAssetDialog] = useState({ open: false, key: 0 })
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
+  const [threatScenarioDialog, setThreatScenarioDialog] = useState({ open: false, key: 0 })
+  const [attackPathDialog, setAttackPathDialog] = useState({ open: false, key: 0 })
   // The menu is closed when a dialog opens, so the dialogs return the focus to this button themselves.
   const [newButton, setNewButton] = useState<HTMLButtonElement | null>(null)
 
@@ -40,16 +42,20 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
           <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
           {canCreateBelowItems && (
             <>
-              {/* A new key per opening, so the dialog starts from the item and asset of the current page. */}
+              {/* A new key per opening, so the dialogs start from the item and element of the current page. */}
+              <DropdownMenuItem onSelect={() => setAssetDialog(({ key }) => ({ open: true, key: key + 1 }))}>{t('entities.assets')}</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
                 {t('entities.damage-scenarios')}
               </DropdownMenuItem>
-              {OTHER_TYPES.map((label) => (
-                <DropdownMenuItem key={label} disabled>
-                  {t(`entities.${label}`)}
-                </DropdownMenuItem>
-              ))}
             </>
+          )}
+          <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+            {t('entities.threat-scenarios')}
+          </DropdownMenuItem>
+          {canCreateBelowItems && (
+            <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+              {t('entities.attack-paths')}
+            </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -60,13 +66,44 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         onOpenChange={setItemDialogOpen}
         returnFocusTo={newButton}
       />
-      {canCreateBelowItems && (
+      {/* Mounted from the first opening on, so closed dialogs load nothing on every page. */}
+      {assetDialog.key > 0 && (
+        <CreateAssetDialog
+          key={`asset-${assetDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={assetDialog.open}
+          onOpenChange={(open) => setAssetDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
+      {damageScenarioDialog.key > 0 && (
         <CreateDamageScenarioDialog
-          key={damageScenarioDialog.key}
+          key={`damage-scenario-${damageScenarioDialog.key}`}
           projectId={projectId}
           projectName={projectName}
           open={damageScenarioDialog.open}
           onOpenChange={(open) => setDamageScenarioDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
+      {threatScenarioDialog.key > 0 && (
+        <CreateThreatScenarioDialog
+          key={`threat-scenario-${threatScenarioDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={threatScenarioDialog.open}
+          onOpenChange={(open) => setThreatScenarioDialog((prev) => ({ ...prev, open }))}
+          returnFocusTo={newButton}
+        />
+      )}
+      {attackPathDialog.key > 0 && (
+        <CreateAttackPathDialog
+          key={`attack-path-${attackPathDialog.key}`}
+          projectId={projectId}
+          projectName={projectName}
+          open={attackPathDialog.open}
+          onOpenChange={(open) => setAttackPathDialog((prev) => ({ ...prev, open }))}
           returnFocusTo={newButton}
         />
       )}

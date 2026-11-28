@@ -24,6 +24,7 @@ type healthQueries struct {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
@@ -34,6 +35,7 @@ type healthQueries struct {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 }
 
 func statusFunc(f func(context.Context) (string, error)) healthQueries {

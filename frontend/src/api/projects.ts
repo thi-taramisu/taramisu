@@ -28,13 +28,15 @@ export function createProjectApi(
   }: ProjectApiOptions = {},
 ): ProjectService {
   function toProject(body: ProjectBody): Project {
+    const projectExtras = extras.get(body.id)
     return {
       id: body.id,
       name: body.name,
       description: body.description ?? '',
       role: body.role,
       updatedAt: body.created_at,
-      ...extras.get(body.id),
+      ...projectExtras,
+      archived: body.archived_at != null || projectExtras.archived,
     }
   }
 

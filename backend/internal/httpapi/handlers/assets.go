@@ -7,12 +7,14 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
 type AssetStore interface {
+	Auditor
+	GetAssetForUpdate(context.Context, db.GetAssetForUpdateParams) (db.Asset, error)
+	GetAssetForDelete(context.Context, db.GetAssetForDeleteParams) (db.Asset, error)
 	CreateAsset(context.Context, db.CreateAssetParams) (db.Asset, error)
 	GetAsset(context.Context, db.GetAssetParams) (db.Asset, error)
 	ListAssets(context.Context, db.ListAssetsParams) ([]db.Asset, error)
@@ -62,6 +64,7 @@ type AssetBody struct {
 
 type Asset struct {
 	ID                   string                   `json:"id" format:"uuid"`
+	DisplayID            string                   `json:"display_id" readOnly:"true" example:"AS-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	ItemDefinitionID     string                   `json:"item_definition_id" format:"uuid"`
 	Name                 string                   `json:"name"`
 	Description          *string                  `json:"description" nullable:"true"`
@@ -135,22 +138,30 @@ func (assetUUID) Schema(huma.Registry) *huma.Schema {
 		Pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"}
 }
 func assetBody(a db.Asset) Asset {
-	return Asset{ID: a.ID.String(), ItemDefinitionID: a.ItemDefinitionID.String(), Name: a.Name,
+	return Asset{ID: a.ID.String(), DisplayID: displayID(displayPrefixAsset, a.DisplayNumber),
+		ItemDefinitionID: a.ItemDefinitionID.String(), Name: a.Name,
 		Description: a.Description, IdentificationSource: a.IdentificationSource}
 }
 func assetError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("asset not found")
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
-	}
 	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAssetOutput, error) {
-	a, err := h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
-		Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		var err error
+		a, err = h.queries.CreateAsset(ctx, db.CreateAssetParams{ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
+			Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(a)), nil
+	})
+	if notFound := itemDeletedOnCreate(err); notFound != nil {
+		return nil, notFound
+	}
 	if err != nil {
 		return nil, assetError(err)
 	}
@@ -175,8 +186,19 @@ func (h *Assets) List(ctx context.Context, in *ListAssetsInput) (*ListAssetsOutp
 	return out, nil
 }
 func (h *Assets) Replace(ctx context.Context, in *ReplaceAssetInput) (*AssetOutput, error) {
-	a, err := h.queries.ReplaceAsset(ctx, db.ReplaceAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
-		Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForUpdate(ctx, db.GetAssetForUpdateParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		a, err = h.queries.ReplaceAsset(ctx, db.ReplaceAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
+			Name: in.Body.Name, Description: in.Body.Description, IdentificationSource: in.Body.IdentificationSource})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}
@@ -190,14 +212,34 @@ func (h *Assets) Update(ctx context.Context, in *UpdateAssetInput) (*AssetOutput
 	p := db.UpdateAssetParams{ID: pgtype.UUID(in.ID), Name: b.Name.Value, ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 		SetDescription: b.Description.Set, Description: b.Description.Value,
 		SetIdentificationSource: b.IdentificationSource.Set, IdentificationSource: b.IdentificationSource.Value}
-	a, err := h.queries.UpdateAsset(ctx, p)
+	var a db.Asset
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForUpdate(ctx, db.GetAssetForUpdateParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		a, err = h.queries.UpdateAsset(ctx, p)
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(before), assetBody(a)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}
 	return &AssetOutput{Body: assetBody(a)}, nil
 }
 func (h *Assets) Delete(ctx context.Context, in *AssetIDInput) (*struct{}, error) {
-	_, err := h.queries.DeleteAsset(ctx, db.DeleteAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
+		before, err := h.queries.GetAssetForDelete(ctx, db.GetAssetForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if _, err := h.queries.DeleteAsset(ctx, db.DeleteAssetParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)}); err != nil {
+			return db.Change{}, err
+		}
+		return db.Deleted(db.TargetAsset, projectIDFromContext(ctx), before.ID, assetBody(before)), nil
+	})
 	if err != nil {
 		return nil, assetError(err)
 	}

@@ -22,6 +22,11 @@ export interface AttackPath {
   attack_steps_and_weaknesses: AttackStep[] | null
 }
 
+/** POST body: title, owning item and the threat scenarios the attack path realizes; the other fields follow on its page. */
+export type AttackPathBody = Pick<AttackPath, 'item_definition_id' | 'title'> & {
+  threat_scenario_ids: string[]
+}
+
 /** PATCH body: only the given fields change. */
 export type PatchAttackPathBody = Partial<Pick<AttackPath, 'title' | 'analysis_approach' | 'is_partial_early_stage' | 'attack_steps_and_weaknesses'>>
 

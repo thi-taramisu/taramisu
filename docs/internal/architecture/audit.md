@@ -72,13 +72,25 @@ project.
 | Project | `project.created` | After: name, first Owner | Stored |
 | Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
 | Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
-| Project | `project.archived`, `project.restored` | – | With archiving |
+| Project | `project.archived`, `project.unarchived` | Archived state before and after | Stored |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
 | Members | `member.added` | After: role, user or group | Stored |
 | Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Stored |
 | Members | `member.removed`, including leaving | Before: role, user or group. The actor equals the user when someone left | Stored |
 | Item definitions | `item_definition.created`, `.updated`, `.deleted` | API representation before and after | Stored |
-| Other analysis content | `<record>.created`, `<record>.updated`, `<record>.deleted` | API representation before and after | Planned |
+| Assets | `asset.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Asset cybersecurity properties | `asset_cybersecurity_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Damage scenario asset properties | `damage_scenario_asset_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Threat scenario asset properties | `threat_scenario_asset_property.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Damage scenarios | `damage_scenario.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Impact ratings | `impact_rating.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Attack paths | `attack_path.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Attack feasibility ratings | `attack_feasibility_rating.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Threat–damage links | `threat_damage_link.created`, `.deleted` | API representation before and after | Stored |
+| Threat–attack path links | `threat_attack_path_link.created`, `.deleted` | API representation before and after | Stored |
+| Threat scenarios | `threat_scenario.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Risk values | `risk_value.created`, `.updated`, `.deleted` | API representation before and after | Stored |
+| Risk treatment decisions | `risk_treatment_decision.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | AI assistant | `ai_suggestion.applied` | Target record, applied fields, model | With the AI assistant |
 | Review | `review.requested`, `review.approved`, `review.rejected` | Reviewed state | With the review workflow |
 

@@ -54,6 +54,11 @@ class DeliveryError(Exception):
     pass
 
 
+def warn_delivery(labels, error):
+    # Route labels come from LABEL_WEBHOOKS and transport errors omit secrets.
+    print(f"::warning title=Discord notification undelivered::{', '.join(labels)}: {error}")
+
+
 def send_webhook(webhook, payload):
     try:
         parsed = urlsplit(webhook)
@@ -93,9 +98,9 @@ class GitHub:
         self.token = os.environ["GH_TOKEN"]
         self.sha = None
 
-    def request(self, path, data=None, method=None):
+    def request(self, path, data=None, method=None, *, root=None):
         request = urllib.request.Request(
-            self.root + path,
+            (root or self.root) + path,
             data=json.dumps(data).encode() if data is not None else None,
             headers={"Authorization": f"Bearer {self.token}", "Accept": "application/vnd.github+json",
                      "Content-Type": "application/json", "User-Agent": "Taramisu-Issue-Digest"},
@@ -148,6 +153,14 @@ class GitHub:
         if self.sha:
             data["sha"] = self.sha
         self.sha = self.request(f"/contents/{STATE_PATH}", data, "PUT")["content"]["sha"]
+
+    def approved_pulls(self, labels):
+        repo = os.environ["GITHUB_REPOSITORY"]
+        query = f'repo:{repo} is:pr is:open review:approved label:{",".join(labels)}'
+        result = self.request("/search/issues?" + urlencode({"q": query, "per_page": 8}),
+                              root="https://api.github.com")
+        search_url = f"https://github.com/{repo}/pulls?" + urlencode({"q": query})
+        return result["items"], result["total_count"], search_url
 
     def issues(self, since, until):
         # GitHub filters updated_at strictly after since; overlap one second

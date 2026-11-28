@@ -39,7 +39,7 @@ make down
 API, backend database and migrations, Authentik, frontend, and proxy. Startup provisions Authentik before starting the API.
 See the [deployment README](../deploy/README.md) for setup, networking, and migration from the former two-project layout.
 
-Container commands use `iam/.env`; `make init` generates it without starting services.
+Container commands use `iam/.env` and `storage/.env`; `make init` generates them without starting services.
 `make db` starts only the backend database, and `make migrate` applies its migrations.
 These commands initialize the configuration automatically if needed.
 
@@ -47,14 +47,35 @@ These commands initialize the configuration automatically if needed.
 connected to the backend database. It remains opt-in through the `tools` profile.
 
 To run the API directly on the host, copy `.env.example` to `.env`, stop the API container with
-`docker compose --env-file ../iam/.env -f ../deploy/compose.yaml stop api`, and run `make run`.
+`docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml stop api`, and follow
+the [host storage setup](../deploy/README.md#seaweedfs-object-storage) before running `make run`.
 `make run` and `make test` load the backend `.env`; bare `make` runs tests.
 The host process listens on port 8080 directly (`HTTP_ADDR=:8080`). To return to the full Compose stack, run `make up`.
 
 `make down` stops the entire stack, including frontend, proxy, and IAM, and preserves data and secrets.
 
-> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, and Authentik data volumes.
-> It keeps `iam/.env`; `make up` provisions a fresh stack afterward.
+> **Warning:** `make reset` stops the entire stack and deletes its backend, pgAdmin, Authentik, and storage data volumes.
+> It keeps `iam/.env` and `storage/.env`; `make up` provisions a fresh stack afterward.
+
+## Sentry
+
+Reporting is optional: an empty `SENTRY_DSN` keeps JSON logs local. When enabled, Sentry receives application logs
+at Info, Warn, and Error, subject to the configured log level. HTTP panics produce an event with a stack trace and the matched route.
+Panic values and raw request data stay local, as do request, access-denial, and audit logs.
+Application logs sent to Sentry omit raw error attributes.
+Request bodies, headers, cookies, query parameters, and automatically collected user
+information are excluded. In-flight requests drain before the database pool closes and pending reports flush;
+the Compose API stop timeout is 15 seconds to cover all three phases.
+
+For **host execution** (`make run`), set `SENTRY_DSN`, `SENTRY_ENVIRONMENT=development`, and optionally
+`SENTRY_RELEASE` in `backend/.env`. The host sends directly unless `SENTRY_TUNNEL_URL` is configured.
+
+For **Compose/server execution**, set the backend project's `SENTRY_DSN` in **`iam/.env`**. `backend/.env` is not
+read by Compose. Backend and frontend Compose builds share `SENTRY_ENVIRONMENT` (default `production`).
+The API remains on internal networks and sends through `http://sentry-ingest:8081`; the dedicated ingest proxy forwards only POSTs to
+that DSN's Sentry SaaS project envelope endpoint, with TLS verification. Port 8081 is not published and the
+public listener has no ingest route. The original DSN stays in SDK envelopes and authentication headers.
+See [deployment configuration](../deploy/README.md#sentry-reporting) for frontend build settings and verification.
 
 ## Authentication
 
@@ -77,6 +98,25 @@ Adding members and showing member names needs the Authentik Core API through `AU
 The Compose stack sets both (see [IAM README](../iam/README.md#project-roles-groups-and-api-access)). For `make run` on the
 host, copy the token from `iam/.env` into `backend/.env` (see `.env.example`). Without them the API starts,
 omits member names, and returns 503 for adding members and for `GET /api/v1/groups`.
+
+## Archived projects
+
+Owners can `POST /api/v1/projects/{id}/archive` and `POST /api/v1/projects/{id}/unarchive`.
+Both return the project and are idempotent: repeated archive preserves its original timestamp.
+State changes record project.archived or project.unarchived in the audit history.
+Project responses include `archived_at` (null for active projects). The project list accepts
+`?archived=true` (archived only), `?archived=false` (active only), or neither (both, the existing default).
+
+The shared project authorization blocks project settings and all analysis-content writes while archived
+with HTTP 409. Reads, project deletion, and membership maintenance (including leaving) remain available;
+normal role and last-Owner rules still apply. Unarchive is Owner-only. Role failures retain 403/404 and
+are checked before archive state. Archive state is checked against the database for every write,
+without caching. Requests already authorized before archiving may still complete.
+
+New project operations inherit archive protection through `InProject`. Only explicit maintenance
+exceptions use `.AllowArchived()`; a read permission on a write operation does not bypass protection.
+Run the backend integration tests with a migrated `TEST_DATABASE_URL` to verify the archive lifecycle,
+filters, maintenance exceptions, and rejection of every registered project-content write.
 
 ## Logging
 
@@ -108,7 +148,7 @@ TEST_DATABASE_URL='postgres://taramisu:taramisu@localhost:5432/taramisu?sslmode=
 ```
 
 Database tests need the running stack; they are skipped without `TEST_DATABASE_URL`.
-API logs: `docker compose --env-file ../iam/.env -f ../deploy/compose.yaml logs api`.
+API logs: `docker compose --env-file ../iam/.env --env-file ../storage/.env -f ../deploy/compose.yaml logs api`.
 
 ## Database migrations and sqlc drift detection
 
@@ -118,6 +158,11 @@ After editing `db/schema.sql` or `db/queries/`, generate the corresponding Atlas
 make migrate-diff name=my_change
 make sqlc
 ```
+
+PostgreSQL extensions are the exception: Atlas without login rejects `CREATE EXTENSION` in `db/schema.sql` and ignores
+extensions when it compares, so they are created only in a hand-written migration (`pg_trgm` and `unaccent` for the search,
+in `20261123212752_search_extensions.sql`). `db/schema.sql` must not use objects that need them, such as trigram indexes,
+because the drift check builds it in a database without extensions. Queries in `db/queries/` may use their functions.
 
 CI verifies that migrations and generated Go models are in sync with `db/schema.sql` and `db/queries/`:
 
@@ -282,3 +327,6 @@ For offline use and CI, commit [`openapi.json`](openapi.json) and refresh with `
 `go run ./cmd/openapi > openapi.json`; no DB or running server—`make up`/`make run` do not update the file).
 API-changing PRs must include an updated spec; CI regenerates and fails if it is stale.
 Source of truth: `internal/httpapi/`.
+
+For host Go runs, configure S3 using [the storage setup](../deploy/README.md#seaweedfs-object-storage)
+and the values in `.env.example`.

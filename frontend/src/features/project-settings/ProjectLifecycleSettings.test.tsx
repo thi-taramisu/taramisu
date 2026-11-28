@@ -82,11 +82,11 @@ describe('ProjectLifecycleSettings', () => {
     const dialog = await screen.findByRole('alertdialog', { name: 'Archive Headlamp System' })
     await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }))
 
-    expect(await within(lifecycle).findByRole('button', { name: 'Restore Project' })).toBeInTheDocument()
+    expect(await within(lifecycle).findByRole('button', { name: 'Unarchive Project' })).toBeInTheDocument()
     expect(within(lifecycle).getByText(/This project is archived and read-only/)).toBeInTheDocument()
     expect(await projects.get('headlamp')).toMatchObject({ archived: true })
 
-    await user.click(within(lifecycle).getByRole('button', { name: 'Restore Project' }))
+    await user.click(within(lifecycle).getByRole('button', { name: 'Unarchive Project' }))
 
     expect(await within(lifecycle).findByRole('button', { name: 'Archive Project' })).toBeInTheDocument()
     expect(await projects.get('headlamp')).toMatchObject({ archived: false })
@@ -202,7 +202,7 @@ describe('ProjectLifecycleSettings', () => {
     fail = false
     await archiveWithConfirmation()
 
-    expect(await within(lifecycle).findByRole('button', { name: 'Restore Project' })).toBeInTheDocument()
+    expect(await within(lifecycle).findByRole('button', { name: 'Unarchive Project' })).toBeInTheDocument()
     expect(within(lifecycle).queryByRole('alert')).not.toBeInTheDocument()
   })
 })

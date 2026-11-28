@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 import functools
 import hashlib
 from http.cookiejar import CookieJar
+import http.client
 import json
 import os
 from pathlib import Path
@@ -39,6 +40,26 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+
+
+class LocalhostHTTPHandler(urllib.request.HTTPHandler):
+    """Connect to IPv4 localhost without changing HTTP origins, cookies, or Host.
+
+    Compose publishes the proxy on 127.0.0.1. On Windows a failed ::1 attempt
+    otherwise delays each sequential request long enough to miss an outage.
+    Non-local HTTP hosts and HTTPS retain urllib's normal connection behavior.
+    """
+
+    def http_open(self, req: urllib.request.Request) -> Any:
+        def connection(host: str, **kwargs: Any) -> http.client.HTTPConnection:
+            if host == "localhost" or host.startswith("localhost:"):
+                host = "127.0.0.1" + host[len("localhost"):]
+            return http.client.HTTPConnection(host, **kwargs)
+
+        return self.do_open(connection, req)
+
+
+HTTP_OPENER = urllib.request.build_opener(LocalhostHTTPHandler())
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -135,7 +156,7 @@ def _run(
 
 def run_compose(*args: str, check: bool = True, new_session: bool = False) -> subprocess.CompletedProcess[str]:
     files = [arg for path in COMPOSE_FILES for arg in ("-f", str(path))]
-    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), *files, *args]
+    cmd = ["docker", "compose", "--env-file", str(ENV_FILE), "--env-file", str(REPO_ROOT / "storage" / ".env"), *files, *args]
     return _run(cmd, check, COMPOSE_TIMEOUT, new_session)
 
 
@@ -208,7 +229,7 @@ def oidc_pkce_login(
 ) -> str:
     """Performs an OIDC Authorization Code + PKCE login flow against Authentik via NGINX."""
     jar = CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener = urllib.request.build_opener(LocalhostHTTPHandler(), urllib.request.HTTPCookieProcessor(jar))
     base = base_url.rstrip("/")
 
     # 1. Initialize flow to establish session
@@ -272,6 +293,7 @@ def oidc_pkce_login(
     auth_url = f"{base}/auth/application/o/authorize/?{auth_params}"
 
     no_redir_opener = urllib.request.build_opener(
+        LocalhostHTTPHandler(),
         urllib.request.HTTPCookieProcessor(jar),
         NoRedirect(),
     )
@@ -305,7 +327,7 @@ def oidc_pkce_login(
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
-    with urllib.request.urlopen(req_token, timeout=20) as resp:
+    with HTTP_OPENER.open(req_token, timeout=20) as resp:
         token_res = json.loads(resp.read().decode("utf-8"))
 
     if "access_token" not in token_res:
@@ -421,7 +443,7 @@ def query_proxy(
     if token is not None:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with HTTP_OPENER.open(req, timeout=5) as resp:
             return resp.status, decode_body(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         return e.code, decode_body(e.read().decode("utf-8", errors="replace"))
@@ -539,7 +561,7 @@ def proxy_ready(base_url: str, attempts: int, delay: float) -> bool:
     """Polls /health/ready through NGINX until it returns 200."""
     for _ in range(attempts):
         try:
-            with urllib.request.urlopen(f"{base_url}/health/ready", timeout=3) as resp:
+            with HTTP_OPENER.open(f"{base_url}/health/ready", timeout=3) as resp:
                 if resp.status == 200:
                     return True
         except Exception:
@@ -552,7 +574,13 @@ def cleanup_stack(initial_count: int) -> bool:
     """Restores the api service to its initial replica count and waits until NGINX serves it again."""
     try:
         scale_api(initial_count, new_session=True)
-        # Until the resolver TTL expires, NGINX may still route to a replica that was just removed.
+        for replica in wait_for_api_replicas(initial_count):
+            wait_for_replica_ready(replica["ip"])
+        # The scale-down can remove all addresses used by the final test and
+        # restart a stopped replica. Refresh DNS and passive failure state only
+        # after the tests; runtime failover assertions never reload the proxy.
+        run_compose("exec", "-T", "proxy", "nginx", "-t", new_session=True)
+        run_compose("exec", "-T", "proxy", "nginx", "-s", "reload", new_session=True)
         if not proxy_ready(STACK.base_url, attempts=10, delay=1):
             print("Warning: api is not ready through NGINX after restoring the replica count", file=sys.stderr)
             return False

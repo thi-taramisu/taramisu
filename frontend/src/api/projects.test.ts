@@ -17,6 +17,7 @@ const battery: ProjectBody = {
   name: 'Battery Security',
   description: 'Battery system TARA',
   role: 'OWNER',
+  archived_at: null,
   created_at: '2026-11-10T09:30:00Z',
 }
 const shared: ProjectBody = { ...battery, id: '7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', name: 'Shared', role: 'EDITOR' }

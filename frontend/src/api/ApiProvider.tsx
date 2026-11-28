@@ -5,22 +5,26 @@ import { createMockItemApi } from './mocks/mockItemApi'
 import { createExampleProjectApi } from './mocks/mockProjectApi'
 import { createMockProjectExtras } from './mocks/mockProjectExtras'
 import { createProjectApi } from './projects'
+import type { AssetService } from './services/assets'
 import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
 import type { ItemContentService, ItemService } from './services/items'
 import type { ProjectService } from './services/projects'
+import type { SearchService } from './services/search'
 import type { ThreatScenarioService } from './services/threatScenarios'
 import { useAuth } from '@/auth/useAuth'
 
 /**
- * Everything the app reads from the backend. `client`, `projects` and `items` talk to the real backend, with
- * the example project and everything below the items still mocked. Tests pass mocks through `api`.
+ * The client and adapters serve backend projects, item definitions and threat scenarios. The example project
+ * and other workspace entities use the mock services. Tests pass overrides through `api`.
  */
 export interface Api {
   client: ApiClient
   projects: ProjectService
+  search: SearchService
   items: ItemService
   content: ItemContentService
+  assets: AssetService
   damageScenarios: DamageScenarioService
   threatScenarios: ThreatScenarioService
   attackPaths: AttackPathService
@@ -37,7 +41,7 @@ export function ApiProvider({
 }) {
   const { accessToken, signOut } = useAuth()
   // Created once, so the mocked parts survive a new token (and with it a new client).
-  const itemMocks = useMemo(() => createMockItemApi(), [])
+  const itemMocks = useMemo(() => createMockItemApi(api?.projects), [api?.projects])
   const projectMocks = useMemo(
     () => ({ extras: createMockProjectExtras(), example: createExampleProjectApi() }),
     [],
@@ -61,6 +65,8 @@ export function ApiProvider({
     () => ({
       client,
       projects: api?.projects ?? defaultProjects,
+      search: api?.search ?? itemMocks.search,
+      assets: api?.assets ?? itemMocks.assets,
       items: api?.items ?? defaultItems.items,
       content: api?.content ?? defaultItems.content,
       damageScenarios: api?.damageScenarios ?? defaultItems.damageScenarios,
@@ -68,15 +74,18 @@ export function ApiProvider({
       attackPaths: api?.attackPaths ?? defaultItems.attackPaths,
     }),
     [
+      api?.assets,
       api?.attackPaths,
       api?.content,
       api?.damageScenarios,
       api?.items,
       api?.projects,
+      api?.search,
       api?.threatScenarios,
       client,
       defaultItems,
       defaultProjects,
+      itemMocks,
     ],
   )
 

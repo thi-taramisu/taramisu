@@ -21,6 +21,7 @@ type Queries interface {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
@@ -31,18 +32,25 @@ type Queries interface {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 }
 
 // Option configures optional dependencies of the API.
 type Option func(*options)
 
 type options struct {
-	directory handlers.Directory
+	directory   handlers.Directory
+	attachments *Attachments
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
 func WithDirectory(directory handlers.Directory) Option {
 	return func(o *options) { o.directory = directory }
+}
+
+// WithAttachments enables attachment storage.
+func WithAttachments(files *Attachments) Option {
+	return func(o *options) { o.attachments = files }
 }
 
 func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
@@ -100,8 +108,10 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewAttackFeasibilityRating(queries, queries).Register(api)
 	handlers.NewThreatAttackPathLink(queries, queries).Register(api)
 	handlers.NewDamageScenario(queries, queries).Register(api)
+	handlers.NewThreatScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
+	handlers.NewSearch(queries).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,
@@ -111,6 +121,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	registerAttachments(api, o.attachments, queries)
 	// Fail closed: an /api/ operation without an access declaration must not be served.
 	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
 		panic(err)

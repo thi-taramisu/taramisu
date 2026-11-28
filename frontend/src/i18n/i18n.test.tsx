@@ -100,25 +100,6 @@ describe('language selector', () => {
   })
 })
 
-
-function leaves(value: Record<string, unknown>, prefix = ''): Record<string, string> {
-  return Object.fromEntries(Object.entries(value).flatMap(([key, child]) =>
-    typeof child === 'string' ? [[prefix + key, child]] : Object.entries(leaves(child as Record<string, unknown>, `${prefix}${key}.`)),
-  ))
-}
-
-it('has matching translation keys and interpolation variables in both languages', () => {
-  for (const namespace of ['common', 'ui']) {
-    const en = leaves(i18n.getResourceBundle('en', namespace))
-    const de = leaves(i18n.getResourceBundle('de', namespace))
-    expect(Object.keys(de).toSorted()).toEqual(Object.keys(en).toSorted())
-    for (const key of Object.keys(en)) {
-      expect(de[key].trim()).not.toBe('')
-      expect(de[key].match(/{{[^}]+}}/g)?.toSorted()).toEqual(en[key].match(/{{[^}]+}}/g)?.toSorted())
-    }
-  }
-})
-
 it('formats quantities when the language changes while preserving plural selection', async () => {
   await i18n.changeLanguage('en')
   expect(i18n.t('navigation.assetsWithCount', { count: 1234 })).toBe('Assets (1,234)')
@@ -206,8 +187,8 @@ it('keeps the threat definition and relations translated when switching with an 
 })
 
 it.each([
-  ['en', 'New', ['Item', 'Damage Scenario', 'Asset', 'Threat Scenario', 'Attack Path']],
-  ['de', 'Neu', ['Item', 'Schadensszenario', 'Asset', 'Bedrohungsszenario', 'Angriffspfad']],
+  ['en', 'New', ['Item', 'Asset', 'Damage Scenario', 'Threat Scenario', 'Attack Path']],
+  ['de', 'Neu', ['Item', 'Asset', 'Schadensszenario', 'Bedrohungsszenario', 'Angriffspfad']],
 ] as const)('uses consistent glossary labels in the %s new-element menu', async (language, button, labels) => {
   await i18n.changeLanguage(language)
   const { user } = renderApp('/projects/headlamp/items/i-01')

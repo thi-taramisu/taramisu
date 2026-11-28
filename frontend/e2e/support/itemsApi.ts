@@ -4,6 +4,7 @@ type ItemBody = { name: string; scope_type: 'ITEM' | 'COMPONENT' } & Record<stri
 
 interface ItemDefinition extends ItemBody {
   id: string
+  display_id: string
   tara_project_id: string
   created_at: string
 }
@@ -19,7 +20,10 @@ function withoutNulls(item: ItemDefinition) {
  */
 export async function stubItemsApi(page: Page) {
   const items = new Map<string, ItemDefinition>()
+  let nextItem = 1
   const notFound = { status: 404, json: { status: 404, title: 'Not Found', detail: 'item definition not found' } }
+
+  await page.route(/\/api\/v1\/item-definitions\/[^/]+\/threat-scenarios(\?.*)?$/, (route) => route.fulfill({ json: [] }))
 
   await page.route(/\/api\/v1\/projects\/[^/]+\/item-definitions(\/[^/?]+)?(\?.*)?$/, async (route) => {
     const request = route.request()
@@ -31,6 +35,7 @@ export async function stubItemsApi(page: Page) {
       const item: ItemDefinition = {
         ...(request.postDataJSON() as ItemBody),
         id: crypto.randomUUID(),
+        display_id: `IT-${nextItem++}`,
         tara_project_id: projectId,
         created_at: new Date().toISOString(),
       }

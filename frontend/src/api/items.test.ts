@@ -15,6 +15,7 @@ const server = setupServer()
 // As the backend sends it: empty optional fields are left out.
 const ecu: ItemDefinition = {
   id: '0b7e1d2c-3a4f-4b5c-8d6e-7f8a9b0c1d2e',
+  display_id: 'IT-1',
   tara_project_id: projectId,
   name: 'Battery ECU',
   scope_type: 'ITEM',
@@ -135,17 +136,20 @@ describe('createItemApi', () => {
     expect((await rejection(api.items.delete(projectId, ecu.id))).status).toBe(409)
   })
 
-  it('has nothing below the items of real projects, without asking the backend', async () => {
+  it('puts backend threat scenarios under their item in the tree', async () => {
+    const scenario = { id: 'ts-id', item_definition_id: ecu.id, display_id: 'TS-5', title: 'Tampered settings' }
+    server.use(http.get(`${baseUrl}/api/v1/item-definitions/${ecu.id}/threat-scenarios`, () => HttpResponse.json([scenario])))
     const api = createApi()
 
-    expect(await api.content.children(projectId, ecu.id)).toEqual([])
+    const reference = { id: scenario.id, code: scenario.display_id, name: scenario.title }
+    expect(await api.content.children(projectId, ecu.id)).toEqual([{ ...reference, type: 'threat-scenarios' }])
     expect(await api.content.assets(projectId, ecu.id)).toEqual([])
     expect(await api.content.risks(projectId, ecu.id)).toEqual([])
-    expect(await api.content.threatScenarios(projectId, ecu.id)).toEqual([])
+    expect(await api.content.threatScenarios(projectId, ecu.id)).toEqual([reference])
     expect(await api.content.damageScenarios(projectId, ecu.id)).toEqual([])
     expect(await api.content.attackPaths(projectId, ecu.id)).toEqual([])
     const addAsset = await rejection(
-      api.content.addAsset(projectId, ecu.id, { name: 'Firmware', component: 'ECU', properties: ['I'] }),
+      api.content.addAsset(projectId, ecu.id, { name: 'Firmware', properties: ['I'] }),
     )
     expect(addAsset.status).toBe(501)
   })

@@ -8,6 +8,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ElicitationMethod, ThreatScenario, ThreatScenarioRelations, ThreatTarget } from '../../api/models/threatScenario'
+import { isExampleProject } from '../../api/mocks/data/headlamp'
 import { useSetThreatTargets, useThreatScenario, useThreatScenarioRelations, useUpdateThreatScenario } from '../../api/queries/items'
 import { useProjectAccess } from '../../api/queries/projects'
 import { entityPath } from '../workspace/entities'
@@ -17,6 +18,7 @@ import { ThreatTargetsField } from './ThreatTargetsField'
 const ELICITATION_METHODS: ElicitationMethod[] = [
   'GROUP_DISCUSSION', 'MALICIOUS_USE_CASE', 'EVITA', 'TVRA', 'PASTA', 'STRIDE', 'OTHER',
 ]
+const noRelations: ThreatScenarioRelations = { damageScenarios: [], attackPaths: [], targets: [] }
 
 interface FormValues {
   title: string
@@ -43,8 +45,10 @@ export function ThreatScenarioDefinitionTab() {
   const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const { data: scenario } = useThreatScenario(projectId, entityId)
-  const relations = useThreatScenarioRelations(projectId, entityId)
+  const example = isExampleProject(projectId)
+  const relations = useThreatScenarioRelations(projectId, entityId, { enabled: example })
   if (!scenario) return null
+  if (!example) return <DefinitionForm key={scenario.id} projectId={projectId} scenario={scenario} relations={noRelations} />
   if (!relations.data) {
     return relations.isError ? (
       <p role="alert" className="text-sm text-destructive">{t('ui:loadTargetsError')}</p>
@@ -69,9 +73,10 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
   const isCause = (target: ThreatTarget) => causes.some((cause) => cause.asset.id === target.assetId && cause.property === target.property)
   const currentTargets = targets.filter(isCause)
   const [titleError, setTitleError] = useState<string>()
-  const updateScenario = useUpdateThreatScenario(projectId, scenario.id)
+  const updateScenario = useUpdateThreatScenario(projectId, scenario.id, scenario.item_definition_id)
   const saveTargets = useSetThreatTargets(projectId, scenario.id)
   const { canEdit } = useProjectAccess(projectId)
+  const example = isExampleProject(projectId)
   const [status, setStatus] = useState<SaveStatus>('idle')
   // Set once the fields are saved, so a failure of the targets after them does not say nothing was saved.
   const [fieldsSaved, setFieldsSaved] = useState(false)
@@ -196,7 +201,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
             onChange={(event) => change({ technical_notes: event.target.value })}
           />
         </div>
-        <ThreatTargetsField
+        {example && <ThreatTargetsField
           damageScenarios={relations.damageScenarios}
           value={currentTargets}
           onChange={(next) => {
@@ -204,7 +209,7 @@ function DefinitionForm({ projectId, scenario, relations }: { projectId: string;
             keepPending()
           }}
           relationsPath={`${entityPath(projectId, 'threat-scenarios', scenario.id)}/relations`}
-        />
+        />}
       </fieldset>
       {canEdit && (
         <div className="flex items-center gap-3">

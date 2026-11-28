@@ -33,6 +33,8 @@ interface CreateElementDialogProps {
   onCreate: (name: string, form: HTMLFormElement) => Promise<CreatedElement | undefined>
   /** Resets the other fields after "Create & add another" and on close. */
   onReset?: () => void
+  /** Follows the typed name, e.g. to point out similar existing elements. */
+  onNameChange?: (name: string) => void
   /** Fields below the name. */
   children?: ReactNode
 }
@@ -55,6 +57,7 @@ export function CreateElementDialog({
   locked = false,
   onCreate,
   onReset,
+  onNameChange,
   children,
 }: CreateElementDialogProps) {
   const { t } = useTranslation()
@@ -71,6 +74,7 @@ export function CreateElementDialog({
 
   function reset() {
     setName('')
+    onNameChange?.('')
     setNameError(undefined)
     setFailed(false)
     onReset?.()
@@ -145,6 +149,7 @@ export function CreateElementDialog({
               placeholder={namePlaceholder}
               onChange={(event) => {
                 setName(event.target.value)
+                onNameChange?.(event.target.value)
                 setNameError(undefined)
                 setCreated(undefined)
               }}

@@ -22,14 +22,14 @@ export function useProject(projectId: string) {
 
 /**
  * What the current user may do in a project. Archived projects are read-only for all members until they
- * are restored; nothing can be edited before the project is loaded. The backend enforces the same (#233),
+ * are restored. Owners and Editors can edit active projects after they load. The backend enforces the same,
  * so this only shapes the UI.
  */
 export function useProjectAccess(projectId: string) {
   const { data: project } = useProject(projectId)
   return {
     archived: project?.archived ?? false,
-    canEdit: project !== undefined && !project.archived,
+    canEdit: !!project && !project.archived && (project.role === 'OWNER' || project.role === 'EDITOR'),
   }
 }
 
@@ -37,6 +37,7 @@ export function useProjectAccess(projectId: string) {
 function useStoreProject() {
   const queryClient = useQueryClient()
   return (project: Project) => {
+    void queryClient.invalidateQueries({ queryKey: ['search'] })
     queryClient.setQueryData(keys.project(project.id), project)
     queryClient.setQueryData<Project[]>(keys.list, (projects) => {
       if (!projects) return projects
@@ -113,6 +114,7 @@ export function useDeleteProject() {
     onSuccess: (_, projectId) => {
       queryClient.setQueryData<Project[]>(keys.list, (projects) => projects?.filter((p) => p.id !== projectId))
       queryClient.removeQueries({ queryKey: keys.project(projectId) })
+      void queryClient.invalidateQueries({ queryKey: ['search'] })
       return queryClient.invalidateQueries({ queryKey: keys.list })
     },
   })

@@ -13,7 +13,7 @@ test('creates, edits and deletes an item of a project from the backend', async (
 
   const tree = page.getByRole('navigation', { name: 'Project elements' })
   await tree.getByRole('button', { name: 'New' }).click()
-  await expect(page.getByRole('menuitem')).toHaveText(['Item'])
+  await expect(page.getByRole('menuitem')).toHaveText(['Item', 'Threat Scenario'])
   await page.getByRole('menuitem', { name: 'Item' }).click()
   const dialog = page.getByRole('dialog', { name: 'New Item' })
   await dialog.getByLabel(/Name/).fill('Brake controller')

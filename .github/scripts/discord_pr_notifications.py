@@ -9,7 +9,7 @@ from pathlib import Path
 
 from discord_notifications import (
     DeliveryError, GitHub, LABEL_WEBHOOKS, NO_MENTIONS, PR_COLOR, MERGED_COLOR, LABEL_COLOR,
-    destinations, display_text, send_webhook, timestamp,
+    destinations, display_text, send_webhook, timestamp, warn_delivery,
 )
 
 
@@ -53,7 +53,6 @@ def deliver_pr(github, event, environ):
         return
     state = github.load(timestamp(datetime.now(timezone.utc) - timedelta(days=1)))
     sent = state.setdefault("prs", {}).setdefault(f"{number}:{'merged' if merged else 'announced'}", [])
-    failed = False
     for webhook, routed_labels in routed.items():
         keys = set(LABEL_WEBHOOKS[label] for label in routed_labels)
         legacy_key = hashlib.sha256(webhook.encode()).hexdigest()
@@ -65,15 +64,12 @@ def deliver_pr(github, event, environ):
             continue
         try:
             send_webhook(webhook, pr_payload(event))
-        except DeliveryError:
-            print("PR delivery failed for: " + ", ".join(routed_labels), file=sys.stderr)
-            failed = True
+        except DeliveryError as error:
+            warn_delivery(routed_labels, error)
             continue
         sent.extend(sorted(keys))
         # Stop immediately if recording a successful delivery fails.
         github.save(state)
-    if failed:
-        raise DeliveryError("Some PR destinations failed")
 
 
 def main():

@@ -23,11 +23,13 @@ const projectID = "11111111-1111-1111-1111-111111111111"
 type fakeProjects struct {
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	statusReaderFunc
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectAccessStore
@@ -149,6 +151,10 @@ func TestTaraProjectRoutes(t *testing.T) {
 		{"create whitespace name", true, http.MethodPost, base, `{"name":"   "}`, http.StatusUnprocessableEntity},
 		{"list", true, http.MethodGet, base, "", http.StatusOK},
 		{"list empty", false, http.MethodGet, base, "", http.StatusOK},
+		{"archive", true, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusOK},
+		{"archive missing", false, http.MethodPost, base + "/" + projectID + "/archive", "", http.StatusNotFound},
+		{"unarchive", true, http.MethodPost, base + "/" + projectID + "/unarchive", "", http.StatusOK},
+		{"unarchive missing", false, http.MethodPost, base + "/" + projectID + "/unarchive", "", http.StatusNotFound},
 		{"get", true, http.MethodGet, base + "/" + projectID, "", http.StatusOK},
 		{"get missing", false, http.MethodGet, base + "/" + projectID, "", http.StatusNotFound},
 		{"get bad id", true, http.MethodGet, base + "/nope", "", http.StatusUnprocessableEntity},
@@ -375,4 +381,24 @@ func TestTaraProjectChangesAreAudited(t *testing.T) {
 			t.Errorf("actor = %v, want the caller %s", actor.UserID, authtest.UserID)
 		}
 	}
+}
+
+func (f *fakeProjects) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return f.project.ArchivedAt.Valid, nil
+}
+func (f *fakeProjects) ArchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
+	if !f.found {
+		return db.TaraProject{}, pgx.ErrNoRows
+	}
+	if !f.project.ArchivedAt.Valid {
+		f.project.ArchivedAt = pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
+	}
+	return f.project, nil
+}
+func (f *fakeProjects) UnarchiveTaraProject(context.Context, pgtype.UUID) (db.TaraProject, error) {
+	if !f.found {
+		return db.TaraProject{}, pgx.ErrNoRows
+	}
+	f.project.ArchivedAt = pgtype.Timestamptz{}
+	return f.project, nil
 }

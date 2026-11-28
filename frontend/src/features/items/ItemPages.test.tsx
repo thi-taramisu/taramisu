@@ -27,15 +27,13 @@ describe('sidebar tree', () => {
 })
 
 describe('create item', () => {
-  it('offers only Item and Damage Scenario in the "+ New" menu for now', async () => {
+  it('offers every element type in the "+ New" menu', async () => {
     const { user } = renderApp(project)
 
     await user.click(await within(tree()).findByRole('button', { name: 'New' }))
 
-    expect(screen.getByRole('menuitem', { name: 'Item' })).not.toHaveAttribute('aria-disabled')
-    expect(screen.getByRole('menuitem', { name: 'Damage Scenario' })).not.toHaveAttribute('aria-disabled')
-    for (const name of ['Asset', 'Threat Scenario', 'Attack Path']) {
-      expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-disabled', 'true')
+    for (const name of ['Item', 'Asset', 'Damage Scenario', 'Threat Scenario', 'Attack Path']) {
+      expect(screen.getByRole('menuitem', { name })).not.toHaveAttribute('aria-disabled')
     }
   })
 
@@ -325,11 +323,11 @@ describe('review findings', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Add Asset' }))
     const dialog = screen.getByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Name'), 'LED driver')
-    await user.type(within(dialog).getByLabelText('Component'), 'Lamp ECU')
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await user.type(within(dialog).getByLabelText(/Name/), 'LED driver')
+    await user.click(within(dialog).getByRole('button', { name: 'Create & open' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be added')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('could not be created')
+    expect(within(dialog).getByLabelText(/Name/)).toHaveDisplayValue('LED driver')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
@@ -355,17 +353,17 @@ describe('review findings', () => {
 })
 
 describe('project from the backend', () => {
-  // Only items are connected for real projects so far; the example project keeps its mocked content (#250).
+  // Real projects have item definitions and threat scenarios.
   const battery = '/projects/battery-security'
 
-  it('opens the workspace with the items of the project and offers only Item in the "+ New" menu', async () => {
+  it('opens the workspace and offers items and threat scenarios in the "+ New" menu', async () => {
     const api = createMockItemApi()
     const item = await api.items.create('battery-security', { name: 'Battery ECU', scope_type: 'ITEM' })
     const { user } = renderApp(battery, api)
 
     expect(await within(tree()).findByRole('link', { name: 'Battery ECU' })).toHaveAttribute('href', `${battery}/items/${item.id}`)
     await user.click(within(tree()).getByRole('button', { name: 'New' }))
-    expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Item'])
+    expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Item', 'Threat Scenario'])
   })
 
   it('shows Assets and Risks as placeholders, without the asset count', async () => {
