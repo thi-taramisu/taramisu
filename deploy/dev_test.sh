@@ -258,15 +258,17 @@ model = json.loads((root / 'model.json').read_text())
 services = model['services']
 assert model['name'] == 'taramisu'
 assert set(services) == {'api', 'db', 'dev-db', 'migrate', 'pgadmin', 'frontend', 'proxy', 'sentry-ingest', 'docs',
-                         'authentik-server', 'authentik-worker', 'authentik-db', 'storage', 'storage-config', 'storage-init'}
+                         'authentik-server', 'authentik-worker', 'authentik-db', 'storage', 'storage-config', 'storage-init',
+                         'llm'}
 expected_networks = {
-    'api': {'proxy', 'app-db', 'storage'},
+    'api': {'proxy', 'app-db', 'storage', 'llm'},
     'db': {'app-db'}, 'dev-db': {'app-db'}, 'migrate': {'app-db'}, 'pgadmin': {'app-db'},
     'frontend': {'proxy'}, 'proxy': {'edge', 'proxy'},
     'sentry-ingest': {'edge', 'proxy'},
     'authentik-server': {'proxy', 'iam-db'}, 'authentik-worker': {'iam-db'}, 'authentik-db': {'iam-db'},
     'docs': {'proxy'},
     'storage': {'storage'}, 'storage-config': {'storage'}, 'storage-init': {'storage'},
+    'llm': {'llm', 'llm-egress'},
 }
 for service, networks in expected_networks.items():
     assert set(services[service]['networks']) == networks, service
@@ -289,7 +291,7 @@ assert services['api']['environment']['S3_ENDPOINT'] == 'http://storage:8333'
 assert 'S3_ROOT_SECRET_KEY' not in services['api']['environment']
 assert services['api']['environment']['S3_ACCESS_KEY'] != services['storage-init']['environment']['S3_ROOT_ACCESS_KEY']
 assert {key: bool(value.get('internal')) for key, value in model['networks'].items()} == {
-    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'storage': True}
+    'edge': False, 'proxy': True, 'app-db': True, 'iam-db': True, 'storage': True, 'llm': True, 'llm-egress': False}
 assert services['authentik-server']['environment']['AUTHENTIK_DISABLE_UPDATE_CHECK'] == 'true'
 # Without the dev override only the proxy publishes a port.
 assert {name for name, service in services.items() if service.get('ports')} == {'proxy'}

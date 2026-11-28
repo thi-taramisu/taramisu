@@ -46,6 +46,7 @@ authentik_db=$(ip_of authentik-db iam-db)
 api=$(ip_of api proxy)
 frontend=$(ip_of frontend proxy)
 docs=$(ip_of docs proxy)
+llm=$(ip_of llm llm)
 
 echo "Allowed:"
 check proxy  frontend:80              open "proxy forwards to the frontend"
@@ -54,7 +55,9 @@ check proxy  docs:80                  open "proxy forwards to the docs"
 check proxy  authentik-server:9000    open "proxy and API reach Authentik (/auth/, JWKS)"
 check app-db db:5432                  open "API reaches the database"
 check iam-db authentik-db:5432        open "Authentik reaches its database"
+check llm    llm:8080                 open "API reaches the LLM service"
 check edge   "$INTERNET"              open "edge has internet access (shows that the check itself works)"
+check llm-egress "$INTERNET"          open "LLM service reaches the model API on the internet"
 
 echo "Forbidden:"
 check proxy  "$db:5432"               closed "proxy network cannot reach the database"
@@ -65,9 +68,13 @@ check edge   "$api:8080"              closed "edge cannot reach the API directly
 check edge   "$frontend:80"           closed "edge cannot reach the frontend directly"
 check edge   "$docs:80"               closed "edge cannot reach the docs directly"
 check edge   "$db:5432"               closed "edge cannot reach the database"
+check edge   "$llm:8080"              closed "edge cannot reach the LLM service, which holds the API key"
+check proxy  "$llm:8080"              closed "proxy network cannot reach the LLM service"
+check llm    "$db:5432"               closed "LLM service cannot reach the database"
 check proxy  "$INTERNET"              closed "API, frontend, docs and Authentik server have no internet access"
 check app-db "$INTERNET"              closed "database network has no internet access"
 check iam-db "$INTERNET"              closed "Authentik database network has no internet access"
+check llm    "$INTERNET"              closed "API has no internet access through the llm network"
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures check(s) failed"

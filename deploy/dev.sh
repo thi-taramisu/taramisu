@@ -92,6 +92,8 @@ if ! compose exec -T authentik-worker ak apply_blueprint $(grep -v '^#' authenti
     exit 1
 fi
 rm ../iam/.blueprint.log
+# The API does not need the LLM service to start; without LLM_API_KEY the service answers 503.
+compose up -d --build --wait --wait-timeout 180 llm
 compose up -d --build --wait --wait-timeout 180 api
 compose up -d --build --wait --wait-timeout 180 frontend proxy
 # Compose does not recreate an existing proxy when its bind-mounted config changes.

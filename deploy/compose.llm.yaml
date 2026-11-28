@@ -1,0 +1,14 @@
+# LLM service from the architecture overview (#229): forwards the API's model requests to SAIA (GWDG) and holds the key.
+# The API reaches it through the internal llm network; only this service is in llm-egress and can reach the internet.
+services:
+  llm:
+    networks: [llm, llm-egress]
+    # Same image as the API (backend/Dockerfile builds both binaries); build here too, so a local build never
+    # falls back to pulling a published image without /llm.
+    image: ghcr.io/thi-taramisu/taramisu-api:${TARAMISU_VERSION:-latest}
+    build:
+      context: ../backend
+    entrypoint: ["/llm"]
+    environment:
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_UPSTREAM_URL: ${LLM_UPSTREAM_URL:-https://chat-ai.academiccloud.de}
