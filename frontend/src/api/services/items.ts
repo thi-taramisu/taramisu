@@ -2,6 +2,7 @@ import type { ItemAsset, NewAsset } from '../models/asset'
 import type { ItemDefinition, ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { RiskGroup } from '../models/risk'
 import type { EntityRef, TreeNode } from '../models/tree'
+import type { PageRequest } from '../pagination'
 import type { DamageScenarioService } from './damageScenarios'
 import type { AttackPathService } from './attackPaths'
 import type { ThreatScenarioService } from './threatScenarios'
@@ -14,7 +15,8 @@ import type { ThreatScenarioService } from './threatScenarios'
  * with an `ApiError`, e.g. status 404 for unknown items and 422 for invalid bodies.
  */
 export interface ItemService {
-  list(projectId: string): Promise<ItemDefinition[]>
+  /** Returns one page when specified, or all item definitions for the workspace tree. */
+  list(projectId: string, page?: PageRequest): Promise<ItemDefinition[]>
   get(projectId: string, itemId: string): Promise<ItemDefinition>
   create(projectId: string, body: ItemDefinitionBody): Promise<ItemDefinition>
   update(projectId: string, itemId: string, body: PatchItemDefinitionBody): Promise<ItemDefinition>

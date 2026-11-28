@@ -1,6 +1,7 @@
 import type { ApiClient } from './client'
 import { ApiError } from './errors'
 import { isExampleProject } from './mocks/data/headlamp'
+import { readAllPages, type PageRequest } from './pagination'
 import type { ItemApi, ItemContentService, ItemService } from './services/items'
 import { unwrap } from './unwrap'
 
@@ -17,9 +18,12 @@ const none = async () => []
 
 export function createItemApi(client: ApiClient, example: ItemApi): ItemApi {
   const items: ItemService = {
-    list: async (projectId) => {
-      if (isExampleProject(projectId)) return example.items.list(projectId)
-      return (await unwrap(client.GET(collection, inProject(projectId)))) ?? []
+    list: async (projectId, page) => {
+      if (isExampleProject(projectId)) return example.items.list(projectId, page)
+      const readPage = async (query: PageRequest) => (await unwrap(client.GET(collection, {
+        params: { ...inProject(projectId).params, query },
+      }))) ?? []
+      return page ? readPage(page) : readAllPages(readPage)
     },
     get: (projectId, itemId) => {
       if (isExampleProject(projectId)) return example.items.get(projectId, itemId)

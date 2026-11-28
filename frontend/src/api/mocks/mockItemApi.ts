@@ -116,8 +116,10 @@ export function createMockItemApi(): ItemApi {
 
   return {
     items: {
-      list: (projectId) =>
-        run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),
+      list: (projectId, page) => run(() => {
+        const items = [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)
+        return page ? items.slice(page.offset, page.offset + page.limit) : items
+      }),
       get: (projectId, itemId) => run(() => find(projectId, itemId).item),
       create: (projectId, body) =>
         run(() => {

@@ -56,6 +56,23 @@ describe('createItemApi', () => {
     expect(await createApi().items.list(projectId)).toEqual([])
   })
 
+  it('supports one page and loads every page for the workspace', async () => {
+    const records = Array.from({ length: 102 }, (_, index) => ({ ...ecu, id: String(index) }))
+    const requests: Array<[number, number]> = []
+    server.use(http.get(items, ({ request }) => {
+      const query = new URL(request.url).searchParams
+      const limit = Number(query.get('limit'))
+      const offset = Number(query.get('offset'))
+      requests.push([limit, offset])
+      return HttpResponse.json(records.slice(offset, offset + limit))
+    }))
+    const api = createApi().items
+
+    expect(await api.list(projectId, { limit: 2, offset: 99 })).toEqual(records.slice(99, 101))
+    expect(await api.list(projectId)).toEqual(records)
+    expect(requests).toEqual([[2, 99], [100, 0], [100, 100]])
+  })
+
   it('creates an item with the trimmed name', async () => {
     let body: unknown
     server.use(
