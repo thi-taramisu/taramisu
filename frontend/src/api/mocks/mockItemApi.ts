@@ -6,7 +6,7 @@ import type { ItemApi } from '../services/items'
 import type { ProjectService } from '../services/projects'
 import type { SearchService } from '../services/search'
 import { createMockProjectApi } from './mockProjectApi'
-import { createMockSearchService } from './mockSearch'
+import { createMockSearchService, type SearchDocument } from './mockSearch'
 import { exampleProject, headlampAssetDetails, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
 import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
@@ -102,7 +102,12 @@ function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenari
  * In-memory implementation of the item API, seeded with the headlamp example. Each call returns
  * copies, so callers cannot change the stored state by accident.
  */
-export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
+export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & {
+  projects: ProjectService
+  search: SearchService
+  /** Search over the stored elements with another project service, e.g. the real one. */
+  searchWith: (projects: ProjectService) => SearchService
+} {
   const db = seed()
 
   function find(projectId: string, itemId: string) {
@@ -119,19 +124,22 @@ export function createMockItemApi(projects: ProjectService = createMockProjectAp
     throw new ApiError(404, 'Damage scenario not found.')
   }
 
+  const documents = (): SearchDocument[] => [...db.values()].flatMap((entry) => {
+    const { item, assets, damageScenarios, threatScenarios, attackPaths } = entry
+    const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
+    return [
+      { ...common, type: 'items' as const, id: item.id, name: item.name },
+      ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
+      ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
+      ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
+      ...attackPaths.map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.title })),
+    ]
+  })
+
   return {
     projects,
-    search: createMockSearchService(projects, () => [...db.values()].flatMap((entry) => {
-      const { item, assets, damageScenarios, threatScenarios, attackPaths } = entry
-      const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
-      return [
-        { ...common, type: 'items' as const, id: item.id, name: item.name },
-        ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
-        ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
-        ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
-        ...attackPaths.map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.title })),
-      ]
-    })),
+    search: createMockSearchService(projects, documents),
+    searchWith: (other) => createMockSearchService(other, documents),
     items: {
       list: (projectId) =>
         run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),

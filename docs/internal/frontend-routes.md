@@ -64,6 +64,10 @@ Auth values: public means no login, user means logged in, and read, write and ma
 [project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
+Projects (#248): the list, creating, renaming (Settings, General) and deleting use `/api/v1/projects`. Favorites, archive, owner and
+image are mocked in memory until they are connected (#361 archive, #375 favorites). Every project opens its workspace, which stays empty
+for backend projects until their items come from the backend (#250); every project has its settings.
+
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
 `&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.
@@ -131,7 +135,7 @@ Search is a shared overlay, without its own URL. It is available from the projec
 and Ctrl/Cmd + K on any route. Opening within `/projects/:projectId/*` applies a removable project filter; other routes start globally.
 Selecting a result closes the overlay and opens `/projects/:projectId` or the existing `entityPath` for that element. Element URLs stay flat.
 Accessible mock projects can open an empty workspace as well as the Headlamp example; unknown projects show the not-found page.
-Settings are available only for the Headlamp example, so other project headers hide the Settings link.
+Every project header links to the project's settings.
 
 The search service reads the live mock stores, including unlinked elements. It combines project and entity-type filters, deduplicates
 shared elements and paginates results. Real cross-project authorization/search remains the backend work in #240; display IDs

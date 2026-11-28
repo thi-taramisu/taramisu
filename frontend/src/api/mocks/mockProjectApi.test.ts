@@ -67,6 +67,18 @@ describe('createMockProjectApi', () => {
     expect(await rejection(api.create({ name: '   ' }))).toBe(422)
   })
 
+  it('renames a project and rejects a blank name and viewers', async () => {
+    const api = createMockProjectApi([owned, { ...shared, role: 'VIEWER' }])
+
+    expect(await api.update('owned', { name: ' Renamed ', description: 'New' })).toMatchObject({
+      name: 'Renamed',
+      description: 'New',
+    })
+    expect(await rejection(api.update('owned', { name: '  ', description: '' }))).toBe(422)
+    expect(await rejection(api.update('shared', { name: 'Shared', description: '' }))).toBe(403)
+    expect(await rejection(api.update('missing', { name: 'Missing', description: '' }))).toBe(404)
+  })
+
   it('releases the image URL of a deleted project', async () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:image')
     const revoke = vi.spyOn(URL, 'revokeObjectURL')

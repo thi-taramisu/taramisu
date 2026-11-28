@@ -1,13 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import App from '../App'
+import { renderApp } from '../test/renderApp'
 
 describe('colour scheme pages', () => {
   it('compares all schemes and navigates to a shareable individual page', async () => {
-    const user = userEvent.setup()
-    render(<MemoryRouter initialEntries={['/design-system/colors']}><App /></MemoryRouter>)
+    const { user } = renderApp('/design-system/colors')
     expect(screen.getAllByRole('region')).toHaveLength(6)
     const navigation = screen.getByRole('navigation', { name: 'Colour schemes' })
     const ocean = within(navigation).getByRole('link', { name: 'Ocean' })
