@@ -21,6 +21,7 @@ var auditedOperations = []string{
 	"create-damage-scenario-asset-property", "replace-damage-scenario-asset-property", "update-damage-scenario-asset-property", "delete-damage-scenario-asset-property",
 	"create-threat-scenario-asset-property", "replace-threat-scenario-asset-property", "update-threat-scenario-asset-property", "delete-threat-scenario-asset-property",
 	"create-damage-scenario", "replace-damage-scenario", "update-damage-scenario", "delete-damage-scenario",
+	"create-threat-scenario", "replace-threat-scenario", "update-threat-scenario", "delete-threat-scenario",
 	"create-impact-rating", "replace-impact-rating", "update-impact-rating", "delete-impact-rating",
 	"create-attack-path", "replace-attack-path", "update-attack-path", "delete-attack-path",
 	"replace-attack-feasibility-rating", "update-attack-feasibility-rating", "delete-attack-feasibility-rating",

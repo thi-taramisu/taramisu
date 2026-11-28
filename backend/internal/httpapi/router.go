@@ -21,6 +21,7 @@ type Queries interface {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 	handlers.ProjectMemberStore
@@ -107,6 +108,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewAttackFeasibilityRating(queries, queries).Register(api)
 	handlers.NewThreatAttackPathLink(queries, queries).Register(api)
 	handlers.NewDamageScenario(queries, queries).Register(api)
+	handlers.NewThreatScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
 	handlers.NewSearch(queries).Register(api)

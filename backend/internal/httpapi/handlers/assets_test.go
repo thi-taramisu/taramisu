@@ -31,6 +31,7 @@ type assetStore struct {
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
 	handlers.DamageScenarioStore
+	handlers.ThreatScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
 

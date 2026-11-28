@@ -40,6 +40,7 @@ type fakeDamage struct {
 	handlers.AssetCybersecurityPropertyStore
 	handlers.DamagePropertyLinkStore
 	handlers.ThreatPropertyLinkStore
+	handlers.ThreatScenarioStore
 
 	handlers.TaraProjectStore
 	handlers.ProjectMemberStore
