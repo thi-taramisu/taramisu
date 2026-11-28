@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/api/errors'
 import { mockProjects } from '@/api/mocks/data/projects'
@@ -43,18 +43,9 @@ describe('ProjectLifecycleSettings', () => {
   })
 
   it.each<ProjectRole>(['EDITOR', 'REVIEWER', 'VIEWER'])('hides both actions from the role %s', async (role) => {
-    const projects = projectsWithHeadlampRole(role)
-    // Wait for the page's own request, so the section had the chance to appear.
-    const get = projects.get
-    let loaded: Promise<unknown> | undefined
-    projects.get = (projectId) => (loaded = get(projectId))
-    renderSettings(projects)
+    renderSettings(projectsWithHeadlampRole(role))
 
-    await waitFor(() => expect(loaded).toBeDefined())
-    await act(async () => {
-      await loaded
-    })
-    expect(screen.getByRole('heading', { name: 'General' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'General' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Danger Zone' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive Project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument()
