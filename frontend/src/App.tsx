@@ -24,9 +24,11 @@ import { ThreatScenarioDefinitionTab } from './features/threat-scenarios/ThreatS
 import { ThreatScenarioPage } from './features/threat-scenarios/ThreatScenarioPage'
 import { ThreatScenarioRelationsTab } from './features/threat-scenarios/ThreatScenarioRelationsTab'
 import { ThreatScenarioRisksTab } from './features/threat-scenarios/ThreatScenarioRisksTab'
+import { ThreatScenarioTreatmentTab } from './features/threat-scenarios/ThreatScenarioTreatmentTab'
 import type { EntityType } from './api/models/tree'
 import { ENTITY_TYPES } from './features/workspace/entities'
 import { EntityPage } from './features/workspace/EntityPage'
+import { ExampleProjectOnly } from './features/workspace/ExampleProjectOnly'
 import { Placeholder } from './features/workspace/Placeholder'
 import { WorkspaceLayout } from './features/workspace/WorkspaceLayout'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
@@ -44,11 +46,11 @@ const PAGES: Partial<Record<EntityType, ReactNode>> = {
   'attack-paths': <AttackPathPage />,
 }
 
-// Tabs that already have content, everything else renders a placeholder.
+// Tabs that already have content, everything else renders a placeholder. Real items only have their definition.
 const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'items/': <ItemDefinitionTab />,
-  'items/assets': <ItemAssetsTab />,
-  'items/risks': <ItemRisksTab />,
+  'items/assets': <ExampleProjectOnly tab="assets"><ItemAssetsTab /></ExampleProjectOnly>,
+  'items/risks': <ExampleProjectOnly tab="risks"><ItemRisksTab /></ExampleProjectOnly>,
   'assets/': <AssetDefinitionTab />,
   'assets/risks': <AssetRisksTab />,
   'assets/relations': <AssetRelationsTab />,
@@ -56,8 +58,9 @@ const TAB_CONTENT: Partial<Record<`${EntityType}/${string}`, ReactNode>> = {
   'damage-scenarios/impact': <DamageScenarioImpactTab />,
   'damage-scenarios/relations': <DamageScenarioRelationsTab />,
   'threat-scenarios/': <ThreatScenarioDefinitionTab />,
-  'threat-scenarios/risks': <ThreatScenarioRisksTab />,
-  'threat-scenarios/relations': <ThreatScenarioRelationsTab />,
+  'threat-scenarios/risks': <ExampleProjectOnly tab="risks"><ThreatScenarioRisksTab /></ExampleProjectOnly>,
+  'threat-scenarios/treatment': <ThreatScenarioTreatmentTab />,
+  'threat-scenarios/relations': <ExampleProjectOnly tab="relations"><ThreatScenarioRelationsTab /></ExampleProjectOnly>,
   'attack-paths/': <AttackPathDefinitionTab />,
   'attack-paths/rating': <AttackPathRatingTab />,
   'attack-paths/relations': <AttackPathRelationsTab />,

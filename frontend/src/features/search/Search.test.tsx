@@ -216,7 +216,7 @@ describe('Spotlight search', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByText('Battery Security')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/projects/battery-security/settings')
   })
 
   it('combines multiple selected projects and clears all active filters', async () => {

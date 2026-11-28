@@ -5,13 +5,15 @@ import { isNotFound } from '../../api/errors'
 import { useItem, useItemAssets } from '../../api/queries/items'
 import { useTranslation } from 'react-i18next'
 import { useProjectAccess } from '../../api/queries/projects'
+import { isExampleProject } from '../../api/mocks/data/headlamp'
 
 /** Item page: header from the item API, delete action and the asset count on the Assets tab. */
 export function ItemPage() {
   const { t } = useTranslation()
   const { projectId = '', entityId = '' } = useParams()
   const item = useItem(projectId, entityId)
-  const assets = useItemAssets(projectId, entityId)
+  // Only the example project has assets so far (#250).
+  const assets = useItemAssets(projectId, entityId, { enabled: isExampleProject(projectId) })
   const { canEdit } = useProjectAccess(projectId)
 
   if (isNotFound(item.error)) {

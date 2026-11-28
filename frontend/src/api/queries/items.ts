@@ -1,11 +1,13 @@
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
+import { deleteThreatScenario } from '../items'
 import type { CiaProperty, NewAsset, PatchAssetBody } from '../models/asset'
 import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
 import type { PatchThreatScenarioBody, ThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
 import type { EntityRef, TreeNode } from '../models/tree'
+import { isExampleProject } from '../mocks/data/headlamp'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
 // views together.
@@ -68,9 +70,9 @@ export function useItem(projectId: string, itemId: string) {
   return useQuery({ queryKey: keys.item(projectId, itemId), queryFn: () => api.items.get(projectId, itemId) })
 }
 
-export function useItemAssets(projectId: string, itemId: string) {
+export function useItemAssets(projectId: string, itemId: string, { enabled = true } = {}) {
   const api = useApi()
-  return useQuery({ queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
+  return useQuery({ enabled, queryKey: keys.assets(projectId, itemId), queryFn: () => api.content.assets(projectId, itemId) })
 }
 
 export function useItemRisks(projectId: string, itemId: string) {
@@ -283,9 +285,18 @@ export function useItemAttackPaths(projectId: string, itemId: string) {
 
 export function useThreatScenario(projectId: string, threatScenarioId: string) {
   const api = useApi()
+  const example = isExampleProject(projectId)
+  const tree = useProjectTree(projectId, { enabled: !example })
+  const itemId = tree.data?.find(({ children }) =>
+    children?.some(({ type, id }) => type === 'threat-scenarios' && id === threatScenarioId),
+  )?.id
   return useQuery({
     queryKey: keys.threatScenario(projectId, threatScenarioId),
-    queryFn: () => api.threatScenarios.get(projectId, threatScenarioId),
+    enabled: example || !tree.isPending,
+    queryFn: () => {
+      if (!example && tree.isError && !tree.data) throw tree.error
+      return api.threatScenarios.get(projectId, threatScenarioId, itemId)
+    },
   })
 }
 
@@ -296,12 +307,26 @@ export function useCreateThreatScenario(projectId: string) {
   return useMutation({ mutationFn: (body: ThreatScenarioBody) => api.threatScenarios.create(projectId, body), onSuccess: invalidate })
 }
 
-export function useUpdateThreatScenario(projectId: string, threatScenarioId: string) {
+export function useUpdateThreatScenario(projectId: string, threatScenarioId: string, itemId?: string) {
   const api = useApi()
   const storeSaved = useStoreSaved(projectId, keys.threatScenario(projectId, threatScenarioId))
   return useMutation({
-    mutationFn: (body: PatchThreatScenarioBody) => api.threatScenarios.update(projectId, threatScenarioId, body),
+    mutationFn: (body: PatchThreatScenarioBody) => api.threatScenarios.update(projectId, threatScenarioId, body, itemId),
     onSuccess: storeSaved,
+  })
+}
+
+export function useDeleteThreatScenario(projectId: string, itemId: string, scenarioId: string) {
+  const { client } = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => deleteThreatScenario(client, itemId, scenarioId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.tree(projectId) })
+      void queryClient.invalidateQueries({ queryKey: keys.children(projectId, itemId) })
+      void queryClient.invalidateQueries({ queryKey: keys.threatScenarios(projectId, itemId) })
+      void queryClient.invalidateQueries({ queryKey: ['search'] })
+    },
   })
 }
 
@@ -333,10 +358,11 @@ export function useThreatScenariosRisks(projectId: string, threatScenarioIds: st
   })
 }
 
-export function useThreatScenarioRelations(projectId: string, threatScenarioId: string) {
+export function useThreatScenarioRelations(projectId: string, threatScenarioId: string, { enabled = true } = {}) {
   const api = useApi()
   return useQuery({
     queryKey: keys.threatScenarioRelations(projectId, threatScenarioId),
+    enabled,
     queryFn: () => api.threatScenarios.relations(projectId, threatScenarioId),
   })
 }

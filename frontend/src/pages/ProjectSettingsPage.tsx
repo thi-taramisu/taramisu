@@ -1,5 +1,4 @@
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { exampleProject } from '../api/mocks/data/headlamp'
 import { isNotFound } from '../api/errors'
 import { useProject } from '../api/queries/projects'
 import { ArchivedProjectBanner } from '../features/projects/ArchivedProjectBanner'
@@ -17,8 +16,7 @@ export function ProjectSettingsPage() {
   const { t } = useTranslation()
   const { projectId = '' } = useParams()
   const project = useProject(projectId)
-  // Settings data exists only for the example project; a deleted project has no settings.
-  if (projectId !== exampleProject.id || isNotFound(project.error)) return <NotFoundPage />
+  if (isNotFound(project.error)) return <NotFoundPage />
 
   return (
     <div className="flex h-screen flex-col">

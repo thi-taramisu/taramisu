@@ -6,6 +6,7 @@ import { CreateAssetDialog } from '../assets/CreateAssetDialog'
 import { CreateAttackPathDialog } from '../attack-paths/CreateAttackPathDialog'
 import { CreateDamageScenarioDialog } from '../damage-scenarios/CreateDamageScenarioDialog'
 import { CreateItemDialog } from '../items/CreateItemDialog'
+import { isExampleProject } from '../../api/mocks/data/headlamp'
 import { CreateThreatScenarioDialog } from '../threat-scenarios/CreateThreatScenarioDialog'
 import { useTranslation } from 'react-i18next'
 
@@ -19,6 +20,7 @@ interface NewElementMenuProps {
 /** "+ New" button above the element tree (Add Items wireframes). */
 export function NewElementMenu({ projectId, projectName, disabled = false }: NewElementMenuProps) {
   const { t } = useTranslation()
+  const canCreateBelowItems = isExampleProject(projectId)
   const [itemDialogOpen, setItemDialogOpen] = useState(false)
   const [assetDialog, setAssetDialog] = useState({ open: false, key: 0 })
   const [damageScenarioDialog, setDamageScenarioDialog] = useState({ open: false, key: 0 })
@@ -38,17 +40,23 @@ export function NewElementMenu({ projectId, projectName, disabled = false }: New
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuItem onSelect={() => setItemDialogOpen(true)}>{t('entities.items')}</DropdownMenuItem>
-          {/* A new key per opening, so the dialogs start from the item and element of the current page. */}
-          <DropdownMenuItem onSelect={() => setAssetDialog(({ key }) => ({ open: true, key: key + 1 }))}>{t('entities.assets')}</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            {t('entities.damage-scenarios')}
-          </DropdownMenuItem>
+          {canCreateBelowItems && (
+            <>
+              {/* A new key per opening, so the dialogs start from the item and element of the current page. */}
+              <DropdownMenuItem onSelect={() => setAssetDialog(({ key }) => ({ open: true, key: key + 1 }))}>{t('entities.assets')}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setDamageScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+                {t('entities.damage-scenarios')}
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem onSelect={() => setThreatScenarioDialog(({ key }) => ({ open: true, key: key + 1 }))}>
             {t('entities.threat-scenarios')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
-            {t('entities.attack-paths')}
-          </DropdownMenuItem>
+          {canCreateBelowItems && (
+            <DropdownMenuItem onSelect={() => setAttackPathDialog(({ key }) => ({ open: true, key: key + 1 }))}>
+              {t('entities.attack-paths')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <CreateItemDialog

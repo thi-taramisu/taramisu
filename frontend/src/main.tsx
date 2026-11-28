@@ -9,10 +9,10 @@ import { i18n } from './i18n'
 import App from './App.tsx'
 import { sentryEnabled } from './sentry.ts'
 import { ApiProvider } from './api/ApiProvider'
-import { retryUnlessNotFound } from './api/errors'
+import { retryTransient } from './api/errors'
 import { AuthProvider } from './auth/AuthContext'
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryUnlessNotFound } } })
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: retryTransient } } })
 
 createRoot(document.getElementById('root')!, sentryEnabled ? {
   onUncaughtError: Sentry.reactErrorHandler(),

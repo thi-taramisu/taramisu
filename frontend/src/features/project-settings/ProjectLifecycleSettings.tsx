@@ -5,7 +5,7 @@ import { Archive, ArchiveRestore, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ArchiveProjectDialog } from '@/features/projects/ArchiveProjectDialog'
 import { DeleteProjectDialog } from '@/features/projects/DeleteProjectDialog'
-import { isNotFound } from '../../api/errors'
+import { changeError } from '@/features/projects/changeError'
 import {
   resetFailed,
   useArchiveProject,
@@ -47,22 +47,13 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
     if (!isOpen) setOpenDialog(null)
   }
 
-  // A 404 is handled by the settings page; other errors must not look like missing rights.
-  if (project.isError && !isNotFound(project.error)) {
-    return (
-      <div className="flex items-center justify-between gap-2">
-        <p role="alert" className="text-sm text-destructive">{t('ui:theArchiveAndDeleteOptionsCouldNotBeLoaded')}</p>
-        <Button variant="outline" size="sm" onClick={() => void project.refetch()}>{t('ui:retry')}</Button>
-      </div>
-    )
-  }
-
+  // Load errors are shown by the General section (`GeneralSettings.tsx`); without the project nothing is offered.
   if (project.data?.role !== 'OWNER') return null
 
   const { name, archived } = project.data
   const pending = archiveProject.isPending || restoreProject.isPending || deleteProject.isPending
   const mutations = [archiveProject, restoreProject, deleteProject]
-  const failed = mutations.some((mutation) => mutation.isError)
+  const failed = mutations.find((mutation) => mutation.isError)
 
   return (
     <section aria-labelledby="danger-zone" className="grid gap-3">
@@ -101,7 +92,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
         >{t('ui:permanentlyDeleteTheProjectWithEverythingInItThisCannotBeUndone')}</SettingRow>
       </div>
       {failed && (
-        <p role="alert" className="text-sm text-destructive">{t('ui:theChangeCouldNotBeSavedPleaseTryAgain')}</p>
+        <p role="alert" className="text-sm text-destructive">{t(changeError(failed.error))}</p>
       )}
 
       <ArchiveProjectDialog

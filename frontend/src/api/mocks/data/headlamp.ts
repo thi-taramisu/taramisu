@@ -51,7 +51,13 @@ export const exampleProject = {
   ] satisfies TreeNode[] as TreeNode[],
 }
 
+/** The example project is served by the mocks, with everything below its items (#250). */
+export function isExampleProject(projectId: string) {
+  return projectId === exampleProject.id
+}
+
 export const headlampItem: ItemDefinition = {
+  display_id: 'IT-1',
   id: 'i-01',
   tara_project_id: exampleProject.id,
   name: 'Headlamp system',

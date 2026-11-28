@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, retryUnlessNotFound } from '../errors'
+import { ApiError } from '../errors'
 import { createMockItemApi } from './mockItemApi'
 
 const project = 'headlamp'
@@ -456,14 +456,6 @@ describe('createMockItemApi', () => {
       expect((await attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).threatScenarios).toEqual([])
       await expect(attackPaths.unlinkThreatScenario(project, 'ap-03', 'ts-01')).rejects.toMatchObject({ status: 404 })
     })
-  })
-})
-
-describe('retryUnlessNotFound', () => {
-  it('does not retry 404s but retries other errors up to three times', () => {
-    expect(retryUnlessNotFound(0, new ApiError(404, 'gone'))).toBe(false)
-    expect(retryUnlessNotFound(0, new ApiError(500, 'oops'))).toBe(true)
-    expect(retryUnlessNotFound(3, new Error('network'))).toBe(false)
   })
 })
 

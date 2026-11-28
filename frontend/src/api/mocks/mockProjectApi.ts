@@ -1,11 +1,18 @@
 import { ApiError } from '../errors'
 import type { Project } from '../models/project'
 import type { ProjectService } from '../services/projects'
+import { exampleProject } from './data/headlamp'
 import { mockProjects } from './data/projects'
 import { run } from './request'
 
-// MOCK: in-memory project API. Replace it in `ApiProvider` with an implementation on the generated
-// client once the frontend uses `/api/v1/projects` and the archive endpoints (#233) exist.
+// MOCK: in-memory project API. Tests use it instead of the backend, and the real project service
+// (`../projects.ts`) serves the example project from it until the example lives in the backend (#250).
+
+function validateName(name: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new ApiError(422, 'Name is required.')
+  return trimmed
+}
 
 /**
  * In-memory implementation of the project API, seeded with the mock project list. Each call returns
@@ -31,11 +38,9 @@ export function createMockProjectApi(seed: Project[] = mockProjects): ProjectSer
     get: (projectId) => run(() => find(projectId)),
     create: ({ name, description = '', image }) =>
       run(() => {
-        const trimmed = name.trim()
-        if (!trimmed) throw new ApiError(422, 'Name is required.')
         const project: Project = {
           id: crypto.randomUUID(),
-          name: trimmed,
+          name: validateName(name),
           description,
           role: 'OWNER',
           // The mock owns the object URL and releases it when the project is deleted.
@@ -48,11 +53,16 @@ export function createMockProjectApi(seed: Project[] = mockProjects): ProjectSer
         db.set(project.id, project)
         return project
       }),
+    update: (projectId, { name, description }) =>
+      run(() => {
+        const project = findOwned(projectId)
+        project.name = validateName(name)
+        project.description = description
+        return project
+      }),
     setFavorite: (projectId, favorite) =>
       run(() => {
-        const project = find(projectId)
-        project.favorite = favorite
-        return project
+        find(projectId).favorite = favorite
       }),
     archive: (projectId) =>
       run(() => {
@@ -73,4 +83,9 @@ export function createMockProjectApi(seed: Project[] = mockProjects): ProjectSer
         db.delete(projectId)
       }),
   }
+}
+
+/** Mock API with only the example project, which the real project service serves from it. */
+export function createExampleProjectApi() {
+  return createMockProjectApi(mockProjects.filter((project) => project.id === exampleProject.id))
 }
