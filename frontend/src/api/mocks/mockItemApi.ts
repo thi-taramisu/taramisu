@@ -3,7 +3,11 @@ import type { CiaProperty, ItemAsset } from '../models/asset'
 import type { DamageScenario, DamageScenarioRelations, ImpactRatingBody } from '../models/damageScenario'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../models/item'
 import type { ItemApi } from '../services/items'
-import { exampleProject, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
+import type { ProjectService } from '../services/projects'
+import type { SearchService } from '../services/search'
+import { createMockProjectApi } from './mockProjectApi'
+import { createMockSearchService } from './mockSearch'
+import { exampleProject, headlampAssetDetails, headlampAssets, headlampItem, headlampRisks } from './data/headlamp'
 import { headlampDamageScenarioLinks, headlampDamageScenarios, headlampImpactRatings } from './data/headlampDamageScenarios'
 import {
   headlampAttackFeasibilityRatings,
@@ -24,6 +28,7 @@ import {
   validateTitle,
   type StoredItem,
 } from './mockStore'
+import { createMockAssetService } from './mockAssets'
 import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
@@ -35,7 +40,7 @@ function seed(): Map<string, StoredItem> {
   const entry = structuredClone({
     item: headlampItem,
     children: headlamp.children ?? [],
-    assets: headlampAssets,
+    assets: headlampAssets.map((asset) => ({ ...asset, ...headlampAssetDetails[asset.id] })),
     risks: headlampRisks,
     damageScenarios: headlampDamageScenarios,
     damageScenarioLinks: headlampDamageScenarioLinks,
@@ -97,7 +102,7 @@ function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenari
  * In-memory implementation of the item API, seeded with the headlamp example. Each call returns
  * copies, so callers cannot change the stored state by accident.
  */
-export function createMockItemApi(): ItemApi {
+export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
   const db = seed()
 
   function find(projectId: string, itemId: string) {
@@ -115,6 +120,18 @@ export function createMockItemApi(): ItemApi {
   }
 
   return {
+    projects,
+    search: createMockSearchService(projects, () => [...db.values()].flatMap((entry) => {
+      const { item, assets, damageScenarios, threatScenarios, attackPaths } = entry
+      const common = { projectId: item.tara_project_id, item: { id: item.id, name: item.name } }
+      return [
+        { ...common, type: 'items' as const, id: item.id, name: item.name },
+        ...assets.map((a) => ({ ...common, type: 'assets' as const, id: a.id, code: a.code, name: a.name })),
+        ...damageScenarios.map((ds) => ({ ...common, type: 'damage-scenarios' as const, id: ds.id, code: ds.code, name: ds.title })),
+        ...threatScenarios.map((ts) => ({ ...common, type: 'threat-scenarios' as const, id: ts.id, code: ts.code, name: ts.title })),
+        ...attackPaths.map((ap) => ({ ...common, type: 'attack-paths' as const, id: ap.id, code: ap.code, name: ap.title })),
+      ]
+    })),
     items: {
       list: (projectId) =>
         run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),
@@ -169,14 +186,34 @@ export function createMockItemApi(): ItemApi {
     },
     content: {
       children: (projectId, itemId) => run(() => find(projectId, itemId).children),
-      assets: (projectId, itemId) => run(() => find(projectId, itemId).assets),
+      assets: (projectId, itemId) =>
+        run(() =>
+          find(projectId, itemId).assets.map(({ id, code, name, component, properties, damageScenarios, threatScenarios, maxRisk }): ItemAsset => ({
+            id,
+            code,
+            name,
+            component,
+            properties,
+            damageScenarios,
+            threatScenarios,
+            maxRisk,
+          })),
+        ),
       addAsset: (projectId, itemId, newAsset) =>
         run(() => {
           const entry = find(projectId, itemId)
           const codes = [...db.values()].flatMap((e) => e.assets.map((a) => Number(a.code.slice(3))))
           const code = `AS-${Math.max(0, ...codes) + 1}`
-          const asset: ItemAsset = { ...newAsset, id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
-          entry.assets.push(asset)
+          // Same rule as the non-blank name of `asset` in backend/db/schema.sql.
+          const name = newAsset.name.trim()
+          if (!name) throw new ApiError(422, 'Name is required.')
+          const asset: ItemAsset = { ...newAsset, name, component: '', id: crypto.randomUUID(), code, damageScenarios: 0, threatScenarios: 0, maxRisk: null }
+          entry.assets.push({
+            ...asset,
+            description: null,
+            identification_source: null,
+            propertyDescriptions: Object.fromEntries(newAsset.properties.map((property) => [property, null])),
+          })
           entry.children.push({ type: 'assets', id: asset.id, code, name: asset.name })
           return asset
         }),
@@ -284,6 +321,7 @@ export function createMockItemApi(): ItemApi {
           return relationsOf(entry, scenario.id)
         }),
     },
+    assets: createMockAssetService(db),
     threatScenarios: createMockThreatScenarioService(db),
     attackPaths: createMockAttackPathService(db),
   }

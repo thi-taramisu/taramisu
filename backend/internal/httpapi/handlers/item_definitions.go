@@ -91,6 +91,7 @@ type PatchItemDefinitionInput struct {
 
 type ItemDefinition struct {
 	ID            string `json:"id" format:"uuid"`
+	DisplayID     string `json:"display_id" readOnly:"true" example:"IT-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	TaraProjectID string `json:"tara_project_id" format:"uuid"`
 	ItemDefinitionBody
 	CreatedAt time.Time `json:"created_at"`
@@ -105,7 +106,8 @@ type ListItemDefinitionsOutput struct{ Body []ItemDefinition }
 
 func itemDefinition(row db.ItemDefinition) ItemDefinition {
 	return ItemDefinition{
-		ID: row.ID.String(), TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
+		ID: row.ID.String(), DisplayID: displayID(displayPrefixItem, row.DisplayNumber),
+		TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
 		ItemDefinitionBody: ItemDefinitionBody{
 			Name: row.Name, ScopeType: row.ScopeType, LifecyclePhase: row.LifecyclePhase,
 			Boundary: row.Boundary, Functions: row.Functions, OperationalEnvironment: row.OperationalEnvironment,
@@ -171,6 +173,9 @@ func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionIn
 		}
 		return db.Created(db.TargetItemDefinition, projectID, row.ID, itemDefinition(row)), nil
 	})
+	if errors.Is(err, pgx.ErrNoRows) { // the create query locks the project, which was deleted after the access check
+		return nil, huma.Error404NotFound("project not found")
+	}
 	if err != nil {
 		return nil, itemDefinitionError(err)
 	}

@@ -230,7 +230,7 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	kept, deleted := newProject("kept"), newProject("deleted")
 
 	// A project with item definitions cannot be deleted; the failed deletion stores no event.
-	if _, err := tx.Exec(ctx, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'Item', 'ITEM')`, kept); err != nil {
+	if _, err := db.New(tx).CreateItemDefinition(ctx, db.CreateItemDefinitionParams{ProjectID: kept, Name: "Item", ScopeType: db.ScopeTypeITEM}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.DeleteTaraProject(ctx, actor, kept); err == nil {
@@ -383,6 +383,11 @@ func TestAuditContentPostgres(t *testing.T) {
 	call("replace-tara-project", http.MethodPut, projectPath, `{"name":"Headlamp","description":"Contact: x@example.com"}`, http.StatusOK)
 	call("update-tara-project", http.MethodPatch, projectPath, `{"name":"Headlamp"}`, http.StatusOK) // unchanged
 
+	call("archive-tara-project", http.MethodPost, projectPath+"/archive", "", http.StatusOK)
+	call("archive-tara-project", http.MethodPost, projectPath+"/archive", "", http.StatusOK) // unchanged
+	call("unarchive-tara-project", http.MethodPost, projectPath+"/unarchive", "", http.StatusOK)
+	call("unarchive-tara-project", http.MethodPost, projectPath+"/unarchive", "", http.StatusOK) // unchanged
+
 	items := projectPath + "/item-definitions"
 	created := call("create-item-definition", http.MethodPost, items, `{"name":"Lamp ECU","scope_type":"ITEM","boundary":"CAN"}`, http.StatusCreated)
 	item := items + "/" + created["id"].(string)
@@ -401,6 +406,8 @@ func TestAuditContentPostgres(t *testing.T) {
 		{userID, "project.created", db.TargetProject, projectID, nil, map[string]any{"name": "Lamp", "first_owner": userID}, "create-tara-project"},
 		{userID, "project.updated", db.TargetProject, projectID, map[string]any{"name": "Lamp"}, map[string]any{"name": "Headlamp"}, "update-tara-project"},
 		{userID, "project.updated", db.TargetProject, projectID, map[string]any{"name": "Headlamp"}, map[string]any{"name": "Headlamp", "description_changed": true}, "replace-tara-project"},
+		{userID, "project.archived", db.TargetProject, projectID, map[string]any{"archived": false}, map[string]any{"archived": true}, "archive-tara-project"},
+		{userID, "project.unarchived", db.TargetProject, projectID, map[string]any{"archived": true}, map[string]any{"archived": false}, "unarchive-tara-project"},
 		{userID, "item_definition.created", db.TargetItemDefinition, created["id"].(string), nil, created, "create-item-definition"},
 		{userID, "item_definition.updated", db.TargetItemDefinition, created["id"].(string), created, replaced, "replace-item-definition"},
 		{userID, "item_definition.updated", db.TargetItemDefinition, created["id"].(string), replaced, patched, "update-item-definition"},
@@ -445,6 +452,9 @@ func TestAuditContentPostgres(t *testing.T) {
 
 	// A change whose request fails afterwards is rolled back with its event. A query that escaped the
 	// transaction of Audit would persist and fail these checks.
+	archived, archivedPath := newProject("Archived")
+	archivedState := call("archive-tara-project", http.MethodPost, archivedPath+"/archive", "", http.StatusOK)["archived_at"]
+	archivedHistory := auditEvents(t, ctx, pool, archived["id"].(string))
 	other, otherPath := newProject("Other")
 	otherItem := call("create-item-definition", http.MethodPost, otherPath+"/item-definitions", `{"name":"Kept","scope_type":"ITEM"}`, http.StatusCreated)
 	otherItemPath := otherPath + "/item-definitions/" + otherItem["id"].(string)
@@ -454,6 +464,8 @@ func TestAuditContentPostgres(t *testing.T) {
 		{"create-tara-project", http.MethodPost, "/api/v1/projects", `{` + name + `}`},
 		{"update-tara-project", http.MethodPatch, otherPath, `{` + name + `}`},
 		{"replace-tara-project", http.MethodPut, otherPath, `{` + name + `}`},
+		{"archive-tara-project", http.MethodPost, otherPath + "/archive", ""},
+		{"unarchive-tara-project", http.MethodPost, archivedPath + "/unarchive", ""},
 		{"create-item-definition", http.MethodPost, otherPath + "/item-definitions", `{` + name + `,"scope_type":"ITEM"}`},
 		{"replace-item-definition", http.MethodPut, otherItemPath, `{` + name + `,"scope_type":"ITEM"}`},
 		{"update-item-definition", http.MethodPatch, otherItemPath, `{` + name + `}`},
@@ -491,8 +503,14 @@ func TestAuditContentPostgres(t *testing.T) {
 	if got := auditEvents(t, ctx, pool, other["id"].(string)); !reflect.DeepEqual(got, before) {
 		t.Errorf("failed requests changed the audit history: %+v", got)
 	}
-	if got := call("get-tara-project", http.MethodGet, otherPath, "", http.StatusOK); got["name"] != "Other" {
-		t.Errorf("project name after failed changes = %v, want Other", got["name"])
+	if got := call("get-tara-project", http.MethodGet, otherPath, "", http.StatusOK); got["name"] != "Other" || got["archived_at"] != nil {
+		t.Errorf("failed changes affected project name or archive state: %+v", got)
+	}
+	if got := call("get-tara-project", http.MethodGet, archivedPath, "", http.StatusOK); got["archived_at"] != archivedState {
+		t.Errorf("failed unarchive changed the archive state: %v", got["archived_at"])
+	}
+	if got := auditEvents(t, ctx, pool, archived["id"].(string)); !reflect.DeepEqual(got, archivedHistory) {
+		t.Errorf("failed unarchive changed the audit history: %+v", got)
 	}
 
 	// A locking read outside Audit's transaction is refused: its lock would end with the statement.

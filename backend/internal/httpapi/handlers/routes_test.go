@@ -30,6 +30,7 @@ type propertyQueries struct {
 
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 
 	resourceAccess
 	handlers.ProjectMemberStore
@@ -212,4 +213,8 @@ func TestResourceOpenAPIPermissions(t *testing.T) {
 			}
 		}
 	}
+}
+
+func (a resourceAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
 }
