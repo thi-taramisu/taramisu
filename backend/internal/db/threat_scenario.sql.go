@@ -14,7 +14,7 @@ import (
 const createThreatScenario = `-- name: CreateThreatScenario :one
 WITH display AS (
     INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
-    SELECT tara_project_id, 'DAMAGE_SCENARIO', 1 FROM item_definition WHERE id = $1
+    SELECT tara_project_id, 'THREAT_SCENARIO', 1 FROM item_definition WHERE id = $1
     ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
     RETURNING tara_project_id, last_number
 )
