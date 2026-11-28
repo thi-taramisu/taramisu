@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,13 +64,11 @@ func TestConflictingEditsPostgres(t *testing.T) {
 		etag   string
 		body   map[string]any
 	}
-	sendTo := func(handler http.Handler, method, path, ifMatch, body string) response {
+	sendHeaders := func(handler http.Handler, method, path string, header http.Header, body string) response {
 		req := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
+		maps.Copy(req.Header, header)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", token)
-		if ifMatch != "" {
-			req.Header.Set("If-Match", ifMatch)
-		}
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 		out := response{status: rr.Code, etag: rr.Header().Get("ETag")}
@@ -77,6 +76,13 @@ func TestConflictingEditsPostgres(t *testing.T) {
 			_ = json.Unmarshal(rr.Body.Bytes(), &out.body)
 		}
 		return out
+	}
+	sendTo := func(handler http.Handler, method, path, ifMatch, body string) response {
+		header := http.Header{}
+		if ifMatch != "" {
+			header.Set("If-Match", ifMatch)
+		}
+		return sendHeaders(handler, method, path, header, body)
 	}
 	send := func(method, path, ifMatch, body string) response { return sendTo(handler, method, path, ifMatch, body) }
 	call := func(method, path, ifMatch, body string, want int) response {
@@ -261,6 +267,103 @@ func TestConflictingEditsPostgres(t *testing.T) {
 		t.Fatalf("member version after setting the same role = %d, want 2", v)
 	}
 	call(http.MethodDelete, member, tag(2), "", http.StatusNoContent)
+
+	// Content: every resource below an item definition, the same way.
+	contentItem := call(http.MethodPost, items, "", `{"name":"Content","scope_type":"ITEM"}`, http.StatusCreated).body["id"].(string)
+	seed := func(query string, args ...any) string {
+		t.Helper()
+		var id string
+		if err := pool.QueryRow(ctx, query, args...).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	content := "/api/v1/item-definitions/" + contentItem
+	asset := seedAsset(t, ctx, pool, contentItem, "Asset")
+	propertyAsset := seedAsset(t, ctx, pool, contentItem, "Property asset")
+	property := seed(`INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'INTEGRITY') RETURNING id::text`, asset)
+	otherProperty := seed(`INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'CONFIDENTIALITY') RETURNING id::text`, asset)
+	damage := seedDamageScenario(t, ctx, pool, contentItem, "Damage")
+	threat := seedThreatScenario(t, ctx, pool, contentItem, "Threat")
+	impact := seed(`INSERT INTO impact_rating (damage_scenario_id, impact_category) VALUES ($1, 'SAFETY') RETURNING id::text`, damage)
+	attackPath := seedAttackPath(t, ctx, pool, contentItem, "Path")
+	otherImpact := seed(`INSERT INTO impact_rating (damage_scenario_id, impact_category) VALUES ($1, 'OPERATIONAL') RETURNING id::text`, damage)
+	riskValue := seed(`INSERT INTO risk_value (threat_scenario_id, impact_rating_id, risk_score, determination_method) VALUES ($1, $2, 3, 'RISK_MATRIX') RETURNING id::text`, threat, otherImpact)
+	for _, r := range []struct {
+		name, path              string
+		create, replace, change string // change differs from replace
+		upsert                  bool
+	}{
+		{"asset", content + "/assets", `{"name":"ECU"}`, `{"name":"Gateway","description":"Network"}`, `{"description":null}`, false},
+		{"cybersecurity property", content + "/assets/" + propertyAsset + "/cybersecurity-properties", `{"property_type":"INTEGRITY"}`, `{"property_type":"AVAILABILITY","description":"Required"}`, `{"description":null}`, false},
+		{"damage property link", content + "/damage-scenario-asset-properties",
+			fmt.Sprintf(`{"damage_scenario_id":%q,"asset_cybersecurity_property_id":%q}`, damage, property),
+			fmt.Sprintf(`{"damage_scenario_id":%q,"asset_cybersecurity_property_id":%q,"compromise_mechanism_note":"Tampering"}`, damage, property),
+			`{"compromise_mechanism_note":null}`, false},
+		{"threat property link", content + "/threat-scenario-asset-properties",
+			fmt.Sprintf(`{"threat_scenario_id":%q,"asset_cybersecurity_property_id":%q}`, threat, property),
+			fmt.Sprintf(`{"threat_scenario_id":%q,"asset_cybersecurity_property_id":%q}`, threat, otherProperty),
+			fmt.Sprintf(`{"asset_cybersecurity_property_id":%q}`, property), false},
+		{"damage scenario", content + "/damage-scenarios", `{"title":"Control loss"}`, `{"title":"Steering loss","road_user_harm_description":"Injury"}`, `{"road_user_harm_description":null}`, false},
+		{"impact rating", content + "/damage-scenarios/" + damage + "/impact-ratings", `{"impact_category":"FINANCIAL","rating_value":"MAJOR"}`, `{"impact_category":"FINANCIAL","rating_value":"SEVERE"}`, `{"omission_or_rating_rationale":"Costs"}`, false},
+		{"attack path", content + "/attack-paths", `{"title":"Interface"}`, `{"title":"Debug interface","analysis_approach":"BOTTOM_UP"}`, `{"title":"Debug port"}`, false},
+		{"feasibility rating", content + "/attack-paths/" + attackPath + "/feasibility-rating", `{"rationale":"Physical access"}`, `{"rationale":"Debug connector"}`, `{"rationale":null}`, true},
+		{"risk value", "/api/v1/threat-scenarios/" + threat + "/risk-values",
+			fmt.Sprintf(`{"impact_rating_id":%q,"risk_score":3,"determination_method":"RISK_MATRIX"}`, impact),
+			fmt.Sprintf(`{"impact_rating_id":%q,"risk_score":4,"determination_method":"RISK_MATRIX"}`, impact), `{"risk_score":5}`, false},
+		{"treatment decision", "/api/v1/threat-scenarios/" + threat + "/risk-treatment-decisions", `{"treatment_option":"REDUCING"}`,
+			fmt.Sprintf(`{"risk_value_id":%q,"treatment_option":"RETAINING","decision_rationale":"Accepted","is_cybersecurity_claim":true}`, riskValue),
+			`{"risk_value_id":null,"decision_rationale":null,"is_cybersecurity_claim":false,"treatment_option":"REDUCING"}`, false},
+	} {
+		var record string
+		var created response
+		if r.upsert {
+			// If-Match needs an existing record; If-None-Match: * creates a missing one, and only once.
+			record = r.path
+			if got := send(http.MethodPut, record, tag(1), r.create); got.status != http.StatusPreconditionFailed {
+				t.Fatalf("%s: If-Match on a missing record: status %d, want 412", r.name, got.status)
+			}
+			// Where If-Match is required, only If-None-Match: * stands in for it.
+			for _, header := range []http.Header{nil, {"If-None-Match": {`"7"`}}} {
+				if got := sendHeaders(required, http.MethodPut, record, header, r.create); got.status != http.StatusPreconditionRequired {
+					t.Fatalf("%s: create-or-replace with %v where If-Match is required: status %d, want 428", r.name, header, got.status)
+				}
+			}
+			noneMatch := http.Header{"If-None-Match": {"*"}}
+			if created = sendHeaders(handler, http.MethodPut, record, noneMatch, r.create); created.status != http.StatusOK {
+				t.Fatalf("%s: If-None-Match: * on a missing record: status %d, want 200", r.name, created.status)
+			}
+			if got := sendHeaders(required, http.MethodPut, record, noneMatch, r.replace); got.status != http.StatusPreconditionFailed || got.etag != tag(1) {
+				t.Fatalf("%s: If-None-Match: * on an existing record: status %d, ETag %s; want 412 with %s", r.name, got.status, got.etag, tag(1))
+			}
+		} else {
+			created = call(http.MethodPost, r.path, "", r.create, http.StatusCreated)
+			record = r.path + "/" + created.body["id"].(string)
+		}
+		if v := version(created); v != 1 || created.etag != tag(1) {
+			t.Fatalf("%s: created with version %d and ETag %q, want 1", r.name, v, created.etag)
+		}
+		get := func() response { return call(http.MethodGet, record, "", "", http.StatusOK) }
+		if got := get(); got.etag != tag(1) {
+			t.Fatalf("%s: GET has ETag %q, want %s", r.name, got.etag, tag(1))
+		}
+		rejected(http.MethodPut, record, r.replace, 1, get)
+		rejected(http.MethodPatch, record, r.change, 1, get)
+		rejected(http.MethodDelete, record, "", 1, get)
+		if v := version(call(http.MethodPut, record, tag(1), r.replace, http.StatusOK)); v != 2 {
+			t.Fatalf("%s: version after a replacement = %d, want 2", r.name, v)
+		}
+		if v := version(call(http.MethodPut, record, tag(2), r.replace, http.StatusOK)); v != 2 {
+			t.Fatalf("%s: version after saving without a change = %d, want 2", r.name, v)
+		}
+		if v := version(call(http.MethodPatch, record, tag(2), r.change, http.StatusOK)); v != 3 {
+			t.Fatalf("%s: version after a change = %d, want 3", r.name, v)
+		}
+		if got := sendTo(required, http.MethodDelete, record, "", ""); got.status != http.StatusPreconditionRequired {
+			t.Fatalf("%s: DELETE without If-Match where it is required: status %d, want 428", r.name, got.status)
+		}
+		call(http.MethodDelete, record, tag(3), "", http.StatusNoContent)
+	}
 
 	// Deleting the project.
 	rejected(http.MethodDelete, projectPath, "", 6, getProject)

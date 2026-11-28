@@ -12,16 +12,12 @@ import (
 )
 
 // versionedOperations accept If-Match and reject a change based on an outdated version with 412
-// (docs/internal/architecture/backend/backend-architecture.md#conflicting-edits).
+// (docs/internal/architecture/backend/backend-architecture.md#conflicting-edits). New PUT, PATCH, and
+// DELETE operations go into this list or into unversioned.
 var versionedOperations = []string{
 	"replace-tara-project", "update-tara-project", "delete-tara-project",
 	"update-project-member", "remove-project-member",
 	"replace-item-definition", "update-item-definition", "delete-item-definition",
-}
-
-// notVersionedYet change records that have a version, but do not check If-Match yet. Move an
-// operation to versionedOperations when it does; new operations must go into one of the lists.
-var notVersionedYet = []string{
 	"replace-asset", "update-asset", "delete-asset",
 	"replace-asset-cybersecurity-property", "update-asset-cybersecurity-property", "delete-asset-cybersecurity-property",
 	"replace-damage-scenario-asset-property", "update-damage-scenario-asset-property", "delete-damage-scenario-asset-property",
@@ -48,7 +44,7 @@ func TestEveryChangeIsDeclaredForVersions(t *testing.T) {
 	for _, list := range []struct {
 		name string
 		ids  []string
-	}{{"versionedOperations", versionedOperations}, {"notVersionedYet", notVersionedYet}, {"unversioned", unversioned}} {
+	}{{"versionedOperations", versionedOperations}, {"unversioned", unversioned}} {
 		for _, id := range list.ids {
 			if other, ok := declared[id]; ok {
 				t.Errorf("%s is listed in %s and %s", id, other, list.name)

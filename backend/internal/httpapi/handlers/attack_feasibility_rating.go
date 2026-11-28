@@ -61,9 +61,11 @@ type AttackFeasibilityRatingBody struct {
 	ApTotalScore          *int32                `json:"ap_total_score,omitempty"`
 	FeasibilityRating     *db.AttackFeasibility `json:"feasibility_rating,omitempty" enum:"HIGH,MEDIUM,LOW,VERY_LOW"`
 	Rationale             *string               `json:"rationale,omitempty"`
+	Version               int32                 `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the rating."`
 }
 
 type AttackFeasibilityRatingOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Body AttackFeasibilityRatingBody
 }
 
@@ -73,6 +75,7 @@ type FeasibilityRatingPath struct {
 }
 
 type FeasibilityRatingUpdateInput struct {
+	IfMatch
 	FeasibilityRatingPath
 	Body struct {
 		ApElapsedTime         Optional[int32]                `json:"ap_elapsed_time,omitempty" minimum:"0"`
@@ -88,6 +91,7 @@ type FeasibilityRatingUpdateInput struct {
 
 type FeasibilityRatingInput struct {
 	FeasibilityRatingPath
+	UpsertPrecondition
 	Body struct {
 		ApElapsedTime         *int32                `json:"ap_elapsed_time,omitempty" minimum:"0"`
 		ApSpecialistExpertise *int32                `json:"ap_specialist_expertise,omitempty" minimum:"0"`
@@ -149,6 +153,9 @@ func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRat
 			return db.Change{}, err
 		}
 		created := errors.Is(err, pgx.ErrNoRows)
+		if err := in.checkUpsert(!created, before.Version); err != nil {
+			return db.Change{}, err
+		}
 		r, err = h.store.UpsertAttackFeasibilityRating(ctx, db.UpsertAttackFeasibilityRatingParams{
 			AttackPathID:          id,
 			ApElapsedTime:         in.Body.ApElapsedTime,
@@ -166,7 +173,9 @@ func (h *AttackFeasibilityRating) Upsert(ctx context.Context, in *FeasibilityRat
 		if created {
 			return db.Created(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(r)), nil
 		}
-		return db.Updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(before), toRatingBody(r)), nil
+		var change db.Change
+		change, r = updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, before, r, toRatingBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapRatingError(err)
@@ -184,6 +193,9 @@ func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRat
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetAttackFeasibilityRatingForUpdate(ctx, id)
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		r, err = h.store.UpdateAttackFeasibilityRating(ctx, db.UpdateAttackFeasibilityRatingParams{
@@ -208,7 +220,9 @@ func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRat
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, toRatingBody(before), toRatingBody(r)), nil
+		var change db.Change
+		change, r = updated(db.TargetAttackFeasibilityRating, projectIDFromContext(ctx), r.ID, before, r, toRatingBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapRatingError(err)
@@ -216,14 +230,17 @@ func (h *AttackFeasibilityRating) Update(ctx context.Context, in *FeasibilityRat
 	return toRatingOutput(r), nil
 }
 
-func (h *AttackFeasibilityRating) Delete(ctx context.Context, in *FeasibilityRatingPath) (*struct{}, error) {
-	id, _, err := h.ratingPath(ctx, in)
+func (h *AttackFeasibilityRating) Delete(ctx context.Context, in *DeleteFeasibilityRatingInput) (*struct{}, error) {
+	id, _, err := h.ratingPath(ctx, &in.FeasibilityRatingPath)
 	if err != nil {
 		return nil, err
 	}
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetAttackFeasibilityRatingForDelete(ctx, id)
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		n, err := h.store.DeleteAttackFeasibilityRating(ctx, id)
@@ -257,6 +274,7 @@ func mapRatingError(err error) error {
 
 func toRatingBody(r db.AttackFeasibilityRating) AttackFeasibilityRatingBody {
 	out := AttackFeasibilityRatingBody{
+		Version:               r.Version,
 		ID:                    r.ID.String(),
 		AttackPathID:          r.AttackPathID.String(),
 		ApElapsedTime:         r.ApElapsedTime,
@@ -272,5 +290,11 @@ func toRatingBody(r db.AttackFeasibilityRating) AttackFeasibilityRatingBody {
 }
 
 func toRatingOutput(r db.AttackFeasibilityRating) *AttackFeasibilityRatingOutput {
-	return &AttackFeasibilityRatingOutput{Body: toRatingBody(r)}
+	return &AttackFeasibilityRatingOutput{ETag: etag(r.Version), Body: toRatingBody(r)}
+}
+
+// DeleteFeasibilityRatingInput identifies the record to delete and the version the deletion is based on.
+type DeleteFeasibilityRatingInput struct {
+	FeasibilityRatingPath
+	IfMatch
 }

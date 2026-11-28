@@ -73,6 +73,7 @@ type DamagePropertyLink struct {
 	DamageScenarioID             string  `json:"damage_scenario_id" format:"uuid"`
 	AssetCybersecurityPropertyID string  `json:"asset_cybersecurity_property_id" format:"uuid"`
 	CompromiseMechanismNote      *string `json:"compromise_mechanism_note" nullable:"true"`
+	Version                      int32   `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the link."`
 }
 
 // CreateDamagePropertyLinkInput combines the item definition URL ID with the JSON fields for a new link.
@@ -83,6 +84,7 @@ type CreateDamagePropertyLinkInput struct {
 
 // ReplaceDamagePropertyLinkInput identifies an existing link and supplies all replacement references.
 type ReplaceDamagePropertyLinkInput struct {
+	IfMatch
 	PropertyLinkIDInput
 	Body DamagePropertyLinkBody
 }
@@ -90,6 +92,7 @@ type ReplaceDamagePropertyLinkInput struct {
 // UpdateDamagePropertyLinkInput tracks which references and note were supplied for a partial update.
 // References cannot be null; an explicit null clears the optional note.
 type UpdateDamagePropertyLinkInput struct {
+	IfMatch
 	PropertyLinkIDInput
 	Body struct {
 		DamageScenarioID             Optional[assetUUID] `json:"damage_scenario_id,omitempty" nullable:"false"`
@@ -99,20 +102,24 @@ type UpdateDamagePropertyLinkInput struct {
 }
 
 // DamagePropertyLinkOutput returns one link as the JSON response body.
-type DamagePropertyLinkOutput struct{ Body DamagePropertyLink }
+type DamagePropertyLinkOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body DamagePropertyLink
+}
 
 // ListDamagePropertyLinksOutput returns a JSON array of links.
 type ListDamagePropertyLinksOutput struct{ Body []DamagePropertyLink }
 
 // CreateDamagePropertyLinkOutput returns the created link and its URL in the Location header.
 type CreateDamagePropertyLinkOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     DamagePropertyLink
 }
 
 // damagePropertyLinkBody converts a database link record into an API response, formatting UUIDs as strings.
 func damagePropertyLinkBody(row db.DamageScenarioAssetProperty) DamagePropertyLink {
-	return DamagePropertyLink{ID: row.ID.String(), DamageScenarioID: row.DamageScenarioID.String(),
+	return DamagePropertyLink{Version: row.Version, ID: row.ID.String(), DamageScenarioID: row.DamageScenarioID.String(),
 		AssetCybersecurityPropertyID: row.AssetCybersecurityPropertyID.String(), CompromiseMechanismNote: row.CompromiseMechanismNote}
 }
 
@@ -135,6 +142,7 @@ func (h *DamageScenarioAssetProperties) Create(ctx context.Context, in *CreateDa
 		return nil, propertyError(err)
 	}
 	return &CreateDamagePropertyLinkOutput{
+		ETag:     etag(row.Version),
 		Location: itemCollection(in.ItemDefinitionID, "damage-scenario-asset-properties/"+row.ID.String()),
 		Body:     damagePropertyLinkBody(row)}, nil
 }
@@ -147,7 +155,7 @@ func (h *DamageScenarioAssetProperties) Get(ctx context.Context, in *PropertyLin
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &DamagePropertyLinkOutput{Body: damagePropertyLinkBody(row)}, nil
+	return &DamagePropertyLinkOutput{ETag: etag(row.Version), Body: damagePropertyLinkBody(row)}, nil
 }
 
 // List handles GET for the collection, returning links ordered by ID with limit/offset pagination.
@@ -175,6 +183,9 @@ func (h *DamageScenarioAssetProperties) Replace(ctx context.Context, in *Replace
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.queries.ReplaceDamageScenarioAssetProperty(ctx, db.ReplaceDamageScenarioAssetPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 			DamageScenarioID:             pgtype.UUID(in.Body.DamageScenarioID),
@@ -182,12 +193,14 @@ func (h *DamageScenarioAssetProperties) Replace(ctx context.Context, in *Replace
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetDamageScenarioAssetProperty, projectIDFromContext(ctx), row.ID, damagePropertyLinkBody(before), damagePropertyLinkBody(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetDamageScenarioAssetProperty, projectIDFromContext(ctx), row.ID, before, row, damagePropertyLinkBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &DamagePropertyLinkOutput{Body: damagePropertyLinkBody(row)}, nil
+	return &DamagePropertyLinkOutput{ETag: etag(row.Version), Body: damagePropertyLinkBody(row)}, nil
 }
 
 // Update handles PATCH: changes only supplied fields and rejects explicit null references.
@@ -205,6 +218,9 @@ func (h *DamageScenarioAssetProperties) Update(ctx context.Context, in *UpdateDa
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.queries.UpdateDamageScenarioAssetProperty(ctx, db.UpdateDamageScenarioAssetPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 			DamageScenarioID: optionalUUID(b.DamageScenarioID), AssetCybersecurityPropertyID: optionalUUID(b.AssetCybersecurityPropertyID),
@@ -212,20 +228,25 @@ func (h *DamageScenarioAssetProperties) Update(ctx context.Context, in *UpdateDa
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetDamageScenarioAssetProperty, projectIDFromContext(ctx), row.ID, damagePropertyLinkBody(before), damagePropertyLinkBody(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetDamageScenarioAssetProperty, projectIDFromContext(ctx), row.ID, before, row, damagePropertyLinkBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &DamagePropertyLinkOutput{Body: damagePropertyLinkBody(row)}, nil
+	return &DamagePropertyLinkOutput{ETag: etag(row.Version), Body: damagePropertyLinkBody(row)}, nil
 }
 
 // Delete handles DELETE: removes only the link, preserving the scenario and property.
 // A successful deletion returns 204 No Content; a missing or out-of-scope link returns 404.
-func (h *DamageScenarioAssetProperties) Delete(ctx context.Context, in *PropertyLinkIDInput) (*struct{}, error) {
+func (h *DamageScenarioAssetProperties) Delete(ctx context.Context, in *DeletePropertyLinkInput) (*struct{}, error) {
 	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
 		before, err := h.queries.GetDamageScenarioAssetPropertyForDelete(ctx, db.GetDamageScenarioAssetPropertyForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.queries.DeleteDamageScenarioAssetProperty(ctx, db.DeleteDamageScenarioAssetPropertyParams{

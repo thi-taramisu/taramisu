@@ -60,13 +60,16 @@ type DamageScenarioBody struct {
 	Title                        string  `json:"title"`
 	FunctionalityAdverseRelation *string `json:"functionality_adverse_relation,omitempty"`
 	RoadUserHarmDescription      *string `json:"road_user_harm_description,omitempty"`
+	Version                      int32   `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the damage scenario."`
 }
 
 type DamageScenarioOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Body DamageScenarioBody
 }
 
 type CreateDamageScenarioOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     DamageScenarioBody
 }
@@ -102,11 +105,13 @@ type CreateDamageScenarioInput struct {
 }
 
 type ReplaceDamageScenarioInput struct {
+	IfMatch
 	DamageScenarioIDInput
 	Body DamageScenarioFields
 }
 
 type UpdateDamageScenarioInput struct {
+	IfMatch
 	DamageScenarioIDInput
 	Body struct {
 		Title                        *string          `json:"title,omitempty" minLength:"1" pattern:"\\S"`
@@ -141,6 +146,7 @@ func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInp
 		return nil, err
 	}
 	return &CreateDamageScenarioOutput{
+		ETag:     etag(d.Version),
 		Location: "/api/v1/item-definitions/" + in.ItemDefinitionID + "/damage-scenarios/" + d.ID.String(),
 		Body:     toDamageScenarioBody(d),
 	}, nil
@@ -185,6 +191,9 @@ func (h *DamageScenario) Replace(ctx context.Context, in *ReplaceDamageScenarioI
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		d, err = h.store.ReplaceDamageScenario(ctx, db.ReplaceDamageScenarioParams{
 			ID:                           id,
 			ItemDefinitionID:             itemID,
@@ -195,7 +204,9 @@ func (h *DamageScenario) Replace(ctx context.Context, in *ReplaceDamageScenarioI
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(before), toDamageScenarioBody(d)), nil
+		var change db.Change
+		change, d = updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, before, d, toDamageScenarioBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapDamageScenarioError(err)
@@ -214,6 +225,9 @@ func (h *DamageScenario) Update(ctx context.Context, in *UpdateDamageScenarioInp
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		d, err = h.store.UpdateDamageScenario(ctx, db.UpdateDamageScenarioParams{
 			ID:                              id,
 			ItemDefinitionID:                itemID,
@@ -226,7 +240,9 @@ func (h *DamageScenario) Update(ctx context.Context, in *UpdateDamageScenarioInp
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(before), toDamageScenarioBody(d)), nil
+		var change db.Change
+		change, d = updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, before, d, toDamageScenarioBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, mapDamageScenarioError(err)
@@ -234,14 +250,17 @@ func (h *DamageScenario) Update(ctx context.Context, in *UpdateDamageScenarioInp
 	return toDamageScenarioOutput(d), nil
 }
 
-func (h *DamageScenario) Delete(ctx context.Context, in *DamageScenarioIDInput) (*struct{}, error) {
-	id, itemID, err := parseDamageScenarioIDs(in)
+func (h *DamageScenario) Delete(ctx context.Context, in *DeleteDamageScenarioInput) (*struct{}, error) {
+	id, itemID, err := parseDamageScenarioIDs(&in.DamageScenarioIDInput)
 	if err != nil {
 		return nil, err
 	}
 	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetDamageScenarioForDelete(ctx, db.GetDamageScenarioForDeleteParams{ID: id, ItemDefinitionID: itemID})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		n, err := h.store.DeleteDamageScenario(ctx, db.DeleteDamageScenarioParams{ID: id, ItemDefinitionID: itemID})
@@ -276,6 +295,7 @@ func mapDamageScenarioError(err error) error {
 
 func toDamageScenarioBody(d db.DamageScenario) DamageScenarioBody {
 	return DamageScenarioBody{
+		Version:                      d.Version,
 		ID:                           d.ID.String(),
 		DisplayID:                    displayID(displayPrefixDamageScenario, d.DisplayNumber),
 		ItemDefinitionID:             d.ItemDefinitionID.String(),
@@ -286,5 +306,11 @@ func toDamageScenarioBody(d db.DamageScenario) DamageScenarioBody {
 }
 
 func toDamageScenarioOutput(d db.DamageScenario) *DamageScenarioOutput {
-	return &DamageScenarioOutput{Body: toDamageScenarioBody(d)}
+	return &DamageScenarioOutput{ETag: etag(d.Version), Body: toDamageScenarioBody(d)}
+}
+
+// DeleteDamageScenarioInput identifies the record to delete and the version the deletion is based on.
+type DeleteDamageScenarioInput struct {
+	DamageScenarioIDInput
+	IfMatch
 }

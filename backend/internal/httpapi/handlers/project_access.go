@@ -151,7 +151,7 @@ func Register[I, O any](api huma.API, op huma.Operation, access Access, handler 
 	op = declareAccess(api, op, access)
 	if hasIfMatch(reflect.TypeFor[I]()) {
 		op.Errors = appendMissing(op.Errors, http.StatusPreconditionFailed, http.StatusPreconditionRequired)
-		op.Middlewares = append(op.Middlewares, requirePrecondition(api))
+		op.Middlewares = append(op.Middlewares, requirePrecondition(api, isUpsert(reflect.TypeFor[I]())))
 	}
 	huma.Register(api, op, func(ctx context.Context, in *I) (*O, error) {
 		out, err := handler(ctx, in)

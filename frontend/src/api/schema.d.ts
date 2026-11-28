@@ -769,6 +769,11 @@ export interface components {
             /** Format: uuid */
             item_definition_id: string;
             name: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the asset.
+             */
+            version: number;
         };
         AssetBody: {
             description?: string | null;
@@ -784,6 +789,11 @@ export interface components {
             id: string;
             /** @enum {string} */
             property_type: "CONFIDENTIALITY" | "INTEGRITY" | "AVAILABILITY";
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the cybersecurity property.
+             */
+            version: number;
         };
         AssetCybersecurityPropertyBody: {
             description?: string | null;
@@ -829,6 +839,11 @@ export interface components {
             /** Format: uuid */
             id: string;
             rationale?: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the rating.
+             */
+            version: number;
         };
         AttackPathBody: {
             /** @enum {string} */
@@ -845,6 +860,11 @@ export interface components {
             /** Format: uuid */
             item_definition_id: string;
             title: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the attack path.
+             */
+            version: number;
         };
         AttackPathInputBody: {
             /** @enum {string} */
@@ -891,6 +911,11 @@ export interface components {
             damage_scenario_id: string;
             /** Format: uuid */
             id: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the link.
+             */
+            version: number;
         };
         DamagePropertyLinkBody: {
             /** Format: uuid */
@@ -912,6 +937,11 @@ export interface components {
             item_definition_id: string;
             road_user_harm_description?: string;
             title: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the damage scenario.
+             */
+            version: number;
         };
         DamageScenarioFields: {
             functionality_adverse_relation?: string;
@@ -1005,6 +1035,11 @@ export interface components {
             /** @enum {string} */
             rating_value?: "SEVERE" | "MAJOR" | "MODERATE" | "NEGLIGIBLE" | "OMITTED";
             reused_from_functional_safety: boolean;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the impact rating.
+             */
+            version: number;
         };
         ImpactRatingFields: {
             /** @enum {string} */
@@ -1124,6 +1159,11 @@ export interface components {
             threat_scenario_id: string;
             /** @enum {string} */
             treatment_option: "AVOIDING" | "REDUCING" | "SHARING" | "RETAINING";
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the decision.
+             */
+            version: number;
         };
         RiskTreatmentDecisionBody: {
             decision_rationale?: string | null;
@@ -1144,6 +1184,11 @@ export interface components {
             risk_score: number;
             /** Format: uuid */
             threat_scenario_id: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the risk value.
+             */
+            version: number;
         };
         RiskValueBody: {
             /** @enum {string} */
@@ -1233,6 +1278,11 @@ export interface components {
             id: string;
             /** Format: uuid */
             threat_scenario_id: string;
+            /**
+             * Format: int32
+             * @description Raised by every change; send it as If-Match to change or delete the link.
+             */
+            version: number;
         };
         ThreatPropertyLinkBody: {
             /** Format: uuid */
@@ -1428,6 +1478,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -1599,6 +1650,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -1687,6 +1739,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1761,7 +1814,10 @@ export interface operations {
     "replace-asset-cybersecurity-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 asset_id: string;
@@ -1778,6 +1834,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1820,8 +1877,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1852,7 +1929,10 @@ export interface operations {
     "delete-asset-cybersecurity-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 asset_id: string;
@@ -1905,8 +1985,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1937,7 +2037,10 @@ export interface operations {
     "update-asset-cybersecurity-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 asset_id: string;
@@ -1954,6 +2057,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1996,8 +2100,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2040,6 +2164,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2096,7 +2221,10 @@ export interface operations {
     "replace-asset": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2112,6 +2240,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2154,8 +2283,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2177,7 +2326,10 @@ export interface operations {
     "delete-asset": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2229,8 +2381,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2252,7 +2424,10 @@ export interface operations {
     "update-asset": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2268,6 +2443,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2310,8 +2486,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2418,6 +2614,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -2487,6 +2684,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2543,7 +2741,12 @@ export interface operations {
     "replace-attack-feasibility-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+                /** @description * to create the record only if it does not exist yet; if it does, the change is rejected with 412. Use If-Match to replace an existing record. */
+                "If-None-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 attack_path_id: string;
@@ -2559,6 +2762,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2592,8 +2796,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2615,7 +2839,10 @@ export interface operations {
     "delete-attack-feasibility-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 attack_path_id: string;
@@ -2658,8 +2885,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2681,7 +2928,10 @@ export interface operations {
     "update-attack-feasibility-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 attack_path_id: string;
@@ -2697,6 +2947,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2730,8 +2981,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2765,6 +3036,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2821,7 +3093,10 @@ export interface operations {
     "replace-attack-path": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2837,6 +3112,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -2870,8 +3146,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2893,7 +3189,10 @@ export interface operations {
     "delete-attack-path": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2936,8 +3235,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2959,7 +3278,10 @@ export interface operations {
     "update-attack-path": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -2975,6 +3297,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3008,8 +3331,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3134,6 +3477,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -3221,6 +3565,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3295,7 +3640,10 @@ export interface operations {
     "replace-damage-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -3311,6 +3659,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3353,8 +3702,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3385,7 +3754,10 @@ export interface operations {
     "delete-damage-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -3437,8 +3809,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3469,7 +3861,10 @@ export interface operations {
     "update-damage-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -3485,6 +3880,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3527,8 +3923,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3644,6 +4060,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -3788,6 +4205,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -3858,6 +4276,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3914,7 +4333,10 @@ export interface operations {
     "replace-impact-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 damage_scenario_id: string;
@@ -3931,6 +4353,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3964,8 +4387,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3987,7 +4430,10 @@ export interface operations {
     "delete-impact-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 damage_scenario_id: string;
@@ -4031,8 +4477,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4054,7 +4520,10 @@ export interface operations {
     "update-impact-rating": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 damage_scenario_id: string;
@@ -4071,6 +4540,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4104,8 +4574,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4139,6 +4629,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4195,7 +4686,10 @@ export interface operations {
     "replace-damage-scenario": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -4211,6 +4705,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4244,8 +4739,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4267,7 +4782,10 @@ export interface operations {
     "delete-damage-scenario": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -4310,8 +4828,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4333,7 +4871,10 @@ export interface operations {
     "update-damage-scenario": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -4349,6 +4890,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4382,8 +4924,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4924,6 +5486,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -5011,6 +5574,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5085,7 +5649,10 @@ export interface operations {
     "replace-threat-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -5101,6 +5668,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5143,8 +5711,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5175,7 +5763,10 @@ export interface operations {
     "delete-threat-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -5227,8 +5818,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5259,7 +5870,10 @@ export interface operations {
     "update-threat-scenario-asset-property": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 item_definition_id: string;
                 id: string;
@@ -5275,6 +5889,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5317,8 +5932,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7254,6 +7889,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -7332,6 +7968,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7397,7 +8034,10 @@ export interface operations {
     "replace-risk-treatment-decision": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -7413,6 +8053,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7455,8 +8096,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7478,7 +8139,10 @@ export interface operations {
     "delete-risk-treatment-decision": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -7530,8 +8194,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7553,7 +8237,10 @@ export interface operations {
     "update-risk-treatment-decision": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -7569,6 +8256,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7611,8 +8299,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7728,6 +8436,7 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    ETag?: string;
                     Location?: string;
                     [name: string]: unknown;
                 };
@@ -7806,6 +8515,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7871,7 +8581,10 @@ export interface operations {
     "replace-risk-value": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -7887,6 +8600,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7929,8 +8643,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7952,7 +8686,10 @@ export interface operations {
     "delete-risk-value": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -8004,8 +8741,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8027,7 +8784,10 @@ export interface operations {
     "update-risk-value": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Version the change is based on, as an entity tag in quotes: the ETag header, or the version field in quotes, for example "3" for version 3. If it is outdated, the change is rejected with 412. Without it, the change is rejected with 428 where the server requires it (REQUIRE_IF_MATCH); otherwise it is not checked. */
+                "If-Match"?: string;
+            };
             path: {
                 threat_scenario_id: string;
                 id: string;
@@ -8043,6 +8803,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8085,8 +8846,28 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ErrorModel"];
                 };
             };
+            /** @description Precondition Failed */
+            412: {
+                headers: {
+                    /** @description Current version of the record, to reload it and send with the next change. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Precondition Required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };

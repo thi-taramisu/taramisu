@@ -46,9 +46,14 @@ type RiskTreatmentDecision struct {
 	ID               string `json:"id" format:"uuid"`
 	ThreatScenarioID string `json:"threat_scenario_id" format:"uuid"`
 	RiskTreatmentDecisionBody
+	Version int32 `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the decision."`
 }
-type RiskTreatmentDecisionOutput struct{ Body RiskTreatmentDecision }
+type RiskTreatmentDecisionOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body RiskTreatmentDecision
+}
 type CreateRiskTreatmentDecisionOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     RiskTreatmentDecision
 }
@@ -58,16 +63,18 @@ type CreateRiskTreatmentDecisionInput struct {
 	Body RiskTreatmentDecisionBody
 }
 type ReplaceRiskTreatmentDecisionInput struct {
+	IfMatch
 	RiskResourcePath
 	Body RiskTreatmentDecisionBody
 }
 type PatchRiskTreatmentDecisionInput struct {
+	IfMatch
 	RiskResourcePath
 	Body PatchRiskTreatmentDecisionBody
 }
 
 func toRiskTreatmentDecision(row db.RiskTreatmentDecision) RiskTreatmentDecision {
-	return RiskTreatmentDecision{ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(), RiskTreatmentDecisionBody: RiskTreatmentDecisionBody{RiskValueID: riskUUIDString(row.RiskValueID), TreatmentOption: row.TreatmentOption, DecisionRationale: row.DecisionRationale, IsCybersecurityClaim: row.IsCybersecurityClaim}}
+	return RiskTreatmentDecision{Version: row.Version, ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(), RiskTreatmentDecisionBody: RiskTreatmentDecisionBody{RiskValueID: riskUUIDString(row.RiskValueID), TreatmentOption: row.TreatmentOption, DecisionRationale: row.DecisionRationale, IsCybersecurityClaim: row.IsCybersecurityClaim}}
 }
 func (h *RiskTreatmentDecisions) Register(api huma.API) {
 	const collection = riskScenarioPath + "/risk-treatment-decisions"
@@ -99,7 +106,7 @@ func (h *RiskTreatmentDecisions) Get(ctx context.Context, in *RiskResourcePath) 
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskTreatmentDecisionOutput{Body: toRiskTreatmentDecision(row)}, nil
+	return &RiskTreatmentDecisionOutput{ETag: etag(row.Version), Body: toRiskTreatmentDecision(row)}, nil
 }
 func (h *RiskTreatmentDecisions) Create(ctx context.Context, in *CreateRiskTreatmentDecisionInput) (*CreateRiskTreatmentDecisionOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
@@ -116,7 +123,7 @@ func (h *RiskTreatmentDecisions) Create(ctx context.Context, in *CreateRiskTreat
 		return nil, riskError(err)
 	}
 	location := strings.ReplaceAll(riskScenarioPath, "{threat_scenario_id}", scenario.String()) + "/risk-treatment-decisions/" + row.ID.String()
-	return &CreateRiskTreatmentDecisionOutput{Location: location, Body: toRiskTreatmentDecision(row)}, nil
+	return &CreateRiskTreatmentDecisionOutput{ETag: etag(row.Version), Location: location, Body: toRiskTreatmentDecision(row)}, nil
 }
 func (h *RiskTreatmentDecisions) Replace(ctx context.Context, in *ReplaceRiskTreatmentDecisionInput) (*RiskTreatmentDecisionOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
@@ -126,16 +133,21 @@ func (h *RiskTreatmentDecisions) Replace(ctx context.Context, in *ReplaceRiskTre
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.store.ReplaceRiskTreatmentDecision(ctx, db.ReplaceRiskTreatmentDecisionParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), RiskValueID: optionalRiskUUID(in.Body.RiskValueID), TreatmentOption: in.Body.TreatmentOption, DecisionRationale: in.Body.DecisionRationale, IsCybersecurityClaim: in.Body.IsCybersecurityClaim})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetRiskTreatmentDecision, projectIDFromContext(ctx), row.ID, toRiskTreatmentDecision(before), toRiskTreatmentDecision(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetRiskTreatmentDecision, projectIDFromContext(ctx), row.ID, before, row, toRiskTreatmentDecision)
+		return change, nil
 	})
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskTreatmentDecisionOutput{Body: toRiskTreatmentDecision(row)}, nil
+	return &RiskTreatmentDecisionOutput{ETag: etag(row.Version), Body: toRiskTreatmentDecision(row)}, nil
 }
 func (h *RiskTreatmentDecisions) Patch(ctx context.Context, in *PatchRiskTreatmentDecisionInput) (*RiskTreatmentDecisionOutput, error) {
 	if (in.Body.TreatmentOption.Set && in.Body.TreatmentOption.Value == nil) || (in.Body.IsCybersecurityClaim.Set && in.Body.IsCybersecurityClaim.Value == nil) {
@@ -149,22 +161,30 @@ func (h *RiskTreatmentDecisions) Patch(ctx context.Context, in *PatchRiskTreatme
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.store.PatchRiskTreatmentDecision(ctx, db.PatchRiskTreatmentDecisionParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), RiskValueID: optionalRiskUUID(in.Body.RiskValueID.Value), SetRiskValueID: in.Body.RiskValueID.Set, TreatmentOption: in.Body.TreatmentOption.Value, DecisionRationale: in.Body.DecisionRationale.Value, SetDecisionRationale: in.Body.DecisionRationale.Set, IsCybersecurityClaim: in.Body.IsCybersecurityClaim.Value})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetRiskTreatmentDecision, projectIDFromContext(ctx), row.ID, toRiskTreatmentDecision(before), toRiskTreatmentDecision(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetRiskTreatmentDecision, projectIDFromContext(ctx), row.ID, before, row, toRiskTreatmentDecision)
+		return change, nil
 	})
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskTreatmentDecisionOutput{Body: toRiskTreatmentDecision(row)}, nil
+	return &RiskTreatmentDecisionOutput{ETag: etag(row.Version), Body: toRiskTreatmentDecision(row)}, nil
 }
-func (h *RiskTreatmentDecisions) Delete(ctx context.Context, in *RiskResourcePath) (*struct{}, error) {
+func (h *RiskTreatmentDecisions) Delete(ctx context.Context, in *DeleteRiskResourceInput) (*struct{}, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
 	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetRiskTreatmentDecisionForDelete(ctx, db.GetRiskTreatmentDecisionForDeleteParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.store.DeleteRiskTreatmentDecision(ctx, db.DeleteRiskTreatmentDecisionParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)}); err != nil {

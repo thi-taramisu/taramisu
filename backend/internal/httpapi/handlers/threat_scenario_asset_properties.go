@@ -71,6 +71,7 @@ type ThreatPropertyLink struct {
 	ID                           string `json:"id" format:"uuid"`
 	ThreatScenarioID             string `json:"threat_scenario_id" format:"uuid"`
 	AssetCybersecurityPropertyID string `json:"asset_cybersecurity_property_id" format:"uuid"`
+	Version                      int32  `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the link."`
 }
 
 // CreateThreatPropertyLinkInput combines the item definition URL ID with the JSON fields for a new link.
@@ -81,6 +82,7 @@ type CreateThreatPropertyLinkInput struct {
 
 // ReplaceThreatPropertyLinkInput identifies an existing link and supplies all replacement references.
 type ReplaceThreatPropertyLinkInput struct {
+	IfMatch
 	PropertyLinkIDInput
 	Body ThreatPropertyLinkBody
 }
@@ -88,6 +90,7 @@ type ReplaceThreatPropertyLinkInput struct {
 // UpdateThreatPropertyLinkInput tracks which references were supplied for a partial update.
 // References cannot be null, and omitted references remain unchanged.
 type UpdateThreatPropertyLinkInput struct {
+	IfMatch
 	PropertyLinkIDInput
 	Body struct {
 		ThreatScenarioID             Optional[assetUUID] `json:"threat_scenario_id,omitempty" nullable:"false"`
@@ -96,20 +99,24 @@ type UpdateThreatPropertyLinkInput struct {
 }
 
 // ThreatPropertyLinkOutput returns one link as the JSON response body.
-type ThreatPropertyLinkOutput struct{ Body ThreatPropertyLink }
+type ThreatPropertyLinkOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body ThreatPropertyLink
+}
 
 // ListThreatPropertyLinksOutput returns a JSON array of links.
 type ListThreatPropertyLinksOutput struct{ Body []ThreatPropertyLink }
 
 // CreateThreatPropertyLinkOutput returns the created link and its URL in the Location header.
 type CreateThreatPropertyLinkOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     ThreatPropertyLink
 }
 
 // threatPropertyLinkBody converts a database link record into an API response, formatting UUIDs as strings.
 func threatPropertyLinkBody(row db.ThreatScenarioAssetProperty) ThreatPropertyLink {
-	return ThreatPropertyLink{ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(),
+	return ThreatPropertyLink{Version: row.Version, ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(),
 		AssetCybersecurityPropertyID: row.AssetCybersecurityPropertyID.String()}
 }
 
@@ -132,6 +139,7 @@ func (h *ThreatScenarioAssetProperties) Create(ctx context.Context, in *CreateTh
 		return nil, propertyError(err)
 	}
 	return &CreateThreatPropertyLinkOutput{
+		ETag:     etag(row.Version),
 		Location: itemCollection(in.ItemDefinitionID, "threat-scenario-asset-properties/"+row.ID.String()),
 		Body:     threatPropertyLinkBody(row)}, nil
 }
@@ -144,7 +152,7 @@ func (h *ThreatScenarioAssetProperties) Get(ctx context.Context, in *PropertyLin
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &ThreatPropertyLinkOutput{Body: threatPropertyLinkBody(row)}, nil
+	return &ThreatPropertyLinkOutput{ETag: etag(row.Version), Body: threatPropertyLinkBody(row)}, nil
 }
 
 // List handles GET for the collection, returning links ordered by ID with limit/offset pagination.
@@ -171,6 +179,9 @@ func (h *ThreatScenarioAssetProperties) Replace(ctx context.Context, in *Replace
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.queries.ReplaceThreatScenarioAssetProperty(ctx, db.ReplaceThreatScenarioAssetPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 			ThreatScenarioID:             pgtype.UUID(in.Body.ThreatScenarioID),
@@ -178,12 +189,14 @@ func (h *ThreatScenarioAssetProperties) Replace(ctx context.Context, in *Replace
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetThreatScenarioAssetProperty, projectIDFromContext(ctx), row.ID, threatPropertyLinkBody(before), threatPropertyLinkBody(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetThreatScenarioAssetProperty, projectIDFromContext(ctx), row.ID, before, row, threatPropertyLinkBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &ThreatPropertyLinkOutput{Body: threatPropertyLinkBody(row)}, nil
+	return &ThreatPropertyLinkOutput{ETag: etag(row.Version), Body: threatPropertyLinkBody(row)}, nil
 }
 
 // Update handles PATCH: changes only supplied fields and rejects explicit null references.
@@ -200,26 +213,34 @@ func (h *ThreatScenarioAssetProperties) Update(ctx context.Context, in *UpdateTh
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.queries.UpdateThreatScenarioAssetProperty(ctx, db.UpdateThreatScenarioAssetPropertyParams{
 			ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID),
 			ThreatScenarioID: optionalUUID(b.ThreatScenarioID), AssetCybersecurityPropertyID: optionalUUID(b.AssetCybersecurityPropertyID)})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetThreatScenarioAssetProperty, projectIDFromContext(ctx), row.ID, threatPropertyLinkBody(before), threatPropertyLinkBody(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetThreatScenarioAssetProperty, projectIDFromContext(ctx), row.ID, before, row, threatPropertyLinkBody)
+		return change, nil
 	})
 	if err != nil {
 		return nil, propertyError(err)
 	}
-	return &ThreatPropertyLinkOutput{Body: threatPropertyLinkBody(row)}, nil
+	return &ThreatPropertyLinkOutput{ETag: etag(row.Version), Body: threatPropertyLinkBody(row)}, nil
 }
 
 // Delete handles DELETE: removes only the link, preserving the scenario and property.
 // A successful deletion returns 204 No Content; a missing or out-of-scope link returns 404.
-func (h *ThreatScenarioAssetProperties) Delete(ctx context.Context, in *PropertyLinkIDInput) (*struct{}, error) {
+func (h *ThreatScenarioAssetProperties) Delete(ctx context.Context, in *DeletePropertyLinkInput) (*struct{}, error) {
 	err := audit(ctx, h.queries, func(ctx context.Context) (db.Change, error) {
 		before, err := h.queries.GetThreatScenarioAssetPropertyForDelete(ctx, db.GetThreatScenarioAssetPropertyForDeleteParams{ID: pgtype.UUID(in.ID), ItemDefinitionID: pgtype.UUID(in.ItemDefinitionID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.queries.DeleteThreatScenarioAssetProperty(ctx, db.DeleteThreatScenarioAssetPropertyParams{

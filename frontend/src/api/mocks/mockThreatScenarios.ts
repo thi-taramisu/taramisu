@@ -67,13 +67,17 @@ function updateRiskValues(
     impactRatings.flatMap(({ id, rating_value }) => {
       if (!feasibility || !rating_value || rating_value === 'OMITTED') return []
       const stored = entry.riskValues.find((value) => value.threat_scenario_id === threatScenarioId && value.impact_rating_id === id)
+      const riskScore = RISK_MATRIX[rating_value][feasibility]
+      // Like the backend: only a changed score raises the version.
+      const version = !stored ? 1 : stored.risk_score === riskScore ? stored.version : stored.version + 1
       return [
         {
           id: stored?.id ?? crypto.randomUUID(),
           threat_scenario_id: threatScenarioId,
           impact_rating_id: id,
-          risk_score: RISK_MATRIX[rating_value][feasibility],
+          risk_score: riskScore,
           determination_method: 'RISK_MATRIX' as const,
+          version,
         },
       ]
     }),

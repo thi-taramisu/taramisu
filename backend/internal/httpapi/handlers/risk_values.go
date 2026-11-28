@@ -44,9 +44,14 @@ type RiskValue struct {
 	ID               string `json:"id" format:"uuid"`
 	ThreatScenarioID string `json:"threat_scenario_id" format:"uuid"`
 	RiskValueBody
+	Version int32 `json:"version" doc:"Raised by every change; send it as If-Match to change or delete the risk value."`
 }
-type RiskValueOutput struct{ Body RiskValue }
+type RiskValueOutput struct {
+	ETag string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
+	Body RiskValue
+}
 type CreateRiskValueOutput struct {
+	ETag     string `header:"ETag" doc:"Version of the record, to send as If-Match with the next change."`
 	Location string `header:"Location"`
 	Body     RiskValue
 }
@@ -56,16 +61,18 @@ type CreateRiskValueInput struct {
 	Body RiskValueBody
 }
 type ReplaceRiskValueInput struct {
+	IfMatch
 	RiskResourcePath
 	Body RiskValueBody
 }
 type PatchRiskValueInput struct {
+	IfMatch
 	RiskResourcePath
 	Body PatchRiskValueBody
 }
 
 func toRiskValue(row db.RiskValue) RiskValue {
-	return RiskValue{ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(), RiskValueBody: RiskValueBody{ImpactRatingID: row.ImpactRatingID.String(), RiskScore: row.RiskScore, DeterminationMethod: row.DeterminationMethod}}
+	return RiskValue{Version: row.Version, ID: row.ID.String(), ThreatScenarioID: row.ThreatScenarioID.String(), RiskValueBody: RiskValueBody{ImpactRatingID: row.ImpactRatingID.String(), RiskScore: row.RiskScore, DeterminationMethod: row.DeterminationMethod}}
 }
 func (h *RiskValues) Register(api huma.API) {
 	const collection = riskScenarioPath + "/risk-values"
@@ -97,7 +104,7 @@ func (h *RiskValues) Get(ctx context.Context, in *RiskResourcePath) (*RiskValueO
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskValueOutput{Body: toRiskValue(row)}, nil
+	return &RiskValueOutput{ETag: etag(row.Version), Body: toRiskValue(row)}, nil
 }
 func (h *RiskValues) Create(ctx context.Context, in *CreateRiskValueInput) (*CreateRiskValueOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
@@ -114,7 +121,7 @@ func (h *RiskValues) Create(ctx context.Context, in *CreateRiskValueInput) (*Cre
 		return nil, riskError(err)
 	}
 	location := strings.ReplaceAll(riskScenarioPath, "{threat_scenario_id}", scenario.String()) + "/risk-values/" + row.ID.String()
-	return &CreateRiskValueOutput{Location: location, Body: toRiskValue(row)}, nil
+	return &CreateRiskValueOutput{ETag: etag(row.Version), Location: location, Body: toRiskValue(row)}, nil
 }
 func (h *RiskValues) Replace(ctx context.Context, in *ReplaceRiskValueInput) (*RiskValueOutput, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
@@ -124,16 +131,21 @@ func (h *RiskValues) Replace(ctx context.Context, in *ReplaceRiskValueInput) (*R
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.store.ReplaceRiskValue(ctx, db.ReplaceRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: riskUUID(in.Body.ImpactRatingID), RiskScore: in.Body.RiskScore, DeterminationMethod: in.Body.DeterminationMethod})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, toRiskValue(before), toRiskValue(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, before, row, toRiskValue)
+		return change, nil
 	})
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskValueOutput{Body: toRiskValue(row)}, nil
+	return &RiskValueOutput{ETag: etag(row.Version), Body: toRiskValue(row)}, nil
 }
 func (h *RiskValues) Patch(ctx context.Context, in *PatchRiskValueInput) (*RiskValueOutput, error) {
 	if (in.Body.ImpactRatingID.Set && in.Body.ImpactRatingID.Value == nil) || (in.Body.RiskScore.Set && in.Body.RiskScore.Value == nil) || (in.Body.DeterminationMethod.Set && in.Body.DeterminationMethod.Value == nil) {
@@ -147,22 +159,30 @@ func (h *RiskValues) Patch(ctx context.Context, in *PatchRiskValueInput) (*RiskV
 		if err != nil {
 			return db.Change{}, err
 		}
+		if err := in.check(before.Version); err != nil {
+			return db.Change{}, err
+		}
 		row, err = h.store.PatchRiskValue(ctx, db.PatchRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID), ImpactRatingID: optionalRiskUUID(in.Body.ImpactRatingID.Value), RiskScore: in.Body.RiskScore.Value, DeterminationMethod: in.Body.DeterminationMethod.Value})
 		if err != nil {
 			return db.Change{}, err
 		}
-		return db.Updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, toRiskValue(before), toRiskValue(row)), nil
+		var change db.Change
+		change, row = updated(db.TargetRiskValue, projectIDFromContext(ctx), row.ID, before, row, toRiskValue)
+		return change, nil
 	})
 	if err != nil {
 		return nil, riskError(err)
 	}
-	return &RiskValueOutput{Body: toRiskValue(row)}, nil
+	return &RiskValueOutput{ETag: etag(row.Version), Body: toRiskValue(row)}, nil
 }
-func (h *RiskValues) Delete(ctx context.Context, in *RiskResourcePath) (*struct{}, error) {
+func (h *RiskValues) Delete(ctx context.Context, in *DeleteRiskResourceInput) (*struct{}, error) {
 	scenario := riskUUID(in.ThreatScenarioID)
 	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
 		before, err := h.store.GetRiskValueForDelete(ctx, db.GetRiskValueForDeleteParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)})
 		if err != nil {
+			return db.Change{}, err
+		}
+		if err := in.check(before.Version); err != nil {
 			return db.Change{}, err
 		}
 		if _, err := h.store.DeleteRiskValue(ctx, db.DeleteRiskValueParams{ThreatScenarioID: scenario, ID: riskUUID(in.ID)}); err != nil {
