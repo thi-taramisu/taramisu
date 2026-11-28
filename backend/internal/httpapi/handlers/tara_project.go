@@ -27,6 +27,7 @@ type TaraProjectStore interface {
 	UpdateTaraProject(context.Context, db.UpdateTaraProjectParams) (db.TaraProject, error)
 	// DeleteTaraProject also records the audit event (see db.Store).
 	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
+	ExportProject(context.Context, pgtype.UUID) (db.ProjectExport, error)
 }
 
 type TaraProject struct {
