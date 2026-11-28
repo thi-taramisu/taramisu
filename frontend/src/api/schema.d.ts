@@ -442,6 +442,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a TARA project
+         * @description Creates a new project from a document in the format of the project export, so an exported project can be imported again. The caller becomes the first Owner. The import is complete or not at all; a document that breaks a reference or a rule is rejected with 422 and the place in the document. Every record gets a new ID: an id is only the key that other records use to refer to it. Fields that the server sets itself are optional and ignored.
+         */
+        post: operations["import-tara-project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}": {
         parameters: {
             query?: never;
@@ -1191,6 +1211,211 @@ export interface components {
             risk_values: components["schemas"]["RiskValue"][] | null;
             technical_notes: string | null;
             title: string;
+        };
+        ProjectImportAsset: {
+            cybersecurity_properties?: components["schemas"]["ProjectImportAssetProperty"][] | null;
+            description?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            /** @enum {string|null} */
+            identification_source?: "ITEM_DEF" | "IMPACT_RATING" | "THREAT_DERIVED" | "CATALOGUE" | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            item_definition_id?: string;
+            name: string;
+        };
+        ProjectImportAssetProperty: {
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            asset_id?: string;
+            description?: string | null;
+            /** @description Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID. */
+            id?: string;
+            /** @enum {string} */
+            property_type: "CONFIDENTIALITY" | "INTEGRITY" | "AVAILABILITY";
+        };
+        ProjectImportAttackPath: {
+            /** @enum {string} */
+            analysis_approach?: "TOP_DOWN" | "BOTTOM_UP";
+            attack_steps_and_weaknesses?: unknown;
+            feasibility_rating?: components["schemas"]["ProjectImportFeasibilityRating"];
+            /** @description Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID. */
+            id?: string;
+            is_partial_early_stage?: boolean;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            item_definition_id?: string;
+            title: string;
+        };
+        ProjectImportBody: {
+            /**
+             * Format: date-time
+             * @description Ignored.
+             */
+            exported_at?: string;
+            /**
+             * Format: int64
+             * @description Version of this document format. The server accepts only the version it writes on export.
+             * @example 1
+             */
+            format_version: number;
+            items?: components["schemas"]["ProjectImportItem"][] | null;
+            project: components["schemas"]["ProjectImportInfo"];
+        };
+        ProjectImportDamageLink: {
+            /** @description The id of a cybersecurity property of this item. */
+            asset_cybersecurity_property_id: string;
+            compromise_mechanism_note?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            damage_scenario_id?: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+        };
+        ProjectImportDamageScenario: {
+            asset_property_links?: components["schemas"]["ProjectImportDamageLink"][] | null;
+            functionality_adverse_relation?: string;
+            /** @description Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID. */
+            id?: string;
+            impact_ratings?: components["schemas"]["ProjectImportImpactRating"][] | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            item_definition_id?: string;
+            road_user_harm_description?: string;
+            title: string;
+        };
+        ProjectImportFeasibilityRating: {
+            /** Format: int32 */
+            ap_elapsed_time?: number;
+            /** Format: int32 */
+            ap_equipment?: number;
+            /** Format: int32 */
+            ap_knowledge_of_item?: number;
+            /** Format: int32 */
+            ap_specialist_expertise?: number;
+            /** Format: int32 */
+            ap_total_score?: number;
+            /** Format: int32 */
+            ap_window_of_opportunity?: number;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            attack_path_id?: string;
+            /** @enum {string} */
+            feasibility_rating?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            rationale?: string;
+        };
+        ProjectImportImpactRating: {
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            damage_scenario_id?: string;
+            /** @description Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID. */
+            id?: string;
+            /** @enum {string} */
+            impact_category: "SAFETY" | "FINANCIAL" | "OPERATIONAL" | "PRIVACY";
+            is_omitted_by_pm_15_07?: boolean;
+            omission_or_rating_rationale?: string;
+            /** @enum {string} */
+            rating_value?: "SEVERE" | "MAJOR" | "MODERATE" | "NEGLIGIBLE" | "OMITTED";
+            reused_from_functional_safety?: boolean;
+        };
+        ProjectImportInfo: {
+            /**
+             * Format: date-time
+             * @description Ignored.
+             */
+            created_at?: string;
+            description?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            name: string;
+        };
+        ProjectImportItem: {
+            architectural_design?: string | null;
+            assets?: components["schemas"]["ProjectImportAsset"][] | null;
+            attack_paths?: components["schemas"]["ProjectImportAttackPath"][] | null;
+            boundary?: string | null;
+            /**
+             * Format: date-time
+             * @description Ignored.
+             */
+            created_at?: string;
+            cybersecurity_specs_wp_10_01?: string | null;
+            damage_scenarios?: components["schemas"]["ProjectImportDamageScenario"][] | null;
+            functions?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            item_definition_wp_09_01?: string | null;
+            lifecycle_phase?: string | null;
+            name: string;
+            operational_environment?: string | null;
+            /** @enum {string} */
+            scope_type: "ITEM" | "COMPONENT";
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            tara_project_id?: string;
+            threat_scenarios?: components["schemas"]["ProjectImportThreatScenario"][] | null;
+        };
+        ProjectImportRiskValue: {
+            /** @enum {string} */
+            determination_method: "RISK_MATRIX" | "RISK_FORMULA";
+            /** @description Key of this record in the document, for example the UUID of an export. Only needed if another record refers to it. The import gives the record a new ID. */
+            id?: string;
+            /** @description The id of an impact rating of this item. */
+            impact_rating_id: string;
+            /** Format: int32 */
+            risk_score: number;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            threat_scenario_id?: string;
+        };
+        ProjectImportThreatAttackLink: {
+            /** @description The id of an attack path of this item. */
+            attack_path_id: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            threat_scenario_id?: string;
+        };
+        ProjectImportThreatDamageLink: {
+            /** @description The id of a damage scenario of this item. */
+            damage_scenario_id: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            threat_scenario_id?: string;
+        };
+        ProjectImportThreatPropertyLink: {
+            /** @description The id of a cybersecurity property of this item. */
+            asset_cybersecurity_property_id: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            threat_scenario_id?: string;
+        };
+        ProjectImportThreatScenario: {
+            /** @enum {string|null} */
+            aggregated_attack_feasibility?: "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW" | null;
+            asset_property_links?: components["schemas"]["ProjectImportThreatPropertyLink"][] | null;
+            attack_path_links?: components["schemas"]["ProjectImportThreatAttackLink"][] | null;
+            cause_of_compromise?: string | null;
+            damage_scenario_links?: components["schemas"]["ProjectImportThreatDamageLink"][] | null;
+            /** @enum {string|null} */
+            elicitation_method?: "GROUP_DISCUSSION" | "MALICIOUS_USE_CASE" | "EVITA" | "TVRA" | "PASTA" | "STRIDE" | "OTHER" | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            item_definition_id?: string;
+            /** Format: int32 */
+            max_risk_score?: number | null;
+            risk_treatment_decisions?: components["schemas"]["ProjectImportTreatmentDecision"][] | null;
+            risk_values?: components["schemas"]["ProjectImportRiskValue"][] | null;
+            technical_notes?: string | null;
+            title: string;
+        };
+        ProjectImportTreatmentDecision: {
+            decision_rationale?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            id?: string;
+            is_cybersecurity_claim?: boolean;
+            /** @description The id of a risk value of the same threat scenario. */
+            risk_value_id?: string | null;
+            /** @description Ignored: the position in the document tells where the record belongs. */
+            threat_scenario_id?: string;
+            /** @enum {string} */
+            treatment_option: "AVOIDING" | "REDUCING" | "SHARING" | "RETAINING";
         };
         ProjectMember: {
             /** Format: date-time */
@@ -5514,6 +5739,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateTaraProjectInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaraProjectBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "import-tara-project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectImportBody"];
             };
         };
         responses: {

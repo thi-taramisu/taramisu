@@ -28,6 +28,7 @@ type TaraProjectStore interface {
 	// DeleteTaraProject also records the audit event (see db.Store).
 	DeleteTaraProject(context.Context, db.Actor, pgtype.UUID) error
 	ExportProject(context.Context, pgtype.UUID) (db.ProjectExport, error)
+	ProjectImportStore
 }
 
 type TaraProject struct {

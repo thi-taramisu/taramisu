@@ -437,7 +437,12 @@ func TestAuditContentPostgres(t *testing.T) {
 	call("update-project-member", http.MethodPatch, members+"/"+team["id"].(string), `{"role":"EDITOR"}`, http.StatusOK)
 	call("remove-project-member", http.MethodDelete, members+"/"+team["id"].(string), "", http.StatusNoContent)
 	call("delete-tara-project", http.MethodDelete, projectPath, "", http.StatusNoContent)
+	imported := call("import-tara-project", http.MethodPost, "/api/v1/projects/import", `{"format_version":1,"project":{"name":"Imported"}}`, http.StatusCreated)
+	projectIDs = append(projectIDs, imported["id"])
 	written := map[string]bool{}
+	for _, e := range auditEvents(t, ctx, pool, imported["id"].(string)) {
+		written[e.RequestID] = true
+	}
 	for _, e := range auditEvents(t, ctx, pool, projectID) {
 		written[e.RequestID] = true
 		if strings.Contains(fmt.Sprint(e), "@") {
@@ -471,9 +476,13 @@ func TestAuditContentPostgres(t *testing.T) {
 		{"update-item-definition", http.MethodPatch, otherItemPath, `{` + name + `}`},
 		{"delete-item-definition", http.MethodDelete, otherItemPath, ""},
 	}
-	// Membership changes and project deletion run in db.Store methods, not through handlers.Auditor,
-	// so the wrapper cannot reach them; TestAuditHistoryPostgres covers their rejected changes.
-	storeMethods := map[string]bool{"add-project-member": true, "update-project-member": true, "remove-project-member": true, "delete-tara-project": true}
+	// Membership changes, project deletion, and the project import run in db.Store methods, not through
+	// handlers.Auditor, so the wrapper cannot reach them; TestAuditHistoryPostgres covers the rejected
+	// changes of the first three, TestProjectImportPostgres those of the import.
+	storeMethods := map[string]bool{
+		"add-project-member": true, "update-project-member": true, "remove-project-member": true, "delete-tara-project": true,
+		"import-tara-project": true,
+	}
 	for _, r := range rollbacks {
 		// The 500 must come from the injected failure after the change, not from an earlier error.
 		logged := captureLog(t, "unexpected error", func() {

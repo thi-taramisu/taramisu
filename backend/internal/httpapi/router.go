@@ -96,6 +96,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	huma.Get(api, "/health/ready", h.Ready)
 	handlers.NewTaraProject(queries, queries).Register(api)
 	handlers.NewProjectExport(queries, queries).Register(api)
+	handlers.NewProjectImport(queries).Register(api)
 	handlers.NewItemDefinitions(queries, queries).Register(api)
 	handlers.NewAssets(queries, queries).Register(api)
 	handlers.NewAssetCybersecurityProperties(queries, queries).Register(api)
