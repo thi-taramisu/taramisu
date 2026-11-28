@@ -52,6 +52,26 @@ func (q *Queries) DeleteThreatAttackPathLink(ctx context.Context, arg DeleteThre
 	return result.RowsAffected(), nil
 }
 
+const getThreatAttackPathLinkForDelete = `-- name: GetThreatAttackPathLinkForDelete :one
+SELECT l.id, l.threat_scenario_id, l.attack_path_id FROM threat_attack_path_link l
+WHERE l.id = $1
+  AND EXISTS(SELECT 1 FROM threat_scenario t WHERE t.id = l.threat_scenario_id AND t.item_definition_id = $2)
+  AND EXISTS(SELECT 1 FROM attack_path a WHERE a.id = l.attack_path_id AND a.item_definition_id = $2)
+FOR UPDATE OF l
+`
+
+type GetThreatAttackPathLinkForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetThreatAttackPathLinkForDelete(ctx context.Context, arg GetThreatAttackPathLinkForDeleteParams) (ThreatAttackPathLink, error) {
+	row := q.db.QueryRow(ctx, getThreatAttackPathLinkForDelete, arg.ID, arg.ItemDefinitionID)
+	var i ThreatAttackPathLink
+	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AttackPathID)
+	return i, err
+}
+
 const listThreatAttackPathLinks = `-- name: ListThreatAttackPathLinks :many
 SELECT l.id, l.threat_scenario_id, l.attack_path_id FROM threat_attack_path_link l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id

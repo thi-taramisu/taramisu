@@ -12,9 +12,17 @@ import (
 )
 
 const createAsset = `-- name: CreateAsset :one
-INSERT INTO asset (item_definition_id, name, description, identification_source)
-VALUES ($1, $2, $3, $4)
-RETURNING id, item_definition_id, name, description, identification_source
+WITH display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT tara_project_id, 'ASSET', 1 FROM item_definition WHERE id = $1
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
+INSERT INTO asset (item_definition_id, tara_project_id, display_number, name, description, identification_source)
+SELECT $1, display.tara_project_id, display.last_number,
+    $2, $3, $4
+FROM display
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
 `
 
 type CreateAssetParams struct {
@@ -24,6 +32,8 @@ type CreateAssetParams struct {
 	IdentificationSource *IdentificationSource
 }
 
+// Assigns the next display number of the project's assets (see CreateItemDefinition). Returns no row
+// if the item definition does not exist.
 func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error) {
 	row := q.db.QueryRow(ctx, createAsset,
 		arg.ItemDefinitionID,
@@ -35,6 +45,8 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
@@ -60,7 +72,7 @@ func (q *Queries) DeleteAsset(ctx context.Context, arg DeleteAssetParams) (pgtyp
 }
 
 const getAsset = `-- name: GetAsset :one
-SELECT id, item_definition_id, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
 `
 
 type GetAssetParams struct {
@@ -74,6 +86,58 @@ func (q *Queries) GetAsset(ctx context.Context, arg GetAssetParams) (Asset, erro
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
+		&i.Name,
+		&i.Description,
+		&i.IdentificationSource,
+	)
+	return i, err
+}
+
+const getAssetForDelete = `-- name: GetAssetForDelete :one
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+FOR UPDATE
+`
+
+type GetAssetForDeleteParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetForDelete(ctx context.Context, arg GetAssetForDeleteParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, getAssetForDelete, arg.ID, arg.ItemDefinitionID)
+	var i Asset
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
+		&i.Name,
+		&i.Description,
+		&i.IdentificationSource,
+	)
+	return i, err
+}
+
+const getAssetForUpdate = `-- name: GetAssetForUpdate :one
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset WHERE id = $1 AND item_definition_id = $2
+FOR NO KEY UPDATE
+`
+
+type GetAssetForUpdateParams struct {
+	ID               pgtype.UUID
+	ItemDefinitionID pgtype.UUID
+}
+
+func (q *Queries) GetAssetForUpdate(ctx context.Context, arg GetAssetForUpdateParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, getAssetForUpdate, arg.ID, arg.ItemDefinitionID)
+	var i Asset
+	err := row.Scan(
+		&i.ID,
+		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
@@ -82,7 +146,7 @@ func (q *Queries) GetAsset(ctx context.Context, arg GetAssetParams) (Asset, erro
 }
 
 const listAssets = `-- name: ListAssets :many
-SELECT id, item_definition_id, name, description, identification_source FROM asset
+SELECT id, item_definition_id, tara_project_id, display_number, name, description, identification_source FROM asset
 WHERE item_definition_id = $1
 ORDER BY id
 LIMIT $3 OFFSET $2
@@ -106,6 +170,8 @@ func (q *Queries) ListAssets(ctx context.Context, arg ListAssetsParams) ([]Asset
 		if err := rows.Scan(
 			&i.ID,
 			&i.ItemDefinitionID,
+			&i.TaraProjectID,
+			&i.DisplayNumber,
 			&i.Name,
 			&i.Description,
 			&i.IdentificationSource,
@@ -124,7 +190,7 @@ const replaceAsset = `-- name: ReplaceAsset :one
 UPDATE asset
 SET name = $1, description = $2, identification_source = $3
 WHERE id = $4 AND item_definition_id = $5
-RETURNING id, item_definition_id, name, description, identification_source
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
 `
 
 type ReplaceAssetParams struct {
@@ -147,6 +213,8 @@ func (q *Queries) ReplaceAsset(ctx context.Context, arg ReplaceAssetParams) (Ass
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,
@@ -160,7 +228,7 @@ SET name = COALESCE($1::text, name),
     description = CASE WHEN $2::boolean THEN $3::text ELSE description END,
     identification_source = CASE WHEN $4::boolean THEN $5::identification_source ELSE identification_source END
 WHERE id = $6 AND item_definition_id = $7
-RETURNING id, item_definition_id, name, description, identification_source
+RETURNING id, item_definition_id, tara_project_id, display_number, name, description, identification_source
 `
 
 type UpdateAssetParams struct {
@@ -187,6 +255,8 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Name,
 		&i.Description,
 		&i.IdentificationSource,

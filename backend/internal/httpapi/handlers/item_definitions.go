@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,13 +10,17 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
 
-// ItemDefinitionStore is implemented by the sqlc-generated queries.
+// ItemDefinitionStore is implemented by db.Store. Changes run inside Audit.
 type ItemDefinitionStore interface {
+	Auditor
 	ListItemDefinitions(context.Context, db.ListItemDefinitionsParams) ([]db.ItemDefinition, error)
 	GetItemDefinition(context.Context, db.GetItemDefinitionParams) (db.ItemDefinition, error)
+	GetItemDefinitionForUpdate(context.Context, db.GetItemDefinitionForUpdateParams) (db.ItemDefinition, error)
+	GetItemDefinitionForDelete(context.Context, db.GetItemDefinitionForDeleteParams) (db.ItemDefinition, error)
 	CreateItemDefinition(context.Context, db.CreateItemDefinitionParams) (db.ItemDefinition, error)
 	ReplaceItemDefinition(context.Context, db.ReplaceItemDefinitionParams) (db.ItemDefinition, error)
 	PatchItemDefinition(context.Context, db.PatchItemDefinitionParams) (db.ItemDefinition, error)
@@ -88,6 +91,7 @@ type PatchItemDefinitionInput struct {
 
 type ItemDefinition struct {
 	ID            string `json:"id" format:"uuid"`
+	DisplayID     string `json:"display_id" readOnly:"true" example:"IT-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	TaraProjectID string `json:"tara_project_id" format:"uuid"`
 	ItemDefinitionBody
 	CreatedAt time.Time `json:"created_at"`
@@ -102,7 +106,8 @@ type ListItemDefinitionsOutput struct{ Body []ItemDefinition }
 
 func itemDefinition(row db.ItemDefinition) ItemDefinition {
 	return ItemDefinition{
-		ID: row.ID.String(), TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
+		ID: row.ID.String(), DisplayID: displayID(displayPrefixItem, row.DisplayNumber),
+		TaraProjectID: row.TaraProjectID.String(), CreatedAt: row.CreatedAt.Time,
 		ItemDefinitionBody: ItemDefinitionBody{
 			Name: row.Name, ScopeType: row.ScopeType, LifecyclePhase: row.LifecyclePhase,
 			Boundary: row.Boundary, Functions: row.Functions, OperationalEnvironment: row.OperationalEnvironment,
@@ -120,8 +125,7 @@ func itemDefinitionError(err error) error {
 	if errors.As(err, &postgres) && postgres.Code == "23503" {
 		return huma.Error409Conflict("item definition has dependent records or its project no longer exists")
 	}
-	slog.Error("item definition database operation failed", "error", err)
-	return huma.Error500InternalServerError("could not process item definition")
+	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
 
 func (h *ItemDefinitions) List(ctx context.Context, in *ListItemDefinitionsInput) (*ListItemDefinitionsOutput, error) {
@@ -155,12 +159,23 @@ func (h *ItemDefinitions) Create(ctx context.Context, in *CreateItemDefinitionIn
 	if strings.TrimSpace(in.Body.Name) == "" {
 		return nil, huma.Error422UnprocessableEntity("name must not be blank")
 	}
-	row, err := h.store.CreateItemDefinition(ctx, db.CreateItemDefinitionParams{
-		ProjectID: projectID, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
-		Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
-		LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
-		CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
+	var row db.ItemDefinition
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		row, err = h.store.CreateItemDefinition(ctx, db.CreateItemDefinitionParams{
+			ProjectID: projectID, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
+			Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
+			LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
+			CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetItemDefinition, projectID, row.ID, itemDefinition(row)), nil
 	})
+	if errors.Is(err, pgx.ErrNoRows) { // the create query locks the project, which was deleted after the access check
+		return nil, huma.Error404NotFound("project not found")
+	}
 	if err != nil {
 		return nil, itemDefinitionError(err)
 	}
@@ -176,11 +191,29 @@ func (h *ItemDefinitions) Replace(ctx context.Context, in *ReplaceItemDefinition
 	if strings.TrimSpace(in.Body.Name) == "" {
 		return nil, huma.Error422UnprocessableEntity("name must not be blank")
 	}
-	row, err := h.store.ReplaceItemDefinition(ctx, db.ReplaceItemDefinitionParams{
-		ProjectID: projectID, ID: id, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
-		Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
-		LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
-		CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
+	return h.update(ctx, projectID, id, func(ctx context.Context) (db.ItemDefinition, error) {
+		return h.store.ReplaceItemDefinition(ctx, db.ReplaceItemDefinitionParams{
+			ProjectID: projectID, ID: id, Name: in.Body.Name, ScopeType: in.Body.ScopeType,
+			Boundary: in.Body.Boundary, Functions: in.Body.Functions, OperationalEnvironment: in.Body.OperationalEnvironment,
+			LifecyclePhase: in.Body.LifecyclePhase, ItemDefinitionWp0901: in.Body.ItemDefinitionWP0901,
+			CybersecuritySpecsWp1001: in.Body.CybersecuritySpecsWP1001, ArchitecturalDesign: in.Body.ArchitecturalDesign,
+		})
+	})
+}
+
+// update runs change on the item definition and records item_definition.updated, unless nothing
+// changed.
+func (h *ItemDefinitions) update(ctx context.Context, projectID, id pgtype.UUID, change func(context.Context) (db.ItemDefinition, error)) (*ItemDefinitionOutput, error) {
+	var row db.ItemDefinition
+	err := audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetItemDefinitionForUpdate(ctx, db.GetItemDefinitionForUpdateParams{ProjectID: projectID, ID: id})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if row, err = change(ctx); err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetItemDefinition, projectID, id, itemDefinition(before), itemDefinition(row)), nil
 	})
 	if err != nil {
 		return nil, itemDefinitionError(err)
@@ -206,20 +239,18 @@ func (h *ItemDefinitions) Patch(ctx context.Context, in *PatchItemDefinitionInpu
 		value := db.ScopeType(*body.ScopeType.Value)
 		scope = &value
 	}
-	row, err := h.store.PatchItemDefinition(ctx, db.PatchItemDefinitionParams{
-		ProjectID: projectID, ID: id, Name: body.Name.Value, ScopeType: scope,
-		SetBoundary: body.Boundary.Set, Boundary: body.Boundary.Value,
-		SetFunctions: body.Functions.Set, Functions: body.Functions.Value,
-		SetOperationalEnvironment: body.OperationalEnvironment.Set, OperationalEnvironment: body.OperationalEnvironment.Value,
-		SetLifecyclePhase: body.LifecyclePhase.Set, LifecyclePhase: body.LifecyclePhase.Value,
-		SetItemDefinition: body.ItemDefinitionWP0901.Set, ItemDefinitionWp0901: body.ItemDefinitionWP0901.Value,
-		SetCybersecuritySpecs: body.CybersecuritySpecsWP1001.Set, CybersecuritySpecsWp1001: body.CybersecuritySpecsWP1001.Value,
-		SetArchitecturalDesign: body.ArchitecturalDesign.Set, ArchitecturalDesign: body.ArchitecturalDesign.Value,
+	return h.update(ctx, projectID, id, func(ctx context.Context) (db.ItemDefinition, error) {
+		return h.store.PatchItemDefinition(ctx, db.PatchItemDefinitionParams{
+			ProjectID: projectID, ID: id, Name: body.Name.Value, ScopeType: scope,
+			SetBoundary: body.Boundary.Set, Boundary: body.Boundary.Value,
+			SetFunctions: body.Functions.Set, Functions: body.Functions.Value,
+			SetOperationalEnvironment: body.OperationalEnvironment.Set, OperationalEnvironment: body.OperationalEnvironment.Value,
+			SetLifecyclePhase: body.LifecyclePhase.Set, LifecyclePhase: body.LifecyclePhase.Value,
+			SetItemDefinition: body.ItemDefinitionWP0901.Set, ItemDefinitionWp0901: body.ItemDefinitionWP0901.Value,
+			SetCybersecuritySpecs: body.CybersecuritySpecsWP1001.Set, CybersecuritySpecsWp1001: body.CybersecuritySpecsWP1001.Value,
+			SetArchitecturalDesign: body.ArchitecturalDesign.Set, ArchitecturalDesign: body.ArchitecturalDesign.Value,
+		})
 	})
-	if err != nil {
-		return nil, itemDefinitionError(err)
-	}
-	return &ItemDefinitionOutput{Body: itemDefinition(row)}, nil
 }
 
 func (h *ItemDefinitions) Delete(ctx context.Context, in *ItemDefinitionPath) (*struct{}, error) {
@@ -228,12 +259,22 @@ func (h *ItemDefinitions) Delete(ctx context.Context, in *ItemDefinitionPath) (*
 	if err != nil {
 		return nil, err
 	}
-	count, err := h.store.DeleteItemDefinition(ctx, db.DeleteItemDefinitionParams{ProjectID: projectID, ID: id})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetItemDefinitionForDelete(ctx, db.GetItemDefinitionForDeleteParams{ProjectID: projectID, ID: id})
+		if err != nil {
+			return db.Change{}, err
+		}
+		count, err := h.store.DeleteItemDefinition(ctx, db.DeleteItemDefinitionParams{ProjectID: projectID, ID: id})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if count == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetItemDefinition, projectID, id, itemDefinition(before)), nil
+	})
 	if err != nil {
 		return nil, itemDefinitionError(err)
-	}
-	if count == 0 {
-		return nil, huma.Error404NotFound("item definition not found")
 	}
 	return nil, nil
 }

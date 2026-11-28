@@ -8,6 +8,7 @@ and pushes these images to GitHub Container Registry (GHCR):
 | API | `ghcr.io/thi-taramisu/taramisu-api` | `backend/` |
 | Frontend | `ghcr.io/thi-taramisu/taramisu-frontend` | `frontend/` |
 | Docs | `ghcr.io/thi-taramisu/taramisu-docs` | Repository root |
+| Storage bootstrap | `ghcr.io/thi-taramisu/taramisu-storage-bootstrap` | `storage/` |
 
 Each image includes `linux/amd64` and `linux/arm64` in one manifest, so Docker
 selects the matching architecture when pulling it. Each service has its own
@@ -18,14 +19,14 @@ This keeps compilation out of QEMU; runtime images still match the target platfo
 ## Run a build
 
 In GitHub, open **Actions → Publish Docker images → Run workflow**. Select the
-branch or tag to build, choose `all`, `api`, `frontend`, or `docs`, and optionally
+branch or tag to build, choose `all`, `api`, `frontend`, `docs`, or `storage-bootstrap`, and optionally
 enter a version such as `v1.2.3` or `1.2.3` to produce `v1.2.3-SNAPSHOT`.
 Manual runs never publish official release tags, even when run on a Git tag.
 Leave the version empty to publish SHA/latest tags only. Prerelease inputs are
 not supported.
 
-Pushes to `main` publish all three images. Pushing a release Git tag such as
-`v1.2.3` also publishes all three images from that tag. Official releases require
+Pushes to `main` publish all images. Pushing a release Git tag such as
+`v1.2.3` also publishes all images from that tag. Official releases require
 an annotated Git tag; lightweight tags are rejected before publishing:
 
 ```sh
@@ -65,3 +66,9 @@ image serves the site at `/`. Changing the origin requires a rebuild.
 Frontend configuration is compiled into the static image by Vite. Runtime
 container environment variables do not change it. Additional frontend build
 settings must be exposed by its Dockerfile and passed through the workflow.
+
+For Sentry, set the repository Actions variable `VITE_SENTRY_DSN` to the frontend project's public DSN.
+`SENTRY_ENVIRONMENT` defaults to `production` and the workflow embeds the Git commit as `VITE_SENTRY_RELEASE`.
+Configure the deployed backend with the same environment name in `iam/.env`. These values are passed during
+frontend image builds; adding environment variables to an already built container cannot enable browser reporting.
+An empty DSN builds an image with reporting disabled. Sentry source-map uploads are not configured.

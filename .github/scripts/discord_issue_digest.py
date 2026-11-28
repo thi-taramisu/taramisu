@@ -8,11 +8,16 @@ from zoneinfo import ZoneInfo
 
 from discord_notifications import (
     DeliveryError, GitHub, ISSUE_COLOR, LABEL_WEBHOOKS, NO_MENTIONS,
-    destinations, display_text, send_webhook, timestamp,
+    destinations, display_text, send_webhook, timestamp, warn_delivery,
 )
 
 
-def digest_batches(issues, now=None):
+def digest_line(item):
+    title = display_text(item["title"]).replace("\\[", "[").replace("\\]", "]")[:180].rstrip("\\")
+    return f"[#{item['number']}]({item['html_url']}) · {title}"
+
+
+def digest_batches(issues, now=None, pr_section=""):
     """One compact list per batch, within Discord's description limit."""
     now = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Europe/Berlin"))
     heading = "☀️ Morning issue digest" if now.hour < 12 else "🌙 Evening issue digest"
@@ -21,17 +26,21 @@ def digest_batches(issues, now=None):
         batch, lines = [], []
         while pending and len(batch) < 10:
             item = pending[0]
-            title = display_text(item["title"]).replace("\\[", "[").replace("\\]", "]")[:180].rstrip("\\")
-            line = f"[#{item['number']}]({item['html_url']}) · {title}"
-            if lines and len("\n".join([*lines, line])) > 4096:
+            line = digest_line(item)
+            count = len(batch) + 1
+            noun = "issue" if count == 1 else "issues"
+            title = f"**{heading} ({count} new {noun})**"
+            description = "\n".join([title, "", *lines, line]) + pr_section
+            if lines and len(description) > 4096:
                 break
             batch.append(pending.pop(0))
             lines.append(line)
+            batch_description = description
         yield batch, {
             "allowed_mentions": NO_MENTIONS,
-            "embeds": [{"author": {"name": f"{heading} ({len(batch)} new {'issue' if len(batch) == 1 else 'issues'})"},
-                        "description": "\n".join(lines), "color": ISSUE_COLOR}],
+            "embeds": [{"description": batch_description, "color": ISSUE_COLOR}],
         }
+        pr_section = ""
 
 
 def deliver_digest(github, environ, now):
@@ -56,7 +65,6 @@ def deliver_digest(github, environ, now):
     since = min(checkpoint["since"] for _, _, checkpoints in channels for checkpoint in checkpoints.values())
     # Deduplicate API results and exclude PRs defensively, including on retries.
     issues = {item["number"]: item for item in github.issues(since, until) if "pull_request" not in item}
-    failed = False
     for webhook, labels, checkpoints in channels:
         pending = sorted((item for item in issues.values()
                           if any(label["name"] in labels
@@ -64,22 +72,34 @@ def deliver_digest(github, environ, now):
                                  and item["number"] not in checkpoints[LABEL_WEBHOOKS[label["name"]]]["sent"]
                                  for label in item["labels"])),
                          key=lambda item: (item["created_at"], item["number"]))
-        try:
-            for batch, payload in digest_batches(pending, now):
+        pr_section = ""
+        if pending:
+            try:
+                pulls, total, url = github.approved_pulls(labels)
+            except (OSError, ValueError, KeyError):
+                print("Approved PR lookup failed; sending issue digest.", file=sys.stderr)
+            else:
+                if pulls:
+                    lines = ["", "", "**🕒 Approved PRs awaiting merge**", ""]
+                    lines.extend(digest_line(pull) for pull in pulls)
+                    if total > len(pulls):
+                        lines.append(f"[View all {total} approved PRs]({url})")
+                    pr_section = "\n".join(lines)
+        for batch, payload in digest_batches(pending, now, pr_section):
+            try:
                 send_webhook(webhook, payload)
-                for checkpoint in checkpoints.values():
-                    checkpoint["sent"].extend(item["number"] for item in batch)
-                # A state-write failure must stop the run immediately.
-                github.save(state)
+            except DeliveryError as error:
+                warn_delivery(labels, error)
+                break
+            for checkpoint in checkpoints.values():
+                checkpoint["sent"].extend(item["number"] for item in batch)
+            # A state-write failure must stop the run immediately.
+            github.save(state)
+        else:
             for checkpoint in checkpoints.values():
                 checkpoint.update(since=until, sent=[])
             github.save(state)
             print(f"Delivered {len(pending)} new issues for {', '.join(labels)}.")
-        except DeliveryError:
-            print(f"Discord delivery failed for {', '.join(labels)}; checkpoint retained.", file=sys.stderr)
-            failed = True
-    if failed:
-        raise DeliveryError("Some digest destinations failed")
 
 
 def main():

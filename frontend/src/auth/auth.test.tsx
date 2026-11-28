@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AuthCallbackPage } from '@/pages/AuthCallbackPage'
 import { AuthProvider } from './AuthContext'
+import { i18n } from '@/i18n'
 import {
   buildAuthorizationUrl,
   exchangeAuthorizationCode,
@@ -148,6 +149,29 @@ describe('OIDC + PKCE helpers', () => {
 })
 
 describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
+  it('passes language selector changes to each sign-in request', async () => {
+    const user = userEvent.setup()
+    const navigateExternal = vi.fn<(url: string) => void>()
+    render(
+      <MemoryRouter>
+        <AuthProvider config={testOidcConfig} onNavigateExternal={navigateExternal}>
+          <AppHeader collapsed={false} onToggleSidebar={() => {}} />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    for (const language of ['de', 'en', 'de']) {
+      await user.selectOptions(screen.getByRole('combobox'), language)
+      await user.click(screen.getByRole('button', { name: language === 'de' ? 'Anmelden' : 'Sign in' }))
+      await waitFor(() => expect(navigateExternal).toHaveBeenCalledOnce())
+      const url = new URL(navigateExternal.mock.calls[0]![0])
+      expect(url.searchParams.get('ui_locales')).toBe(language)
+      expect(url.searchParams.get('code_challenge_method')).toBe('S256')
+      navigateExternal.mockClear()
+    }
+    localStorage.removeItem('taramisu.language')
+  })
+
   it('completes OIDC callback, hydrates /me, persists across page refresh, and supports Sign out', async () => {
     const user = userEvent.setup()
     const authUrl = new URL(await buildAuthorizationUrl('/projects', testOidcConfig))
@@ -235,12 +259,18 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
     expect(sessionStorage.getItem('taramisu.oidc.session')).toBeNull()
   })
 
-  it('initiates PKCE redirect when Sign in is clicked and displays callback errors', async () => {
+  it.each([
+    ['en', '?error=invalid_request'],
+    ['de', '?error=invalid_request'],
+    ['de', ''],
+  ])('displays localized callback errors and retries sign-in (%s, %s)', async (language, query) => {
+    await i18n.changeLanguage(language)
+    const de = language === 'de'
     const user = userEvent.setup()
     const navigateExternal = vi.fn<(url: string) => void>()
 
     render(
-      <MemoryRouter initialEntries={['/auth/callback?error=invalid_request']}>
+      <MemoryRouter initialEntries={[`/auth/callback${query}`]}>
         <AuthProvider
           config={testOidcConfig}
           apiBaseUrl="http://api.test"
@@ -254,10 +284,16 @@ describe('AuthProvider, AppHeader, and AuthCallbackPage', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByRole('heading', { name: 'Sign-in failed' })).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('invalid_request')
+    expect(screen.getByText(de
+      ? 'Der Autorisierungscode wird mit Authentik ausgetauscht.'
+      : 'Exchanging authorization code with Authentik.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: de ? 'Anmeldung fehlgeschlagen' : 'Sign-in failed' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(de
+      ? 'Die Anmeldung ist fehlgeschlagen. Bitte melde dich erneut an.'
+      : 'Authentication failed. Please sign in again.')
+    expect(screen.queryByText(/Missing authorization code|invalid_request/)).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(screen.getByRole('button', { name: de ? 'Erneut versuchen' : 'Try again' }))
     await waitFor(() => {
       expect(navigateExternal).toHaveBeenCalledOnce()
     })

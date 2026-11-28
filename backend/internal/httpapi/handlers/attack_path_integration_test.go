@@ -47,9 +47,8 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 		}
 	}
 	seed(&projectID, `INSERT INTO tara_project (name) VALUES ('p') RETURNING id::text`)
-	seed(&itemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'a', 'ITEM') RETURNING id::text`, projectID)
-	seed(&otherItemID, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'b', 'ITEM') RETURNING id::text`, projectID)
-	seed(&threatID, `INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 't') RETURNING id::text`, itemID)
+	itemID, otherItemID = seedItem(t, ctx, tx, projectID, "a"), seedItem(t, ctx, tx, projectID, "b")
+	threatID = seedThreatScenario(t, ctx, tx, itemID, "t")
 
 	fixture := authtest.NewFixture(t, db.New(tx))
 	manager, bearer := fixture.Manager, "Bearer "+fixture.Token(t, nil)
@@ -60,7 +59,7 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	if _, err := tx.Exec(ctx, `INSERT INTO project_role_assignment (tara_project_id, user_id, project_role) VALUES ($1, $2, 'EDITOR')`, projectID, userID); err != nil {
 		t.Fatal(err)
 	}
-	handler := httpapi.New(db.New(tx), manager)
+	handler := httpapi.New(db.NewStore(tx), manager)
 	call := func(method, path, body string, want int) []byte {
 		t.Helper()
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
@@ -75,12 +74,12 @@ func TestAttackPathPostgresLifecycle(t *testing.T) {
 	}
 
 	// serve builds the API on q, so a request can also run on a savepoint.
-	serve := func(q db.DBTX, method, path, body string) *httptest.ResponseRecorder {
+	serve := func(q db.TxStarter, method, path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", bearer)
 		rr := httptest.NewRecorder()
-		httpapi.New(db.New(q), manager).ServeHTTP(rr, req)
+		httpapi.New(db.NewStore(q), manager).ServeHTTP(rr, req)
 		return rr
 	}
 

@@ -59,19 +59,19 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		}
 		return id
 	}
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	api := &routeAPI{t: t, handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
 	f := propertyFixture{tx: tx, api: api, authFixture: fixture}
 	for _, target := range []*string{&f.item, &f.otherItem} {
 		project := propertyResponse(t, api.Post("/api/v1/projects", map[string]any{"name": "property API test"}), 201)["id"].(string)
-		*target = insertID("INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project)
+		*target = seedItem(t, ctx, tx, project, "test")
 	}
 	for _, row := range []struct {
 		dest *string
 		item string
 	}{{&f.asset, f.item}, {&f.secondAsset, f.item}, {&f.otherAsset, f.otherItem}} {
-		*row.dest = insertID("INSERT INTO asset (item_definition_id, name) VALUES ($1, 'ECU') RETURNING id", row.item)
+		*row.dest = seedAsset(t, ctx, tx, row.item, "ECU")
 	}
 	f.property = insertID("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'CONFIDENTIALITY') RETURNING id", f.secondAsset)
 	f.otherProperty = insertID("INSERT INTO asset_cybersecurity_property (asset_id, property_type) VALUES ($1, 'INTEGRITY') RETURNING id", f.otherAsset)
@@ -79,13 +79,13 @@ func newPropertyFixture(t *testing.T) propertyFixture {
 		dest *string
 		item string
 	}{{&f.damage, f.item}, {&f.secondDamage, f.item}, {&f.otherDamage, f.otherItem}} {
-		*row.dest = insertID("INSERT INTO damage_scenario (item_definition_id, title) VALUES ($1, 'damage') RETURNING id", row.item)
+		*row.dest = seedDamageScenario(t, ctx, tx, row.item, "damage")
 	}
 	for _, row := range []struct {
 		dest *string
 		item string
 	}{{&f.threat, f.item}, {&f.secondThreat, f.item}, {&f.otherThreat, f.otherItem}} {
-		*row.dest = insertID("INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'threat') RETURNING id", row.item)
+		*row.dest = seedThreatScenario(t, ctx, tx, row.item, "threat")
 	}
 	// Fixture setup and handler queries share the transaction and roll back together.
 	return f

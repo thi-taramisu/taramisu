@@ -1,5 +1,5 @@
 import { ApiError } from '../errors'
-import type { CiaProperty, ItemAsset } from '../models/asset'
+import type { CiaProperty, IdentificationSource, ItemAsset } from '../models/asset'
 import type { AttackFeasibilityRating, AttackPath } from '../models/attackPath'
 import type { DamageScenario, DamageScenarioAssetProperty, ImpactRating } from '../models/damageScenario'
 import type { ItemDefinition } from '../models/item'
@@ -9,10 +9,18 @@ import type { EntityRef, TreeNode } from '../models/tree'
 
 // MOCK: stored data of the in-memory item API and the helpers its services share.
 
+/** Asset row of the item views with the fields only the asset page shows. */
+export interface StoredAsset extends ItemAsset {
+  description: string | null
+  identification_source: IdentificationSource | null
+  /** Context per declared property [WP-15-02]; `properties` says which ones are declared. */
+  propertyDescriptions: Partial<Record<CiaProperty, string | null>>
+}
+
 export interface StoredItem {
   item: ItemDefinition
   children: TreeNode[]
-  assets: ItemAsset[]
+  assets: StoredAsset[]
   risks: RiskGroup[]
   damageScenarios: DamageScenario[]
   damageScenarioLinks: (DamageScenarioAssetProperty & { damage_scenario_id: string })[]
@@ -36,6 +44,26 @@ export function validateTitle(title: string | undefined) {
 
 export function titleRef({ id, code, title }: { id: string; code: string; title: string }): EntityRef {
   return { id, code, name: title }
+}
+
+/** Item entry of the project; 404 like the item routes. */
+export function findItem(db: Map<string, StoredItem>, projectId: string, itemId: string) {
+  const entry = db.get(itemId)
+  if (!entry || entry.item.tara_project_id !== projectId) throw new ApiError(404, 'Item definition not found.')
+  return entry
+}
+
+/** Next display ID such as TS-4, counted over all items of the mock as for the other elements. */
+export function nextCode(prefix: 'TS' | 'AP', codes: string[]) {
+  return `${prefix}-${Math.max(0, ...codes.map((code) => Number(code.slice(prefix.length + 1)))) + 1}`
+}
+
+/** Rejects ids that are not elements of the item or are given twice, as a POST with links would (422). */
+export function validateLinkIds(ids: string[], known: { id: string }[], label: string) {
+  for (const id of ids) {
+    if (!known.some((element) => element.id === id)) throw new ApiError(422, `${label} ${id} is not part of the item.`)
+  }
+  if (new Set(ids).size !== ids.length) throw new ApiError(422, `Each ${label.toLowerCase()} can only be linked once.`)
 }
 
 /** Renames every occurrence of an element in the tree; shared elements appear below several parents. */
@@ -127,11 +155,4 @@ export function removeThreatAttackPathLink(entry: StoredItem, threatScenarioId: 
   removeLink(entry, entry.threatAttackPathLinks, isThreatAttackPathLink(threatScenarioId, attackPathId))
 }
 
-/** Runs `fn` like a request: async, with a copy of the result, errors as rejections. */
-export function run<T>(fn: () => T): Promise<T> {
-  try {
-    return Promise.resolve(structuredClone(fn()))
-  } catch (error) {
-    return Promise.reject(error)
-  }
-}
+export { run } from './request'

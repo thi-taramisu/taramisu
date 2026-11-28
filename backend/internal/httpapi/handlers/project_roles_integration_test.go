@@ -40,7 +40,7 @@ func TestProjectRolesPostgres(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	handler := httpapi.New(queries, fixture.Manager, httpapi.WithDirectory(&fakeDirectory{}))
 
@@ -131,13 +131,8 @@ func TestProjectRolesPostgres(t *testing.T) {
 	call(bob, http.MethodDelete, members+"/"+bobMember.ID, "", http.StatusConflict)
 
 	// Parent lookups used by handlers below a project.
-	var itemID, threatID string
-	if err := tx.QueryRow(ctx, `INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'Item', 'ITEM') RETURNING id::text`, project.ID).Scan(&itemID); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.QueryRow(ctx, `INSERT INTO threat_scenario (item_definition_id, title) VALUES ($1, 'Threat') RETURNING id::text`, itemID).Scan(&threatID); err != nil {
-		t.Fatal(err)
-	}
+	itemID := seedItem(t, ctx, tx, project.ID, "Item")
+	threatID := seedThreatScenario(t, ctx, tx, itemID, "Threat")
 	fromItem, err := queries.ProjectIDForItemDefinition(ctx, mustUUID(itemID))
 	if err != nil || fromItem.String() != project.ID {
 		t.Fatalf("ProjectIDForItemDefinition = %v, %v", fromItem, err)

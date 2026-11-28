@@ -49,7 +49,7 @@ func TestRiskPostgresLifecycle(t *testing.T) {
 	const otherImpact = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 	const damage = "ffffffff-ffff-4fff-8fff-ffffffffffff"
 	const otherDamage = "99999999-9999-4999-8999-999999999999"
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	a := &riskAPI{handler: httpapi.New(queries, fixture.Manager), token: "Bearer " + fixture.Token(t, nil)}
 	createdProject := a.call("POST", "/api/v1/projects", `{"name":"Risk test"}`)
@@ -58,9 +58,12 @@ func TestRiskPostgresLifecycle(t *testing.T) {
 		t.Fatalf("create project: %d %s", createdProject.Code, createdProject.Body)
 	}
 	project := projectBody.ID
-	exec(`INSERT INTO item_definition(id,tara_project_id,name,scope_type) VALUES($1,$3,'First','ITEM'),($2,$3,'Other','ITEM')`, item, otherItem, project)
-	exec(`INSERT INTO threat_scenario(id,item_definition_id,title) VALUES($1,$2,'Threat'),($3,$4,'Other threat')`, riskThreat, item, otherThreat, otherItem)
-	exec(`INSERT INTO damage_scenario(id,item_definition_id,title) VALUES($1,$2,'Damage'),($3,$4,'Other damage')`, damage, item, otherDamage, otherItem)
+	// Fixed IDs, so the display numbers are set here too. Like every insert that bypasses the create
+	// queries, it raises the counters to the highest number (docs/internal/architecture/data-model.md#27-display-ids).
+	exec(`INSERT INTO item_definition(id,tara_project_id,display_number,name,scope_type) VALUES($1,$3,1,'First','ITEM'),($2,$3,2,'Other','ITEM')`, item, otherItem, project)
+	exec(`INSERT INTO threat_scenario(id,item_definition_id,tara_project_id,display_number,title) VALUES($1,$2,$5,1,'Threat'),($3,$4,$5,2,'Other threat')`, riskThreat, item, otherThreat, otherItem, project)
+	exec(`INSERT INTO damage_scenario(id,item_definition_id,tara_project_id,display_number,title) VALUES($1,$2,$5,1,'Damage'),($3,$4,$5,2,'Other damage')`, damage, item, otherDamage, otherItem, project)
+	exec(`INSERT INTO display_id_counter(tara_project_id,element_type,last_number) VALUES($1,'ITEM',2),($1,'THREAT_SCENARIO',2),($1,'DAMAGE_SCENARIO',2)`, project)
 	exec(`INSERT INTO impact_rating(id,damage_scenario_id,impact_category) VALUES($1,$2,'SAFETY'),($3,$4,'SAFETY')`, riskImpact, damage, otherImpact, otherDamage)
 	call := func(method, path, body string, want int) *httptest.ResponseRecorder {
 		t.Helper()

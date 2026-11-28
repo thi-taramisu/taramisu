@@ -11,7 +11,7 @@ describe('graph view', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('link', { name: /AP-02 Malicious/ })).toHaveAttribute('href', expect.stringContaining('graphMode=minimal'))
+    expect(screen.getByRole('link', { name: /AP-2 Malicious/ })).toHaveAttribute('href', expect.stringContaining('graphMode=minimal'))
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-checked', 'false')
   })
@@ -34,8 +34,12 @@ describe('graph view', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('region', { name: 'Relation graph' })).toBeInTheDocument()
   })
-  it('does not invent nodes for an unknown entity', async () => {
-    renderApp('/projects/headlamp/assets/unknown?view=graph')
+  it('does not invent nodes for an element missing from the graph data', async () => {
+    // The asset page loads the asset itself, so serve one that the graph does not contain.
+    const api = createMockItemApi()
+    const get = api.assets.get
+    api.assets.get = async (projectId) => ({ ...(await get(projectId, 'a-01')), id: 'unknown', code: 'A-99' })
+    renderApp('/projects/headlamp/assets/unknown?view=graph', api)
     expect(await screen.findByText('No graph data for this element.')).toBeInTheDocument()
   })
 })

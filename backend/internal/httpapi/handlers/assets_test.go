@@ -36,6 +36,7 @@ type assetStore struct {
 
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 
 	handlers.AssetStore
 	handlers.TaraProjectStore
@@ -101,17 +102,20 @@ func TestAssetErrors(t *testing.T) {
 		name, method, path string
 		err                error
 		want               int
+		detail             string
 	}{
-		{"missing", "GET", assetPath, pgx.ErrNoRows, 404},
-		{"unexpected error", "GET", assetPath, errors.New("private database details"), 500},
-		{"unknown parent", "POST", assetCollection, &pgconn.PgError{Code: "23503"}, 422},
-		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404},
+		{"missing", "GET", assetPath, pgx.ErrNoRows, 404, "asset not found"},
+		{"unexpected error", "GET", assetPath, errors.New("private database details"), 500, ""},
+		// The create query returns no row when the item was deleted after the access check.
+		{"deleted parent", "POST", assetCollection, pgx.ErrNoRows, 404, "item definition not found"},
+		{"parent deleted during create", "POST", assetCollection, &pgconn.PgError{Code: "23503"}, 404, "item definition not found"},
+		{"missing delete", "DELETE", assetPath, pgx.ErrNoRows, 404, "asset not found"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &assetStore{err: tc.err, resourceAccess: resourceAccess{role: db.ProjectRoleEDITOR}}
 			h := httpapi.New(s, manager)
 			r := assetRequest(t, h, bearer, tc.method, tc.path, strings.NewReader(assetJSON))
-			if r.Code != tc.want || strings.Contains(r.Body.String(), "private database details") {
+			if r.Code != tc.want || !strings.Contains(r.Body.String(), tc.detail) || strings.Contains(r.Body.String(), "private database details") {
 				t.Fatalf("got %d, want %d: %s", r.Code, tc.want, r.Body)
 			}
 		})
@@ -154,12 +158,12 @@ func (s *assetStore) UpdateAsset(context.Context, db.UpdateAssetParams) (db.Asse
 func TestAssetAuthorization(t *testing.T) {
 	manager, bearer := authtest.NewManagerAndToken(t)
 	for _, route := range []struct {
-		method, path string
-		status       int
+		method, path  string
+		status, calls int
 	}{
-		{"GET", assetCollection, 200}, {"GET", assetPath, 200},
-		{"POST", assetCollection, 201}, {"PUT", assetPath, 200},
-		{"PATCH", assetPath, 200}, {"DELETE", assetPath, 204},
+		{"GET", assetCollection, 200, 1}, {"GET", assetPath, 200, 1},
+		{"POST", assetCollection, 201, 1}, {"PUT", assetPath, 200, 2},
+		{"PATCH", assetPath, 200, 2}, {"DELETE", assetPath, 204, 2},
 	} {
 		for _, access := range []struct {
 			name   string
@@ -184,7 +188,7 @@ func TestAssetAuthorization(t *testing.T) {
 				r := assetRequest(t, httpapi.New(s, manager), access.token, route.method, route.path, strings.NewReader(assetJSON))
 				calls := 0
 				if want < 400 {
-					calls = 1
+					calls = route.calls
 				}
 				if r.Code != want || s.calls != calls {
 					t.Fatalf("got %d, want %d; calls %d, want %d: %s", r.Code, want, s.calls, calls, r.Body)
@@ -192,4 +196,12 @@ func TestAssetAuthorization(t *testing.T) {
 			})
 		}
 	}
+}
+
+func (f *assetStore) GetAssetForUpdate(ctx context.Context, p db.GetAssetForUpdateParams) (db.Asset, error) {
+	return f.GetAsset(ctx, db.GetAssetParams(p))
+}
+
+func (f *assetStore) GetAssetForDelete(ctx context.Context, p db.GetAssetForDeleteParams) (db.Asset, error) {
+	return f.GetAsset(ctx, db.GetAssetParams(p))
 }

@@ -46,6 +46,7 @@ type fakeDamage struct {
 	handlers.ItemDefinitionStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 	handlers.AttackPathStore
 	handlers.AttackFeasibilityRatingStore
 	handlers.ThreatAttackPathLinkStore
@@ -174,6 +175,7 @@ func TestDamageRoutes(t *testing.T) {
 	}{
 		{"create scenario", true, nil, http.MethodPost, dmgScenarios, `{"title":"Brake loss"}`, http.StatusCreated},
 		{"create scenario unknown item", false, nil, http.MethodPost, dmgScenarios, `{"title":"x"}`, http.StatusNotFound},
+		{"create scenario item deleted during create", true, pgCode("23503"), http.MethodPost, dmgScenarios, `{"title":"x"}`, http.StatusNotFound},
 		{"create scenario blank title", true, nil, http.MethodPost, dmgScenarios, `{"title":"  "}`, http.StatusUnprocessableEntity},
 		{"create scenario missing title", true, nil, http.MethodPost, dmgScenarios, `{}`, http.StatusUnprocessableEntity},
 		{"create scenario bad item id", true, nil, http.MethodPost, "/api/v1/item-definitions/nope/damage-scenarios", `{"title":"x"}`, http.StatusUnprocessableEntity},
@@ -319,4 +321,26 @@ func TestDamageRoutesRequireAuthentication(t *testing.T) {
 			t.Fatalf("GET %s: status = %d, want %d", path, rr.Code, http.StatusUnauthorized)
 		}
 	}
+}
+
+func (f *fakeDamage) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
+
+func (f *fakeDamage) GetDamageScenarioForUpdate(ctx context.Context, p db.GetDamageScenarioForUpdateParams) (db.DamageScenario, error) {
+	return f.GetDamageScenario(ctx, db.GetDamageScenarioParams(p))
+}
+
+func (f *fakeDamage) GetDamageScenarioForDelete(ctx context.Context, p db.GetDamageScenarioForDeleteParams) (db.DamageScenario, error) {
+	return f.GetDamageScenario(ctx, db.GetDamageScenarioParams(p))
+}
+
+func (f *fakeDamage) GetImpactRatingForUpdate(ctx context.Context, p db.GetImpactRatingForUpdateParams) (db.ImpactRating, error) {
+	return f.GetImpactRating(ctx, db.GetImpactRatingParams(p))
+}
+
+func (f *fakeDamage) GetImpactRatingForDelete(ctx context.Context, p db.GetImpactRatingForDeleteParams) (db.ImpactRating, error) {
+	return f.GetImpactRating(ctx, db.GetImpactRatingParams(p))
+}
+
+func (f *fakeDamage) GetThreatDamageLinkForDelete(ctx context.Context, p db.GetThreatDamageLinkForDeleteParams) (db.ThreatDamageLink, error) {
+	return db.ThreatDamageLink{ID: dmgUUID(dmgRatingID), ThreatScenarioID: dmgUUID(dmgThreatID), DamageScenarioID: dmgUUID(dmgScenarioID)}, f.lookup()
 }

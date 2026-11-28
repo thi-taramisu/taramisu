@@ -35,7 +35,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	queries := db.New(tx)
+	queries := db.NewStore(tx)
 	fixture := authtest.NewFixture(t, queries)
 	bearer := "Bearer " + fixture.Token(t, nil)
 	h := httpapi.New(queries, fixture.Manager)
@@ -54,9 +54,7 @@ func TestAssetPostgresCRUD(t *testing.T) {
 	}
 	var item, otherItem string
 	for _, dest := range []*string{&item, &otherItem} {
-		if err := tx.QueryRow(ctx, "INSERT INTO item_definition (tara_project_id, name, scope_type) VALUES ($1, 'test', 'ITEM') RETURNING id", project.ID).Scan(dest); err != nil {
-			t.Fatal(err)
-		}
+		*dest = seedItem(t, ctx, tx, project.ID, "test")
 	}
 	collection := "/api/v1/item-definitions/" + item + "/assets"
 	otherCollection := "/api/v1/item-definitions/" + otherItem + "/assets"

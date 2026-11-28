@@ -1,18 +1,18 @@
 import type { ImpactCategory, ImpactRatingValue } from '../../api/models/damageScenario'
 
 export const IMPACT_CATEGORIES: { value: ImpactCategory; label: string }[] = [
-  { value: 'SAFETY', label: 'Safety' },
-  { value: 'FINANCIAL', label: 'Financial' },
-  { value: 'OPERATIONAL', label: 'Operational' },
-  { value: 'PRIVACY', label: 'Privacy' },
+  { value: 'SAFETY', label: 'ui:safety' },
+  { value: 'FINANCIAL', label: 'ui:financial' },
+  { value: 'OPERATIONAL', label: 'ui:operational' },
+  { value: 'PRIVACY', label: 'ui:privacy' },
 ]
 
 /** The rating levels from the highest impact down; OMITTED is not a level of the scale. */
 export const IMPACT_SCALE: { value: Exclude<ImpactRatingValue, 'OMITTED'>; label: string }[] = [
-  { value: 'SEVERE', label: 'Severe' },
-  { value: 'MAJOR', label: 'Major' },
-  { value: 'MODERATE', label: 'Moderate' },
-  { value: 'NEGLIGIBLE', label: 'Negligible' },
+  { value: 'SEVERE', label: 'ui:severe' },
+  { value: 'MAJOR', label: 'ui:major' },
+  { value: 'MODERATE', label: 'ui:moderate' },
+  { value: 'NEGLIGIBLE', label: 'ui:negligible' },
 ]
 
 export const categoryLabel = (value: ImpactCategory) => IMPACT_CATEGORIES.find((category) => category.value === value)?.label

@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
-import type { CiaProperty, NewAsset } from '../models/asset'
-import type { AttackFeasibilityRatingBody, PatchAttackPathBody } from '../models/attackPath'
+import type { CiaProperty, NewAsset, PatchAssetBody } from '../models/asset'
+import type { AttackFeasibilityRatingBody, AttackPathBody, PatchAttackPathBody } from '../models/attackPath'
 import type { DamageScenarioBody, ImpactRatingBody, PatchDamageScenarioBody } from '../models/damageScenario'
 import type { ItemDefinitionBody, PatchItemDefinitionBody } from '../models/item'
-import type { PatchThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
-import type { TreeNode } from '../models/tree'
+import type { PatchThreatScenarioBody, ThreatScenarioBody, ThreatTarget } from '../models/threatScenario'
+import type { EntityRef, TreeNode } from '../models/tree'
 
 // Everything below a project shares the key prefix, so a change invalidates the tree and the item
 // views together.
@@ -17,6 +17,8 @@ const keys = {
   assets: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'assets'] as const,
   risks: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'risks'] as const,
   threatScenarios: (projectId: string, itemId: string) => ['projects', projectId, 'items', itemId, 'threat-scenarios'] as const,
+  asset: (projectId: string, id: string) => ['projects', projectId, 'assets', id] as const,
+  assetRelations: (projectId: string, id: string) => ['projects', projectId, 'assets', id, 'relations'] as const,
   damageScenario: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id] as const,
   impactRatings: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'impact'] as const,
   damageScenarioRelations: (projectId: string, id: string) => ['projects', projectId, 'damage-scenarios', id, 'relations'] as const,
@@ -76,6 +78,18 @@ export function useItemRisks(projectId: string, itemId: string) {
   return useQuery({ queryKey: keys.risks(projectId, itemId), queryFn: () => api.content.risks(projectId, itemId) })
 }
 
+/** Damage or threat scenarios of an item, e.g. the elements a new one can be linked to; shares the cache with the hooks per type. */
+export function useItemScenarios(projectId: string, itemId: string, type: 'damage-scenarios' | 'threat-scenarios') {
+  const api = useApi()
+  const damage = type === 'damage-scenarios'
+  return useQuery<EntityRef[]>({
+    queryKey: damage ? keys.itemDamageScenarios(projectId, itemId) : keys.threatScenarios(projectId, itemId),
+    queryFn: () => (damage ? api.content.damageScenarios(projectId, itemId) : api.content.threatScenarios(projectId, itemId)),
+    // No item to ask for, e.g. while the tree loads or in a project without items.
+    enabled: Boolean(itemId),
+  })
+}
+
 export function useItemThreatScenarios(projectId: string, itemId: string) {
   const api = useApi()
   return useQuery({ queryKey: keys.threatScenarios(projectId, itemId), queryFn: () => api.content.threatScenarios(projectId, itemId) })
@@ -83,7 +97,10 @@ export function useItemThreatScenarios(projectId: string, itemId: string) {
 
 function useInvalidateProject(projectId: string) {
   const queryClient = useQueryClient()
-  return () => queryClient.invalidateQueries({ queryKey: keys.project(projectId) })
+  return () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: keys.project(projectId) }),
+    queryClient.invalidateQueries({ queryKey: ['search'] }),
+  ])
 }
 
 export function useCreateItem(projectId: string) {
@@ -111,15 +128,49 @@ export function useDeleteItem(projectId: string, itemId: string) {
       // its page is still mounted. If the item page is opened again (browser back), its refetch
       // gets the 404 without retries and shows the not-found state.
       queryClient.setQueryData<TreeNode[]>(keys.tree(projectId), (tree) => tree?.filter((node) => node.id !== itemId))
+      void queryClient.invalidateQueries({ queryKey: ['search'] })
       return queryClient.invalidateQueries({ queryKey: keys.tree(projectId) })
     },
   })
 }
 
-export function useAddAsset(projectId: string, itemId: string) {
+/** Creates an asset in the given item; the item is part of the call, so one dialog can create in any item. */
+export function useCreateAsset(projectId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
-  return useMutation({ mutationFn: (asset: NewAsset) => api.content.addAsset(projectId, itemId, asset), onSuccess: invalidate })
+  return useMutation({
+    mutationFn: ({ itemId, asset }: { itemId: string; asset: NewAsset }) => api.content.addAsset(projectId, itemId, asset),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAsset(projectId: string, assetId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.asset(projectId, assetId), queryFn: () => api.assets.get(projectId, assetId) })
+}
+
+export function useUpdateAsset(projectId: string, assetId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: PatchAssetBody) => api.assets.update(projectId, assetId, body), onSuccess: invalidate })
+}
+
+export function useAssetRelations(projectId: string, assetId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: keys.assetRelations(projectId, assetId), queryFn: () => api.assets.relations(projectId, assetId) })
+}
+
+/** Links a damage scenario with the given properties of the asset or changes them; no properties remove the link. */
+export function useSetAssetDamageLink(projectId: string, assetId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({
+    mutationFn: ({ damageScenarioId, properties }: { damageScenarioId: string; properties: CiaProperty[] }) =>
+      properties.length > 0
+        ? api.damageScenarios.linkAsset(projectId, damageScenarioId, assetId, properties)
+        : api.damageScenarios.unlinkAsset(projectId, damageScenarioId, assetId),
+    onSuccess: invalidate,
+  })
 }
 
 export function useDamageScenario(projectId: string, damageScenarioId: string) {
@@ -239,6 +290,12 @@ export function useThreatScenario(projectId: string, threatScenarioId: string) {
 }
 
 /** Saves the fields of the Definition tab; the targets are saved on their own, so a failure of one keeps the other. */
+export function useCreateThreatScenario(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: ThreatScenarioBody) => api.threatScenarios.create(projectId, body), onSuccess: invalidate })
+}
+
 export function useUpdateThreatScenario(projectId: string, threatScenarioId: string) {
   const api = useApi()
   const storeSaved = useStoreSaved(projectId, keys.threatScenario(projectId, threatScenarioId))
@@ -262,6 +319,17 @@ export function useThreatScenarioRisks(projectId: string, threatScenarioId: stri
   return useQuery({
     queryKey: keys.threatScenarioRisks(projectId, threatScenarioId),
     queryFn: () => api.threatScenarios.risks(projectId, threatScenarioId),
+  })
+}
+
+/** Risks of several threat scenarios, e.g. all that reach an asset; shares the cache with the threat scenario's Risks tab. */
+export function useThreatScenariosRisks(projectId: string, threatScenarioIds: string[]) {
+  const api = useApi()
+  return useQueries({
+    queries: threatScenarioIds.map((id) => ({
+      queryKey: keys.threatScenarioRisks(projectId, id),
+      queryFn: () => api.threatScenarios.risks(projectId, id),
+    })),
   })
 }
 
@@ -296,6 +364,12 @@ export function useSetThreatAttackPathLink(projectId: string, threatScenarioId: 
 export function useAttackPath(projectId: string, attackPathId: string) {
   const api = useApi()
   return useQuery({ queryKey: keys.attackPath(projectId, attackPathId), queryFn: () => api.attackPaths.get(projectId, attackPathId) })
+}
+
+export function useCreateAttackPath(projectId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateProject(projectId)
+  return useMutation({ mutationFn: (body: AttackPathBody) => api.attackPaths.create(projectId, body), onSuccess: invalidate })
 }
 
 export function useUpdateAttackPath(projectId: string, attackPathId: string) {

@@ -1,7 +1,19 @@
 import { ApiError } from '../errors'
-import type { AttackFeasibilityRatingBody, AttackPathRelations } from '../models/attackPath'
+import type { AttackFeasibilityRatingBody, AttackPath, AttackPathRelations } from '../models/attackPath'
 import type { AttackPathService } from '../services/attackPaths'
-import { addThreatAttackPathLink, removeThreatAttackPathLink, renameNodes, run, titleRef, validateTitle, type StoredItem } from './mockStore'
+import {
+  addThreatAttackPathLink,
+  findItem,
+  nextCode,
+  removeThreatAttackPathLink,
+  renameNodes,
+  run,
+  syncLinks,
+  titleRef,
+  validateLinkIds,
+  validateTitle,
+  type StoredItem,
+} from './mockStore'
 
 function relationsOf(entry: StoredItem, attackPathId: string): AttackPathRelations {
   return {
@@ -32,6 +44,27 @@ export function createMockAttackPathService(db: Map<string, StoredItem>): Attack
   }
 
   return {
+    create: (projectId, body) =>
+      run(() => {
+        const entry = findItem(db, projectId, body.item_definition_id)
+        const title = validateTitle(body.title)!
+        validateLinkIds(body.threat_scenario_ids, entry.threatScenarios, 'Threat scenario')
+        const path: AttackPath = {
+          id: crypto.randomUUID(),
+          item_definition_id: entry.item.id,
+          code: nextCode('AP', [...db.values()].flatMap((e) => e.attackPaths.map((ap) => ap.code))),
+          title,
+          analysis_approach: null,
+          // Default of `attack_path.is_partial_early_stage` in backend/db/schema.sql.
+          is_partial_early_stage: true,
+          attack_steps_and_weaknesses: null,
+        }
+        entry.attackPaths.push(path)
+        entry.threatAttackPathLinks.push(...body.threat_scenario_ids.map((id) => ({ threat_scenario_id: id, attack_path_id: path.id })))
+        // Shows the new attack path below each linked threat scenario in the tree.
+        syncLinks(entry)
+        return path
+      }),
     get: (projectId, attackPathId) => run(() => findAttackPath(projectId, attackPathId).path),
     update: (projectId, attackPathId, body) =>
       run(() => {

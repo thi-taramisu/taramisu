@@ -12,6 +12,9 @@ import (
 )
 
 type DamageScenarioStore interface {
+	Auditor
+	GetDamageScenarioForUpdate(context.Context, db.GetDamageScenarioForUpdateParams) (db.DamageScenario, error)
+	GetDamageScenarioForDelete(context.Context, db.GetDamageScenarioForDeleteParams) (db.DamageScenario, error)
 	CreateDamageScenario(context.Context, db.CreateDamageScenarioParams) (db.DamageScenario, error)
 	GetDamageScenario(context.Context, db.GetDamageScenarioParams) (db.DamageScenario, error)
 	ListDamageScenarios(context.Context, db.ListDamageScenariosParams) ([]db.DamageScenario, error)
@@ -52,6 +55,7 @@ func (h *DamageScenario) Register(api huma.API) {
 
 type DamageScenarioBody struct {
 	ID                           string  `json:"id" format:"uuid"`
+	DisplayID                    string  `json:"display_id" readOnly:"true" example:"DS-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	ItemDefinitionID             string  `json:"item_definition_id" format:"uuid"`
 	Title                        string  `json:"title"`
 	FunctionalityAdverseRelation *string `json:"functionality_adverse_relation,omitempty"`
@@ -116,14 +120,22 @@ func (h *DamageScenario) Create(ctx context.Context, in *CreateDamageScenarioInp
 	if err != nil {
 		return nil, err
 	}
-	d, err := h.store.CreateDamageScenario(ctx, db.CreateDamageScenarioParams{
-		ItemDefinitionID:             itemID,
-		Title:                        in.Body.Title,
-		FunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation,
-		RoadUserHarmDescription:      in.Body.RoadUserHarmDescription,
+	var d db.DamageScenario
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		var err error
+		d, err = h.store.CreateDamageScenario(ctx, db.CreateDamageScenarioParams{
+			ItemDefinitionID:             itemID,
+			Title:                        in.Body.Title,
+			FunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation,
+			RoadUserHarmDescription:      in.Body.RoadUserHarmDescription,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Created(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(d)), nil
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, huma.Error404NotFound("item definition not found")
+	if notFound := itemDeletedOnCreate(err); notFound != nil {
+		return nil, notFound
 	}
 	if err != nil {
 		return nil, err
@@ -167,12 +179,23 @@ func (h *DamageScenario) Replace(ctx context.Context, in *ReplaceDamageScenarioI
 	if err != nil {
 		return nil, err
 	}
-	d, err := h.store.ReplaceDamageScenario(ctx, db.ReplaceDamageScenarioParams{
-		ID:                           id,
-		ItemDefinitionID:             itemID,
-		Title:                        in.Body.Title,
-		FunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation,
-		RoadUserHarmDescription:      in.Body.RoadUserHarmDescription,
+	var d db.DamageScenario
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetDamageScenarioForUpdate(ctx, db.GetDamageScenarioForUpdateParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		d, err = h.store.ReplaceDamageScenario(ctx, db.ReplaceDamageScenarioParams{
+			ID:                           id,
+			ItemDefinitionID:             itemID,
+			Title:                        in.Body.Title,
+			FunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation,
+			RoadUserHarmDescription:      in.Body.RoadUserHarmDescription,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(before), toDamageScenarioBody(d)), nil
 	})
 	if err != nil {
 		return nil, mapDamageScenarioError(err)
@@ -185,14 +208,25 @@ func (h *DamageScenario) Update(ctx context.Context, in *UpdateDamageScenarioInp
 	if err != nil {
 		return nil, err
 	}
-	d, err := h.store.UpdateDamageScenario(ctx, db.UpdateDamageScenarioParams{
-		ID:                              id,
-		ItemDefinitionID:                itemID,
-		Title:                           in.Body.Title,
-		SetFunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation.Set,
-		FunctionalityAdverseRelation:    in.Body.FunctionalityAdverseRelation.Value,
-		SetRoadUserHarmDescription:      in.Body.RoadUserHarmDescription.Set,
-		RoadUserHarmDescription:         in.Body.RoadUserHarmDescription.Value,
+	var d db.DamageScenario
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetDamageScenarioForUpdate(ctx, db.GetDamageScenarioForUpdateParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		d, err = h.store.UpdateDamageScenario(ctx, db.UpdateDamageScenarioParams{
+			ID:                              id,
+			ItemDefinitionID:                itemID,
+			Title:                           in.Body.Title,
+			SetFunctionalityAdverseRelation: in.Body.FunctionalityAdverseRelation.Set,
+			FunctionalityAdverseRelation:    in.Body.FunctionalityAdverseRelation.Value,
+			SetRoadUserHarmDescription:      in.Body.RoadUserHarmDescription.Set,
+			RoadUserHarmDescription:         in.Body.RoadUserHarmDescription.Value,
+		})
+		if err != nil {
+			return db.Change{}, err
+		}
+		return db.Updated(db.TargetDamageScenario, projectIDFromContext(ctx), d.ID, toDamageScenarioBody(before), toDamageScenarioBody(d)), nil
 	})
 	if err != nil {
 		return nil, mapDamageScenarioError(err)
@@ -205,12 +239,22 @@ func (h *DamageScenario) Delete(ctx context.Context, in *DamageScenarioIDInput) 
 	if err != nil {
 		return nil, err
 	}
-	n, err := h.store.DeleteDamageScenario(ctx, db.DeleteDamageScenarioParams{ID: id, ItemDefinitionID: itemID})
+	err = audit(ctx, h.store, func(ctx context.Context) (db.Change, error) {
+		before, err := h.store.GetDamageScenarioForDelete(ctx, db.GetDamageScenarioForDeleteParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		n, err := h.store.DeleteDamageScenario(ctx, db.DeleteDamageScenarioParams{ID: id, ItemDefinitionID: itemID})
+		if err != nil {
+			return db.Change{}, err
+		}
+		if n == 0 {
+			return db.Change{}, pgx.ErrNoRows
+		}
+		return db.Deleted(db.TargetDamageScenario, projectIDFromContext(ctx), before.ID, toDamageScenarioBody(before)), nil
+	})
 	if err != nil {
 		return nil, mapDamageScenarioError(err)
-	}
-	if n == 0 {
-		return nil, huma.Error404NotFound("damage scenario not found")
 	}
 	return nil, nil
 }
@@ -233,6 +277,7 @@ func mapDamageScenarioError(err error) error {
 func toDamageScenarioBody(d db.DamageScenario) DamageScenarioBody {
 	return DamageScenarioBody{
 		ID:                           d.ID.String(),
+		DisplayID:                    displayID(displayPrefixDamageScenario, d.DisplayNumber),
 		ItemDefinitionID:             d.ItemDefinitionID.String(),
 		Title:                        d.Title,
 		FunctionalityAdverseRelation: d.FunctionalityAdverseRelation,
