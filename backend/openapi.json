@@ -1072,6 +1072,450 @@
         },
         "type": "object"
       },
+      "ProjectExportAsset": {
+        "additionalProperties": false,
+        "properties": {
+          "cybersecurity_properties": {
+            "items": {
+              "$ref": "#/components/schemas/AssetCybersecurityProperty"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "identification_source": {
+            "enum": [
+              "ITEM_DEF",
+              "IMPACT_RATING",
+              "THREAT_DERIVED",
+              "CATALOGUE",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "item_definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cybersecurity_properties",
+          "id",
+          "item_definition_id",
+          "name",
+          "description",
+          "identification_source"
+        ],
+        "type": "object"
+      },
+      "ProjectExportAttackPath": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_approach": {
+            "enum": [
+              "TOP_DOWN",
+              "BOTTOM_UP"
+            ],
+            "type": "string"
+          },
+          "attack_steps_and_weaknesses": {},
+          "feasibility_rating": {
+            "$ref": "#/components/schemas/AttackFeasibilityRatingBody"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_partial_early_stage": {
+            "type": "boolean"
+          },
+          "item_definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "item_definition_id",
+          "title",
+          "is_partial_early_stage"
+        ],
+        "type": "object"
+      },
+      "ProjectExportBody": {
+        "additionalProperties": false,
+        "properties": {
+          "exported_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "format_version": {
+            "examples": [
+              1
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectExportItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectExportInfo"
+          }
+        },
+        "required": [
+          "format_version",
+          "exported_at",
+          "project",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ProjectExportDamageScenario": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_property_links": {
+            "items": {
+              "$ref": "#/components/schemas/DamagePropertyLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "functionality_adverse_relation": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "impact_ratings": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactRatingBody"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "item_definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "road_user_harm_description": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "impact_ratings",
+          "asset_property_links",
+          "id",
+          "item_definition_id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "ProjectExportInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ProjectExportItem": {
+        "additionalProperties": false,
+        "properties": {
+          "architectural_design": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectExportAsset"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "attack_paths": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectExportAttackPath"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "boundary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "cybersecurity_specs_wp_10_01": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "damage_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectExportDamageScenario"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "functions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "item_definition_wp_09_01": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lifecycle_phase": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "operational_environment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope_type": {
+            "enum": [
+              "ITEM",
+              "COMPONENT"
+            ],
+            "type": "string"
+          },
+          "tara_project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "threat_scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectExportThreatScenario"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "assets",
+          "damage_scenarios",
+          "threat_scenarios",
+          "attack_paths",
+          "id",
+          "tara_project_id",
+          "created_at",
+          "name",
+          "scope_type"
+        ],
+        "type": "object"
+      },
+      "ProjectExportThreatScenario": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregated_attack_feasibility": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "VERY_LOW"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset_property_links": {
+            "items": {
+              "$ref": "#/components/schemas/ThreatPropertyLink"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "attack_path_links": {
+            "items": {
+              "$ref": "#/components/schemas/ThreatAttackPathLinkBody"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "cause_of_compromise": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "damage_scenario_links": {
+            "items": {
+              "$ref": "#/components/schemas/ThreatDamageLinkBody"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "elicitation_method": {
+            "enum": [
+              "GROUP_DISCUSSION",
+              "MALICIOUS_USE_CASE",
+              "EVITA",
+              "TVRA",
+              "PASTA",
+              "STRIDE",
+              "OTHER"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "item_definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "max_risk_score": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "risk_treatment_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/RiskTreatmentDecision"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "risk_values": {
+            "items": {
+              "$ref": "#/components/schemas/RiskValue"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "technical_notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_property_links",
+          "damage_scenario_links",
+          "attack_path_links",
+          "risk_values",
+          "risk_treatment_decisions",
+          "id",
+          "item_definition_id",
+          "title",
+          "cause_of_compromise",
+          "elicitation_method",
+          "technical_notes",
+          "aggregated_attack_feasibility",
+          "max_risk_score"
+        ],
+        "type": "object"
+      },
       "ProjectMember": {
         "additionalProperties": false,
         "properties": {
@@ -8487,6 +8931,93 @@
         "x-taramisu-permission": "manage"
       }
     },
+    "/api/v1/projects/{id}/export": {
+      "get": {
+        "description": "Returns the project with all item definitions and everything below them as one JSON document. Members and uploaded files are not included.",
+        "operationId": "export-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectExportBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export a TARA project",
+        "tags": [
+          "Project Export"
+        ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "read"
+      }
+    },
     "/api/v1/projects/{id}/members": {
       "get": {
         "description": "Any project role. Names and email addresses are omitted when Authentik is unavailable.",
@@ -11747,6 +12278,10 @@
     {
       "description": "Create, read, replace, update and delete TARA projects.",
       "name": "Tara Project"
+    },
+    {
+      "description": "Export a whole TARA project as one JSON document.",
+      "name": "Project Export"
     },
     {
       "description": "Give users and Authentik groups a role in a project.",

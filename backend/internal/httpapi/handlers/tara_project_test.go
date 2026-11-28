@@ -89,6 +89,11 @@ func (f *fakeProjects) GetTaraProject(context.Context, pgtype.UUID) (db.TaraProj
 	return f.project, nil
 }
 
+func (f *fakeProjects) ExportProject(ctx context.Context, id pgtype.UUID) (db.ProjectExport, error) {
+	p, err := f.GetTaraProject(ctx, id)
+	return db.ProjectExport{Project: p}, err
+}
+
 func (f *fakeProjects) ListTaraProjects(_ context.Context, a db.ListTaraProjectsParams) ([]db.ListTaraProjectsRow, error) {
 	f.listQuery = a
 	if !f.found {
