@@ -544,6 +544,7 @@ type Asset struct {
 	Name                 string
 	Description          *string
 	IdentificationSource *IdentificationSource
+	Version              int32
 }
 
 type AssetCybersecurityProperty struct {
@@ -551,6 +552,7 @@ type AssetCybersecurityProperty struct {
 	AssetID      pgtype.UUID
 	PropertyType CybersecurityPropertyType
 	Description  *string
+	Version      int32
 }
 
 type Attachment struct {
@@ -577,6 +579,7 @@ type AttackFeasibilityRating struct {
 	ApTotalScore          *int32
 	FeasibilityRating     *AttackFeasibility
 	Rationale             *string
+	Version               int32
 }
 
 type AttackPath struct {
@@ -588,6 +591,7 @@ type AttackPath struct {
 	AnalysisApproach         *AnalysisApproach
 	IsPartialEarlyStage      bool
 	AttackStepsAndWeaknesses []byte
+	Version                  int32
 }
 
 type AuditEvent struct {
@@ -611,6 +615,7 @@ type DamageScenario struct {
 	Title                        string
 	FunctionalityAdverseRelation *string
 	RoadUserHarmDescription      *string
+	Version                      int32
 }
 
 type DamageScenarioAssetProperty struct {
@@ -618,6 +623,7 @@ type DamageScenarioAssetProperty struct {
 	DamageScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
 	CompromiseMechanismNote      *string
+	Version                      int32
 }
 
 type DisplayIDCounter struct {
@@ -644,6 +650,7 @@ type ImpactRating struct {
 	IsOmittedByPm1507          bool
 	OmissionOrRatingRationale  *string
 	ReusedFromFunctionalSafety bool
+	Version                    int32
 }
 
 type ItemDefinition struct {
@@ -660,6 +667,7 @@ type ItemDefinition struct {
 	CybersecuritySpecsWp1001 *string
 	ArchitecturalDesign      *string
 	CreatedAt                pgtype.Timestamptz
+	Version                  int32
 }
 
 type ProjectRoleAssignment struct {
@@ -669,6 +677,7 @@ type ProjectRoleAssignment struct {
 	GroupID       pgtype.UUID
 	ProjectRole   ProjectRole
 	AssignedAt    pgtype.Timestamptz
+	Version       int32
 }
 
 type RiskTreatmentDecision struct {
@@ -678,6 +687,7 @@ type RiskTreatmentDecision struct {
 	TreatmentOption      RiskTreatmentOption
 	DecisionRationale    *string
 	IsCybersecurityClaim bool
+	Version              int32
 }
 
 type RiskValue struct {
@@ -686,6 +696,7 @@ type RiskValue struct {
 	ImpactRatingID      pgtype.UUID
 	RiskScore           int32
 	DeterminationMethod RiskDeterminationMethod
+	Version             int32
 }
 
 type ServiceStatus struct {
@@ -700,6 +711,7 @@ type TaraProject struct {
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	DeletedAt   pgtype.Timestamptz
+	Version     int32
 }
 
 type ThreatAttackPathLink struct {
@@ -725,10 +737,12 @@ type ThreatScenario struct {
 	TechnicalNotes              *string
 	AggregatedAttackFeasibility *AttackFeasibility
 	MaxRiskScore                *int32
+	Version                     int32
 }
 
 type ThreatScenarioAssetProperty struct {
 	ID                           pgtype.UUID
 	ThreatScenarioID             pgtype.UUID
 	AssetCybersecurityPropertyID pgtype.UUID
+	Version                      int32
 }

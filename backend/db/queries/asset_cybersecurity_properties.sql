@@ -25,7 +25,7 @@ ORDER BY p.id LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 -- A NULL description clears the stored text, including when PUT omits the optional field.
 -- name: ReplaceAssetCybersecurityProperty :one
 UPDATE asset_cybersecurity_property p
-SET property_type = sqlc.arg(property_type), description = sqlc.narg(description)
+SET version = p.version + 1, property_type = sqlc.arg(property_type), description = sqlc.narg(description)
 FROM asset a
 WHERE p.id = sqlc.arg(id) AND a.id = p.asset_id AND a.id = sqlc.arg(asset_id)
     AND a.item_definition_id = sqlc.arg(item_definition_id)
@@ -35,7 +35,7 @@ RETURNING p.*;
 -- The separate set_description flag distinguishes omission (preserve) from explicit NULL (clear).
 -- name: UpdateAssetCybersecurityProperty :one
 UPDATE asset_cybersecurity_property p
-SET property_type = COALESCE(sqlc.narg(property_type)::cybersecurity_property_type, p.property_type),
+SET version = p.version + 1, property_type = COALESCE(sqlc.narg(property_type)::cybersecurity_property_type, p.property_type),
     description = CASE WHEN sqlc.arg(set_description)::boolean THEN sqlc.narg(description)::text ELSE p.description END
 FROM asset a
 WHERE p.id = sqlc.arg(id) AND a.id = p.asset_id AND a.id = sqlc.arg(asset_id)

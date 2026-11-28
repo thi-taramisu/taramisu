@@ -141,6 +141,10 @@ project after `AUDIT_RETENTION_AFTER_DELETE` (default `8760h`, one year). In the
 Until the grace period ends, operators can restore a project with `cmd/restore-project`
 ([deployment guide](../deploy/README.md#restoring-a-deleted-project)).
 
+Changes of a record can send its version as `If-Match`; an outdated one is rejected with `412`. With `REQUIRE_IF_MATCH=true`
+(default `false`; in the Compose stack in `iam/.env`), a change without it is rejected with `428`
+([conflicting edits](../docs/internal/architecture/backend/backend-architecture.md#conflicting-edits)).
+
 ## Checks
 
 ```sh

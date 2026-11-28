@@ -250,12 +250,12 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	const added = db.EventMemberAdded
 	const del, res = db.EventProjectDeleted, db.EventProjectRestored
 
-	must(store.DeleteTaraProject(ctx, actor, restored))
+	must(store.DeleteTaraProject(ctx, actor, restored, nil))
 	must(store.RestoreTaraProject(ctx, actor, restored, "operator"))
 	// Deleted, restored, and deleted again: the retention period runs from the second deletion.
-	must(store.DeleteTaraProject(ctx, actor, deleted))
+	must(store.DeleteTaraProject(ctx, actor, deleted, nil))
 	must(store.RestoreTaraProject(ctx, actor, deleted, "operator"))
-	must(store.DeleteTaraProject(ctx, actor, deleted))
+	must(store.DeleteTaraProject(ctx, actor, deleted, nil))
 	var secondDeletion time.Time
 	must(tx.QueryRow(ctx, `SELECT max(occurred_at) FROM audit_event WHERE tara_project_id = $1 AND event = $2`, deleted, del).Scan(&secondDeletion))
 
@@ -265,7 +265,7 @@ func TestAuditRetentionPostgres(t *testing.T) {
 		if _, err := store.AddProjectMember(ctx, actor, db.AddProjectMemberParams{ProjectID: id, GroupExternalID: teamGroupID, Role: db.ProjectRoleEDITOR}); !errors.Is(err, db.ErrProjectNotFound) {
 			t.Fatalf("add member to project %s: %v, want ErrProjectNotFound", id, err)
 		}
-		if err := store.DeleteTaraProject(ctx, actor, id); !errors.Is(err, db.ErrProjectNotFound) {
+		if err := store.DeleteTaraProject(ctx, actor, id, nil); !errors.Is(err, db.ErrProjectNotFound) {
 			t.Fatalf("delete project %s: %v, want ErrProjectNotFound", id, err)
 		}
 	}
@@ -290,7 +290,7 @@ func TestAuditRetentionPostgres(t *testing.T) {
 	if err != nil || !slices.Contains(purged, deleted) || slices.Contains(purged, restored) || slices.Contains(purged, kept) {
 		t.Fatalf("purged projects = %v, %v, want %s but not the restored or the kept project", purged, err, deleted)
 	}
-	must(store.DeleteTaraProject(ctx, actor, marked))
+	must(store.DeleteTaraProject(ctx, actor, marked, nil))
 
 	// While another replica holds the cleanup lock, this one skips the cleanup. (Once this
 	// transaction has taken the lock itself, it keeps it until the test ends, so this comes first.)

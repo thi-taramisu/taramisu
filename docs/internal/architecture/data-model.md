@@ -268,6 +268,9 @@ erDiagram
   their dependent properties, links, ratings, risk values, and treatment decisions.
   Deleting a project sets `deleted_at` and hides the project; after a grace period the row is deleted, which cascades
   through its role assignments and items ([project roles](iam/project-roles.md#deleting-a-project)).
+* **Versions:** Every editable table has a `version` column that every update raises. A change can send the version it is based
+  on, so that it is rejected if the record has changed in the meantime
+  ([conflicting edits](backend/backend-architecture.md#conflicting-edits)).
 * **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
   externally by Authentik. Following strict separation of concerns, no redundant user-specific
   metadata (such as emails or display names) is stored in the application database; it stores only immutable external

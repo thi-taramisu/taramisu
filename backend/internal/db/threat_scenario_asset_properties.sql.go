@@ -19,7 +19,7 @@ JOIN asset a ON a.id = p.asset_id
 WHERE t.id = $1 AND p.id = $2
     AND t.item_definition_id = $3
     AND a.item_definition_id = $3
-RETURNING id, threat_scenario_id, asset_cybersecurity_property_id
+RETURNING id, threat_scenario_id, asset_cybersecurity_property_id, version
 `
 
 type CreateThreatScenarioAssetPropertyParams struct {
@@ -33,7 +33,12 @@ type CreateThreatScenarioAssetPropertyParams struct {
 func (q *Queries) CreateThreatScenarioAssetProperty(ctx context.Context, arg CreateThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, createThreatScenarioAssetProperty, arg.ThreatScenarioID, arg.AssetCybersecurityPropertyID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }
 
@@ -59,7 +64,7 @@ func (q *Queries) DeleteThreatScenarioAssetProperty(ctx context.Context, arg Del
 }
 
 const getThreatScenarioAssetProperty = `-- name: GetThreatScenarioAssetProperty :one
-SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -76,12 +81,17 @@ type GetThreatScenarioAssetPropertyParams struct {
 func (q *Queries) GetThreatScenarioAssetProperty(ctx context.Context, arg GetThreatScenarioAssetPropertyParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, getThreatScenarioAssetProperty, arg.ID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }
 
 const getThreatScenarioAssetPropertyForDelete = `-- name: GetThreatScenarioAssetPropertyForDelete :one
-SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -98,12 +108,17 @@ type GetThreatScenarioAssetPropertyForDeleteParams struct {
 func (q *Queries) GetThreatScenarioAssetPropertyForDelete(ctx context.Context, arg GetThreatScenarioAssetPropertyForDeleteParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, getThreatScenarioAssetPropertyForDelete, arg.ID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }
 
 const getThreatScenarioAssetPropertyForUpdate = `-- name: GetThreatScenarioAssetPropertyForUpdate :one
-SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -120,12 +135,17 @@ type GetThreatScenarioAssetPropertyForUpdateParams struct {
 func (q *Queries) GetThreatScenarioAssetPropertyForUpdate(ctx context.Context, arg GetThreatScenarioAssetPropertyForUpdateParams) (ThreatScenarioAssetProperty, error) {
 	row := q.db.QueryRow(ctx, getThreatScenarioAssetPropertyForUpdate, arg.ID, arg.ItemDefinitionID)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }
 
 const listThreatScenarioAssetProperties = `-- name: ListThreatScenarioAssetProperties :many
-SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id FROM threat_scenario_asset_property l
+SELECT l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version FROM threat_scenario_asset_property l
 JOIN threat_scenario t ON t.id = l.threat_scenario_id
 JOIN asset_cybersecurity_property p ON p.id = l.asset_cybersecurity_property_id
 JOIN asset a ON a.id = p.asset_id
@@ -150,7 +170,12 @@ func (q *Queries) ListThreatScenarioAssetProperties(ctx context.Context, arg Lis
 	var items []ThreatScenarioAssetProperty
 	for rows.Next() {
 		var i ThreatScenarioAssetProperty
-		if err := rows.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreatScenarioID,
+			&i.AssetCybersecurityPropertyID,
+			&i.Version,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -163,7 +188,7 @@ func (q *Queries) ListThreatScenarioAssetProperties(ctx context.Context, arg Lis
 
 const replaceThreatScenarioAssetProperty = `-- name: ReplaceThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
-SET threat_scenario_id = $1, asset_cybersecurity_property_id = $2
+SET version = l.version + 1, threat_scenario_id = $1, asset_cybersecurity_property_id = $2
 FROM threat_scenario old_t, asset_cybersecurity_property old_p
 JOIN asset old_a ON old_a.id = old_p.asset_id,
     threat_scenario t, asset_cybersecurity_property p
@@ -172,7 +197,7 @@ WHERE l.id = $3 AND old_t.id = l.threat_scenario_id AND old_p.id = l.asset_cyber
     AND old_t.item_definition_id = $4 AND old_a.item_definition_id = $4
     AND t.id = $1 AND p.id = $2
     AND t.item_definition_id = $4 AND a.item_definition_id = $4
-RETURNING l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id
+RETURNING l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version
 `
 
 type ReplaceThreatScenarioAssetPropertyParams struct {
@@ -192,13 +217,18 @@ func (q *Queries) ReplaceThreatScenarioAssetProperty(ctx context.Context, arg Re
 		arg.ItemDefinitionID,
 	)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }
 
 const updateThreatScenarioAssetProperty = `-- name: UpdateThreatScenarioAssetProperty :one
 UPDATE threat_scenario_asset_property l
-SET threat_scenario_id = COALESCE($1::uuid, l.threat_scenario_id),
+SET version = l.version + 1, threat_scenario_id = COALESCE($1::uuid, l.threat_scenario_id),
     asset_cybersecurity_property_id = COALESCE($2::uuid, l.asset_cybersecurity_property_id)
 FROM threat_scenario old_t, asset_cybersecurity_property old_p
 JOIN asset old_a ON old_a.id = old_p.asset_id,
@@ -209,7 +239,7 @@ WHERE l.id = $3 AND old_t.id = l.threat_scenario_id AND old_p.id = l.asset_cyber
     AND t.id = COALESCE($1::uuid, l.threat_scenario_id)
     AND p.id = COALESCE($2::uuid, l.asset_cybersecurity_property_id)
     AND t.item_definition_id = $4 AND a.item_definition_id = $4
-RETURNING l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id
+RETURNING l.id, l.threat_scenario_id, l.asset_cybersecurity_property_id, l.version
 `
 
 type UpdateThreatScenarioAssetPropertyParams struct {
@@ -229,6 +259,11 @@ func (q *Queries) UpdateThreatScenarioAssetProperty(ctx context.Context, arg Upd
 		arg.ItemDefinitionID,
 	)
 	var i ThreatScenarioAssetProperty
-	err := row.Scan(&i.ID, &i.ThreatScenarioID, &i.AssetCybersecurityPropertyID)
+	err := row.Scan(
+		&i.ID,
+		&i.ThreatScenarioID,
+		&i.AssetCybersecurityPropertyID,
+		&i.Version,
+	)
 	return i, err
 }

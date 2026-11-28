@@ -16,7 +16,7 @@ INSERT INTO asset_cybersecurity_property (asset_id, property_type, description)
 SELECT a.id, $1, $2
 FROM asset a
 WHERE a.id = $3 AND a.item_definition_id = $4
-RETURNING id, asset_id, property_type, description
+RETURNING id, asset_id, property_type, description, version
 `
 
 type CreateAssetCybersecurityPropertyParams struct {
@@ -41,6 +41,7 @@ func (q *Queries) CreateAssetCybersecurityProperty(ctx context.Context, arg Crea
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }
@@ -68,7 +69,7 @@ func (q *Queries) DeleteAssetCybersecurityProperty(ctx context.Context, arg Dele
 }
 
 const getAssetCybersecurityProperty = `-- name: GetAssetCybersecurityProperty :one
-SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+SELECT p.id, p.asset_id, p.property_type, p.description, p.version FROM asset_cybersecurity_property p
 JOIN asset a ON a.id = p.asset_id
 WHERE p.id = $1 AND a.id = $2
     AND a.item_definition_id = $3
@@ -89,12 +90,13 @@ func (q *Queries) GetAssetCybersecurityProperty(ctx context.Context, arg GetAsse
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAssetCybersecurityPropertyForDelete = `-- name: GetAssetCybersecurityPropertyForDelete :one
-SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+SELECT p.id, p.asset_id, p.property_type, p.description, p.version FROM asset_cybersecurity_property p
 JOIN asset a ON a.id = p.asset_id
 WHERE p.id = $1 AND a.id = $2
     AND a.item_definition_id = $3
@@ -115,12 +117,13 @@ func (q *Queries) GetAssetCybersecurityPropertyForDelete(ctx context.Context, ar
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getAssetCybersecurityPropertyForUpdate = `-- name: GetAssetCybersecurityPropertyForUpdate :one
-SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+SELECT p.id, p.asset_id, p.property_type, p.description, p.version FROM asset_cybersecurity_property p
 JOIN asset a ON a.id = p.asset_id
 WHERE p.id = $1 AND a.id = $2
     AND a.item_definition_id = $3
@@ -141,12 +144,13 @@ func (q *Queries) GetAssetCybersecurityPropertyForUpdate(ctx context.Context, ar
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listAssetCybersecurityProperties = `-- name: ListAssetCybersecurityProperties :many
-SELECT p.id, p.asset_id, p.property_type, p.description FROM asset_cybersecurity_property p
+SELECT p.id, p.asset_id, p.property_type, p.description, p.version FROM asset_cybersecurity_property p
 JOIN asset a ON a.id = p.asset_id
 WHERE a.id = $1 AND a.item_definition_id = $2
 ORDER BY p.id LIMIT $4 OFFSET $3
@@ -179,6 +183,7 @@ func (q *Queries) ListAssetCybersecurityProperties(ctx context.Context, arg List
 			&i.AssetID,
 			&i.PropertyType,
 			&i.Description,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -192,11 +197,11 @@ func (q *Queries) ListAssetCybersecurityProperties(ctx context.Context, arg List
 
 const replaceAssetCybersecurityProperty = `-- name: ReplaceAssetCybersecurityProperty :one
 UPDATE asset_cybersecurity_property p
-SET property_type = $1, description = $2
+SET version = p.version + 1, property_type = $1, description = $2
 FROM asset a
 WHERE p.id = $3 AND a.id = p.asset_id AND a.id = $4
     AND a.item_definition_id = $5
-RETURNING p.id, p.asset_id, p.property_type, p.description
+RETURNING p.id, p.asset_id, p.property_type, p.description, p.version
 `
 
 type ReplaceAssetCybersecurityPropertyParams struct {
@@ -223,18 +228,19 @@ func (q *Queries) ReplaceAssetCybersecurityProperty(ctx context.Context, arg Rep
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }
 
 const updateAssetCybersecurityProperty = `-- name: UpdateAssetCybersecurityProperty :one
 UPDATE asset_cybersecurity_property p
-SET property_type = COALESCE($1::cybersecurity_property_type, p.property_type),
+SET version = p.version + 1, property_type = COALESCE($1::cybersecurity_property_type, p.property_type),
     description = CASE WHEN $2::boolean THEN $3::text ELSE p.description END
 FROM asset a
 WHERE p.id = $4 AND a.id = p.asset_id AND a.id = $5
     AND a.item_definition_id = $6
-RETURNING p.id, p.asset_id, p.property_type, p.description
+RETURNING p.id, p.asset_id, p.property_type, p.description, p.version
 `
 
 type UpdateAssetCybersecurityPropertyParams struct {
@@ -263,6 +269,7 @@ func (q *Queries) UpdateAssetCybersecurityProperty(ctx context.Context, arg Upda
 		&i.AssetID,
 		&i.PropertyType,
 		&i.Description,
+		&i.Version,
 	)
 	return i, err
 }

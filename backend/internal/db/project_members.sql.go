@@ -85,7 +85,7 @@ func (q *Queries) DeleteProjectMember(ctx context.Context, arg DeleteProjectMemb
 }
 
 const getProjectMember = `-- name: GetProjectMember :one
-SELECT a.id, a.project_role, a.assigned_at, a.user_id, u.external_iam_sub, g.external_iam_group_id
+SELECT a.id, a.project_role, a.assigned_at, a.user_id, u.external_iam_sub, g.external_iam_group_id, a.version
 FROM project_role_assignment a
 LEFT JOIN iam_user u ON u.id = a.user_id
 LEFT JOIN iam_group g ON g.id = a.group_id
@@ -104,6 +104,7 @@ type GetProjectMemberRow struct {
 	UserID             pgtype.UUID
 	ExternalIamSub     *string
 	ExternalIamGroupID *string
+	Version            int32
 }
 
 func (q *Queries) GetProjectMember(ctx context.Context, arg GetProjectMemberParams) (GetProjectMemberRow, error) {
@@ -116,13 +117,32 @@ func (q *Queries) GetProjectMember(ctx context.Context, arg GetProjectMemberPara
 		&i.UserID,
 		&i.ExternalIamSub,
 		&i.ExternalIamGroupID,
+		&i.Version,
 	)
 	return i, err
 }
 
+const getProjectMemberVersionForUpdate = `-- name: GetProjectMemberVersionForUpdate :one
+SELECT version FROM project_role_assignment WHERE tara_project_id = $1 AND id = $2 FOR UPDATE
+`
+
+type GetProjectMemberVersionForUpdateParams struct {
+	ProjectID pgtype.UUID
+	ID        pgtype.UUID
+}
+
+// The version of a role assignment, locked until the transaction ends, so that a change can check
+// If-Match before it runs.
+func (q *Queries) GetProjectMemberVersionForUpdate(ctx context.Context, arg GetProjectMemberVersionForUpdateParams) (int32, error) {
+	row := q.db.QueryRow(ctx, getProjectMemberVersionForUpdate, arg.ProjectID, arg.ID)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
+}
+
 const listProjectMembers = `-- name: ListProjectMembers :many
 
-SELECT a.id, a.project_role, a.assigned_at, a.user_id, u.external_iam_sub, g.external_iam_group_id
+SELECT a.id, a.project_role, a.assigned_at, a.user_id, u.external_iam_sub, g.external_iam_group_id, a.version
 FROM project_role_assignment a
 LEFT JOIN iam_user u ON u.id = a.user_id
 LEFT JOIN iam_group g ON g.id = a.group_id
@@ -137,6 +157,7 @@ type ListProjectMembersRow struct {
 	UserID             pgtype.UUID
 	ExternalIamSub     *string
 	ExternalIamGroupID *string
+	Version            int32
 }
 
 // Project members: role assignments for users and Authentik groups.
@@ -156,6 +177,7 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID pgtype.UUID)
 			&i.UserID,
 			&i.ExternalIamSub,
 			&i.ExternalIamGroupID,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -224,14 +246,14 @@ func (q *Queries) LockTaraProject(ctx context.Context, id pgtype.UUID) (pgtype.U
 
 const updateProjectMemberRole = `-- name: UpdateProjectMemberRole :one
 UPDATE project_role_assignment a
-SET project_role = $1
+SET version = a.version + 1, project_role = $1
 FROM project_role_assignment previous
 WHERE previous.id = a.id AND a.tara_project_id = $2 AND a.id = $3
   AND ($1::project_role = 'OWNER' OR a.user_id IS NULL OR a.project_role <> 'OWNER' OR EXISTS (
       SELECT 1 FROM project_role_assignment o
       WHERE o.tara_project_id = a.tara_project_id AND o.id <> a.id
         AND o.user_id IS NOT NULL AND o.project_role = 'OWNER'))
-RETURNING a.id, previous.project_role AS previous_role, a.user_id, a.group_id
+RETURNING a.id, previous.project_role AS previous_role, a.user_id, a.group_id, a.version
 `
 
 type UpdateProjectMemberRoleParams struct {
@@ -245,6 +267,7 @@ type UpdateProjectMemberRoleRow struct {
 	PreviousRole ProjectRole
 	UserID       pgtype.UUID
 	GroupID      pgtype.UUID
+	Version      int32
 }
 
 // Change a role unless that would remove the last user Owner. Group Owners do not count,
@@ -259,6 +282,7 @@ func (q *Queries) UpdateProjectMemberRole(ctx context.Context, arg UpdateProject
 		&i.PreviousRole,
 		&i.UserID,
 		&i.GroupID,
+		&i.Version,
 	)
 	return i, err
 }

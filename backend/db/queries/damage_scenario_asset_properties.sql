@@ -34,7 +34,7 @@ ORDER BY l.id LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 -- Both sets must belong to the requested item, so replacement cannot move an out-of-scope link.
 -- name: ReplaceDamageScenarioAssetProperty :one
 UPDATE damage_scenario_asset_property l
-SET damage_scenario_id = sqlc.arg(damage_scenario_id),
+SET version = l.version + 1, damage_scenario_id = sqlc.arg(damage_scenario_id),
     asset_cybersecurity_property_id = sqlc.arg(asset_cybersecurity_property_id),
     compromise_mechanism_note = sqlc.narg(compromise_mechanism_note)
 FROM damage_scenario old_d, asset_cybersecurity_property old_p
@@ -52,7 +52,7 @@ RETURNING l.*;
 -- references against the requested item before changing the link.
 -- name: UpdateDamageScenarioAssetProperty :one
 UPDATE damage_scenario_asset_property l
-SET damage_scenario_id = COALESCE(sqlc.narg(damage_scenario_id)::uuid, l.damage_scenario_id),
+SET version = l.version + 1, damage_scenario_id = COALESCE(sqlc.narg(damage_scenario_id)::uuid, l.damage_scenario_id),
     asset_cybersecurity_property_id = COALESCE(sqlc.narg(asset_cybersecurity_property_id)::uuid, l.asset_cybersecurity_property_id),
     compromise_mechanism_note = CASE WHEN sqlc.arg(set_compromise_mechanism_note)::boolean
         THEN sqlc.narg(compromise_mechanism_note)::text ELSE l.compromise_mechanism_note END

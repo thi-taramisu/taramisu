@@ -77,7 +77,7 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	defer func() { _ = first.Rollback(ctx) }()
 	if _, err := db.NewStore(first).UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{
 		ProjectID: project.ID, ID: aliceOwner, Role: db.ProjectRoleVIEWER,
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatalf("first downgrade: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	go func() {
 		_, err := store.UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{
 			ProjectID: project.ID, ID: bobOwner, Role: db.ProjectRoleVIEWER,
-		})
+		}, nil)
 		second <- err
 	}()
 	select {
@@ -114,7 +114,7 @@ func TestLastOwnerLockPostgres(t *testing.T) {
 	}
 
 	// The same lock protects removal.
-	if _, err := store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: project.ID, ID: bobOwner}); !errors.Is(err, pgx.ErrNoRows) {
+	if _, err := store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: project.ID, ID: bobOwner}, nil); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("remove last Owner: %v, want pgx.ErrNoRows", err)
 	}
 }

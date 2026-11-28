@@ -26,13 +26,13 @@ LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ReplaceDamageScenario :one
 UPDATE damage_scenario
-SET title = $3, functionality_adverse_relation = $4, road_user_harm_description = $5
+SET version = damage_scenario.version + 1, title = $3, functionality_adverse_relation = $4, road_user_harm_description = $5
 WHERE id = $1 AND item_definition_id = $2
 RETURNING *;
 
 -- name: UpdateDamageScenario :one
 UPDATE damage_scenario
-SET title = COALESCE(sqlc.narg('title'), title),
+SET version = damage_scenario.version + 1, title = COALESCE(sqlc.narg('title'), title),
     functionality_adverse_relation = CASE WHEN sqlc.arg('set_functionality_adverse_relation')::boolean THEN sqlc.narg('functionality_adverse_relation')::text ELSE functionality_adverse_relation END,
     road_user_harm_description = CASE WHEN sqlc.arg('set_road_user_harm_description')::boolean THEN sqlc.narg('road_user_harm_description')::text ELSE road_user_harm_description END
 WHERE id = @id AND item_definition_id = @item_definition_id

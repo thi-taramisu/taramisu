@@ -55,6 +55,43 @@ The API depends on an abstraction (`Store`), not directly on the database. Produ
 
 A missing `Register` call in step 3 compiles, but the routes return `404`. A route test through `httpapi.New` catches it.
 
+## Conflicting edits
+
+A change based on an outdated state is rejected instead of silently overwriting someone else's change. Why Taramisu uses
+optimistic concurrency control with HTTP preconditions instead of edit locks is recorded in
+[ADR 0006](../../adr/0006-conflicting-edits.md); this section describes the contract and how handlers implement it.
+
+- **Version.** Every editable table has a `version` column. Every update raises it (`version = <table or alias>.version + 1`); deletes
+  and cascades do not need to. `TestEveryUpdateRaisesTheVersion` checks the queries, because Atlas manages triggers only in
+  its paid edition. Tables without fields to overwrite (links) and tables that are never edited are listed as exceptions in
+  that test.
+- **Responses.** Records return their version as the `version` field, so that lists carry it too, and single records also as
+  the `ETag` header, for example `"3"`.
+- **Requests.** `PUT`, `PATCH`, and `DELETE` send the version they are based on as `If-Match: "3"`. If the record has changed
+  in the meantime, the API answers `412 Precondition Failed` with the current `ETag`, changes nothing, and records no audit
+  event. `*` matches any version. A missing record is still `404`.
+- **Proxies.** `If-Match` uses the strong comparison (RFC 9110), so a weak tag such as `W/"3"` never matches. nginx turns
+  the `ETag` into a weak one when it compresses a response, so the proxy must not enable gzip for `/api/`. Clients that build
+  `If-Match` from the `version` field are not affected.
+- **Saving without a change** keeps the version: `Store.Audit` rolls back a change that records no event, so others who read
+  the record before can still save. The handler then returns the record as it was before the change, because the record that
+  the update returned carries a version that was never committed.
+- **Scope.** The version covers the record's own fields, not the lists of records below it. Creating a record needs no
+  version.
+- **Required header.** With `REQUIRE_IF_MATCH=true`, a change of a versioned record without `If-Match` is rejected with
+  `428 Precondition Required`, after the access check and before the input is validated. The default is `false`, so that the
+  current frontend, which does not send the header yet, can still save; turn it on once every client sends it. Creating a
+  record, changing links, and deleting attachments never need the header.
+- **Current state.** All editable tables have the column and every update raises it, but only project settings, project
+  deletion, members, and item definitions return the version and check `If-Match` so far. `notVersionedYet` in
+  `TestEveryChangeIsDeclaredForVersions` lists the operations that follow.
+
+In a handler, embed `IfMatch` in the input of the operation and call `check` with the version of the record that the change
+has locked (`FOR UPDATE` or `FOR NO KEY UPDATE`) inside `Audit`. The row stays locked until the commit, so no other change can
+come in between the check and the write. Store methods that lock the record themselves take a `db.VersionCheck` instead.
+`TestEveryChangeIsDeclaredForVersions` lists every `PUT`, `PATCH`, and `DELETE` as versioned, not versioned yet, or
+unversioned; a new operation must be added to one of the lists.
+
 ## Testing Routes
 
 Route tests send real HTTP requests through `httpapi.New`, so the router, the authentication middleware and the handler are all exercised

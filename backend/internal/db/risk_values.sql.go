@@ -20,7 +20,7 @@ WHERE EXISTS (
     JOIN threat_scenario t ON t.item_definition_id = d.item_definition_id
     WHERE t.id = $1
       AND ir.id = $2)
-RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method
+RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version
 `
 
 type CreateRiskValueParams struct {
@@ -44,6 +44,7 @@ func (q *Queries) CreateRiskValue(ctx context.Context, arg CreateRiskValueParams
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ func (q *Queries) DeleteRiskValue(ctx context.Context, arg DeleteRiskValueParams
 }
 
 const getRiskValue = `-- name: GetRiskValue :one
-SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version FROM risk_value
 WHERE risk_value.threat_scenario_id = $1
   AND risk_value.id = $2
 `
@@ -86,12 +87,13 @@ func (q *Queries) GetRiskValue(ctx context.Context, arg GetRiskValueParams) (Ris
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getRiskValueForDelete = `-- name: GetRiskValueForDelete :one
-SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version FROM risk_value
 WHERE risk_value.threat_scenario_id = $1
   AND risk_value.id = $2
 FOR UPDATE
@@ -111,12 +113,13 @@ func (q *Queries) GetRiskValueForDelete(ctx context.Context, arg GetRiskValueFor
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }
 
 const getRiskValueForUpdate = `-- name: GetRiskValueForUpdate :one
-SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version FROM risk_value
 WHERE risk_value.threat_scenario_id = $1
   AND risk_value.id = $2
 FOR NO KEY UPDATE
@@ -136,12 +139,13 @@ func (q *Queries) GetRiskValueForUpdate(ctx context.Context, arg GetRiskValueFor
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }
 
 const listRiskValues = `-- name: ListRiskValues :many
-SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method FROM risk_value
+SELECT id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version FROM risk_value
 WHERE risk_value.threat_scenario_id = $1
 ORDER BY id LIMIT $3 OFFSET $2
 `
@@ -167,6 +171,7 @@ func (q *Queries) ListRiskValues(ctx context.Context, arg ListRiskValuesParams) 
 			&i.ImpactRatingID,
 			&i.RiskScore,
 			&i.DeterminationMethod,
+			&i.Version,
 		); err != nil {
 			return nil, err
 		}
@@ -180,7 +185,7 @@ func (q *Queries) ListRiskValues(ctx context.Context, arg ListRiskValuesParams) 
 
 const patchRiskValue = `-- name: PatchRiskValue :one
 UPDATE risk_value
-SET impact_rating_id = COALESCE($1::uuid, risk_value.impact_rating_id),
+SET version = risk_value.version + 1, impact_rating_id = COALESCE($1::uuid, risk_value.impact_rating_id),
     risk_score = COALESCE($2::integer, risk_score),
     determination_method = COALESCE($3::risk_determination_method, determination_method)
 WHERE risk_value.threat_scenario_id = $4
@@ -190,7 +195,7 @@ WHERE risk_value.threat_scenario_id = $4
     JOIN threat_scenario t ON t.item_definition_id = d.item_definition_id
     WHERE t.id = $4
       AND ir.id = COALESCE($1::uuid, risk_value.impact_rating_id))
-RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method
+RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version
 `
 
 type PatchRiskValueParams struct {
@@ -216,13 +221,14 @@ func (q *Queries) PatchRiskValue(ctx context.Context, arg PatchRiskValueParams) 
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }
 
 const replaceRiskValue = `-- name: ReplaceRiskValue :one
 UPDATE risk_value
-SET impact_rating_id = $1,
+SET version = risk_value.version + 1, impact_rating_id = $1,
     risk_score = $2,
     determination_method = $3
 WHERE risk_value.threat_scenario_id = $4
@@ -232,7 +238,7 @@ WHERE risk_value.threat_scenario_id = $4
     JOIN threat_scenario t ON t.item_definition_id = d.item_definition_id
     WHERE t.id = $4
       AND ir.id = $1)
-RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method
+RETURNING id, threat_scenario_id, impact_rating_id, risk_score, determination_method, version
 `
 
 type ReplaceRiskValueParams struct {
@@ -258,6 +264,7 @@ func (q *Queries) ReplaceRiskValue(ctx context.Context, arg ReplaceRiskValuePara
 		&i.ImpactRatingID,
 		&i.RiskScore,
 		&i.DeterminationMethod,
+		&i.Version,
 	)
 	return i, err
 }

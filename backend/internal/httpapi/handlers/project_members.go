@@ -34,8 +34,8 @@ type ProjectMemberStore interface {
 	GetProjectMember(context.Context, db.GetProjectMemberParams) (db.GetProjectMemberRow, error)
 	// The changes below also record their audit event (see db.Store).
 	AddProjectMember(context.Context, db.Actor, db.AddProjectMemberParams) (pgtype.UUID, error)
-	UpdateProjectMemberRole(context.Context, db.Actor, db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error)
-	DeleteProjectMember(context.Context, db.Actor, db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error)
+	UpdateProjectMemberRole(context.Context, db.Actor, db.UpdateProjectMemberRoleParams, db.VersionCheck) (db.UpdateProjectMemberRoleRow, error)
+	DeleteProjectMember(context.Context, db.Actor, db.DeleteProjectMemberParams, db.VersionCheck) (db.DeleteProjectMemberRow, error)
 }
 
 // ProjectMembers manages project role assignments for users and Authentik groups.
@@ -98,14 +98,17 @@ type ProjectMember struct {
 	Email      *string        `json:"email,omitempty"`
 	Role       db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 	AssignedAt time.Time      `json:"assigned_at"`
+	Version    int32          `json:"version" doc:"Raised by every role change; send it as If-Match to change or remove the member."`
 }
 
 type ProjectMemberOutput struct {
+	ETag string `header:"ETag"`
 	Body ProjectMember
 }
 
 type CreateProjectMemberOutput struct {
 	Location string `header:"Location"`
+	ETag     string `header:"ETag"`
 	Body     ProjectMember
 }
 
@@ -129,6 +132,7 @@ type CreateProjectMemberInput struct {
 
 type UpdateProjectMemberInput struct {
 	ProjectMemberPath
+	IfMatch
 	Body struct {
 		Role db.ProjectRole `json:"role" enum:"VIEWER,EDITOR,OWNER"`
 	}
@@ -188,6 +192,7 @@ func (h *ProjectMembers) Create(ctx context.Context, in *CreateProjectMemberInpu
 	}
 	return &CreateProjectMemberOutput{
 		Location: "/api/v1/projects/" + projectID.String() + "/members/" + member.ID,
+		ETag:     etag(member.Version),
 		Body:     member,
 	}, nil
 }
@@ -231,7 +236,7 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 	if err != nil {
 		return nil, err
 	}
-	_, err = h.store.UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role})
+	_, err = h.store.UpdateProjectMemberRole(ctx, actor, db.UpdateProjectMemberRoleParams{ProjectID: projectID, ID: memberID, Role: in.Body.Role}, in.check)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No row is updated if the member does not exist or is the last user Owner.
 		if _, getErr := h.get(ctx, projectID, memberID); getErr != nil {
@@ -246,10 +251,15 @@ func (h *ProjectMembers) Update(ctx context.Context, in *UpdateProjectMemberInpu
 	if err != nil {
 		return nil, err
 	}
-	return &ProjectMemberOutput{Body: member}, nil
+	return &ProjectMemberOutput{ETag: etag(member.Version), Body: member}, nil
 }
 
-func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*struct{}, error) {
+type DeleteProjectMemberInput struct {
+	ProjectMemberPath
+	IfMatch
+}
+
+func (h *ProjectMembers) Delete(ctx context.Context, in *DeleteProjectMemberInput) (*struct{}, error) {
 	projectID := projectIDFromContext(ctx)
 	memberID, err := parseUUID(in.MemberID)
 	if err != nil {
@@ -269,7 +279,7 @@ func (h *ProjectMembers) Delete(ctx context.Context, in *ProjectMemberPath) (*st
 		logDenied(ctx, opRemoveProjectMember, err)
 		return nil, err
 	}
-	_, err = h.store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID})
+	_, err = h.store.DeleteProjectMember(ctx, actor, db.DeleteProjectMemberParams{ProjectID: projectID, ID: memberID}, in.check)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No row is deleted if the member was removed in the meantime or is the last user Owner.
 		if _, getErr := h.store.GetProjectMember(ctx, db.GetProjectMemberParams{ProjectID: projectID, ID: memberID}); getErr != nil {
@@ -339,7 +349,7 @@ func (h *ProjectMembers) newNameResolver() *nameResolver {
 // memberIdentity converts a row without display names.
 func memberIdentity(row db.GetProjectMemberRow) ProjectMember {
 	m := ProjectMember{ID: row.ID.String(), Role: row.ProjectRole, AssignedAt: row.AssignedAt.Time, Type: "group",
-		GroupID: row.ExternalIamGroupID}
+		GroupID: row.ExternalIamGroupID, Version: row.Version}
 	if row.UserID.Valid {
 		userID := row.UserID.String()
 		m.Type, m.UserID, m.GroupID = "user", &userID, nil

@@ -34,6 +34,7 @@ RETURNING *;
 
 -- name: ReplaceItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = sqlc.arg(name), scope_type = sqlc.arg(scope_type),
     lifecycle_phase = sqlc.narg(lifecycle_phase),
     boundary = sqlc.narg(boundary),
@@ -47,6 +48,7 @@ RETURNING *;
 
 -- name: PatchItemDefinition :one
 UPDATE item_definition SET
+    version = item_definition.version + 1,
     name = COALESCE(sqlc.narg(name)::text, name),
     scope_type = COALESCE(sqlc.narg(scope_type)::scope_type, scope_type),
     boundary = CASE WHEN sqlc.arg(set_boundary)::boolean THEN sqlc.narg(boundary)::text ELSE boundary END,

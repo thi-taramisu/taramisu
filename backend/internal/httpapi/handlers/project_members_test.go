@@ -131,7 +131,7 @@ func (f *fakeMembers) protectsLastOwner(i int) bool {
 	return true
 }
 
-func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, actor db.Actor, a db.UpdateProjectMemberRoleParams) (db.UpdateProjectMemberRoleRow, error) {
+func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, actor db.Actor, a db.UpdateProjectMemberRoleParams, _ db.VersionCheck) (db.UpdateProjectMemberRoleRow, error) {
 	f.actors = append(f.actors, actor)
 	i := f.find(a.ID)
 	if i < 0 || (a.Role != db.ProjectRoleOWNER && f.protectsLastOwner(i)) {
@@ -142,7 +142,7 @@ func (f *fakeMembers) UpdateProjectMemberRole(_ context.Context, actor db.Actor,
 	return db.UpdateProjectMemberRoleRow{ID: a.ID, PreviousRole: previous}, nil
 }
 
-func (f *fakeMembers) DeleteProjectMember(_ context.Context, actor db.Actor, a db.DeleteProjectMemberParams) (db.DeleteProjectMemberRow, error) {
+func (f *fakeMembers) DeleteProjectMember(_ context.Context, actor db.Actor, a db.DeleteProjectMemberParams, _ db.VersionCheck) (db.DeleteProjectMemberRow, error) {
 	f.actors = append(f.actors, actor)
 	i := f.find(a.ID)
 	if i < 0 || f.protectsLastOwner(i) {

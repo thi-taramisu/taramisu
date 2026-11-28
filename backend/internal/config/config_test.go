@@ -22,6 +22,7 @@ func clearOIDCEnv(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("AUDIT_RETENTION_AFTER_DELETE", "")
 	t.Setenv("PROJECT_DELETE_GRACE_PERIOD", "")
+	t.Setenv("REQUIRE_IF_MATCH", "")
 }
 
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
@@ -381,6 +382,33 @@ func TestLoadRetentionPeriods(t *testing.T) {
 					t.Errorf("%s = %v, want %v", period.name, got, tt.want)
 				}
 			})
+		}
+	}
+}
+
+func TestLoadRequireIfMatch(t *testing.T) {
+	for _, tt := range []struct {
+		raw       string
+		want      bool
+		wantError bool
+	}{
+		{raw: "", want: false},
+		{raw: "true", want: true},
+		{raw: "false", want: false},
+		{raw: "yes", wantError: true},
+	} {
+		clearOIDCEnv(t)
+		t.Setenv("DATABASE_URL", "postgres://user@localhost:5432/taramisu")
+		t.Setenv("REQUIRE_IF_MATCH", tt.raw)
+		cfg, err := Load()
+		if tt.wantError {
+			if err == nil || !strings.Contains(err.Error(), "REQUIRE_IF_MATCH") {
+				t.Errorf("REQUIRE_IF_MATCH=%q: error = %v, want one naming the variable", tt.raw, err)
+			}
+			continue
+		}
+		if err != nil || cfg.RequireIfMatch != tt.want {
+			t.Errorf("REQUIRE_IF_MATCH=%q: RequireIfMatch = %v, %v; want %v", tt.raw, cfg.RequireIfMatch, err, tt.want)
 		}
 	}
 }

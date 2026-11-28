@@ -30,6 +30,8 @@ type Config struct {
 	LogLevel                  slog.Level
 	AuditRetentionAfterDelete time.Duration
 	ProjectDeleteGracePeriod  time.Duration
+	// RequireIfMatch rejects a PUT, PATCH, or DELETE on a versioned record without If-Match with 428.
+	RequireIfMatch bool
 }
 
 // S3Config holds S3 settings.
@@ -120,6 +122,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	// Off until every client sends If-Match, so that the current frontend can still save (#241).
+	requireIfMatch := false
+	if raw := os.Getenv("REQUIRE_IF_MATCH"); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid REQUIRE_IF_MATCH: must be a boolean such as true or false: %q", raw)
+		}
+		requireIfMatch = parsed
+	}
+
 	logLevel := slog.LevelInfo
 	if raw := os.Getenv("LOG_LEVEL"); raw != "" {
 		if err := logLevel.UnmarshalText([]byte(raw)); err != nil {
@@ -141,6 +153,7 @@ func Load() (Config, error) {
 		LogLevel:                  logLevel,
 		AuditRetentionAfterDelete: auditRetentionAfterDelete,
 		ProjectDeleteGracePeriod:  projectDeleteGracePeriod,
+		RequireIfMatch:            requireIfMatch,
 	}, nil
 }
 

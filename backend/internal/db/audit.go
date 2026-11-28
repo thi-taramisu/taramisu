@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"reflect"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -67,14 +68,42 @@ func Created(targetType string, projectID, id pgtype.UUID, after any) Change {
 }
 
 // Updated describes a changed record, or returns a zero Change if before and after are stored as the
-// same JSON.
+// same JSON apart from their version. Audit rolls a zero Change back, so a handler that returns the
+// record must then return before, not after: after carries a version that was never committed.
 func Updated(targetType string, projectID, id pgtype.UUID, before, after any) Change {
-	b, errBefore := json.Marshal(before)
-	a, errAfter := json.Marshal(after)
-	if errBefore == nil && errAfter == nil && bytes.Equal(b, a) {
+	if sameExceptVersion(before, after) {
 		return Change{}
 	}
 	return Change{Event: targetType + ".updated", ProjectID: projectID, TargetType: targetType, TargetID: id, Before: before, After: after}
+}
+
+// sameExceptVersion tells whether two records are equal apart from their record version, the int32
+// field named Version. Every update raises it, also one that changes nothing else, and that alone is
+// not a change to record. Other fields, even if their JSON name is "version", are compared.
+func sameExceptVersion(before, after any) bool {
+	b, errBefore := json.Marshal(withoutVersion(before))
+	a, errAfter := json.Marshal(withoutVersion(after))
+	return errBefore == nil && errAfter == nil && bytes.Equal(b, a)
+}
+
+// withoutVersion returns a copy of a struct (or of the struct a pointer points to) with its Version
+// field set to zero; other values are returned as they are.
+func withoutVersion(record any) any {
+	v := reflect.ValueOf(record)
+	if v.Kind() == reflect.Pointer && !v.IsNil() {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return record
+	}
+	field, ok := v.Type().FieldByName("Version")
+	if !ok || field.Type.Kind() != reflect.Int32 || len(field.Index) != 1 {
+		return record
+	}
+	copied := reflect.New(v.Type()).Elem()
+	copied.Set(v)
+	copied.Field(field.Index[0]).SetInt(0)
+	return copied.Interface()
 }
 
 // Deleted describes a deleted record; before is the record as the API returned it.
