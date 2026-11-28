@@ -241,6 +241,26 @@ Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings fro
 > Bind mounts such as the proxy's `nginx.conf` point to the checkout that last recreated the container;
 > run `make -C deploy up` from your main checkout when you finish in a worktree.
 
+## Restoring a deleted project
+
+Deleting a project in the application only hides it; the API deletes it for good after `PROJECT_DELETE_GRACE_PERIOD`
+(default 30 days, set in `iam/.env`). Until the API has done that, which it does at start and once a day, an operator can
+restore the project with its content and members. The command is part of the API image since this feature. Run from the
+repository root; on the VM that is `/opt/taramisu`, as root with `sudo -u taramisu` in front, because only the `taramisu`
+user may use Docker there:
+
+```bash
+docker compose --env-file iam/.env -f deploy/compose.yaml run --rm --no-deps --entrypoint /restore-project api \
+  -project <project id> -actor <user id> -operator <your name>
+```
+
+- Deleted projects that can still be restored: `SELECT id, name, deleted_at FROM tara_project WHERE deleted_at IS NOT NULL;`
+- The actor is the `iam_user.id` recorded for the `project.restored` event, for example the Owner who asked for the
+  restore: `actor_user_id` of the project's latest `project.deleted` event in `audit_event`
+  ([Audit and logging](../docs/internal/architecture/audit.md#who-may-read-the-history)).
+- The operator is your own name or user name (letters, digits, `.`, `_`, `@`, `-`). The event records it, because the
+  actor alone does not show who ran the restore.
+
 ## Database password mismatch
 
 `POSTGRES_PASSWORD` initializes a new database; changing `PG_PASS` in `iam/.env` does not update a password stored in an existing volume.

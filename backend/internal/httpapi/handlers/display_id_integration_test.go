@@ -346,12 +346,13 @@ func TestDisplayIDsConcurrentPostgres(t *testing.T) {
 	wantNumbers("asset")
 }
 
-// TestDisplayIDsProjectDeletePostgres runs a creation while a project deletion holds the project lock.
-// The deletion then removes the project's counters. An item creation locks the project before its
-// counter, so it waits for the deletion instead of deadlocking with it. An element creation takes no
-// project lock, and its item keeps the project from being deleted. If the counter row exists, the
-// creation does not wait; the first one of its type waits through the new counter row's foreign key,
-// but cannot deadlock, because the deletion does not see that row.
+// TestDisplayIDsProjectDeletePostgres runs a creation while the purge of a deleted project holds the
+// project lock. The purge then removes the project with its content and counters (ON DELETE CASCADE).
+// An item creation locks the project before its counter, so it waits for the purge instead of
+// deadlocking with it. An element creation takes no project lock. If the counter row exists, the
+// creation does not wait, and the purge deletes the new element with its item; the first one of its
+// type waits through the new counter row's foreign key, but cannot deadlock, because the purge does
+// not see that row.
 func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 	ctx, pool, store, _, owner := committedDB(t)
 	createAsset := func(q *db.Queries, itemID string) error {
@@ -364,8 +365,8 @@ func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 		seed   func(projectID string) string
 		create func(q *db.Queries, arg string) error
 		waits  bool // whether the creation waits for the deletion
-		// Errors expected to contain these texts; empty for none.
-		wantDeleteErr, wantCreateErr string
+		// Error of the creation expected to contain this text; empty for none. The deletion always succeeds.
+		wantCreateErr string
 	}{
 		{
 			name: "item in a project without items",
@@ -390,8 +391,7 @@ func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 				seedAsset(t, ctx, pool, itemID, "Existing") // creates the asset counter row
 				return itemID
 			},
-			create:        createAsset,
-			wantDeleteErr: "23503", // item_definition still references the project
+			create: createAsset,
 		},
 		{
 			name: "first asset of the project",
@@ -400,7 +400,7 @@ func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 			},
 			create:        createAsset,
 			waits:         true, // for the foreign key of the new counter row
-			wantDeleteErr: "23503",
+			wantCreateErr: "23503",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -425,7 +425,7 @@ func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 				}
 				conn.Release()
 			}()
-			if _, err := db.New(deletion).LockTaraProjectForDelete(ctx, project); err != nil {
+			if _, err := deletion.Exec(ctx, "SELECT id FROM tara_project WHERE id = $1 FOR UPDATE", project); err != nil {
 				t.Fatal(err)
 			}
 			go func() {
@@ -461,7 +461,7 @@ func TestDisplayIDsProjectDeletePostgres(t *testing.T) {
 				what      string
 				err       error
 				wantInErr string
-			}{{"deletion", deleteErr, tc.wantDeleteErr}, {"creation", createErr, tc.wantCreateErr}} {
+			}{{"deletion", deleteErr, ""}, {"creation", createErr, tc.wantCreateErr}} {
 				if check.wantInErr == "" && check.err != nil || check.wantInErr != "" && (check.err == nil || !strings.Contains(check.err.Error(), check.wantInErr)) {
 					t.Errorf("%s: %v, want %q (empty: no error)", check.what, check.err, check.wantInErr)
 				}

@@ -310,4 +310,29 @@ func TestSearchPostgres(t *testing.T) {
 			t.Errorf("pages returned %d of 11 results", len(seen))
 		}
 	})
+
+	t.Run("deleted projects", func(t *testing.T) {
+		deleted := createProject(alice, "Spoofed deleted")
+		deletedItem := seedItem(t, ctx, tx, deleted, "Spoofed camera frames deleted")
+		deletedThreat := seedThreatScenario(t, ctx, tx, deletedItem, "Spoofed camera frames")
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/"+deleted, http.NoBody)
+		req.Header.Set("Authorization", alice)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusNoContent {
+			t.Fatalf("delete project: %d %s", rr.Code, rr.Body)
+		}
+		page := search(t, alice, q("spoofed"))
+		if !contains(page, spoofed) {
+			t.Errorf("own threat scenario missing: %v", ids(page))
+		}
+		for _, hidden := range []string{deleted, deletedItem, deletedThreat} {
+			if contains(page, hidden) {
+				t.Errorf("result %s from a deleted project: %v", hidden, ids(page))
+			}
+		}
+		if page := search(t, alice, q("spoofed", "project_id", deleted)); len(page.Results) != 0 || page.Total != 0 {
+			t.Errorf("explicit deleted project returned %v", ids(page))
+		}
+	})
 }

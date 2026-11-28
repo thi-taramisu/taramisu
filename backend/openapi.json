@@ -7902,6 +7902,7 @@
     },
     "/api/v1/projects/{id}": {
       "delete": {
+        "description": "Owner only. The project disappears for all members at once, with all its content, and is deleted permanently after a grace period (30 days by default). Until then, an operator can restore it.",
         "operationId": "delete-tara-project",
         "parameters": [
           {

@@ -15,7 +15,7 @@ const searchElements = `-- name: SearchElements :many
 WITH projects AS (
     SELECT p.id, p.name
     FROM tara_project p
-    WHERE p.id IN (
+    WHERE p.deleted_at IS NULL AND p.id IN (
         SELECT a.tara_project_id
         FROM project_role_assignment a
         LEFT JOIN iam_group g ON g.id = a.group_id
@@ -96,8 +96,8 @@ type SearchElementsRow struct {
 }
 
 // Global search (#240, ADR 0005 in docs/internal/adr/0005-backend-search.md) over projects and their elements.
-// Only projects the caller has a role in, directly or through a group (as in ListTaraProjects), are
-// searched; the filter applies before the pagination. Project IDs outside them return no results.
+// Only projects the caller has a role in, directly or through a group (as in ListTaraProjects), and that
+// are not marked as deleted are searched; the filter applies before the pagination. Project IDs outside them return no results.
 // Each element branch also filters by the accessible project IDs, so that PostgreSQL reads only their rows
 // (through the (tara_project_id, display_number) indexes) before it compares any text.
 //

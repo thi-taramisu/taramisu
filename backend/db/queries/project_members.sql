@@ -59,15 +59,11 @@ RETURNING a.id, a.project_role, a.user_id, a.group_id;
 
 -- Serializes membership changes per project. The Store's membership methods take this lock before
 -- the guarded statement, so two Owners cannot downgrade or remove each other at the same moment.
--- NO KEY UPDATE still conflicts with itself and with deleting the project, but not with the
+-- NO KEY UPDATE still conflicts with itself and with marking the project as deleted, but not with the
 -- KEY SHARE locks that foreign key checks take, so content can be written in the meantime.
+-- No row for a project marked as deleted, also when it was marked after the request's access check.
 -- name: LockTaraProject :one
-SELECT id FROM tara_project WHERE id = $1 FOR NO KEY UPDATE;
-
--- Locks the project for its deletion. Taking FOR UPDATE at once, instead of upgrading from
--- NO KEY UPDATE at the DELETE, makes concurrent content inserts wait instead of deadlocking.
--- name: LockTaraProjectForDelete :one
-SELECT id FROM tara_project WHERE id = $1 FOR UPDATE;
+SELECT id FROM tara_project WHERE id = $1 AND deleted_at IS NULL FOR NO KEY UPDATE;
 
 -- The project's role assignments with internal IDs, for the audit event of a project deletion.
 -- name: ListProjectRoleAssignments :many

@@ -108,6 +108,7 @@ erDiagram
         string name "Top-level project name, e.g., Vehicle Platform X"
         text description "Project description"
         timestamp created_at
+        timestamp deleted_at "Set when the project is deleted; hidden from then on, removed after the grace period"
     }
 
     DISPLAY_ID_COUNTER {
@@ -265,6 +266,8 @@ erDiagram
   those fields. `cybersecurity_specs_wp_10_01` supplies supporting information per **15.6.1.1 NOTE**.
   Deleting an item cascades through its assets, damage scenarios, threat scenarios, attack paths, and
   their dependent properties, links, ratings, risk values, and treatment decisions.
+  Deleting a project sets `deleted_at` and hides the project; after a grace period the row is deleted, which cascades
+  through its role assignments and items ([project roles](iam/project-roles.md#deleting-a-project)).
 * **Decoupled Authentication (`IAM_USER`, `IAM_GROUP`):** User authentication and profile management are handled
   externally by Authentik. Following strict separation of concerns, no redundant user-specific
   metadata (such as emails or display names) is stored in the application database; it stores only immutable external
@@ -354,10 +357,11 @@ erDiagram
   get consecutive numbers, and a rolled-back creation also rolls back the counter. The counter never
   decreases, so the number of a deleted element is not reused.
 * **Lock order:** An item creation locks the project (`FOR KEY SHARE`) before the counter row, the order in
-  which a project deletion locks the project and then removes its counters, so it waits for a concurrent
-  deletion instead of deadlocking with it. Element creations take no explicit project lock, because a project
-  with items cannot be deleted. The first creation of a type in a project waits for a deletion through the
-  new counter row's foreign key, but cannot deadlock with it, because the deletion does not see that row.
+  which the purge of a deleted project locks the project and then removes it with its content and counters,
+  so it waits for a concurrent purge instead of deadlocking with it. Element creations take no explicit
+  project lock: if the counter row exists, they do not wait, and the purge deletes the new element with its
+  item. The first creation of a type in a project waits for a purge through the new counter row's foreign key,
+  but cannot deadlock with it, because the purge does not see that row.
   No code creates several element types in one transaction yet; such code must take the counter rows in a
   fixed order, for example the order of `display_id_type`, so that two such transactions cannot deadlock.
 * **Uniqueness:** Elements of an item repeat the item's `tara_project_id` and refer to the item with the

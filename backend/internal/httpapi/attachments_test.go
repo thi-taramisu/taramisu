@@ -400,9 +400,17 @@ func TestAttachmentsIntegration(t *testing.T) {
 				}
 				switch scenario {
 				case "delete-project-storage-failure", "delete-project-db-failure":
-					// Permanent project deletion queues the file without contacting S3.
+					// Deleting a project hides it; the purge after the grace period queues the file
+					// without contacting S3.
 					check(request("DELETE", "/api/v1/projects/"+project, other, nil, ""), 404)
 					check(request("DELETE", "/api/v1/projects/"+project, user, nil, ""), 204)
+					id, err := parseUUID(project)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := db.New(pool).PurgeDeletedTaraProject(ctx, db.PurgeDeletedTaraProjectParams{ID: id, Cutoff: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}}); err != nil {
+						t.Fatalf("purge project: %v", err)
+					}
 					if tracked.deletes != 0 {
 						t.Fatal("project deletion contacted storage before cleanup")
 					}

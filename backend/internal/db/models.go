@@ -699,6 +699,7 @@ type TaraProject struct {
 	Description *string
 	ArchivedAt  pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
 }
 
 type ThreatAttackPathLink struct {

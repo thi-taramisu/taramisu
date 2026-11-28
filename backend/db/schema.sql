@@ -42,8 +42,13 @@ CREATE TABLE tara_project (
     name text NOT NULL,
     description text,
     archived_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    -- Set when an Owner deletes the project. The project is then hidden from everyone and deleted for
+    -- good after the grace period, unless an operator restores it (docs/internal/architecture/audit.md).
+    deleted_at timestamptz
 );
+
+CREATE INDEX tara_project_deleted_at_idx ON tara_project (deleted_at) WHERE deleted_at IS NOT NULL;
 
 CREATE TABLE project_role_assignment (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,7 +86,7 @@ CREATE TABLE audit_event (
 );
 
 CREATE INDEX audit_event_project_time_idx ON audit_event (tara_project_id, occurred_at DESC);
--- Finds the projects whose deletion is older than the retention period.
+-- Finds the project.deleted events for the retention cleanup.
 CREATE INDEX audit_event_project_deleted_idx ON audit_event (occurred_at) WHERE event = 'project.deleted';
 
 -- Display IDs (docs/internal/architecture/data-model.md#27-display-ids): the last number assigned per
@@ -96,7 +101,7 @@ CREATE TABLE display_id_counter (
 
 CREATE TABLE item_definition (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tara_project_id uuid NOT NULL REFERENCES tara_project (id),
+    tara_project_id uuid NOT NULL REFERENCES tara_project (id) ON DELETE CASCADE,
     display_number integer NOT NULL CHECK (display_number > 0),
     name text NOT NULL,
     scope_type scope_type NOT NULL,
