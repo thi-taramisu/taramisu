@@ -1,6 +1,20 @@
+-- Assigns the next display number of the project's attack paths (see CreateItemDefinition). Returns
+-- no row if the item definition does not exist.
 -- name: CreateAttackPath :one
-INSERT INTO attack_path (item_definition_id, title, analysis_approach, is_partial_early_stage, attack_steps_and_weaknesses)
-VALUES ($1, $2, $3, $4, $5) RETURNING *;
+WITH display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT tara_project_id, 'ATTACK_PATH', 1 FROM item_definition WHERE id = sqlc.arg(item_definition_id)
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
+INSERT INTO attack_path (
+    item_definition_id, tara_project_id, display_number, title, analysis_approach, is_partial_early_stage,
+    attack_steps_and_weaknesses
+)
+SELECT sqlc.arg(item_definition_id), display.tara_project_id, display.last_number,
+    sqlc.arg(title), sqlc.narg(analysis_approach), sqlc.arg(is_partial_early_stage), sqlc.narg(attack_steps_and_weaknesses)
+FROM display
+RETURNING *;
 
 -- name: GetAttackPath :one
 SELECT * FROM attack_path WHERE id = $1 AND item_definition_id = $2;

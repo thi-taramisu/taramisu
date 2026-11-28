@@ -18,7 +18,7 @@ describe('ArchiveProjectDialog', () => {
 
     expect(dialog).toHaveAccessibleDescription(
       'This will make the project and all of its content read-only for all members. '
-      + 'Owners can restore it at any time from the archive or the project settings.',
+      + 'Owners can unarchive it at any time from the archive or the project settings.',
     )
   })
 

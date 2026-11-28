@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -71,6 +72,12 @@ func Middleware(next http.Handler) http.Handler {
 					panic(recovered)
 				}
 				slog.ErrorContext(ctx, "panic while handling request", "panic", recovered, "stack", string(debug.Stack()))
+				if hub := sentry.GetHubFromContext(ctx); hub != nil {
+					if route := chi.RouteContext(ctx); route != nil {
+						hub.Scope().SetTag("route", route.RoutePattern())
+					}
+					hub.RecoverWithContext(ctx, errors.New("panic while handling request"))
+				}
 				if !ww.started() {
 					// The same problem+json body as every other error of the API.
 					ww.Header().Set("Content-Type", "application/problem+json")

@@ -32,20 +32,27 @@ type Queries interface {
 	handlers.ThreatPropertyLinkStore
 	handlers.RiskValueStore
 	handlers.RiskTreatmentDecisionStore
+	handlers.SearchStore
 }
 
 // Option configures optional dependencies of the API.
 type Option func(*options)
 
 type options struct {
-	directory handlers.Directory
-	llm       llm.Client
-	llmModel  string
+	directory   handlers.Directory
+	attachments *Attachments
+	llm         llm.Client
+	llmModel    string
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
 func WithDirectory(directory handlers.Directory) Option {
 	return func(o *options) { o.directory = directory }
+}
+
+// WithAttachments enables attachment storage.
+func WithAttachments(files *Attachments) Option {
+	return func(o *options) { o.attachments = files }
 }
 
 // WithAssistant enables the AI assistant with the given model client and model name.
@@ -120,6 +127,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewDamageScenario(queries, queries).Register(api)
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
+	handlers.NewSearch(queries).Register(api)
 	handlers.NewAssistant(queries, selfRouted(mux), o.llm, o.llmModel).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
@@ -130,6 +138,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	}, handlers.WithoutProject(), func(ctx context.Context, _ *struct{}) (*struct{ Body auth.User }, error) {
 		return &struct{ Body auth.User }{Body: auth.UserFromContext(ctx)}, nil
 	})
+	registerAttachments(api, o.attachments, queries)
 	// Fail closed: an /api/ operation without an access declaration must not be served.
 	if err := handlers.CheckAccessDeclared(api.OpenAPI()); err != nil {
 		panic(err)

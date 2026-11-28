@@ -23,6 +23,7 @@ migrate-validate: init
 	$(COMPOSE) run --rm --no-deps migrate migrate validate --dir file://db/migrations
 test:
 	sh dev_test.sh
+	python3 ../proxy/sentry_config_test.py
 test-storage:
 	python3 ../storage/integration_test.py
 test-stack:
