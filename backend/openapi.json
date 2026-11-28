@@ -10,6 +10,14 @@
               "null"
             ]
           },
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "AS-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -37,6 +45,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "name",
           "description",
@@ -214,6 +223,51 @@
         ],
         "type": "object"
       },
+      "AttachmentMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "uploaded_by": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "file_name",
+          "content_type",
+          "size_bytes",
+          "sha256",
+          "uploaded_by",
+          "created_at"
+        ],
+        "type": "object"
+      },
       "AttackFeasibilityRatingBody": {
         "additionalProperties": false,
         "properties": {
@@ -279,6 +333,14 @@
             "type": "string"
           },
           "attack_steps_and_weaknesses": {},
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "AP-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "type": "string"
@@ -296,6 +358,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "title",
           "is_partial_early_stage"
@@ -467,6 +530,14 @@
       "DamageScenarioBody": {
         "additionalProperties": false,
         "properties": {
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "DS-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "functionality_adverse_relation": {
             "type": "string"
           },
@@ -487,6 +558,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "item_definition_id",
           "title"
         ],
@@ -817,6 +889,14 @@
               "null"
             ]
           },
+          "display_id": {
+            "description": "Readable ID, unique within the project and never reused; assigned on creation",
+            "examples": [
+              "IT-1"
+            ],
+            "readOnly": true,
+            "type": "string"
+          },
           "functions": {
             "type": [
               "string",
@@ -864,6 +944,7 @@
         },
         "required": [
           "id",
+          "display_id",
           "tara_project_id",
           "created_at",
           "name",
@@ -1274,6 +1355,102 @@
         ],
         "type": "object"
       },
+      "SearchPage": {
+        "additionalProperties": false,
+        "properties": {
+          "next_offset": {
+            "description": "Offset of the next page, or null on the last page",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Number of all matches; 0 for a page past the last match",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "results",
+          "total",
+          "next_offset"
+        ],
+        "type": "object"
+      },
+      "SearchRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "SearchResult": {
+        "additionalProperties": false,
+        "properties": {
+          "display_id": {
+            "description": "Display ID of the element; null for projects",
+            "examples": [
+              "TS-12"
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/SearchRef",
+            "description": "Item of the element; omitted for projects and items"
+          },
+          "name": {
+            "description": "Name or title",
+            "type": "string"
+          },
+          "project": {
+            "$ref": "#/components/schemas/SearchRef"
+          },
+          "type": {
+            "enum": [
+              "projects",
+              "items",
+              "assets",
+              "damage-scenarios",
+              "threat-scenarios",
+              "attack-paths"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "display_id",
+          "name",
+          "project"
+        ],
+        "type": "object"
+      },
       "StatusOutputBody": {
         "additionalProperties": false,
         "properties": {
@@ -1289,6 +1466,14 @@
       "TaraProjectBody": {
         "additionalProperties": false,
         "properties": {
+          "archived_at": {
+            "description": "Archive timestamp; null for an active project",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -1313,6 +1498,7 @@
           }
         },
         "required": [
+          "archived_at",
           "id",
           "name",
           "created_at",
@@ -1819,6 +2005,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -1893,6 +2080,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -1923,6 +2120,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2072,6 +2270,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -2206,6 +2405,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2329,6 +2529,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -2456,6 +2657,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -2594,6 +2796,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -2731,6 +2934,7 @@
         "tags": [
           "Asset cybersecurity properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -2794,6 +2998,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -2824,6 +3038,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -2921,6 +3136,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -2999,6 +3215,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -3029,6 +3255,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -3106,6 +3333,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -3136,6 +3373,7 @@
         "tags": [
           "Assets"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3254,6 +3492,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -3357,6 +3596,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3447,6 +3687,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -3542,6 +3783,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -3648,6 +3890,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -3753,6 +3996,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -3843,6 +4087,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -3938,6 +4183,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -4044,6 +4290,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -4149,6 +4396,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -4288,6 +4536,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -4412,6 +4661,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -4524,6 +4774,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -4641,6 +4892,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -4769,6 +5021,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -4896,6 +5149,7 @@
         "tags": [
           "Damage scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5014,6 +5268,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -5117,6 +5372,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5244,6 +5500,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -5356,6 +5613,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5455,6 +5713,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -5559,6 +5818,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -5674,6 +5934,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -5788,6 +6049,7 @@
         "tags": [
           "Impact Rating"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -5878,6 +6140,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -5973,6 +6236,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -6078,6 +6342,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -6183,6 +6448,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6301,6 +6567,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -6404,6 +6671,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6494,6 +6762,7 @@
         "tags": [
           "Attack Path"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6612,6 +6881,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -6715,6 +6985,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6805,6 +7076,7 @@
         "tags": [
           "Damage Scenario"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -6944,6 +7216,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -7068,6 +7341,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -7180,6 +7454,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -7297,6 +7572,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -7425,6 +7701,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -7552,6 +7829,7 @@
         "tags": [
           "Threat scenario asset properties"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -7591,6 +7869,18 @@
     "/api/v1/projects": {
       "get": {
         "operationId": "list-tara-projects",
+        "parameters": [
+          {
+            "description": "true: archived only; false: active only; omitted: both",
+            "explode": false,
+            "in": "query",
+            "name": "archived",
+            "schema": {
+              "description": "true: archived only; false: active only; omitted: both",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7742,6 +8032,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       },
       "get": {
@@ -7818,6 +8109,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -7874,6 +8166,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -7904,6 +8206,7 @@
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "manage"
       },
       "put": {
@@ -7929,6 +8232,95 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a TARA project",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/archive": {
+      "post": {
+        "operationId": "archive-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -7986,10 +8378,11 @@
             "bearer": []
           }
         ],
-        "summary": "Replace a TARA project",
+        "summary": "Archive a TARA project (idempotent)",
         "tags": [
           "Tara Project"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8075,6 +8468,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -8169,6 +8563,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8250,6 +8645,7 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -8346,6 +8742,86 @@
         "tags": [
           "Project members"
         ],
+        "x-taramisu-allow-archived": true,
+        "x-taramisu-permission": "manage"
+      }
+    },
+    "/api/v1/projects/{id}/unarchive": {
+      "post": {
+        "operationId": "unarchive-tara-project",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaraProjectBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unarchive an archived TARA project (idempotent)",
+        "tags": [
+          "Tara Project"
+        ],
+        "x-taramisu-allow-archived": true,
         "x-taramisu-permission": "manage"
       }
     },
@@ -8415,6 +8891,16 @@
             },
             "description": "Not Found"
           },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/problem+json": {
@@ -8475,6 +8961,302 @@
         "tags": [
           "Assistant"
         ],
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "read"
+      }
+    },
+    "/api/v1/projects/{project_id}/attachments": {
+      "get": {
+        "operationId": "list-attachments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AttachmentMetadata"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Attachments (limit 1–100, offset \u003e= 0)"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List project attachments",
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "read"
+      },
+      "post": {
+        "operationId": "upload-attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "contentMediaType": "application/octet-stream",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentMetadata"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Project is archived"
+          },
+          "413": {
+            "description": "File exceeds 10 MiB"
+          },
+          "415": {
+            "description": "Unsupported file type"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "500": {
+            "description": "Storage operation failed"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upload one multipart file (field file), up to 10 MiB; PDF, PNG, JPEG, GIF, WebP or plain text",
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "edit"
+      }
+    },
+    "/api/v1/projects/{project_id}/attachments/{attachment_id}": {
+      "delete": {
+        "operationId": "delete-attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deletion accepted; attachment is hidden and cleanup will retry automatically"
+          },
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Project is archived"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete an attachment",
+        "x-taramisu-allow-archived": false,
+        "x-taramisu-permission": "edit"
+      },
+      "get": {
+        "operationId": "download-attachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-None-Match",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "contentMediaType": "application/octet-stream",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "File bytes; ETag is quoted SHA-256; Cache-Control: private, no-cache"
+          },
+          "304": {
+            "description": "Unchanged; authorization revalidated"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Invalid project ID"
+          },
+          "500": {
+            "description": "Storage operation failed"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Download an attachment",
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       }
     },
@@ -8612,6 +9394,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -8735,6 +9518,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -8845,6 +9629,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -8960,6 +9745,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -9085,6 +9871,7 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -9210,7 +9997,140 @@
         "tags": [
           "Item definitions"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "description": "Finds projects and elements by name or title, tolerating small typos, and elements by display ID (`TS-12`, `ts12`, `TS-012`; `TS-1` also finds IDs whose number starts with 1, such as `TS-10`). Only projects the caller has a role in are searched.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "description": "Name, title, or display ID to search for",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Name, title, or display ID to search for",
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only search these projects; projects without a role return nothing",
+            "explode": true,
+            "in": "query",
+            "name": "project_id",
+            "schema": {
+              "description": "Only search these projects; projects without a role return nothing",
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only return these result types",
+            "explode": true,
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "description": "Only return these result types",
+              "items": {
+                "enum": [
+                  "projects",
+                  "items",
+                  "assets",
+                  "damage-scenarios",
+                  "threat-scenarios",
+                  "attack-paths"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Search projects and elements",
+        "tags": [
+          "Search"
+        ]
       }
     },
     "/api/v1/threat-scenarios/{threat_scenario_id}/risk-treatment-decisions": {
@@ -9337,6 +10257,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -9450,6 +10371,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -9550,6 +10472,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -9655,6 +10578,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -9770,6 +10694,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -9885,6 +10810,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10012,6 +10938,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "post": {
@@ -10125,6 +11052,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10225,6 +11153,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "get": {
@@ -10330,6 +11259,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "read"
       },
       "patch": {
@@ -10445,6 +11375,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       },
       "put": {
@@ -10560,6 +11491,7 @@
         "tags": [
           "Risk"
         ],
+        "x-taramisu-allow-archived": false,
         "x-taramisu-permission": "edit"
       }
     },
@@ -10640,6 +11572,10 @@
     {
       "description": "Create, read, replace, update and delete the impact ratings of a damage scenario.",
       "name": "Impact Rating"
+    },
+    {
+      "description": "Search projects and their elements across all accessible projects.",
+      "name": "Search"
     }
   ]
 }

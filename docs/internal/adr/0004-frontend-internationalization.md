@@ -1,6 +1,6 @@
 # ADR 0004: Frontend internationalization
 
-- Status: Proposed
+- Status: Accepted, implemented in the frontend
 - Issue: [#256](https://github.com/thi-taramisu/taramisu/issues/256)
 - Related: [ADR 0003](0003-frontend-date-format.md) (date format), [frontend README](../../../frontend/README.md)
 

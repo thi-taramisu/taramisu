@@ -2,7 +2,7 @@ import { ApiError } from '../errors'
 import type { Project } from '../models/project'
 import type { ProjectService } from '../services/projects'
 import { mockProjects } from './data/projects'
-import { run } from './mockStore'
+import { run } from './request'
 
 // MOCK: in-memory project API. Replace it in `ApiProvider` with an implementation on the generated
 // client once the frontend uses `/api/v1/projects` and the archive endpoints (#233) exist.

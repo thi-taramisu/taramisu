@@ -442,3 +442,7 @@ func TestProjectMemberChangesPassTheCaller(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeMembers) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return false, nil
+}

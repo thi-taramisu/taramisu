@@ -12,10 +12,19 @@ import (
 )
 
 const createDamageScenario = `-- name: CreateDamageScenario :one
-INSERT INTO damage_scenario (item_definition_id, title, functionality_adverse_relation, road_user_harm_description)
-SELECT $1, $2, $3, $4
-WHERE EXISTS(SELECT 1 FROM item_definition WHERE id = $1)
-RETURNING id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description
+WITH display AS (
+    INSERT INTO display_id_counter (tara_project_id, element_type, last_number)
+    SELECT tara_project_id, 'DAMAGE_SCENARIO', 1 FROM item_definition WHERE id = $1
+    ON CONFLICT (tara_project_id, element_type) DO UPDATE SET last_number = display_id_counter.last_number + 1
+    RETURNING tara_project_id, last_number
+)
+INSERT INTO damage_scenario (
+    item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description
+)
+SELECT $1, display.tara_project_id, display.last_number,
+    $2, $3, $4
+FROM display
+RETURNING id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description
 `
 
 type CreateDamageScenarioParams struct {
@@ -25,6 +34,8 @@ type CreateDamageScenarioParams struct {
 	RoadUserHarmDescription      *string
 }
 
+// Assigns the next display number of the project's damage scenarios (see CreateItemDefinition).
+// Returns no row if the item definition does not exist.
 func (q *Queries) CreateDamageScenario(ctx context.Context, arg CreateDamageScenarioParams) (DamageScenario, error) {
 	row := q.db.QueryRow(ctx, createDamageScenario,
 		arg.ItemDefinitionID,
@@ -36,6 +47,8 @@ func (q *Queries) CreateDamageScenario(ctx context.Context, arg CreateDamageScen
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,
@@ -61,7 +74,7 @@ func (q *Queries) DeleteDamageScenario(ctx context.Context, arg DeleteDamageScen
 }
 
 const getDamageScenario = `-- name: GetDamageScenario :one
-SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
 `
 
 type GetDamageScenarioParams struct {
@@ -75,6 +88,8 @@ func (q *Queries) GetDamageScenario(ctx context.Context, arg GetDamageScenarioPa
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,
@@ -83,7 +98,7 @@ func (q *Queries) GetDamageScenario(ctx context.Context, arg GetDamageScenarioPa
 }
 
 const getDamageScenarioForDelete = `-- name: GetDamageScenarioForDelete :one
-SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
 FOR UPDATE
 `
 
@@ -98,6 +113,8 @@ func (q *Queries) GetDamageScenarioForDelete(ctx context.Context, arg GetDamageS
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,
@@ -106,7 +123,7 @@ func (q *Queries) GetDamageScenarioForDelete(ctx context.Context, arg GetDamageS
 }
 
 const getDamageScenarioForUpdate = `-- name: GetDamageScenarioForUpdate :one
-SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
+SELECT id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario WHERE id = $1 AND item_definition_id = $2
 FOR NO KEY UPDATE
 `
 
@@ -121,6 +138,8 @@ func (q *Queries) GetDamageScenarioForUpdate(ctx context.Context, arg GetDamageS
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,
@@ -129,7 +148,7 @@ func (q *Queries) GetDamageScenarioForUpdate(ctx context.Context, arg GetDamageS
 }
 
 const listDamageScenarios = `-- name: ListDamageScenarios :many
-SELECT id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario
+SELECT id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description FROM damage_scenario
 WHERE item_definition_id = $1
 ORDER BY title, id
 LIMIT $3 OFFSET $2
@@ -153,6 +172,8 @@ func (q *Queries) ListDamageScenarios(ctx context.Context, arg ListDamageScenari
 		if err := rows.Scan(
 			&i.ID,
 			&i.ItemDefinitionID,
+			&i.TaraProjectID,
+			&i.DisplayNumber,
 			&i.Title,
 			&i.FunctionalityAdverseRelation,
 			&i.RoadUserHarmDescription,
@@ -171,7 +192,7 @@ const replaceDamageScenario = `-- name: ReplaceDamageScenario :one
 UPDATE damage_scenario
 SET title = $3, functionality_adverse_relation = $4, road_user_harm_description = $5
 WHERE id = $1 AND item_definition_id = $2
-RETURNING id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description
+RETURNING id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description
 `
 
 type ReplaceDamageScenarioParams struct {
@@ -194,6 +215,8 @@ func (q *Queries) ReplaceDamageScenario(ctx context.Context, arg ReplaceDamageSc
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,
@@ -207,7 +230,7 @@ SET title = COALESCE($1, title),
     functionality_adverse_relation = CASE WHEN $2::boolean THEN $3::text ELSE functionality_adverse_relation END,
     road_user_harm_description = CASE WHEN $4::boolean THEN $5::text ELSE road_user_harm_description END
 WHERE id = $6 AND item_definition_id = $7
-RETURNING id, item_definition_id, title, functionality_adverse_relation, road_user_harm_description
+RETURNING id, item_definition_id, tara_project_id, display_number, title, functionality_adverse_relation, road_user_harm_description
 `
 
 type UpdateDamageScenarioParams struct {
@@ -234,6 +257,8 @@ func (q *Queries) UpdateDamageScenario(ctx context.Context, arg UpdateDamageScen
 	err := row.Scan(
 		&i.ID,
 		&i.ItemDefinitionID,
+		&i.TaraProjectID,
+		&i.DisplayNumber,
 		&i.Title,
 		&i.FunctionalityAdverseRelation,
 		&i.RoadUserHarmDescription,

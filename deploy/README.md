@@ -217,10 +217,15 @@ In rolling-deploy order, it starts a replacement replica, stops an old one, and 
 and drops the old one, and that the new replica accepts the token with a cold cache.
 It restores the initial replica count on success, failure, and SIGINT/SIGTERM (exit code 130; 2 if the restore fails);
 further signals are ignored while it restores.
+Cleanup verifies the restored replicas directly and reloads NGINX to clear stale upstream addresses
+and passive failure state. The failover tests themselves verify runtime recovery without a reload.
 `python3 deploy/stack_test.py --self-check`, run by `make -C deploy test`, checks offline that `proxy/nginx.conf`
 still matches the timings and log format the runner parses.
 To run single tests, pass their names, e.g. `python3 deploy/stack_test.py MultiReplicaFailoverTest.test_04_sigterm_stop_failover`.
 Proxy requests are tagged with `User-Agent: stack-test/<run>/<phase>` so access-log checks ignore other traffic.
+For HTTP URLs using `localhost`, the runner connects to `127.0.0.1` while preserving the original
+Host header, URLs, cookies, and OIDC issuer. Compose publishes the proxy on IPv4; avoiding a failed IPv6
+connection attempt keeps the load frequent enough to exercise the outage window on Windows too.
 
 Failover mechanics in `proxy/nginx.conf`, which the runner reads its timings from:
 
@@ -308,3 +313,36 @@ Restore into an empty volume with storage stopped, start the same version, and v
 The `storage_config` volume is regenerated from `storage/.env`. `down` preserves volumes; `reset` deletes them.
 
 Run `make -C deploy test-storage` for isolated live S3, network, rotation, and restore checks (requires Linux Docker and Python 3).
+
+## Sentry reporting
+
+The Compose stack reads **`iam/.env`**. `backend/.env` only configures a backend started on the host, and
+`frontend/.env.local` only configures a frontend built/run directly with Vite. To enable the Compose stack:
+
+```dotenv
+SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/BACKEND_PROJECT_ID
+VITE_SENTRY_DSN=https://PUBLIC_KEY@o123.ingest.de.sentry.io/FRONTEND_PROJECT_ID
+SENTRY_ENVIRONMENT=production
+```
+
+Use the actual DSNs from each Sentry project's client-key settings. Empty DSNs disable reporting. Optional
+`SENTRY_RELEASE` and `VITE_SENTRY_RELEASE` identify releases. Backend and frontend Compose settings share
+`SENTRY_ENVIRONMENT` and default to `production`. Rebuild the frontend after changes with `make -C deploy up`.
+
+For prebuilt GHCR images, set repository Actions variables `VITE_SENTRY_DSN` and optionally `SENTRY_ENVIRONMENT`
+before publishing. The latter defaults to `production`; configure the deployed backend with the same name.
+Frontend DSNs are public in browser JavaScript; Sentry auth tokens must never be used as build arguments.
+
+The API keeps its internal-only networks. Its Sentry HTTP transport routes envelopes to the dedicated ingest proxy's unpublished
+port 8081 while retaining the original DSN. The proxy accepts only POSTs for the configured backend project and
+forwards them to that DSN's Sentry SaaS HTTPS host with certificate verification. Other paths/projects/methods are
+rejected; incoming cookies and Authorization headers are removed. This is not a general outbound proxy, and the
+public port 80 listener exposes no ingest endpoint. With no backend DSN, the internal listener rejects all requests.
+The ingest configuration is generated on startup. The API depends on this service, so it starts first and remains
+available until the API has drained requests, closed its pool, and flushed reports during shutdown.
+
+`make -C deploy test` checks configuration and defaults. After starting the stack, run
+`python3 deploy/sentry_smoke_test.py` from the repository root (or pass `--api-image IMAGE`). It uses temporary
+isolated networks and a local TLS collector to verify actual SDK delivery, upstream verification, method/project
+restrictions, API network isolation, and the absence of a public ingest route. No test event reaches Sentry.
+The existing full-stack test continues to cover real OIDC logins, API replicas, and failover.
