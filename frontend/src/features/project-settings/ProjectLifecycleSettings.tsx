@@ -37,8 +37,10 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
   const [openDialog, setOpenDialog] = useState<'archive' | 'delete' | null>(null)
   // Kept after closing, so the dialog can return focus to the button that opened it.
   const [opener, setOpener] = useState<HTMLButtonElement | null>(null)
+  const [deleteVersion, setDeleteVersion] = useState<number>()
 
   function open(dialog: 'archive' | 'delete', button: HTMLButtonElement) {
+    if (dialog === 'delete') setDeleteVersion(project.data?.version)
     setOpener(button)
     setOpenDialog(dialog)
   }
@@ -112,7 +114,7 @@ export function ProjectLifecycleSettings({ projectId }: { projectId: string }) {
           // A second confirm while the request runs would delete twice and report the second 404.
           if (deleteProject.isPending) return
           resetFailed(...mutations)
-          deleteProject.mutate(projectId, {
+          deleteProject.mutate({ id: projectId, version: deleteVersion }, {
             onSuccess: () => navigate('/projects'),
             onError: () => setOpenDialog(null),
           })

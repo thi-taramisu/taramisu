@@ -1,11 +1,12 @@
 import type { components } from '../schema'
+import type { Versioned } from '../versions'
 
 // Item definitions as `/projects/{project_id}/item-definitions` returns and takes them. The backend leaves
 // out optional fields that are empty, so they can be missing as well as null.
 
 type Schemas = components['schemas']
 
-export type ItemDefinition = Schemas['ItemDefinition']
+export type ItemDefinition = Omit<Schemas['ItemDefinition'], 'version'> & Versioned
 
 export type ScopeType = ItemDefinition['scope_type']
 

@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import type { ItemDefinition } from '../../api/models/item'
 import type { TreeNode } from '../../api/models/tree'
 import { useDeleteItem, useItemChildren } from '../../api/queries/items'
+import { isVersionConflict } from '../../api/versions'
 
 function countBelow(nodes: readonly TreeNode[] = []): number {
   return nodes.reduce((sum, node) => sum + 1 + countBelow(node.children), 0)
@@ -26,7 +27,8 @@ function countBelow(nodes: readonly TreeNode[] = []): number {
 export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const { t } = useTranslation()
   const projectId = item.tara_project_id
-  const [open, setOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ItemDefinition>()
+  const open = deleteTarget !== undefined
   const navigate = useNavigate()
   // The warning must name what is deleted, so the action waits for the counts. They are loaded
   // separately because the tree shows a failed request as an item with nothing below it.
@@ -38,7 +40,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
   const others = countBelow(below) - assets
 
   function handleDelete() {
-    deleteItem.mutate(undefined, { onSuccess: () => navigate(`/projects/${projectId}`) })
+    deleteItem.mutate(deleteTarget?.version, { onSuccess: () => navigate(`/projects/${projectId}`) })
   }
 
   return (
@@ -47,7 +49,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
       onOpenChange={(next) => {
         if (deleteItem.isPending) return
         deleteItem.reset()
-        setOpen(next)
+        setDeleteTarget(next ? item : undefined)
       }}
     >
       <AlertDialogTrigger asChild>
@@ -58,7 +60,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t('ui:deleteItemTitle', { name: item.name })}</AlertDialogTitle>
+          <AlertDialogTitle>{t('ui:deleteItemTitle', { name: (deleteTarget ?? item).name })}</AlertDialogTitle>
           <AlertDialogDescription>
             {assets + others > 0
               ? t('ui:deleteItemChildren', { assets: t('ui:assetCount', { count: assets }), elements: t('ui:elementCount', { count: others }) })
@@ -78,7 +80,7 @@ export function DeleteItemDialog({ item }: { item: ItemDefinition }) {
         )}
         {deleteItem.isError && (
           <p role="alert" className="text-sm text-destructive">
-            {t('ui:deleteItemError')}
+            {t(isVersionConflict(deleteItem.error) ? 'ui:recordVersionConflict' : 'ui:deleteItemError')}
           </p>
         )}
         <AlertDialogFooter>

@@ -91,16 +91,19 @@ describe('createItemApi', () => {
 
   it('deletes an item', async () => {
     let deleted: unknown
+    let version: string | null = null
     server.use(
-      http.delete(`${items}/:itemId`, ({ params }) => {
+      http.delete(`${items}/:itemId`, ({ params, request }) => {
         deleted = params.itemId
+        version = request.headers.get('If-Match')
         return new HttpResponse(null, { status: 204 })
       }),
     )
 
-    await createApi().items.delete(projectId, ecu.id)
+    await createApi().items.delete(projectId, ecu.id, 8)
 
     expect(deleted).toBe(ecu.id)
+    expect(version).toBe('"8"')
   })
 
   it('rejects with the status and the problem detail', async () => {

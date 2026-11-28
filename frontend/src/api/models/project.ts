@@ -1,3 +1,5 @@
+import type { Versioned } from '../versions'
+
 // Projects and their settings. Projects go through `ProjectService` (`../services/projects.ts`). The members
 // settings still read the mock data in `../mocks/data/` directly (#249).
 
@@ -6,7 +8,7 @@
  * `/api/v1/projects`, `updatedAt` from its `created_at` until the backend has an update time. `favorite`,
  * `archived`, `owner` and `image` are mocked until the backend has them (see `../mocks/mockProjectExtras.ts`).
  */
-export type Project = {
+export type Project = Versioned & {
   id: string
   name: string
   description: string

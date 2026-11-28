@@ -3,6 +3,7 @@ import { ApiError } from './errors'
 import { isExampleProject } from './mocks/data/headlamp'
 import type { ItemApi, ItemContentService, ItemService } from './services/items'
 import { unwrap } from './unwrap'
+import { ifMatch } from './versions'
 
 // REAL: item definitions on `/api/v1/projects/{project_id}/item-definitions`. Everything below the items
 // (assets, risks, scenarios) has no frontend adapter yet, so real items have nothing below them. The example
@@ -29,14 +30,18 @@ export function createItemApi(client: ApiClient, example: ItemApi): ItemApi {
       if (isExampleProject(projectId)) return example.items.create(projectId, body)
       return unwrap(client.POST(collection, { ...inProject(projectId), body: { ...body, name: body.name.trim() } }))
     },
-    update: (projectId, itemId, body) => {
+    update: (projectId, itemId, body, version) => {
       if (isExampleProject(projectId)) return example.items.update(projectId, itemId, body)
       const name = body.name?.trim()
-      return unwrap(client.PATCH(member, { ...inItem(projectId, itemId), body: name === undefined ? body : { ...body, name } }))
+      return unwrap(client.PATCH(member, {
+        ...inItem(projectId, itemId),
+        headers: ifMatch(version),
+        body: name === undefined ? body : { ...body, name },
+      }))
     },
-    delete: async (projectId, itemId) => {
+    delete: async (projectId, itemId, version) => {
       if (isExampleProject(projectId)) return example.items.delete(projectId, itemId)
-      await unwrap(client.DELETE(member, inItem(projectId, itemId)))
+      await unwrap(client.DELETE(member, { ...inItem(projectId, itemId), headers: ifMatch(version) }))
     },
   }
 
