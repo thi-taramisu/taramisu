@@ -163,3 +163,8 @@ The canvas handles pointer updates internally and saves positions when the drag 
 are determined by the default relation layout and remain fixed when nodes move, including across a neighbor.
 Moving a node never changes the source/target entities, arrow direction, or risk of a relation.
 It does not edit relations, calculate risk, persist layout, or connect to a graph backend. It is a local prototype for wireframe review.
+
+Shared elements can appear below several parents. Breadcrumbs list every available path in a dropdown (#255), and tree links select
+their own occurrence. The optional `hierarchy` query parameter stores the sequence of element types and technical IDs; labels and
+relations are still read from the current tree. Tab and graph switches preserve the selection. A missing path falls back to the
+first available path, or the existing unavailable state when no path remains.

@@ -59,7 +59,10 @@ follow links, and Enter/Space to toggle branches. Arrow Up/Down and Home/End mov
 moves to its first child, and Arrow Left collapses it or moves to its parent. Overflowing labels scroll on hover or keyboard focus and reset
 on leave; reduced-motion preferences disable the animation.
 
-Element detail pages show breadcrumbs from the first matching path in the current project tree (relations can have several parents).
+Element detail pages show breadcrumbs for the selected position in the project tree. Shared elements offer
+a dropdown with all paths (#255).
+Selecting an occurrence in the hierarchy selects that exact path. The `hierarchy` query parameter preserves the choice across tabs,
+graph toggles, browser history and reloads. Invalid or removed paths fall back to the first available path.
 Segments display the element code and name, or just the name when no code exists (including items). Parent links preserve query
 parameters; long labels wrap without shortening. If the path cannot be loaded, the breadcrumb shows "Path unavailable".
 

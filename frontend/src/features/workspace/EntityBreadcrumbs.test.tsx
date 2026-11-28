@@ -8,14 +8,22 @@ import { createApiClient } from '../../api/client'
 import { createMockItemApi } from '../../api/mocks/mockItemApi'
 import type { EntityType, TreeNode } from '../../api/models/tree'
 import { EntityPage } from './EntityPage'
-import { formatEntityId } from './entities'
+import { formatEntityId, hierarchySearch } from './entities'
+import { Filetree } from './Filetree'
+import { useProjectTree } from '../../api/queries/items'
 
-function renderPage(path: string, api = createMockItemApi()) {
+function TestTree() {
+  const { data = [] } = useProjectTree('headlamp')
+  return <nav aria-label="Test hierarchy"><Filetree projectId="headlamp" nodes={data} /></nav>
+}
+
+function renderPage(path: string, api = createMockItemApi(), showTree = false) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <ApiProvider api={{ client: createApiClient(), ...api }}>
         <MemoryRouter initialEntries={[`/projects/headlamp/${path}`]}>
+          {showTree && <TestTree />}
           <Routes>
             {(['items', 'assets', 'damage-scenarios', 'threat-scenarios', 'attack-paths'] as EntityType[]).map((type) => (
               <Route key={type} path={`/projects/:projectId/${type}/:entityId/*`} element={<EntityPage type={type} />} />
@@ -127,5 +135,64 @@ describe('Entity breadcrumbs', () => {
     expect(await breadcrumbs().findByText('Path unavailable')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: id })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Asset tabs' })).toBeInTheDocument()
+  })
+})
+
+
+async function sharedScenario() {
+  const api = createMockItemApi()
+  const children = await api.content.children('headlamp', 'i-01')
+  const scenario = children[0].children![0]
+  children[1].children = [scenario]
+  const spy = vi.spyOn(api.content, 'children').mockResolvedValue(children)
+  return { api, children, spy }
+}
+
+describe('shared hierarchy paths', () => {
+  it('selects all available paths from the dropdown and keeps the choice on tabs and parent navigation', async () => {
+    const { api } = await sharedScenario()
+    const user = userEvent.setup()
+    renderPage('damage-scenarios/ds-01?filter=open', api)
+    await user.click(await breadcrumbs().findByRole('button', { name: 'Select hierarchy path' }))
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(2)
+    await user.click(screen.getByRole('menuitemradio', { name: /AS-2 Body control ECU firmware/ }))
+    expect(breadcrumbs().getByRole('link', { name: /AS-2/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Impact' }))
+    expect(breadcrumbs().getByRole('link', { name: /AS-2/ })).toBeInTheDocument()
+    const parent = breadcrumbs().getByRole('link', { name: /AS-2/ })
+    expect(parent.getAttribute('href')).toContain('filter=open')
+    await user.click(parent)
+    expect(breadcrumbs().getByText('AS-2 Body control ECU firmware')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('follows the exact occurrence clicked in the hierarchy and marks only that occurrence active', async () => {
+    const { api } = await sharedScenario()
+    const user = userEvent.setup()
+    renderPage('damage-scenarios/ds-01', api, true)
+    const tree = within(screen.getByRole('navigation', { name: 'Test hierarchy' }))
+    const links = await tree.findAllByRole('link', { name: /^DS-1 / })
+    await user.click(links[1])
+    expect(breadcrumbs().getByRole('link', { name: /AS-2/ })).toBeInTheDocument()
+    expect(links[1]).toHaveAttribute('aria-current', 'page')
+    expect(links[0]).not.toHaveAttribute('aria-current', 'page')
+    await user.click(links[0])
+    expect(breadcrumbs().getByRole('link', { name: /AS-1/ })).toBeInTheDocument()
+  })
+
+  it('falls back to an existing path if the chosen relation is removed', async () => {
+    const { api, children, spy } = await sharedScenario()
+    const chosen = [{ type: 'items' as const, id: 'i-01', name: 'Headlamp' }, children[1], children[1].children![0]]
+    const queryClient = renderPage(`damage-scenarios/ds-01${hierarchySearch('', chosen, true)}`, api)
+    await breadcrumbs().findByRole('link', { name: /AS-2/ })
+    spy.mockResolvedValue([children[0]])
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ['projects', 'headlamp'] }) })
+    expect(await breadcrumbs().findByRole('link', { name: /AS-1/ })).toBeInTheDocument()
+    expect(breadcrumbs().queryByRole('button', { name: 'Select hierarchy path' })).not.toBeInTheDocument()
+  })
+
+  it('ignores an invalid path parameter', async () => {
+    const { api } = await sharedScenario()
+    renderPage('damage-scenarios/ds-01?hierarchy=invalid', api)
+    expect(await breadcrumbs().findByRole('link', { name: /AS-1/ })).toBeInTheDocument()
   })
 })

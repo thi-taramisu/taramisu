@@ -7,12 +7,13 @@ import { entityPath, formatEntityId } from './entities'
 interface FiletreeLinkProps {
   node: TreeNode
   projectId: string
+  selected: boolean
   search: string
   icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   onKeyDown: KeyboardEventHandler<HTMLAnchorElement>
 }
 
-export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }: FiletreeLinkProps) {
+export function FiletreeLink({ node, projectId, search, selected, icon: Icon, onKeyDown }: FiletreeLinkProps) {
   const { t } = useTranslation()
   const displayCode = formatEntityId(node.code)
   const label = useRef<HTMLSpanElement>(null)
@@ -54,6 +55,7 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
   return (
     <NavLink
       to={{ pathname: entityPath(projectId, node.type, node.id), search }}
+      aria-current={selected ? 'page' : false}
       title={`${t(`entities.${node.type}`)}: ${node.name}`}
       onKeyDown={onKeyDown}
       onMouseEnter={() => updateScrolling('hovered', true)}
@@ -61,7 +63,7 @@ export function FiletreeLink({ node, projectId, search, icon: Icon, onKeyDown }:
       onFocus={() => updateScrolling('focused', true)}
       onBlur={() => updateScrolling('focused', false)}
       className={({ isActive }) =>
-        `group/filetree-link flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-[5px] text-[13px] leading-[18px] outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring ${isActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : ''}`
+        `group/filetree-link flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-[5px] text-[13px] leading-[18px] outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring ${isActive && selected ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : ''}`
       }
     >
       <Icon aria-hidden={true} className="size-3.5 shrink-0 text-muted-foreground" />
