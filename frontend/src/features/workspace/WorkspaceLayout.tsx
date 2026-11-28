@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { Outlet, useParams, useSearchParams } from 'react-router-dom'
-import { Label } from '@/components/ui/label'
+import { Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { NotFoundPage } from '../../pages/NotFoundPage'
+import { AssistantPanel } from '../assistant/AssistantPanel'
 import { isNotFound } from '../../api/errors'
 import { useProjectTree } from '../../api/queries/items'
 import { useProject, useProjectAccess } from '../../api/queries/projects'
@@ -13,12 +16,32 @@ import { ProjectHeader } from './ProjectHeader'
 import { ResizableSidebar } from './ResizableSidebar'
 import { useTranslation } from 'react-i18next'
 
-/** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content. */
+const ASSISTANT_KEY = 'taramisu.assistant.open'
+
+function loadAssistantOpen(): boolean {
+  try {
+    return localStorage.getItem(ASSISTANT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Project workspace from the Concept 2 wireframes: header with graph toggle, element tree, content, assistant. */
 export function WorkspaceLayout() {
   const { t } = useTranslation()
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const graphView = searchParams.get('view') === 'graph'
+  const [assistantOpen, setAssistantOpenState] = useState(loadAssistantOpen)
+
+  function setAssistantOpen(open: boolean) {
+    setAssistantOpenState(open)
+    try {
+      localStorage.setItem(ASSISTANT_KEY, open ? '1' : '0')
+    } catch {
+      // Storage unavailable: the panel state is just not remembered.
+    }
+  }
   const project = useProject(projectId)
   const tree = useProjectTree(projectId, { enabled: Boolean(project.data) })
   const { canEdit } = useProjectAccess(projectId)
@@ -35,6 +58,10 @@ export function WorkspaceLayout() {
           onCheckedChange={(checked) => setSearchParams(checked ? { view: 'graph' } : {})}
         />
         <Label htmlFor="graph-view">{t('navigation.graph')}</Label>
+        <Button size="sm" variant={assistantOpen ? 'secondary' : 'ghost'} aria-pressed={assistantOpen}
+          onClick={() => setAssistantOpen(!assistantOpen)}>
+          <Bot /> {t('navigation.assistant')}
+        </Button>
       </ProjectHeader>
       <ArchivedProjectBanner projectId={projectId} />
       {/* Without the project nothing can be edited, so a failed load must not look like a read-only project. */}
@@ -60,6 +87,7 @@ export function WorkspaceLayout() {
         <main className="relative min-w-0 flex-1 overflow-y-auto p-6">
           {project.data ? <Outlet /> : <output>{t('ui:loading')}</output>}
         </main>
+        <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       </div>
     </div>
   )
