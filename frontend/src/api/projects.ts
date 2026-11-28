@@ -7,12 +7,13 @@ import type { Project } from './models/project'
 import type { components } from './schema'
 import type { ProjectService } from './services/projects'
 import { unwrap } from './unwrap'
+import { ifMatch, type Versioned } from './versions'
 
 // REAL: the project service on `/api/v1/projects`. Fields the backend does not have yet come from the
 // mocked extras (`./mocks/mockProjectExtras.ts`); the example project comes from the mock project API
 // until it lives in the backend (#250).
 
-type ProjectBody = components['schemas']['TaraProjectBody']
+type ProjectBody = components['schemas']['TaraProjectBody'] & Versioned
 
 export interface ProjectApiOptions {
   extras?: MockProjectExtras
@@ -30,6 +31,7 @@ export function createProjectApi(
   function toProject(body: ProjectBody): Project {
     return {
       id: body.id,
+      version: body.version,
       name: body.name,
       description: body.description ?? '',
       role: body.role,
@@ -64,11 +66,12 @@ export function createProjectApi(
       if (image) extras.set(body.id, { image: URL.createObjectURL(image) })
       return toProject(body)
     },
-    update: async (projectId, { name, description }) => {
+    update: async (projectId, { name, description }, version) => {
       if (isExampleProject(projectId)) return example.update(projectId, { name, description })
       const body = await unwrap(
         client.PATCH('/api/v1/projects/{id}', {
           params: { path: { id: projectId } },
+          headers: ifMatch(version),
           body: { name: name.trim(), description },
         }),
       )
@@ -81,9 +84,12 @@ export function createProjectApi(
     },
     archive: (projectId) => (isExampleProject(projectId) ? example.archive(projectId) : setOwnedExtras(projectId, true)),
     restore: (projectId) => (isExampleProject(projectId) ? example.restore(projectId) : setOwnedExtras(projectId, false)),
-    delete: async (projectId) => {
+    delete: async (projectId, version) => {
       if (isExampleProject(projectId)) return example.delete(projectId)
-      await unwrap(client.DELETE('/api/v1/projects/{id}', { params: { path: { id: projectId } } }))
+      await unwrap(client.DELETE('/api/v1/projects/{id}', {
+        params: { path: { id: projectId } },
+        headers: ifMatch(version),
+      }))
       extras.remove(projectId)
     },
   }

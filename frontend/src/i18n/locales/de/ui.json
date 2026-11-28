@@ -103,6 +103,7 @@
   "environmentPlaceholder": "Vernetzung, Update-Wege, Werkstattzugang",
   "itemRequiredFields": "Die Item-Definition ist erst vollständig, wenn alle mit * gekennzeichneten Felder ausgefüllt sind.",
   "saveItemError": "Das Item konnte nicht gespeichert werden. Bitte versuche es erneut.",
+  "recordVersionConflict": "Dieser Eintrag wurde geändert. Lade die Seite neu und prüfe den aktuellen Stand, bevor du es erneut versuchst.",
   "itemNotFound": "Item nicht gefunden",
   "itemMissing": "Das Item existiert nicht oder wurde gelöscht.",
   "loadItemError": "Das Item konnte nicht geladen werden.",

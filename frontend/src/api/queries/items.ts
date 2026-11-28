@@ -95,7 +95,8 @@ export function useUpdateItem(projectId: string, itemId: string) {
   const api = useApi()
   const invalidate = useInvalidateProject(projectId)
   return useMutation({
-    mutationFn: (body: PatchItemDefinitionBody) => api.items.update(projectId, itemId, body),
+    mutationFn: ({ body, version }: { body: PatchItemDefinitionBody; version?: number }) =>
+      api.items.update(projectId, itemId, body, version),
     onSuccess: invalidate,
   })
 }
@@ -104,7 +105,7 @@ export function useDeleteItem(projectId: string, itemId: string) {
   const api = useApi()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => api.items.delete(projectId, itemId),
+    mutationFn: (version?: number) => api.items.delete(projectId, itemId, version),
     onSuccess: () => {
       // Only the tree is refreshed: refetching the item's own queries would end in a 404 while
       // its page is still mounted. If the item page is opened again (browser back), its refetch

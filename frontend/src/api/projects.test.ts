@@ -134,6 +134,20 @@ describe('createProjectApi', () => {
     expect(project).toMatchObject({ name: 'Battery Pack', description: 'Pack TARA' })
   })
 
+  it('reads versions and sends the edit version as If-Match', async () => {
+    const versioned = { ...battery, version: 4 }
+    serveProjects(versioned)
+    server.use(http.patch(`${projects}/:id`, ({ request }) => {
+      expect(request.headers.get('If-Match')).toBe('"4"')
+      return HttpResponse.json({ detail: 'stale version' }, { status: 412, headers: { ETag: '"5"' } })
+    }))
+    const api = createApi()
+    const project = await api.get(battery.id)
+    expect(project.version).toBe(4)
+    await expect(api.update(project.id, { name: 'Old edit', description: '' }, project.version))
+      .rejects.toMatchObject({ status: 412 })
+  })
+
   it('keeps favorite and archive state for backend projects in memory', async () => {
     serveProjects(battery)
     const api = createApi()

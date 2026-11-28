@@ -31,5 +31,5 @@ export function renderApp(path: string, api = createMockItemApi(), projects = cr
       </AuthProvider>
     </QueryClientProvider>,
   )
-  return { api, projects, user }
+  return { api, projects, queryClient, user }
 }

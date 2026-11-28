@@ -17,8 +17,8 @@ export interface ItemService {
   list(projectId: string): Promise<ItemDefinition[]>
   get(projectId: string, itemId: string): Promise<ItemDefinition>
   create(projectId: string, body: ItemDefinitionBody): Promise<ItemDefinition>
-  update(projectId: string, itemId: string, body: PatchItemDefinitionBody): Promise<ItemDefinition>
-  delete(projectId: string, itemId: string): Promise<void>
+  update(projectId: string, itemId: string, body: PatchItemDefinitionBody, version?: number): Promise<ItemDefinition>
+  delete(projectId: string, itemId: string, version?: number): Promise<void>
 }
 
 /** What the item views show below an item, until the asset and risk endpoints exist. */

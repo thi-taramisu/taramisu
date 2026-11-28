@@ -76,7 +76,7 @@ export function ProjectListPage() {
     // A second confirm while the request runs would delete twice and report the second 404.
     if (!projectToDelete || deleteProject.isPending) return
     resetFailed(...mutations)
-    deleteProject.mutate(projectToDelete.id, { onSettled: () => setProjectToDelete(null) })
+    deleteProject.mutate(projectToDelete, { onSettled: () => setProjectToDelete(null) })
   }
 
   const projects = projectsQuery.data ?? []

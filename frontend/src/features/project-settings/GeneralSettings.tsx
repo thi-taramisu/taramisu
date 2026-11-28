@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { generatedProjectImage } from '../projects/projectImageSource'
 import { ApiError, isNotFound, isUnauthorized } from '../../api/errors'
+import { isVersionConflict } from '../../api/versions'
 import { SignInPrompt } from '../../auth/SignInPrompt'
 import type { Project } from '../../api/models/project'
 import { resetFailed, useProject, useProjectAccess, useUpdateProject } from '../../api/queries/projects'
@@ -15,6 +16,7 @@ import { ProjectLifecycleSettings } from './ProjectLifecycleSettings'
 
 /** Translation key of the message for a failed save. */
 function saveError(error: unknown) {
+  if (isVersionConflict(error)) return 'ui:recordVersionConflict'
   if (error instanceof ApiError && error.status === 403) return 'ui:onlyOwnersCanChangeTheProject'
   return 'ui:theProjectCouldNotBeSavedPleaseTryAgain'
 }
@@ -25,6 +27,8 @@ function DetailsForm({ project }: { project: Project }) {
   // The backend lets only owners change the project settings (`update-tara-project`).
   const canEdit = useProjectAccess(project.id).canEdit && project.role === 'OWNER'
   const updateProject = useUpdateProject()
+  // Keep the version that the uncontrolled fields were populated from, including during a background refetch.
+  const [version, setVersion] = useState(project.version)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -32,9 +36,10 @@ function DetailsForm({ project }: { project: Project }) {
     const form = new FormData(event.currentTarget)
     updateProject.mutate({
       projectId: project.id,
+      version,
       name: String(form.get('name') ?? ''),
       description: String(form.get('description') ?? ''),
-    })
+    }, { onSuccess: (saved) => setVersion(saved.version) })
   }
 
   return (

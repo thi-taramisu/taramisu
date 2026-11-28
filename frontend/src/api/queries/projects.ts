@@ -65,7 +65,8 @@ export function useUpdateProject() {
   const api = useApi()
   const store = useStoreProject()
   return useMutation({
-    mutationFn: ({ projectId, ...body }: ProjectUpdate & { projectId: string }) => api.projects.update(projectId, body),
+    mutationFn: ({ projectId, version, ...body }: ProjectUpdate & { projectId: string; version?: number }) =>
+      api.projects.update(projectId, body, version),
     onSuccess: store,
   })
 }
@@ -109,8 +110,8 @@ export function useDeleteProject() {
   const api = useApi()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (projectId: string) => api.projects.delete(projectId),
-    onSuccess: (_, projectId) => {
+    mutationFn: ({ id, version }: Pick<Project, 'id' | 'version'>) => api.projects.delete(id, version),
+    onSuccess: (_, { id: projectId }) => {
       queryClient.setQueryData<Project[]>(keys.list, (projects) => projects?.filter((p) => p.id !== projectId))
       queryClient.removeQueries({ queryKey: keys.project(projectId) })
       return queryClient.invalidateQueries({ queryKey: keys.list })

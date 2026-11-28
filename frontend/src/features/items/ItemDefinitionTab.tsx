@@ -10,6 +10,7 @@ import { ItemDefinitionDiagram } from '../item-definition/ItemDefinitionDiagram'
 import { ITEM_NAME_MAX_LENGTH, type ItemDefinition } from '../../api/models/item'
 import { useItem, useUpdateItem } from '../../api/queries/items'
 import { useProjectAccess } from '../../api/queries/projects'
+import { isVersionConflict } from '../../api/versions'
 
 // The React Flow diagram only exists for the headlamp example so far.
 const EXAMPLE_DIAGRAM_ITEM = 'i-01'
@@ -46,6 +47,7 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
   const [values, setValues] = useState(() => toValues(item))
   // Last saved state; kept here so a failed refetch of the item cannot make the form dirty again.
   const [saved, setSaved] = useState(values)
+  const [version, setVersion] = useState(item.version)
   const [nameError, setNameError] = useState<string>()
   const update = useUpdateItem(item.tara_project_id, item.id)
   const { canEdit } = useProjectAccess(item.tara_project_id)
@@ -69,15 +71,19 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
     }
     update.mutate(
       {
-        name,
-        boundary: values.boundary || null,
-        functions: values.functions || null,
-        operational_environment: values.operational_environment || null,
+        version,
+        body: {
+          name,
+          boundary: values.boundary || null,
+          functions: values.functions || null,
+          operational_environment: values.operational_environment || null,
+        },
       },
       {
         onSuccess: (updated) => {
           setValues(toValues(updated))
           setSaved(toValues(updated))
+          setVersion(updated.version)
         },
       },
     )
@@ -125,7 +131,9 @@ function DefinitionForm({ item }: { item: ItemDefinition }) {
               {update.isSuccess && !dirty && t('ui:saved')}
             </output>
             {update.isError && (
-              <p role="alert" className="text-sm text-destructive">{t('ui:saveItemError')}</p>
+              <p role="alert" className="text-sm text-destructive">
+                {t(isVersionConflict(update.error) ? 'ui:recordVersionConflict' : 'ui:saveItemError')}
+              </p>
             )}
           </div>
         )}

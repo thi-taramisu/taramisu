@@ -71,6 +71,22 @@ describe('GeneralSettings', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('uses the form version after a background refresh and keeps the draft on conflict', async () => {
+    const projects = createMockProjectApi(mockProjects.map((project) => ({ ...project, version: 3 })))
+    const update = vi.spyOn(projects, 'update').mockRejectedValue(new ApiError(412, 'stale version'))
+    const { user, queryClient } = await renderGeneral(projects, 'battery-security')
+    const name = screen.getByLabelText('Name')
+    await user.clear(name)
+    await user.type(name, 'My draft')
+    const latest = { ...await projects.get('battery-security'), name: 'Remote edit', version: 4 }
+    act(() => { queryClient.setQueryData(['projects', latest.id, 'details'], latest) })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(update).toHaveBeenCalledWith(latest.id, expect.objectContaining({ name: 'My draft' }), 3)
+    expect(await screen.findByRole('alert')).toHaveTextContent('This record has changed.')
+    expect(name).toHaveValue('My draft')
+  })
+
   it.each<ProjectRole>(['EDITOR', 'REVIEWER', 'VIEWER'])('shows the details read-only and no Save to the role %s', async (role) => {
     // Only owners may change the project settings in the backend.
     const projects = createMockProjectApi(mockProjects.map((project) => (project.id === 'headlamp' ? { ...project, role } : project)))

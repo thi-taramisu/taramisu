@@ -103,6 +103,7 @@
   "environmentPlaceholder": "Connectivity, update paths, workshop access",
   "itemRequiredFields": "Fields marked * are needed before the item definition is complete.",
   "saveItemError": "The item could not be saved. Please try again.",
+  "recordVersionConflict": "This record has changed. Reload the page and review the latest version before trying again.",
   "itemNotFound": "Item not found",
   "itemMissing": "The item does not exist or was deleted.",
   "loadItemError": "The item could not be loaded.",
