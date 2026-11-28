@@ -50,20 +50,13 @@ export function createProjectApi(
       description: body.description ?? '',
       role: body.role,
       updatedAt: body.created_at,
+      archived: body.archived_at != null,
       ...extras.get(body.id),
     }
   }
 
   const fetchProject = (projectId: string) =>
     unwrap(client.GET('/api/v1/projects/{id}', { params: { path: { id: projectId } } }))
-
-  /** Checks the backend's role, as the archive endpoints (#233) do; they are connected with #361. */
-  async function setOwnedExtras(projectId: string, archived: boolean) {
-    const body = await fetchProject(projectId)
-    if (body.role !== 'OWNER') throw new ApiError(403, 'Only owners can do this.')
-    extras.set(projectId, { archived })
-    return toProject(body)
-  }
 
   return {
     list: async () => {
@@ -95,8 +88,14 @@ export function createProjectApi(
       // Favorites have no backend route yet, so nothing is sent.
       extras.set(projectId, { favorite })
     },
-    archive: (projectId) => (isExample(projectId) ? example.archive(projectId) : setOwnedExtras(projectId, true)),
-    restore: (projectId) => (isExample(projectId) ? example.restore(projectId) : setOwnedExtras(projectId, false)),
+    archive: async (projectId) => {
+      if (isExample(projectId)) return example.archive(projectId)
+      return toProject(await unwrap(client.POST('/api/v1/projects/{id}/archive', { params: { path: { id: projectId } } })))
+    },
+    restore: async (projectId) => {
+      if (isExample(projectId)) return example.restore(projectId)
+      return toProject(await unwrap(client.POST('/api/v1/projects/{id}/unarchive', { params: { path: { id: projectId } } })))
+    },
     delete: async (projectId) => {
       if (isExample(projectId)) return example.delete(projectId)
       await unwrap(client.DELETE('/api/v1/projects/{id}', { params: { path: { id: projectId } } }))

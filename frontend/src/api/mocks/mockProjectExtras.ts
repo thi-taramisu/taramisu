@@ -3,12 +3,11 @@ import type { Project } from '../models/project'
 // MOCK: project fields that `/api/v1/projects` does not have yet. The real project service
 // (`../projects.ts`) merges them into the backend's projects; they are kept in memory and reset on reload.
 // Each field moves to the backend with its issue:
-// - `archived`: archive endpoints exist (#233), connected with #361
 // - `image`: project image upload (#231, #284)
 // - `owner`: project members (#249)
 // - `favorite`: favorite endpoints (#232), connected with #375
 
-export type ProjectExtras = Pick<Project, 'favorite' | 'archived' | 'owner' | 'image'>
+export type ProjectExtras = Pick<Project, 'favorite' | 'owner' | 'image'>
 
 export interface MockProjectExtras {
   /** Extras of a project, with defaults for projects that have none stored. */
@@ -18,7 +17,7 @@ export interface MockProjectExtras {
   remove(projectId: string): void
 }
 
-const defaults: ProjectExtras = { favorite: false, archived: false, owner: 'Demo User' }
+const defaults: ProjectExtras = { favorite: false, owner: 'Demo User' }
 
 export function createMockProjectExtras(): MockProjectExtras {
   const store = new Map<string, ProjectExtras>()

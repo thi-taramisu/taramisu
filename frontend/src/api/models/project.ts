@@ -3,8 +3,8 @@
 
 /**
  * A project as the views use it. `id`, `name`, `description` and `role` come from `TaraProjectBody` of
- * `/api/v1/projects`, `updatedAt` from its `created_at` until the backend has an update time. `favorite`,
- * `archived`, `owner` and `image` are mocked until the backend has them (see `../mocks/mockProjectExtras.ts`).
+ * `/api/v1/projects`, `updatedAt` from `created_at` and `archived` from `archived_at`.
+ * `favorite`, `owner` and `image` are stored by `../mocks/mockProjectExtras.ts`.
  */
 export type Project = {
   id: string

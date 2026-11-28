@@ -101,7 +101,7 @@ mock item services; tests pass mocks through its `api` prop. Once a route is in 
 with `ApiError` and the HTTP status), derive the model from `components['schemas']` in `schema.d.ts`, and use it as the default in
 `ApiProvider`.
 
-Project fields the backend does not have yet (`favorite`, `archived`, `owner`, `image`) come from `mocks/mockProjectExtras.ts`, kept in
+Project archive status comes from `archived_at` in the API. `favorite`, `owner` and `image` come from `mocks/mockProjectExtras.ts`, kept in
 memory by project ID and reset on reload; each is marked with the issue that moves it to the backend. The example project (`headlamp`) is
 served by the mock project API until it exists in the backend. The E2E tests run without a backend and stub `/api/v1/projects` with
 `e2e/support/projectsApi.ts`. Components never import from `mocks/` except for data
