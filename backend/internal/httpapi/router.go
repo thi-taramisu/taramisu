@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/thi-taramisu/taramisu/backend/internal/auth"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi/handlers"
+	"github.com/thi-taramisu/taramisu/backend/internal/llm"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 )
 
@@ -40,6 +41,8 @@ type Option func(*options)
 type options struct {
 	directory   handlers.Directory
 	attachments *Attachments
+	llm         llm.Client
+	llmModel    string
 }
 
 // WithDirectory enables Authentik user and group lookups for project members.
@@ -52,6 +55,11 @@ func WithAttachments(files *Attachments) Option {
 	return func(o *options) { o.attachments = files }
 }
 
+// WithAssistant enables the AI assistant with the given model client and model name.
+func WithAssistant(client llm.Client, model string) Option {
+	return func(o *options) { o.llm, o.llmModel = client, model }
+}
+
 func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
 	mux, _ := newAPI(queries, manager, opts...)
 	return mux
@@ -60,6 +68,16 @@ func New(queries Queries, manager *auth.Manager, opts ...Option) http.Handler {
 func OpenAPI() *huma.OpenAPI {
 	_, api := newAPI(nil, nil)
 	return api.OpenAPI()
+}
+
+// selfRouted serves requests that a handler sends to the API itself, such as the assistant's tool reads. Their
+// context comes from the request being handled, which chi has already routed. A routing context of their own
+// makes chi route them by their method and path instead of continuing with the outer request.
+func selfRouted(mux *chi.Mux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, huma.API) {
@@ -110,6 +128,7 @@ func newAPI(queries Queries, manager *auth.Manager, opts ...Option) (*chi.Mux, h
 	handlers.NewImpactRating(queries, queries).Register(api)
 	handlers.NewThreatDamageLink(queries, queries).Register(api)
 	handlers.NewSearch(queries).Register(api)
+	handlers.NewAssistant(queries, selfRouted(mux), o.llm, o.llmModel).Register(api)
 	handlers.Register(api, huma.Operation{
 		OperationID: "current-user",
 		Method:      http.MethodGet,

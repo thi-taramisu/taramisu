@@ -13,7 +13,12 @@ import (
 	"time"
 )
 
-const defaultHTTPAddr = ":8080"
+const (
+	defaultHTTPAddr = ":8080"
+	// defaultLLMModel called a tool for every question in the tests for #299. The faster qwen3-30b-a3b-instruct-2507
+	// answered some of them without a tool and invented project data.
+	defaultLLMModel = "qwen3.6-35b-a3b"
+)
 
 // Config contains the runtime configuration for the API.
 type Config struct {
@@ -27,6 +32,9 @@ type Config struct {
 	AuthentikToken            string
 	IAMUserCacheTTL           time.Duration
 	AuthentikMetadataCacheTTL time.Duration
+	// LLMURL is the base URL of the LLM service (deploy/compose.llm.yaml); empty disables the assistant.
+	LLMURL                    string
+	LLMModel                  string
 	LogLevel                  slog.Level
 	AuditRetentionAfterDelete time.Duration
 }
@@ -103,6 +111,17 @@ func Load() (Config, error) {
 		authentikMetadataCacheTTL = parsed
 	}
 
+	llmURL := os.Getenv("LLM_URL")
+	if llmURL != "" {
+		if err := validateHTTPURL(llmURL); err != nil {
+			return Config{}, fmt.Errorf("invalid LLM_URL: %w", err)
+		}
+	}
+	llmModel := os.Getenv("LLM_MODEL")
+	if llmModel == "" {
+		llmModel = defaultLLMModel
+	}
+
 	s3, err := loadS3()
 	if err != nil {
 		return Config{}, err
@@ -136,6 +155,8 @@ func Load() (Config, error) {
 		AuthentikToken:            authentikToken,
 		IAMUserCacheTTL:           iamUserCacheTTL,
 		AuthentikMetadataCacheTTL: authentikMetadataCacheTTL,
+		LLMURL:                    llmURL,
+		LLMModel:                  llmModel,
 		LogLevel:                  logLevel,
 		AuditRetentionAfterDelete: auditRetentionAfterDelete,
 	}, nil

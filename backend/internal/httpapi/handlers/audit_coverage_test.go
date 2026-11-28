@@ -36,6 +36,10 @@ var notAuditedYet = []string{
 	"upload-attachment", "delete-attachment",
 }
 
+// readOnlyOperations use POST but change nothing, so they have no audit events. The assistant takes the
+// conversation in the request body and only reads the project.
+var readOnlyOperations = []string{"ask-assistant"}
+
 // TestEveryChangeIsDeclaredForAudit makes adding a mutating operation a conscious decision about its
 // audit events, like the access declaration in handlers.Register.
 func TestEveryChangeIsDeclaredForAudit(t *testing.T) {
@@ -43,7 +47,7 @@ func TestEveryChangeIsDeclaredForAudit(t *testing.T) {
 	for _, list := range []struct {
 		name string
 		ids  []string
-	}{{"auditedOperations", auditedOperations}, {"notAuditedYet", notAuditedYet}} {
+	}{{"auditedOperations", auditedOperations}, {"notAuditedYet", notAuditedYet}, {"readOnlyOperations", readOnlyOperations}} {
 		for _, id := range list.ids {
 			if other, ok := declared[id]; ok {
 				t.Errorf("%s is listed in %s and %s", id, other, list.name)

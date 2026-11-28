@@ -18,6 +18,7 @@ import (
 	"github.com/thi-taramisu/taramisu/backend/internal/config"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 	"github.com/thi-taramisu/taramisu/backend/internal/httpapi"
+	"github.com/thi-taramisu/taramisu/backend/internal/llm"
 	"github.com/thi-taramisu/taramisu/backend/internal/logging"
 	"github.com/thi-taramisu/taramisu/backend/internal/storage"
 )
@@ -111,6 +112,11 @@ func run(logLevel *slog.LevelVar) error {
 		opts = append(opts, httpapi.WithDirectory(directory))
 	} else {
 		slog.Warn("AUTHENTIK_API_URL or AUTHENTIK_API_TOKEN not set: member names are hidden and adding members is disabled")
+	}
+	if cfg.LLMURL != "" {
+		opts = append(opts, httpapi.WithAssistant(llm.NewHTTPClient(cfg.LLMURL), cfg.LLMModel))
+	} else {
+		slog.Warn("LLM_URL not set: the AI assistant is disabled")
 	}
 	handler := httpapi.New(queries, iam, opts...)
 	if os.Getenv("SENTRY_DSN") != "" {
