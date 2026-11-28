@@ -6,6 +6,16 @@ import { configDefaults, defineConfig } from 'vitest/config'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rolldownOptions: {
+      input: { app: 'index.html', 'theme': 'theme.css' },
+      output: {
+        assetFileNames: asset => asset.names.includes('theme.css')
+          ? 'theme.css'
+          : 'assets/[name]-[hash][extname]',
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

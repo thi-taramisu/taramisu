@@ -16,6 +16,19 @@ entries:
       branding_favicon: /static/dist/assets/icons/blank.svg
       branding_default_flow_background: /static/dist/assets/icons/blank.svg
       branding_custom_css: |
+        /* The page and spinner paint before the flow component initializes. */
+        html:has(ak-flow-executor),
+        body:has(ak-flow-executor) {
+          background-color: var(--background, Canvas);
+        }
+        ak-flow-executor .pf-c-spinner {
+          --pf-c-spinner--Color: var(--primary, CanvasText);
+        }
+        ak-flow-executor {
+          --pf-global--FontFamily--text: "Geist Variable", sans-serif;
+          --pf-global--FontFamily--heading: var(--pf-global--FontFamily--text);
+          font-family: var(--pf-global--FontFamily--text);
+        }
         ak-flow-executor::part(branding),
         ak-flow-executor::part(footer),
         ak-flow-executor::part(locale-select) {
@@ -28,13 +41,60 @@ entries:
         ak-flow-executor::part(login) {
           --ak-c-login__main-ColumnWidth: min(28rem, calc(100vw - 2rem));
           grid-template-rows: 1fr auto 1fr;
-          background: light-dark(#f4f5f7, #15171c);
+          background: var(--background, Canvas);
+        }
+        ak-flow-executor::part(locale-select) {
+          color: var(--foreground, CanvasText);
+          text-shadow: none;
         }
         ak-flow-executor::part(main) {
           --ak-c-login__main--BoxShadow: 0 12px 40px rgb(0 0 0 / 12%);
           align-self: center;
-          border: 1px solid light-dark(#e2e5ea, #30343b);
-          border-radius: 0.75rem;
+          background: var(--card, Canvas);
+          color: var(--card-foreground, CanvasText);
+          border: 1px solid var(--border, GrayText);
+          border-radius: var(--radius, 0.625rem);
+        }
+        /* Brand CSS is adopted into Authentik's shadow roots. Scope controls to flows. */
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button.pf-m-primary {
+          font-family: inherit;
+          font-size: 0.875rem;
+          font-weight: 500;
+          background: var(--primary, CanvasText);
+          color: var(--primary-foreground, Canvas);
+          border-radius: calc(var(--radius, 0.625rem) * 0.8);
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button.pf-m-primary:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--primary, CanvasText) 90%, transparent);
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button:focus-visible,
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) a:focus-visible {
+          outline: 2px solid var(--ring, Highlight);
+          outline-offset: 2px;
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-button:disabled {
+          opacity: 0.5;
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-form-control {
+          font-family: inherit;
+          --pf-c-form-control--BackgroundColor: var(--card, Canvas);
+          --pf-c-form-control--Color: var(--card-foreground, CanvasText);
+          --pf-c-form-control--BorderTopColor: var(--input, GrayText);
+          --pf-c-form-control--BorderRightColor: var(--input, GrayText);
+          --pf-c-form-control--BorderBottomColor: var(--input, GrayText);
+          --pf-c-form-control--BorderLeftColor: var(--input, GrayText);
+          --pf-c-form-control--BorderRadius: calc(var(--radius, 0.625rem) * 0.8);
+          --pf-c-form-control--focus--BorderBottomColor: var(--ring, Highlight);
+          --pf-c-form-control--hover--BorderBottomColor: var(--ring, Highlight);
+          --pf-c-form-control--invalid--BorderBottomColor: var(--destructive, red);
+          --pf-c-form-control--placeholder--Color: var(--muted-foreground, GrayText);
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) .pf-c-login__main-footer-band {
+          background: var(--card, Canvas);
+          color: var(--foreground, CanvasText);
+        }
+        :is(:host-context(ak-flow-executor), :host(ak-stage-identification), :host(ak-stage-password), :host(ak-stage-prompt)) a {
+          color: var(--primary, CanvasText);
         }
   - model: authentik_flows.flow
     identifiers:

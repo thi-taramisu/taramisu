@@ -1,0 +1,4 @@
+@import "@fontsource-variable/geist";
+@import "./src/styles/themes/neutral.css";
+@import "./src/styles/themes/ocean.css";
+@import "./src/styles/themes/iris.css";

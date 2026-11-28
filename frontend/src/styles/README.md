@@ -93,3 +93,5 @@ is applied to the document root and saved independently as `taramisu.colorScheme
 default to light and Neutral, regardless of the OS preference. The blocking `public/theme-init.js` script applies
 the saved mode before the app and styles load; `features/theme/` keeps mounted controls and tabs in sync.
 If storage is unavailable, switching still works for the current page.
+
+Authentik login and enrollment load the same palettes and Geist font from the shared `/theme.css` stylesheet.

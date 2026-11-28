@@ -17,6 +17,8 @@ x-authentik: &authentik
   volumes:
     - authentik_data:/data
     - ../iam/branding/blank.svg:/web/dist/assets/icons/blank.svg:ro
+    - ../iam/branding/templates/if/flow.html:/templates/if/flow.html:ro
+    - ../frontend/public/theme-init.js:/web/dist/taramisu-theme.js:ro
   shm_size: 512mb
   healthcheck:
     test: [CMD, ak, healthcheck]

@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 4173
-const BASE_URL = `http://127.0.0.1:${PORT}`
+const STACK_URL = process.env.AUTHENTIK_THEME_TEST_URL
+const BASE_URL = STACK_URL ?? `http://127.0.0.1:${PORT}`
 
 export default defineConfig({
   testDir: './e2e',
@@ -19,8 +20,13 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    ...(STACK_URL ? [{
+      name: 'firefox',
+      testMatch: '**/authentik-theme.spec.ts',
+      use: devices['Desktop Firefox'],
+    }] : []),
   ],
-  webServer: {
+  webServer: STACK_URL ? undefined : {
     command: `npm run preview -- --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
