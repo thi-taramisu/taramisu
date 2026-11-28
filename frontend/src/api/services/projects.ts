@@ -5,7 +5,7 @@ import type { NewProject, Project, ProjectUpdate } from '../models/project'
 
 /**
  * Projects of the current user. `list`, `get`, `create`, `update` and `delete` follow `/api/v1/projects`;
- * `archive` and `restore` are still mocked (archive endpoints #233, connected with #361); so is `setFavorite`
+ * `archive` and `restore` use the project lifecycle endpoints; `setFavorite` is still mocked
  * (favorite endpoints #232, connected with #375). Calls reject with an `ApiError`, e.g. 404 for unknown
  * projects, 403 for missing rights and 422 for invalid bodies.
  */

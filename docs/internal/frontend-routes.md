@@ -64,8 +64,8 @@ Auth values: public means no login, user means logged in, and read, write and ma
 [project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
-Projects (#248): the list, creating, renaming (Settings, General) and deleting use `/api/v1/projects`. Favorites, archive, owner and
-image are mocked in memory until they are connected (#361 archive, #375 favorites). Every project opens its workspace, which stays empty
+Projects (#248): the list, creating, renaming (Settings, General), archiving, restoring and deleting use `/api/v1/projects`. Favorites,
+owner and image are stored in memory. Every project opens its workspace, which stays empty
 for backend projects until their items come from the backend (#250); every project has its settings.
 
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.

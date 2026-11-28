@@ -135,19 +135,38 @@ describe('createProjectApi', () => {
     expect(project).toMatchObject({ name: 'Battery Pack', description: 'Pack TARA' })
   })
 
-  it('keeps favorite and archive state for backend projects in memory', async () => {
-    serveProjects(battery)
+  it('archives and restores a backend project and reads its persisted state', async () => {
+    let project = { ...battery }
+    server.use(
+      http.get(projects, () => HttpResponse.json([project])),
+      http.get(`${projects}/${battery.id}`, () => HttpResponse.json(project)),
+      http.post(`${projects}/${battery.id}/archive`, () => {
+        project = { ...project, archived_at: '2026-11-28T12:00:00Z' }
+        return HttpResponse.json(project)
+      }),
+      http.post(`${projects}/${battery.id}/unarchive`, () => {
+        project = { ...project, archived_at: null }
+        return HttpResponse.json(project)
+      }),
+    )
     const api = createApi()
 
     await api.setFavorite(battery.id, true)
     expect(await api.archive(battery.id)).toMatchObject({ favorite: true, archived: true })
-    expect(await api.get(battery.id)).toMatchObject({ favorite: true, archived: true })
+    expect(await createApi().get(battery.id)).toMatchObject({ archived: true })
+    expect((await api.list())[0]).toMatchObject({ favorite: true, archived: true })
     expect(await api.restore(battery.id)).toMatchObject({ archived: false })
     expect((await api.list())[0]).toMatchObject({ favorite: true, archived: false })
   })
 
-  it('only lets owners archive and restore, by the role from the backend', async () => {
+  it('preserves lifecycle errors returned by the backend', async () => {
     serveProjects(shared)
+    server.use(
+      http.post(`${projects}/${shared.id}/archive`, () =>
+        HttpResponse.json({ detail: 'only owners can archive' }, { status: 403 })),
+      http.post(`${projects}/${shared.id}/unarchive`, () =>
+        HttpResponse.json({ detail: 'only owners can unarchive' }, { status: 403 })),
+    )
     const api = createApi()
 
     expect((await rejection(api.archive(shared.id))).status).toBe(403)
