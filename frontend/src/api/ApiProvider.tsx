@@ -1,6 +1,10 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { createApiClient, type ApiClient } from './client'
+import { createItemApi } from './items'
 import { createMockItemApi } from './mocks/mockItemApi'
+import { createExampleProjectApi } from './mocks/mockProjectApi'
+import { createMockProjectExtras } from './mocks/mockProjectExtras'
+import { createProjectApi } from './projects'
 import type { AssetService } from './services/assets'
 import type { AttackPathService } from './services/attackPaths'
 import type { DamageScenarioService } from './services/damageScenarios'
@@ -11,8 +15,8 @@ import type { ThreatScenarioService } from './services/threatScenarios'
 import { useAuth } from '@/auth/useAuth'
 
 /**
- * Everything the app reads from the backend. `client` always talks to the real backend; the services
- * are mocks until their routes are in `backend/openapi.json` (see `main.tsx`).
+ * The client and adapters serve backend projects, item definitions and threat scenarios. The example project
+ * and other workspace entities use the mock services. Tests pass overrides through `api`.
  */
 export interface Api {
   client: ApiClient
@@ -36,7 +40,12 @@ export function ApiProvider({
   children: ReactNode
 }) {
   const { accessToken, signOut } = useAuth()
-  const defaultMocks = useMemo(() => createMockItemApi(api?.projects), [api?.projects])
+  // Created once, so the mocked parts survive a new token (and with it a new client).
+  const itemMocks = useMemo(() => createMockItemApi(api?.projects), [api?.projects])
+  const projectMocks = useMemo(
+    () => ({ extras: createMockProjectExtras(), example: createExampleProjectApi() }),
+    [],
+  )
 
   const client = useMemo(
     () =>
@@ -49,20 +58,35 @@ export function ApiProvider({
       }),
     [accessToken, api?.client, signOut],
   )
+  const defaultProjects = useMemo(() => createProjectApi(client, projectMocks), [client, projectMocks])
+  const defaultItems = useMemo(() => createItemApi(client, itemMocks), [client, itemMocks])
 
   const value = useMemo<Api>(
     () => ({
       client,
-      projects: api?.projects ?? defaultMocks.projects,
-      search: api?.search ?? defaultMocks.search,
-      items: api?.items ?? defaultMocks.items,
-      content: api?.content ?? defaultMocks.content,
-      assets: api?.assets ?? defaultMocks.assets,
-      damageScenarios: api?.damageScenarios ?? defaultMocks.damageScenarios,
-      threatScenarios: api?.threatScenarios ?? defaultMocks.threatScenarios,
-      attackPaths: api?.attackPaths ?? defaultMocks.attackPaths,
+      projects: api?.projects ?? defaultProjects,
+      search: api?.search ?? itemMocks.search,
+      assets: api?.assets ?? itemMocks.assets,
+      items: api?.items ?? defaultItems.items,
+      content: api?.content ?? defaultItems.content,
+      damageScenarios: api?.damageScenarios ?? defaultItems.damageScenarios,
+      threatScenarios: api?.threatScenarios ?? defaultItems.threatScenarios,
+      attackPaths: api?.attackPaths ?? defaultItems.attackPaths,
     }),
-    [api?.assets, api?.attackPaths, api?.content, api?.damageScenarios, api?.items, api?.projects, api?.search, api?.threatScenarios, client, defaultMocks],
+    [
+      api?.assets,
+      api?.attackPaths,
+      api?.content,
+      api?.damageScenarios,
+      api?.items,
+      api?.projects,
+      api?.search,
+      api?.threatScenarios,
+      client,
+      defaultItems,
+      defaultProjects,
+      itemMocks,
+    ],
   )
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>

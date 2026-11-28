@@ -88,7 +88,7 @@ project.
 | Attack feasibility ratings | `attack_feasibility_rating.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | Threat–damage links | `threat_damage_link.created`, `.deleted` | API representation before and after | Stored |
 | Threat–attack path links | `threat_attack_path_link.created`, `.deleted` | API representation before and after | Stored |
-| Threat scenarios | `threat_scenario.created`, `.updated`, `.deleted` | API representation before and after | With threat scenario write endpoints |
+| Threat scenarios | `threat_scenario.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | Risk values | `risk_value.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | Risk treatment decisions | `risk_treatment_decision.created`, `.updated`, `.deleted` | API representation before and after | Stored |
 | AI assistant | `ai_suggestion.applied` | Target record, applied fields, model | With the AI assistant |

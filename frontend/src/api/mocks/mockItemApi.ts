@@ -32,8 +32,8 @@ import { createMockAssetService } from './mockAssets'
 import { createMockAttackPathService } from './mockAttackPaths'
 import { createMockThreatScenarioService } from './mockThreatScenarios'
 
-// MOCK: in-memory item API. Replace it in `main.tsx` with an implementation on the generated client
-// once the item routes (#83) are in `backend/openapi.json`.
+// MOCK: in-memory item API for tests and the example project, which the real item service (`../items.ts`)
+// serves from it.
 
 function seed(): Map<string, StoredItem> {
   const [headlamp] = exampleProject.tree
@@ -104,6 +104,7 @@ function relationsOf(entry: StoredItem, damageScenarioId: string): DamageScenari
  */
 export function createMockItemApi(projects: ProjectService = createMockProjectApi()): ItemApi & { projects: ProjectService; search: SearchService } {
   const db = seed()
+  const nextItemNumber = new Map([[exampleProject.id, 2]])
 
   function find(projectId: string, itemId: string) {
     const entry = db.get(itemId)
@@ -133,11 +134,16 @@ export function createMockItemApi(projects: ProjectService = createMockProjectAp
       ]
     })),
     items: {
-      list: (projectId) =>
-        run(() => [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)),
+      list: (projectId, page) => run(() => {
+        const items = [...db.values()].map((entry) => entry.item).filter((item) => item.tara_project_id === projectId)
+        return page ? items.slice(page.offset, page.offset + page.limit) : items
+      }),
       get: (projectId, itemId) => run(() => find(projectId, itemId).item),
       create: (projectId, body) =>
         run(() => {
+          const name = validateName(body.name)!
+          const number = nextItemNumber.get(projectId) ?? 1
+          nextItemNumber.set(projectId, number + 1)
           const item: ItemDefinition = {
             lifecycle_phase: null,
             item_definition_wp_09_01: null,
@@ -147,7 +153,8 @@ export function createMockItemApi(projects: ProjectService = createMockProjectAp
             functions: null,
             operational_environment: null,
             ...body,
-            name: validateName(body.name)!,
+            name,
+            display_id: `IT-${number}`,
             id: crypto.randomUUID(),
             tara_project_id: projectId,
             created_at: new Date().toISOString(),

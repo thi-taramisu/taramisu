@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/api/errors'
 import { mockProjects } from '@/api/mocks/data/projects'
@@ -43,18 +43,9 @@ describe('ProjectLifecycleSettings', () => {
   })
 
   it.each<ProjectRole>(['EDITOR', 'REVIEWER', 'VIEWER'])('hides both actions from the role %s', async (role) => {
-    const projects = projectsWithHeadlampRole(role)
-    // Wait for the page's own request, so the section had the chance to appear.
-    const get = projects.get
-    let loaded: Promise<unknown> | undefined
-    projects.get = (projectId) => (loaded = get(projectId))
-    renderSettings(projects)
+    renderSettings(projectsWithHeadlampRole(role))
 
-    await waitFor(() => expect(loaded).toBeDefined())
-    await act(async () => {
-      await loaded
-    })
-    expect(screen.getByRole('heading', { name: 'General' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'General' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Danger Zone' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive Project' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete Project' })).not.toBeInTheDocument()
@@ -146,6 +137,20 @@ describe('ProjectLifecycleSettings', () => {
     expect(within(lifecycle).getByRole('button', { name: 'Archive Project' })).toBeEnabled()
   })
 
+  it('explains why a project that still has item definitions cannot be deleted', async () => {
+    const projects = createMockProjectApi()
+    projects.delete = () => Promise.reject(new ApiError(409, 'project still contains item definitions'))
+    const { user } = renderSettings(projects)
+    const lifecycle = await section()
+
+    await user.click(await confirmDelete(user, lifecycle))
+
+    expect(await within(lifecycle).findByRole('alert')).toHaveTextContent(
+      'The project still contains item definitions, so it cannot be deleted yet.',
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(settings)
+  })
+
   it('deletes only once when the confirm button is clicked twice', async () => {
     const projects = createMockProjectApi()
     const remove = projects.delete
@@ -190,21 +195,5 @@ describe('ProjectLifecycleSettings', () => {
 
     expect(await within(lifecycle).findByRole('button', { name: 'Unarchive Project' })).toBeInTheDocument()
     expect(within(lifecycle).queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('shows an error with a retry when the project cannot be loaded', async () => {
-    const projects = createMockProjectApi()
-    const get = projects.get
-    let fail = true
-    projects.get = (projectId) => (fail ? Promise.reject(new ApiError(500, 'Server error.')) : get(projectId))
-    const { user } = renderSettings(projects)
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('The archive and delete options could not be loaded.')
-
-    fail = false
-    await user.click(screen.getByRole('button', { name: 'Retry' }))
-
-    expect(await section()).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

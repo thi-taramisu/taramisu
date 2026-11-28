@@ -351,3 +351,30 @@ describe('review findings', () => {
     expect(within(tree()).getByRole('link', { name: 'Headlamp system' })).toBeInTheDocument()
   })
 })
+
+describe('project from the backend', () => {
+  // Real projects have item definitions and threat scenarios.
+  const battery = '/projects/battery-security'
+
+  it('opens the workspace and offers items and threat scenarios in the "+ New" menu', async () => {
+    const api = createMockItemApi()
+    const item = await api.items.create('battery-security', { name: 'Battery ECU', scope_type: 'ITEM' })
+    const { user } = renderApp(battery, api)
+
+    expect(await within(tree()).findByRole('link', { name: 'Battery ECU' })).toHaveAttribute('href', `${battery}/items/${item.id}`)
+    await user.click(within(tree()).getByRole('button', { name: 'New' }))
+    expect(screen.getAllByRole('menuitem').map((entry) => entry.textContent)).toEqual(['Item', 'Threat Scenario'])
+  })
+
+  it('shows Assets and Risks as placeholders, without the asset count', async () => {
+    const api = createMockItemApi()
+    const item = await api.items.create('battery-security', { name: 'Battery ECU', scope_type: 'ITEM' })
+    const { user } = renderApp(`${battery}/items/${item.id}/assets`, api)
+
+    expect(await screen.findByText('Assets: not implemented yet')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Asset' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Risks' }))
+    expect(await screen.findByText('Risks: not implemented yet')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()
+  })
+})

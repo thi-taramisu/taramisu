@@ -81,7 +81,7 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute('href', '/projects')
-    expect(screen.getByRole('heading', { name: 'General', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'General', level: 1 })).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'Members' }))
 
     expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('aria-current', 'page')

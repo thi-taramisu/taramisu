@@ -114,4 +114,3 @@ describe('create attack path from a Relations tab', () => {
     expect((await api.threatScenarios.relations('headlamp', 'ts-01')).attackPaths.map((ap) => ap.code)).toEqual(['AP-1', 'AP-2', 'AP-4'])
   })
 })
-

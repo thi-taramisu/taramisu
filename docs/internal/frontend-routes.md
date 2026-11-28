@@ -64,12 +64,19 @@ Auth values: public means no login, user means logged in, and read, write and ma
 [project roles](architecture/iam/project-roles.md#permissions): read for Viewer, Editor and Owner, write (`edit`) for Editor and
 Owner, manage for Owner only. Route guards follow with the frontend role ticket.
 
+Projects (#248): the list, creating, renaming (Settings, General) and deleting use `/api/v1/projects`. Favorites, archive, owner and
+image are mocked in memory until the backend has them. Every project opens its workspace, and the settings' Back link leads there.
+
+Items (#250): projects from the backend show their items from `/api/v1/projects/{project_id}/item-definitions` in the tree, without
+elements below them. "+ New" offers only items, the Definition tab edits the item, and the Assets and Risks tabs are
+placeholders. The example project (`headlamp`) keeps its mocked content.
+
 Implemented with content: the item pages (#94): "+ New → Item" dialog, delete confirmation, and the Definition, Assets and Risks tabs.
 The local graph prototype (#184) adds a relation view for every element via `?view=graph`, with
 `&graphMode=minimal` for compact node labels. Other unimplemented views render placeholders.
-Items come from the item API in `frontend/src/api/`, an in-memory mock
-(`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`) until the
-item routes (#83) are in `backend/openapi.json`. The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
+Items come from the item API in `frontend/src/api/`: the backend's item routes, and for the example project an in-memory mock
+(`frontend/src/api/mocks/`) seeded with the headlamp example (`frontend/src/api/mocks/data/headlamp.ts`, project id `headlamp`).
+The tab list per element type is in `frontend/src/features/workspace/entities.ts`.
 
 The damage scenario Relations tab (#185) links assets (with C / I / A) and threat scenarios of the owning item through the mock API. It is
 built from `frontend/src/features/relations/`, which the threat scenario and attack path Relations tabs can reuse. Damage and threat scenarios
@@ -87,7 +94,7 @@ description), the Risks tab (one row per damage scenario × threat scenario of t
 scenario's Risks tab) and the Relations tab (damage scenarios with their properties; threat scenarios that target the asset or reach it
 only via damage, both read-only), all on the mock API. The fields follow the data model: the wireframe's "Group" is not in the data model,
 so it is left out. A property that leads to a damage scenario can only be removed after its links are removed. The Risks tab has no
-treatment column yet, as treatment decisions are still a placeholder.
+treatment column yet. In backend projects, decisions are managed on the threat scenario's Treatment tab.
 
 Assets are created in the "New Asset" dialog ("+ New → Asset", or "Add Asset" on the item's Assets tab with the item fixed): only the name
 is required; item and C / I / A properties are optional (the wireframe's "Component / Interface" is not in the data model either), and a
@@ -99,6 +106,10 @@ a threat scenario, threat scenarios for an attack path. On the page of such an e
 required, as for damage scenarios, because the tree has no place for unlinked elements yet; for the same reason, only elements that are in
 the tree can be linked. The other fields follow on the element's page. The dialogs share `CreateLinkedElementDialog` and the item and "Link
 to" fields in `frontend/src/features/workspace/`.
+
+In backend projects, threat scenarios appear directly below their item. Their Definition tab can save scenario fields and
+the Treatment tab can list, add, edit and delete decisions with an optional link to a risk value. The threat scenario's
+delete action returns to the owning item after confirmation.
 
 ## Decisions
 

@@ -14,8 +14,9 @@ import type {
 export interface ThreatScenarioService {
   /** Rejects with 422 if a damage scenario is not one of the item or is given twice. */
   create(projectId: string, body: ThreatScenarioBody): Promise<ThreatScenario>
-  get(projectId: string, threatScenarioId: string): Promise<ThreatScenario>
-  update(projectId: string, threatScenarioId: string, body: PatchThreatScenarioBody): Promise<ThreatScenario>
+  /** Real scenarios are scoped to their owning item definition. */
+  get(projectId: string, threatScenarioId: string, itemId?: string): Promise<ThreatScenario>
+  update(projectId: string, threatScenarioId: string, body: PatchThreatScenarioBody, itemId?: string): Promise<ThreatScenario>
   relations(projectId: string, threatScenarioId: string): Promise<ThreatScenarioRelations>
   linkDamageScenario(projectId: string, threatScenarioId: string, damageScenarioId: string): Promise<ThreatScenarioRelations>
   unlinkDamageScenario(projectId: string, threatScenarioId: string, damageScenarioId: string): Promise<ThreatScenarioRelations>

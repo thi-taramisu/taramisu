@@ -199,6 +199,13 @@ func (f resourceAuditFixture) exerciseDamageAudit(itemID string) {
 func (f resourceAuditFixture) exerciseAttackAudit(itemID string) {
 	item := "/api/v1/item-definitions/" + itemID
 	f.exercise(auditResource{
+		target: "threat_scenario", operation: "threat-scenario", path: item + "/threat-scenarios",
+		parentColumn: "item_definition_id", parentID: itemID,
+		create:  `{"title":"Unexpected settings","technical_notes":"Initial notes"}`,
+		replace: `{"title":"Incorrect settings","elicitation_method":"STRIDE"}`,
+		patch:   `{"elicitation_method":null}`,
+	})
+	f.exercise(auditResource{
 		target: "attack_path", operation: "attack-path", path: item + "/attack-paths",
 		parentColumn: "item_definition_id", parentID: itemID,
 		create: "{\"title\":\"Access interface\"}", replace: "{\"title\":\"Access debug interface\",\"analysis_approach\":\"BOTTOM_UP\"}",

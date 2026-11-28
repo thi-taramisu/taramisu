@@ -31,6 +31,7 @@ const (
 	TargetThreatScenarioAssetProperty = "threat_scenario_asset_property"
 
 	TargetDamageScenario = "damage_scenario"
+	TargetThreatScenario = "threat_scenario"
 	TargetImpactRating   = "impact_rating"
 
 	TargetAttackPath              = "attack_path"

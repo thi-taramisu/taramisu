@@ -4,15 +4,12 @@ import type { ImpactRating } from './damageScenario'
 import type { EntityRef } from './tree'
 import type { components } from '../schema'
 
-// Threat scenarios and their links follow `THREAT_SCENARIO`, `THREAT_DAMAGE_LINK`, `THREAT_ATTACK_PATH_LINK`
-// and `THREAT_SCENARIO_ASSET_PROPERTY` of the data model. Not in the backend spec yet.
-
-export type ElicitationMethod = 'GROUP_DISCUSSION' | 'MALICIOUS_USE_CASE' | 'EVITA' | 'TVRA' | 'PASTA' | 'STRIDE' | 'OTHER'
+export type ElicitationMethod = NonNullable<components['schemas']['ThreatScenarioBody']['elicitation_method']>
 
 export interface ThreatScenario {
   id: string
   item_definition_id: string
-  /** Display ID such as TS-01; not in the DB schema yet (as for assets). */
+  /** Display ID such as TS-1. */
   code: string
   title: string
   cause_of_compromise: string | null

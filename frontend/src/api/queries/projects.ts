@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from '../ApiProvider'
-import type { NewProject, Project } from '../models/project'
+import type { NewProject, Project, ProjectUpdate } from '../models/project'
 
 // The list has its own key: everything below a project uses the prefix ['projects', projectId] (see
 // `items.ts`), and refreshing the list must not refetch every project's tree.
@@ -22,14 +22,14 @@ export function useProject(projectId: string) {
 
 /**
  * What the current user may do in a project. Archived projects are read-only for all members until they
- * are restored; nothing can be edited before the project is loaded. The backend enforces the same (#233),
+ * are restored. Owners and Editors can edit active projects after they load. The backend enforces the same,
  * so this only shapes the UI.
  */
 export function useProjectAccess(projectId: string) {
   const { data: project } = useProject(projectId)
   return {
     archived: project?.archived ?? false,
-    canEdit: project !== undefined && !project.archived,
+    canEdit: !!project && !project.archived && (project.role === 'OWNER' || project.role === 'EDITOR'),
   }
 }
 
@@ -61,6 +61,16 @@ export function useCreateProject() {
   return useMutation({ mutationFn: (body: NewProject) => api.projects.create(body), onSuccess: store })
 }
 
+/** Renames a project, i.e. changes its name and description. */
+export function useUpdateProject() {
+  const api = useApi()
+  const store = useStoreProject()
+  return useMutation({
+    mutationFn: ({ projectId, ...body }: ProjectUpdate & { projectId: string }) => api.projects.update(projectId, body),
+    onSuccess: store,
+  })
+}
+
 /** Shows the new favorite state at once, so quick clicks toggle back and forth; undone on failure. */
 export function useSetFavorite() {
   const api = useApi()
@@ -78,8 +88,9 @@ export function useSetFavorite() {
     onError: (_error, _variables, context) => {
       queryClient.setQueryData(keys.list, context?.previous)
     },
-    // The list already shows the new state; writing the response into it could undo a later click.
-    onSuccess: (project) => queryClient.setQueryData(keys.project(project.id), project),
+    // The list already shows the new state; only the project's own query still needs it.
+    onSuccess: (_, { projectId, favorite }) =>
+      queryClient.setQueryData<Project>(keys.project(projectId), (project) => project && { ...project, favorite }),
   })
 }
 

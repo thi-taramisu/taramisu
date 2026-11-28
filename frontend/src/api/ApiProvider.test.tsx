@@ -40,8 +40,8 @@ describe('ApiProvider', () => {
 
     const { result, rerender } = renderHook(() => useApi(), { wrapper: TestWrapper })
 
-    // Create an item using the default mock item service
-    const projectId = 'project-1'
+    // Items of the example project are served by the default mock item service
+    const projectId = 'headlamp'
     const created = await result.current.items.create(projectId, {
       name: 'Battery Management System',
       scope_type: 'ITEM',
