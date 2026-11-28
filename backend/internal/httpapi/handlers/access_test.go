@@ -180,6 +180,49 @@ func TestRegisterRejectsWithoutProjectOnProjectPaths(t *testing.T) {
 		handlers.WithoutProject(), echoRole)
 }
 
+func (f fakeAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
+
+type archiveAccess struct {
+	fakeAccess
+	archived bool
+	err      error
+}
+
+func (f archiveAccess) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) {
+	return f.archived, f.err
+}
+
+func TestArchivedAccessFailsClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		archived bool
+		err      error
+		status   int
+	}{
+		{"active", false, nil, 200},
+		{"archived", true, nil, 409},
+		{"deleted since role lookup", false, pgx.ErrNoRows, 404},
+		{"database failure", false, errors.New("archive lookup failed"), 500},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux, _, bearer := newAccessAPI(t, archiveAccess{fakeAccess: fakeAccess{role: db.ProjectRoleOWNER}, archived: tc.archived, err: tc.err})
+			for _, method := range []string{http.MethodGet, http.MethodPost} {
+				r := httptest.NewRequest(method, "/api/v1/item-definitions/"+knownItemID+"/things", http.NoBody)
+				r.Header.Set("Authorization", bearer)
+				w := httptest.NewRecorder()
+				mux.ServeHTTP(w, r)
+				want := tc.status
+				if method == http.MethodGet {
+					want = 200
+				}
+				if w.Code != want {
+					t.Fatalf("%s: got %d want %d: %s", method, w.Code, want, w.Body.String())
+				}
+			}
+		})
+	}
+}
+
 func TestProjectAccessDenialsAreLogged(t *testing.T) {
 	items := "/api/v1/item-definitions/"
 	for _, tc := range []struct {

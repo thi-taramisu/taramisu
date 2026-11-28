@@ -19,7 +19,23 @@ erDiagram
     %% ==========================================
     %% 2. PROJECT & PREREQUISITES (15.1, 15.3.1)
     %% ==========================================
+    TARA_PROJECT ||--o{ ATTACHMENT : "owns"
+    IAM_USER ||--o{ ATTACHMENT : "uploads"
+    ATTACHMENT {
+        uuid id PK
+        uuid project_id FK
+        text file_name
+        text content_type
+        bigint size_bytes
+        text sha256
+        uuid s3_object_key UK
+        boolean delete_pending
+        uuid uploaded_by FK
+        timestamptz created_at
+    }
+
     TARA_PROJECT ||--o{ ITEM_DEFINITION : "contains (0..N)"
+    TARA_PROJECT ||--o{ DISPLAY_ID_COUNTER : "counts display IDs per element type"
     ITEM_DEFINITION ||--o{ ASSET : "contains (15.3.1)"
     ITEM_DEFINITION ||--o{ DAMAGE_SCENARIO : "defines context for (15.3.1)"
     ITEM_DEFINITION ||--o{ THREAT_SCENARIO : "defines context for (15.4.1)"
@@ -94,9 +110,16 @@ erDiagram
         timestamp created_at
     }
 
+    DISPLAY_ID_COUNTER {
+        uuid tara_project_id PK, FK
+        enum element_type PK "ITEM | ASSET | DAMAGE_SCENARIO | THREAT_SCENARIO | ATTACK_PATH"
+        int last_number "Last display number assigned; never decreases"
+    }
+
     ITEM_DEFINITION {
         uuid id PK
         uuid tara_project_id FK
+        int display_number "Unique per project, shown as IT-n"
         string name "Item or Component Name"
         enum scope_type "ITEM | COMPONENT (15.1, 15.6.1.1)"
         string lifecycle_phase "e.g., Concept, Product Development (15.1)"
@@ -112,6 +135,8 @@ erDiagram
     ASSET {
         uuid id PK
         uuid item_definition_id FK
+        uuid tara_project_id FK "Project of the item, (item_definition_id, tara_project_id) FK"
+        int display_number "Unique per project, shown as AS-n"
         string name "e.g., Braking CAN Communication, Personal Data"
         text description "Asset description"
         enum identification_source "ITEM_DEF | IMPACT_RATING | THREAT_DERIVED | CATALOGUE (15.3.2 NOTE 2)"
@@ -127,6 +152,8 @@ erDiagram
     DAMAGE_SCENARIO {
         uuid id PK
         uuid item_definition_id FK
+        uuid tara_project_id FK "Project of the item, (item_definition_id, tara_project_id) FK"
+        int display_number "Unique per project, shown as DS-n"
         string title "Short title of damage scenario [WP-15-01]"
         text functionality_adverse_relation "Relation between item functionality and adverse consequence (15.3.2 NOTE 1)"
         text road_user_harm_description "Description of harm to the road user (15.1, 15.3.2 NOTE 1)"
@@ -152,6 +179,8 @@ erDiagram
     THREAT_SCENARIO {
         uuid id PK
         uuid item_definition_id FK
+        uuid tara_project_id FK "Project of the item, (item_definition_id, tara_project_id) FK"
+        int display_number "Unique per project, shown as TS-n"
         string title "Title of threat scenario [WP-15-03]"
         text cause_of_compromise "Cause of compromise, e.g., Spoofing [RQ-15-03]"
         enum elicitation_method "GROUP_DISCUSSION | MALICIOUS_USE_CASE | EVITA | TVRA | PASTA | STRIDE | OTHER (15.4.2 NOTE 2)"
@@ -175,6 +204,8 @@ erDiagram
     ATTACK_PATH {
         uuid id PK
         uuid item_definition_id FK
+        uuid tara_project_id FK "Project of the item, (item_definition_id, tara_project_id) FK"
+        int display_number "Unique per project, shown as AP-n"
         string title "Attack path identifier/title [WP-15-05]"
         enum analysis_approach "TOP_DOWN | BOTTOM_UP (15.6.2 NOTE 1)"
         boolean is_partial_early_stage "True if incomplete in early development (15.6.2 NOTE 2 & 3)"
@@ -312,12 +343,40 @@ erDiagram
 
 ---
 
+### 2.7 Display IDs
+
+* **Readable, stable IDs (#239):** Items, assets, damage scenarios, threat scenarios, and attack paths
+  have a `display_number` that is unique per project and element type. The API returns it as `display_id`
+  with the type's prefix and without leading zeros (`IT-1`, `AS-7`, `DS-12`, `TS-3`, `AP-100`), the format
+  the frontend shows ([frontend README](../../../frontend/README.md#element-display-ids)). Clients cannot set or change it.
+* **Assignment:** Each create query raises the project's `DISPLAY_ID_COUNTER` row for the element type in
+  the same statement as the insert. The row stays locked until the transaction ends, so concurrent creations
+  get consecutive numbers, and a rolled-back creation also rolls back the counter. The counter never
+  decreases, so the number of a deleted element is not reused.
+* **Lock order:** An item creation locks the project (`FOR KEY SHARE`) before the counter row, the order in
+  which a project deletion locks the project and then removes its counters, so it waits for a concurrent
+  deletion instead of deadlocking with it. Element creations take no explicit project lock, because a project
+  with items cannot be deleted. The first creation of a type in a project waits for a deletion through the
+  new counter row's foreign key, but cannot deadlock with it, because the deletion does not see that row.
+  No code creates several element types in one transaction yet; such code must take the counter rows in a
+  fixed order, for example the order of `display_id_type`, so that two such transactions cannot deadlock.
+* **Uniqueness:** Elements of an item repeat the item's `tara_project_id` and refer to the item with the
+  foreign key `(item_definition_id, tara_project_id)`, so that `UNIQUE (tara_project_id, display_number)`
+  holds per project and an element cannot belong to another project than its item.
+* **Existing data:** The migration numbered existing rows per project and element type: items in creation
+  order (`created_at`), elements, which have no creation time, by their item's number and then by name or title.
+* **Inserts outside the API:** Seeds, imports, and tests create rows through the create queries. Code that
+  inserts rows with its own `display_number` must raise the counter to the highest number in the same
+  transaction. Otherwise the next creation of that type in the project gets a number that is already taken
+  and fails with a unique violation, and so does every later one until the counter is corrected.
+
 ## 3. Entity & Attribute Reference Matrix
 
 | Entity (Table) | ISO/SAE 21434 Clause & Work Product | Purpose & Required Attributes Justification |
 | :--- | :--- | :--- |
 | **`IAM_USER`**, **`IAM_GROUP`**, **`PROJECT_ROLE_ASSIGNMENT`** | App Infrastructure (RBAC) | Maps external IAM technical IDs (`external_iam_sub`, `external_iam_group_id`) without redundant user metadata to `TARA_PROJECT` instances with specific roles (`VIEWER`, `EDITOR`, `OWNER`). |
 | **`TARA_PROJECT`** | App Organizational Hierarchy | Top-level project container (e.g., vehicle platform) grouping multiple `ITEM_DEFINITION` scopes and serving as the RBAC authorization boundary. |
+| **`DISPLAY_ID_COUNTER`** | App Infrastructure | Last display number per project and element type ([2.7](#27-display-ids)). |
 | **`ITEM_DEFINITION`** | **15.1, 15.3.1, 15.4.1, 15.6.1, 15.9.1** (`[WP-09-01]`, `[WP-10-01]`) | Specific TARA scope under a `TARA_PROJECT`. Stores `scope_type` (`ITEM \| COMPONENT` per **15.6.1.1 NOTE**), `lifecycle_phase` (**15.1**), and prerequisite references. |
 | **`ASSET`** | **15.3** (`[RQ-15-02]`, **15.3.2 NOTE 2**) | Represents system assets within an `ITEM_DEFINITION`. Tracks `identification_source` (*Item Definition, Impact Rating, Threat Derived, Catalogue*). |
 | **`ASSET_CYBERSECURITY_PROPERTY`** | **15.3** (`[RQ-15-02]`, `[WP-15-02]`) | Stores the specific security properties (`CONFIDENTIALITY \| INTEGRITY \| AVAILABILITY`) assigned to an `ASSET`. |
@@ -331,3 +390,13 @@ erDiagram
 | **`ATTACK_FEASIBILITY_RATING`** | **15.7** (`[RQ-15-10]`, `[RC-15-11a]`, `[RC-15-12]`, `[WP-15-06]`) | $1:1$ table to `ATTACK_PATH`. Evaluates the 5 numerical Attack Potential core factors (`ap_elapsed_time`, `ap_specialist_expertise`, `ap_knowledge_of_item`, `ap_window_of_opportunity`, `ap_equipment`), `ap_total_score`, and resulting `feasibility_rating`. |
 | **`RISK_VALUE`** | **15.8** (`[RQ-15-15]`, `[RQ-15-16]`, **15.8.2 NOTE 1**, `[WP-15-07]`) | Stores the granular risk score (`1` to `5`) for each combination of `THREAT_SCENARIO` and associated `IMPACT_RATING` (S, F, O, P). |
 | **`RISK_TREATMENT_DECISION`** | **15.9** (`[RQ-15-17]`, **15.9.2 NOTE**, `[WP-15-08]`) | Stores the treatment decision (`AVOIDING \| REDUCING \| SHARING \| RETAINING`), rationale, and Cybersecurity Claim flag (`is_cybersecurity_claim`) for a `THREAT_SCENARIO`. |
+
+Attachments belong to a project and inherit its direct and group roles. Metadata lives in PostgreSQL; bytes live in
+private S3-compatible storage (SeaweedFS), keyed by a random UUID. Permanent project deletion sets the attachment's
+`project_id` to null, preserving its object key for cleanup. Uploader deletion remains restricted while attachments exist.
+The `delete_pending` flag records individual file deletion intent; the cleanup query also selects attachments whose
+project no longer exists. Updating a project without deleting its row does not queue its files for cleanup.
+
+The API retries pending deletions at startup and every minute. It removes the S3 object before removing its metadata;
+failed attempts retain their metadata until a retry succeeds. Pending attachments and files of deleted projects cannot
+be downloaded through the project API.

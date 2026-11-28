@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/thi-taramisu/taramisu/backend/internal/db"
 )
@@ -65,6 +64,7 @@ type AssetBody struct {
 
 type Asset struct {
 	ID                   string                   `json:"id" format:"uuid"`
+	DisplayID            string                   `json:"display_id" readOnly:"true" example:"AS-1" doc:"Readable ID, unique within the project and never reused; assigned on creation"`
 	ItemDefinitionID     string                   `json:"item_definition_id" format:"uuid"`
 	Name                 string                   `json:"name"`
 	Description          *string                  `json:"description" nullable:"true"`
@@ -138,16 +138,13 @@ func (assetUUID) Schema(huma.Registry) *huma.Schema {
 		Pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"}
 }
 func assetBody(a db.Asset) Asset {
-	return Asset{ID: a.ID.String(), ItemDefinitionID: a.ItemDefinitionID.String(), Name: a.Name,
+	return Asset{ID: a.ID.String(), DisplayID: displayID(displayPrefixAsset, a.DisplayNumber),
+		ItemDefinitionID: a.ItemDefinitionID.String(), Name: a.Name,
 		Description: a.Description, IdentificationSource: a.IdentificationSource}
 }
 func assetError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return huma.Error404NotFound("asset not found")
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-		return huma.Error422UnprocessableEntity("item_definition_id does not reference an existing item definition")
 	}
 	return err // handlers.Register logs it with the request ID and answers with a plain 500
 }
@@ -162,6 +159,9 @@ func (h *Assets) Create(ctx context.Context, in *CreateAssetInput) (*CreateAsset
 		}
 		return db.Created(db.TargetAsset, projectIDFromContext(ctx), a.ID, assetBody(a)), nil
 	})
+	if notFound := itemDeletedOnCreate(err); notFound != nil {
+		return nil, notFound
+	}
 	if err != nil {
 		return nil, assetError(err)
 	}

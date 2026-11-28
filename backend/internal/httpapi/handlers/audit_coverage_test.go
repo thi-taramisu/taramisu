@@ -13,6 +13,7 @@ import (
 // auditedOperations record their changes in the audit history (docs/internal/architecture/audit.md).
 var auditedOperations = []string{
 	"create-tara-project", "replace-tara-project", "update-tara-project", "delete-tara-project",
+	"archive-tara-project", "unarchive-tara-project",
 	"add-project-member", "update-project-member", "remove-project-member",
 	"create-item-definition", "replace-item-definition", "update-item-definition", "delete-item-definition",
 	"create-asset", "replace-asset", "update-asset", "delete-asset",
@@ -31,7 +32,9 @@ var auditedOperations = []string{
 
 // notAuditedYet change analysis content without an audit event. Move an operation to
 // auditedOperations when its changes are recorded; new operations must go into one of the lists.
-var notAuditedYet = []string{}
+var notAuditedYet = []string{
+	"upload-attachment", "delete-attachment",
+}
 
 // TestEveryChangeIsDeclaredForAudit makes adding a mutating operation a conscious decision about its
 // audit events, like the access declaration in handlers.Register.

@@ -38,9 +38,9 @@ describe('routing', () => {
       ENTITY_TYPES[type].tabs.filter((t) => t.path).map((t) => [type, t.path, t.label] as const),
     ),
   )('routes %s tab "%s"', async (type, path, label) => {
-    // Item and scenario pages load the element from the API, so they need an existing one.
-    const ids: Partial<Record<EntityType, string>> = { items: 'i-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01', 'attack-paths': 'ap-01' }
-    renderAt(`${project}/${type}/${ids[type] ?? 'x-01'}/${path}`)
+    // Every element page loads the element from the API, so it needs an existing one.
+    const ids: Record<EntityType, string> = { items: 'i-01', assets: 'a-01', 'damage-scenarios': 'ds-01', 'threat-scenarios': 'ts-01', 'attack-paths': 'ap-01' }
+    renderAt(`${project}/${type}/${ids[type]}/${path}`)
 
     const labels = { items: 'Item', assets: 'Asset', 'damage-scenarios': 'Damage Scenario', 'threat-scenarios': 'Threat Scenario', 'attack-paths': 'Attack Path' }
     const tabs = await screen.findByRole('navigation', { name: `${labels[type]} tabs` })
@@ -97,10 +97,10 @@ describe('routing', () => {
     '/item-definition',
   ])(
     'shows the not found page for %s',
-    (path) => {
+    async (path) => {
       renderAt(path)
 
-      expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
     },
   )
 })

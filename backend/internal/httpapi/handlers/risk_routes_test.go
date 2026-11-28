@@ -51,6 +51,7 @@ type riskFake struct {
 	handlers.DamageScenarioStore
 	handlers.ImpactRatingStore
 	handlers.ThreatDamageLinkStore
+	handlers.SearchStore
 	allowed        bool
 	accessErr, err error
 	access         db.GetProjectRoleParams
@@ -346,6 +347,8 @@ func TestRiskProjectPermissions(t *testing.T) {
 		})
 	}
 }
+
+func (s *riskFake) ProjectIsArchived(context.Context, pgtype.UUID) (bool, error) { return false, nil }
 
 func (f *riskFake) GetRiskValueForUpdate(ctx context.Context, p db.GetRiskValueForUpdateParams) (db.RiskValue, error) {
 	return f.GetRiskValue(ctx, db.GetRiskValueParams(p))

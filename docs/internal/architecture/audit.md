@@ -72,7 +72,7 @@ project.
 | Project | `project.created` | After: name, first Owner | Stored |
 | Project | `project.updated` | Name before and after, whether the description changed; later default rating method, AI toggle | Stored |
 | Project | `project.deleted` | Before: name and role assignments (role, user or group) | Stored |
-| Project | `project.archived`, `project.restored` | – | With archiving |
+| Project | `project.archived`, `project.unarchived` | Archived state before and after | Stored |
 | Project | `project.imported`, `project.exported` | Format and version | With import and export |
 | Members | `member.added` | After: role, user or group | Stored |
 | Members | `member.role_changed`, including ownership transfer | Role before and after, user or group | Stored |

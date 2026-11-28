@@ -40,16 +40,21 @@ func newFullItem(t *testing.T, ctx context.Context, q db.DBTX, projectID, name s
 		item[table] = id
 		return id
 	}
-	itemID := insert("item_definition", "tara_project_id, name, scope_type", "$1, $2, 'ITEM'", projectID, name)
-	asset := insert("asset", "item_definition_id, name", "$1, 'Asset'", itemID)
+	// Elements with display numbers are created with their create queries.
+	element := func(table, id string) string {
+		item[table] = id
+		return id
+	}
+	itemID := element("item_definition", seedItem(t, ctx, q, projectID, name))
+	asset := element("asset", seedAsset(t, ctx, q, itemID, "Asset"))
 	property := insert("asset_cybersecurity_property", "asset_id, property_type", "$1, 'INTEGRITY'", asset)
-	damage := insert("damage_scenario", "item_definition_id, title", "$1, 'Damage'", itemID)
+	damage := element("damage_scenario", seedDamageScenario(t, ctx, q, itemID, "Damage"))
 	insert("damage_scenario_asset_property", "damage_scenario_id, asset_cybersecurity_property_id", "$1, $2", damage, property)
 	impact := insert("impact_rating", "damage_scenario_id, impact_category, rating_value", "$1, 'SAFETY', 'MAJOR'", damage)
-	threat := insert("threat_scenario", "item_definition_id, title", "$1, 'Threat'", itemID)
+	threat := element("threat_scenario", seedThreatScenario(t, ctx, q, itemID, "Threat"))
 	insert("threat_scenario_asset_property", "threat_scenario_id, asset_cybersecurity_property_id", "$1, $2", threat, property)
 	insert("threat_damage_link", "threat_scenario_id, damage_scenario_id", "$1, $2", threat, damage)
-	path := insert("attack_path", "item_definition_id, title", "$1, 'Path'", itemID)
+	path := element("attack_path", seedAttackPath(t, ctx, q, itemID, "Path"))
 	insert("threat_attack_path_link", "threat_scenario_id, attack_path_id", "$1, $2", threat, path)
 	insert("attack_feasibility_rating", "attack_path_id, feasibility_rating", "$1, 'LOW'", path)
 	risk := insert("risk_value", "threat_scenario_id, impact_rating_id, risk_score, determination_method", "$1, $2, 3, 'RISK_MATRIX'", threat, impact)
